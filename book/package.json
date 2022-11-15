@@ -1,0 +1,11 @@
+{
+  "name": "senax-book",
+  "version": "0.1.0",
+  "author": "yossyX",
+  "license": "ISC",
+  "devDependencies": {
+    "gitbook-plugin-language-picker": "*",
+    "gitbook-plugin-hide-published-with": "*",
+    "honkit": "^4.0.4"
+  }
+}

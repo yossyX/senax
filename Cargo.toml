@@ -1,0 +1,2 @@
+[workspace]
+members = ["common", "macros", "linker", "logger", "senax"]

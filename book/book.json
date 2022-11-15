@@ -1,0 +1,8 @@
+{
+    "title": "SenaX",
+    "description": "Extremely fast Rust ORM",
+    "plugins": [
+        "hide-published-with",
+        "language-picker"
+    ]
+}

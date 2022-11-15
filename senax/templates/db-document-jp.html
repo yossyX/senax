@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>{{config | get(key="title", default="") }} テーブル定義書</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.min.css">
+    <style>
+        /* https://qiita.com/cognitom/items/d39d5f19054c8c8fd592 */
+        /* https://github.com/cognitom/paper-css */
+        @page {
+            margin: 10mm 0;
+            size: A4
+        }
+
+        body {
+            margin: 0;
+            font-size: 3.5mm;
+        }
+
+        .sheet {
+            margin: 0;
+            padding: 0 10mm;
+            overflow: hidden;
+            position: relative;
+            box-sizing: border-box;
+            page-break-after: always;
+        }
+
+        body.A4 .sheet {
+            width: 210mm;
+            min-height: 276mm
+        }
+
+        body.A4.landscape .sheet {
+            width: 297mm;
+            min-height: 189mm
+        }
+
+        body.letter .sheet {
+            width: 216mm;
+            min-height: 259mm
+        }
+
+        body.letter.landscape .sheet {
+            width: 280mm;
+            min-height: 195mm
+        }
+
+        /** For screen preview **/
+        @media screen {
+            body {
+                background: #e0e0e0
+            }
+
+            .sheet {
+                background: white;
+                box-shadow: 0 .5mm 2mm rgba(0, 0, 0, .3);
+                margin: 5mm auto;
+                padding-bottom: 5mm;
+            }
+        }
+
+        .break-avoid {
+            break-inside: avoid;
+        }
+
+        .frame table {
+            margin-left: auto;
+            margin-right: auto;
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        .frame th,
+        td {
+            border: 1px #000000 solid;
+            padding: 0.2em;
+        }
+
+        th {
+            text-align: center
+        }
+
+        .frame caption {
+            caption-side: top;
+        }
+
+        a {
+            color: #1a0dab;
+        }
+
+        @media print {
+            a {
+                color: #000000;
+                text-decoration: none;
+            }
+        }
+
+        pre,
+        p {
+            margin: 0.2mm;
+            font-family: unset;
+        }
+
+        .title {
+            text-align: center
+        }
+
+        .no_frame {
+            margin-bottom: 4mm;
+        }
+
+        .narrow {
+            width: 8mm
+        }
+
+        .middle {
+            width: 24mm
+        }
+
+        .center {
+            text-align: center
+        }
+
+        .comment {
+            margin: 0 0 2mm;
+        }
+
+        .supplementary {
+            font-size: 80%;
+            text-align: right;
+        }
+
+        .er {
+            break-inside: avoid;
+            margin-top: 5mm;
+        }
+
+        .er svg {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body class="A4">
+    {% if group_list | length > 1 -%}
+    <section class="sheet cover1">
+        <div class="title">
+            <h1>{{config | get(key="title", default="") }} テーブル定義書</h1>
+        </div>
+        <div class="frame info1">
+            <table>
+                <tr>
+                    {% if config.author -%}
+                    <th class="author">作成者</th>
+                    <td class="author">{{config.author}}</td>
+                    {% endif -%}
+                    <th class="created">作成日</th>
+                    <td class="created">{{date | date(format="%x", locale=locale)}}</td>
+                </tr>
+            </table>
+        </div>
+        <div class="frame model-group-list">
+            <table>
+                <caption>
+                    <h3>モデルグループ一覧</h3>
+                </caption>
+                <thead>
+                    <tr>
+                        <th class="no narrow">No.</th>
+                        <th class="group-name">モデルグループ</th>
+                        <th class="updated">最終更新日</th>
+                    </tr>
+                </thead>
+                {% for group in group_list -%}
+                <tr>
+                    <td class="no center">{{loop.index}}</td>
+                    <td class="group-name"><a href="#sub_{{group.group_name}}">{{group.group_def.title}}</a></td>
+                    <td class="updated">
+                        {%- if group.last_update_at %}
+                            {{- group.last_update_at | date(format="%x", locale=locale)}}
+                        {%- endif %}
+                    </td>
+                </tr>
+                {% endfor -%}
+            </table>
+        </div>
+    </section>
+    {%- endif -%}
+
+    {% for group in group_list -%}
+    <section class="sheet cover2">
+        <a id="sub_{{group.group_name}}"></a>
+        {% if group_list | length == 1 -%}
+        <div class="title">
+            <h1>{{config | get(key="title", default="") }} テーブル定義書</h1>
+        </div>
+        <div class="frame info2">
+            <table>
+                <tr>
+                    {% if config.groups | length > 1 -%}
+                    <th class="group-name">モデルグループ</th>
+                    <td class="group-name">{{group.group_def.title}}</td>
+                    {% endif -%}
+                    {% if config.author -%}
+                    <th class="author">作成者</th>
+                    <td class="author">{{config.author}}</td>
+                    {% endif -%}
+                    <th class="created">作成日</th>
+                    <td class="created">{{date | date(format="%x", locale=locale)}}</td>
+                </tr>
+            </table>
+        </div>
+        {% else -%}
+        <div class="title group-name">
+            <h2>{{group.group_def.title}}</h2>
+        </div>
+        {% endif -%}
+        {% if group.history -%}
+        <div class="frame history">
+            <table>
+                <caption>
+                    <h3>更新履歴</h3>
+                </caption>
+                <thead>
+                    <tr>
+                        <th class="updated">更新日</th>
+                        <th class="version">バージョン</th>
+                        <th class="description">変更内容</th>
+                        <th class="author">担当</th>
+                    </tr>
+                </thead>
+                {% for history in group.history -%}
+                <tr>
+                    <td class="updated">{{history.date | date(format="%x", locale=locale)}}</td>
+                    <td class="version">{{history | get(key="version", default="")}}</td>
+                    <td class="description">
+                        <pre>{{history.description}}</pre>
+                    </td>
+                    <td class="author">{{history | get(key="author", default="") }}</td>
+                </tr>
+                {% endfor -%}
+            </table>
+        </div>
+        {% endif -%}
+        {% if group.models -%}
+        <div class="frame break-avoid model-list">
+            <table>
+                <caption>
+                    <h3>テーブル一覧</h3>
+                </caption>
+                <thead>
+                    <tr>
+                        <th class="no narrow">No.</th>
+                        <th class="model-name">テーブル名</th>
+                    </tr>
+                </thead>
+                {% for model_name, model in group.models -%}
+                <tr>
+                    <td class="no center">{{loop.index}}</td>
+                    <td class="model-name"><a href="#model_{{group.group_name}}::{{model_name}}">{{model_name}}
+                            {%- if model.title %} ({{model.title}}){% endif %}</a></td>
+                </tr>
+                {% endfor -%}
+            </table>
+            {% if group.er -%}
+            <div class="er">
+                <h3 class="center">ER図</h3>
+                {{group.er | safe}}
+            </div>
+            {% endif -%}
+        </div>
+        {% endif -%}
+        {% if group.enums -%}
+        <div class="frame enum-list">
+            <table>
+                <caption>
+                    <h3>列挙型一覧</h3>
+                </caption>
+                <thead>
+                    <tr>
+                        <th class="no narrow">No.</th>
+                        <th class="enum-name">列挙型名</th>
+                    </tr>
+                </thead>
+                {% for name, enum in group.enums -%}
+                <tr>
+                    <td class="no center">{{loop.index}}</td>
+                    <td class="enum-name"><a href="#enum_{{group.group_name}}::{{name}}">{{name}}
+                            {%- if enum.title %} ({{enum.title}}){% endif %}</a></td>
+                </tr>
+                {% endfor -%}
+            </table>
+        </div>
+        {% endif -%}
+    </section>
+    {% if group.models -%}
+    {% for model_name, model in group.models -%}
+    <section class="sheet table-info">
+        <a id="model_{{group.group_name}}::{{model_name}}"></a>
+        <div class="title">
+            <h3>{{loop.index}}. {{model_name}}{% if model.title %} ({{model.title}}){% endif %}</h3>
+        </div>
+        <p class="no_frame table-name">
+            <span>実テーブル名: </span>
+            <span>{{model.table_name}}</span>
+        </p>
+        {% if model.comment -%}
+        <div class="comment">
+            <pre>{{model.comment}}</pre>
+        </div>
+        {% endif -%}
+        <div class="frame table-columns">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="no narrow">No.</th>
+                        <th class="name">カラム名</th>
+                        <th class="type">データ型</th>
+                        <th class="null narrow">Null</th>
+                        <th class="length">長さ</th>
+                        <th class="primary narrow">主</th>
+                        <th class="comment">備考</th>
+                    </tr>
+                </thead>
+                {% for name, column in model.columns -%}
+                <tr>
+                    <td class="no center">{{loop.index}}</td>
+                    <td class="name">{{column | get(key="rename", default=name)}}</td>
+                    <td class="type">{% if column.signed %}signed {% endif %}{{column.type}}</td>
+                    <td class="null center">{% if not column.not_null %}Y{% endif %}</td>
+                    <td class="length center">
+                        {%- if column.length %}{{column.length}}{% endif %}
+                        {%- if column.precision %}{{column.precision}}{% endif %}
+                        {%- if column.scale %},{{column.scale}}{% endif %}</td>
+                    <td class="primary center">{% if column.primary %}Y{% endif %}</td>
+                    <td class="comment">
+                        {%- if column.title %}<p>{{column.title}}</p>{% endif %}
+                        {%- if column.enum_values -%}
+                        <p>{% for enum in column.enum_values -%}
+                            {{enum.value}}:{{enum | get(key="title", default=enum.name) }}
+                            {%- if enum.comment %} ({{enum.comment}}){% endif %}
+                            {%- if not loop.last %}<br />{% endif %}
+                            {%- endfor %}</p>
+                        {%- endif -%}
+                        {%- if column.db_enum_values %}<p>{% for enum in column.db_enum_values -%}{{enum.name}}
+                            {%- if enum.title %}:{{enum.title}}{% endif %}
+                            {%- if enum.comment %} ({{enum.comment}}){% endif %}
+                            {%- if not loop.last %}<br />{% endif %}
+                            {%- endfor %}</p>
+                        {%- endif -%}
+                        {%- if column.enum_class %}<a href="#enum_{{column.enum_class}}">{{column.enum_class}}</a>
+                        {%- endif -%}
+                        {%- if column.comment %}
+                        <pre>{{column.comment}}</pre>{% endif -%}
+                    </td>
+                </tr>
+                {% endfor -%}
+            </table>
+            <p class="supplementary">データ型に signed の指定がない場合、 double, decimal 等も含めすべての数値型は unsigned。</p>
+        </div>
+        {% if model.indexes -%}
+        <div class="frame break-avoid table-indexes">
+            <table>
+                <caption>
+                    <h3>インデックス</h3>
+                </caption>
+                <thead>
+                    <tr>
+                        <th class="no narrow">No.</th>
+                        <th class="type middle">タイプ</th>
+                        <th class="fields">カラム</th>
+                    </tr>
+                </thead>
+                {% for name, index in model.indexes -%}
+                <tr>
+                    <td class="no center">{{loop.index}}</td>
+                    <td class="type">
+                        {%- if index %}{{index | get(key="type", default="INDEX") | upper}}
+                        {%- else %}INDEX{% endif %}
+                    </td>
+                    <td class="fields">{%- if index and index.fields %}{% for name, field in index.fields -%}{{name}}
+                        {%- if field and field.length %}({{field.length}}){% endif %}
+                        {%- if not loop.last %}, {% endif %}
+                        {%- endfor %}{% else %}{{name}}{% endif %}</td>
+                </tr>
+                {% endfor -%}
+            </table>
+        </div>
+        {% endif -%}
+        {% if model.relations -%}
+        <div class="frame break-avoid table-relations">
+            <table>
+                <caption>
+                    <h3>リレーション</h3>
+                </caption>
+                <thead>
+                    <tr>
+                        <th class="no narrow">No.</th>
+                        <th class="name">名前</th>
+                        <th class="type">タイプ</th>
+                        <th class="local">カラム</th>
+                        <th class="model">結合先</th>
+                        <th class="foreign">結合カラム</th>
+                        <th class="on_delete">削除時</th>
+                    </tr>
+                </thead>
+                {% for name, relation in model.relations -%}
+                <tr>{% set type = relation | get(key="type", default="one") %}
+                    <td class="no center">{{loop.index}}</td>
+                    <td class="name">{{relation | get(key="title", default=name)}}</td>
+                    <td class="type">{% if type == "one_to_one" %}ONE{% else %}{{type | upper}}{% endif %}</td>
+                    <td class="local">{%- if relation.local %}{{relation.local}}{% else %}
+                        {%- if type == "many" or type == "one_to_one" %}-{% else %}{{name}}_id{% endif %}
+                        {%- endif %}</td>
+                    <td class="model"><a href="#model_{{relation.model}}">
+                        {{relation.model | split(pat="::") | last}}</a></td>
+                    <td class="foreign">{%- if relation.foreign %}{{relation.foreign}}{% else %}
+                        {%- if type == "many" %}{{model_name}}_id{% else %}-{% endif %}
+                        {% endif %}</td>
+                    <td class="on_delete">{{relation | get(key="on_delete", default="")}}</td>
+                </tr>
+                {% endfor -%}
+            </table>
+            <p class="supplementary">カラムの - は主キー。{%- if config.ignore_foreign_key %}実際にはデータベースに外部キー制約は設定しない。{% endif -%}
+            </p>
+        </div>
+        {% endif -%}
+    </section>
+    {% endfor -%}
+    {% endif -%}
+    {% if group.enums -%}
+    <section class="sheet">
+        {% for name, enum in group.enums -%}
+        <div class="frame break-avoid">
+            <a id="enum_{{group.group_name}}::{{name}}"></a>
+            <div class="title">
+                <h3>{{loop.index}}. {{name}}{% if enum.title %} ({{enum.title}}){% endif %}</h3>
+            </div>
+            {% if enum.comment -%}
+            <div class="comment">
+                <pre>{{enum.comment}}</pre>
+            </div>
+            {% endif -%}
+            <table>
+                <thead>
+                    <tr>
+                        <th class="no narrow">値</th>
+                        <th class="name">名前</th>
+                        <th class="comment">備考</th>
+                    </tr>
+                </thead>
+                {% for value in enum.enum_values -%}
+                <tr>
+                    <td class="no center">{{value.value}}</td>
+                    <td class="name">{{value | get(key="title", default=value.name) }}</td>
+                    <td class="comment">
+                        {%- if value.comment %}
+                        <pre>{{value.comment}}</pre>
+                        {% endif -%}
+                    </td>
+                </tr>
+                {% endfor -%}
+            </table>
+        </div>
+        {% endfor -%}
+    </section>
+    {% endif -%}
+    {% endfor -%}
+</body>

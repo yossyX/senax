@@ -1,0 +1,195 @@
+use anyhow::{anyhow, bail, Context, Result};
+use bytes::BufMut;
+use futures_util::{StreamExt, TryFutureExt};
+use log::{error, info};
+use quinn::ServerConfig;
+use sha2::{Digest, Sha512};
+use std::{fs, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use tokio::sync::mpsc::UnboundedSender;
+use zstd::Decoder;
+
+use crate::common::{
+    Pack, ALPN_QUIC_HTTP, CMD_RESET, CONNECTION_SUCCESS, LINKER_VER, LINKER_VER_ERROR,
+    PASSWORD_ERROR,
+};
+
+pub async fn run(
+    key_path: PathBuf,
+    cert_path: PathBuf,
+    addr: SocketAddr,
+    to_local: UnboundedSender<Pack>,
+    pw: String,
+) -> Result<()> {
+    let server_config = make_server(&key_path, &cert_path)?;
+    let (endpoint, mut incoming) = quinn::Endpoint::server(server_config, addr)?;
+    info!("listening on {}", endpoint.local_addr()?);
+    while let Some(conn) = incoming.next().await {
+        tokio::spawn(
+            handle_connection(conn, to_local.clone(), pw.clone()).unwrap_or_else(|e| {
+                error!("connection failed: {}", e);
+            }),
+        );
+    }
+    Ok(())
+}
+
+fn make_server(key_path: &PathBuf, cert_path: &PathBuf) -> Result<ServerConfig> {
+    let key = fs::read(key_path).context("failed to read private key")?;
+    let key = if key_path.extension().map_or(false, |x| x == "der") {
+        rustls::PrivateKey(key)
+    } else {
+        let pkcs8 = rustls_pemfile::pkcs8_private_keys(&mut &*key)
+            .context("malformed PKCS #8 private key")?;
+        match pkcs8.into_iter().next() {
+            Some(x) => rustls::PrivateKey(x),
+            None => {
+                let rsa = rustls_pemfile::rsa_private_keys(&mut &*key)
+                    .context("malformed PKCS #1 private key")?;
+                match rsa.into_iter().next() {
+                    Some(x) => rustls::PrivateKey(x),
+                    None => {
+                        anyhow::bail!("no private keys found");
+                    }
+                }
+            }
+        }
+    };
+    let cert_chain = fs::read(cert_path).context("failed to read certificate chain")?;
+    let certs = if cert_path.extension().map_or(false, |x| x == "der") {
+        vec![rustls::Certificate(cert_chain)]
+    } else {
+        rustls_pemfile::certs(&mut &*cert_chain)
+            .context("invalid PEM-encoded certificate")?
+            .into_iter()
+            .map(rustls::Certificate)
+            .collect()
+    };
+
+    let mut server_crypto = rustls::ServerConfig::builder()
+        .with_safe_defaults()
+        .with_no_client_auth()
+        .with_single_cert(certs, key)?;
+    server_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
+    let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(server_crypto));
+    Arc::get_mut(&mut server_config.transport)
+        .unwrap()
+        .keep_alive_interval(Some(Duration::from_secs(3)))
+        .max_concurrent_bidi_streams(1_u8.into())
+        .max_idle_timeout(Some(Duration::from_secs(30).try_into()?));
+    Ok(server_config)
+}
+
+async fn handle_connection(
+    conn: quinn::Connecting,
+    to_local: UnboundedSender<Pack>,
+    pw: String,
+) -> Result<()> {
+    let quinn::NewConnection {
+        connection,
+        mut uni_streams,
+        mut bi_streams,
+        ..
+    } = conn.await?;
+    info!("connected from {}", connection.remote_address());
+    let (db, cmd) = if let Some(stream) = bi_streams.next().await {
+        let (send, mut recv) = match stream {
+            Err(e) => {
+                return Err(anyhow!(e));
+            }
+            Ok(s) => s,
+        };
+        let mut v = [0; 2];
+        recv.read_exact(&mut v)
+            .await
+            .map_err(|e| anyhow!("failed reading request: {}", e))?;
+        if u16::from_le_bytes(v) != LINKER_VER {
+            send_response(send, LINKER_VER_ERROR).await?;
+            bail!("linker version error");
+        }
+        let mut v = [0; 64];
+        recv.read_exact(&mut v)
+            .await
+            .map_err(|e| anyhow!("failed reading request: {}", e))?;
+        let mut hasher = Sha512::new();
+        hasher.update(pw);
+        if hasher.finalize().to_vec() != v {
+            send_response(send, PASSWORD_ERROR).await?;
+            bail!("password error");
+        }
+        let mut v = [0; 8];
+        recv.read_exact(&mut v)
+            .await
+            .map_err(|e| anyhow!("failed reading request: {}", e))?;
+        let db = u64::from_le_bytes(v);
+        let mut cmd = [0; 2];
+        recv.read_exact(&mut cmd)
+            .await
+            .map_err(|e| anyhow!("failed reading request: {}", e))?;
+
+        send_response(send, CONNECTION_SUCCESS).await?;
+
+        (db, u16::from_le_bytes(cmd))
+    } else {
+        bail!("bi_streams was not sent.");
+    };
+    if cmd == CMD_RESET {
+        let data: Vec<u8> = 0u64.to_le_bytes().into();
+        let _ = to_local.send(Pack {
+            data: data.into(),
+            conn_no: 0,
+            db,
+        });
+        warn!("reset command received");
+    }
+
+    while let Some(stream) = uni_streams.next().await {
+        let stream = match stream {
+            Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
+                info!("connection closed");
+                return Ok(());
+            }
+            Err(e) => {
+                return Err(anyhow!(e));
+            }
+            Ok(s) => s,
+        };
+        tokio::spawn(
+            handle_request(stream, to_local.clone(), db)
+                .unwrap_or_else(move |e| error!("failed: {}", e)),
+        );
+    }
+    Ok(())
+}
+
+async fn send_response(mut send: quinn::SendStream, code: u8) -> Result<()> {
+    let mut vec = Vec::new();
+    vec.put_u8(code);
+    send.write_all(&vec)
+        .await
+        .map_err(|e| anyhow!("failed to send response: {}", e))?;
+    send.finish()
+        .await
+        .map_err(|e| anyhow!("failed to shutdown stream: {}", e))?;
+    Ok(())
+}
+
+async fn handle_request(
+    recv: quinn::RecvStream,
+    to_local: UnboundedSender<Pack>,
+    db: u64,
+) -> Result<()> {
+    let buf = recv
+        .read_to_end(usize::MAX)
+        .await
+        .map_err(|e| anyhow!("failed reading request: {}", e))?;
+    let decoder = Decoder::new(&*buf)?;
+    let list: Vec<Vec<u8>> = bincode::deserialize_from(decoder)?;
+    for buf in list {
+        let _ = to_local.send(Pack {
+            data: buf.into(),
+            conn_no: 0,
+            db,
+        });
+    }
+    Ok(())
+}

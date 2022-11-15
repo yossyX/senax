@@ -1,0 +1,186 @@
+use anyhow::{Error, Result};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use log::{error, info};
+use sha2::{Digest, Sha512};
+use std::path::Path;
+use std::thread;
+use std::time::Duration;
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::oneshot;
+use tokio::time::sleep;
+use tokio_uring::buf::IoBuf;
+use tokio_uring::net::UnixStream;
+
+use super::common::LINKER_VER;
+use super::common::{IoBytesMut, RECEIVER, SENDER};
+
+pub fn run(
+    unix_port: &str,
+    db: u64,
+    from_local: UnboundedReceiver<Vec<u8>>,
+    to_local: UnboundedSender<Vec<u8>>,
+    pw: String,
+    exit_tx: mpsc::Sender<i32>,
+    disable_cache: bool,
+) -> Result<()> {
+    let unix_port = unix_port.to_owned();
+    let _unix_port = unix_port.clone();
+    let _pw = pw.clone();
+    let (conn_no_sender, conn_no_receiver) = oneshot::channel::<u64>();
+    let _exit_tx = exit_tx.clone();
+    thread::Builder::new()
+        .name("unix adapter".to_string())
+        .spawn(move || {
+            tokio_uring::start(async move {
+                let sock_file = Path::new(&_unix_port);
+                info!("connecting to {_unix_port}");
+                let stream = match UnixStream::connect(&sock_file).await {
+                    Ok(stream) => stream,
+                    Err(_) => {
+                        sleep(Duration::from_secs(1)).await;
+                        UnixStream::connect(&sock_file).await?
+                    }
+                };
+                handle_sender_stream(stream, db, conn_no_sender, from_local, _pw).await?;
+                Ok(())
+            })
+            .map_err(|e: Error| {
+                error!("{}", &e);
+                let _ = _exit_tx.try_send(1);
+                e
+            })
+        })?;
+    if !disable_cache {
+        thread::Builder::new()
+            .name("unix adapter".to_string())
+            .spawn(move || {
+                tokio_uring::start(async move {
+                    let conn_no = conn_no_receiver.await?;
+                    let sock_file = Path::new(&unix_port);
+                    info!("connecting to {unix_port}");
+                    let stream = match UnixStream::connect(&sock_file).await {
+                        Ok(stream) => stream,
+                        Err(_) => {
+                            sleep(Duration::from_secs(1)).await;
+                            UnixStream::connect(&sock_file).await?
+                        }
+                    };
+                    handle_receiver_stream(stream, db, conn_no, to_local, pw).await?;
+                    Ok(())
+                })
+                .map_err(|e: Error| {
+                    error!("{}", &e);
+                    let _ = exit_tx.try_send(1);
+                    e
+                })
+            })?;
+    }
+    Ok(())
+}
+
+async fn handle_sender_stream(
+    stream: UnixStream,
+    db: u64,
+    conn_no_sender: oneshot::Sender<u64>,
+    mut from_local: UnboundedReceiver<Vec<u8>>,
+    pw: String,
+) -> Result<()> {
+    let mut buf = BytesMut::with_capacity(2 + 2 + 64 + 8);
+    buf.put_u16_le(LINKER_VER);
+    buf.put_u16_le(SENDER);
+    let mut hasher = Sha512::new();
+    hasher.update(pw);
+    buf.put(&*hasher.finalize());
+    buf.put_u64_le(db);
+    write_all(buf.freeze(), &stream).await?;
+    let buf = IoBytesMut::new(8);
+    let conn_no = read_all(buf, &stream).await?.get_u64_le();
+    let _ = conn_no_sender.send(conn_no);
+    loop {
+        tokio::select! {
+            Some(data) = from_local.recv() => {
+                let mut list = vec![data];
+                while let Ok(data) = from_local.try_recv() {
+                    list.push(data);
+                }
+                let size = bincode::serialized_size(&list)?;
+                let mut buf = Vec::with_capacity((size + (size >> 3) + 100).try_into()?);
+                buf.put_u64_le(0u64);
+                let mut compressor = lz4_flex::frame::FrameEncoder::new(buf);
+                bincode::serialize_into(&mut compressor, &list)?;
+                let mut buf = compressor.finish()?;
+                let size = ((buf.len() - 8) as u64).to_le_bytes();
+                unsafe {
+                    std::ptr::copy(size.as_ptr(), buf.as_mut_ptr(), 8);
+                }
+                write_all(buf.into(), &stream).await?;
+            }
+            else => break,
+        }
+    }
+    Ok(())
+}
+
+async fn handle_receiver_stream(
+    stream: UnixStream,
+    db: u64,
+    conn_no: u64,
+    to_local: UnboundedSender<Vec<u8>>,
+    pw: String,
+) -> Result<()> {
+    let mut buf = BytesMut::with_capacity(2 + 2 + 64 + 8 + 8);
+    buf.put_u16_le(LINKER_VER);
+    buf.put_u16_le(RECEIVER);
+    let mut hasher = Sha512::new();
+    hasher.update(pw);
+    buf.put(&*hasher.finalize());
+    buf.put_u64_le(db);
+    buf.put_u64_le(conn_no);
+    write_all(buf.freeze(), &stream).await?;
+    loop {
+        let buf = IoBytesMut::new(8);
+        tokio::select! {
+            (res, mut buf) = stream.read(buf) => {
+                let n = res?;
+                if n == 0 { break }
+                buf.advance(n);
+                let buf = read_msg(buf, &stream).await?;
+                if buf.is_empty() {
+                    to_local.send(Vec::new())?;
+                } else {
+                    let decompressed_input = lz4_flex::frame::FrameDecoder::new(buf.freeze().reader());
+                    let list: Vec<Vec<u8>> = bincode::deserialize_from(decompressed_input)?;
+                    for data in list {
+                        to_local.send(data)?;
+                    }
+                }
+            },
+            else => break,
+        }
+    }
+    Ok(())
+}
+
+async fn write_all(mut buf: Bytes, stream: &UnixStream) -> Result<()> {
+    while !buf.is_empty() {
+        let (res, _buf) = stream.write(buf).await;
+        buf = _buf;
+        buf.advance(res?);
+    }
+    Ok(())
+}
+
+async fn read_msg(buf: IoBytesMut, stream: &UnixStream) -> Result<BytesMut> {
+    let len = read_all(buf, stream).await?.get_u64_le();
+    let buf = IoBytesMut::new(len.try_into()?);
+    read_all(buf, stream).await
+}
+
+async fn read_all(mut buf: IoBytesMut, stream: &UnixStream) -> Result<BytesMut> {
+    while buf.bytes_total() > 0 {
+        let (res, _buf) = stream.read(buf).await;
+        buf = _buf;
+        buf.advance(res?);
+    }
+    Ok(buf.get())
+}

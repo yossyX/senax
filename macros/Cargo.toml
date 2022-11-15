@@ -1,0 +1,18 @@
+[package]
+name = "senax-macros"
+version = "0.1.0"
+edition = "2021"
+authors = ["yossyX"]
+license = "MIT OR Apache-2.0"
+description = "SenaX macros"
+repository = "https://github.com/yossyX/senax"
+keywords = ["senax"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+darling = "0.14"
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "1.0", features = ["derive"] }

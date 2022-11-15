@@ -1,0 +1,11 @@
+[general]
+default_syntax = "atmark"
+
+[[syntax]]
+name = "atmark"
+block_start = "@%"
+block_end = "%@"
+comment_start = "@#"
+comment_end = "#@"
+expr_start = "@{"
+expr_end = "}@"

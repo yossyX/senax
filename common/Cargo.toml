@@ -1,0 +1,36 @@
+[package]
+name = "senax-common"
+version = "0.1.0"
+edition = "2021"
+authors = ["yossyX"]
+license = "MIT OR Apache-2.0"
+description = "SenaX common library"
+repository = "https://github.com/yossyX/senax"
+keywords = ["senax"]
+
+[dependencies]
+anyhow = "1.0"
+arc-swap = "1.5.1"
+base64 = "0.13.0"
+bincode = "1.3.3"
+byte-unit = { version = "4.0", default-features = false, features = ["std"] }
+bytes = "1.2.1"
+chrono = { version = "0.4", features = ["serde"] }
+crossbeam = "0.8.2"
+derive_more = "0.99"
+downcast-rs = "1.2.0"
+futures = "0.3.13"
+fxhash = "0.2"
+log = { version = "0.4", features = [ "release_max_level_info", "kv_unstable" ] }
+lz4_flex = { version = "0.9.3" }
+moka = { version = "0.9", features = ["future"] }
+once_cell = "1.8.0"
+regex = "1"
+schemars = { version = "0.8.10" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.51"
+sha2 = "0.10.6"
+tokio = { version = "1.20", features = [ "full" ] }
+
+[target.'cfg(unix)'.dependencies]
+tokio-uring = { version = "0.3.0", features = ["bytes"] }
