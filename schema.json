@@ -1,0 +1,1088 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Schema Definition",
+  "type": "object",
+  "properties": {
+    "conf": {
+      "default": {},
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/ConfigDef"
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z][0-9A-Z_a-z]*$"
+      }
+    },
+    "enum": {
+      "default": {},
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/EnumDef"
+      },
+      "propertyNames": {
+        "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
+      }
+    },
+    "model": {
+      "default": {},
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/ModelDef"
+      },
+      "propertyNames": {
+        "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
+      }
+    },
+    "history": {
+      "default": {},
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/History"
+          }
+        },
+        "propertyNames": {
+          "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
+        }
+      },
+      "propertyNames": {
+        "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
+      }
+    }
+  },
+  "definitions": {
+    "ConfigDef": {
+      "title": "Config Definition",
+      "type": "object",
+      "required": [
+        "db",
+        "groups"
+      ],
+      "properties": {
+        "db_no": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "db": {
+          "$ref": "#/definitions/DbType"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ignore_foreign_key": {
+          "default": false,
+          "type": "boolean"
+        },
+        "timestampable": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Timestampable"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "time_zone": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TimeZone"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp_time_zone": {
+          "description": "created_at, updated_at, deleted_atに使用されるタイムゾーン",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TimeZone"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "soft_delete": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SoftDelete"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "use_cache": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_fast_cache": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_cache_all": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "tx_isolation": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Isolation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "read_tx_isolation": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Isolation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "engine": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "character_set": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "collate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "preserve_column_order": {
+          "type": "boolean"
+        },
+        "groups": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/GroupDef"
+          },
+          "propertyNames": {
+            "pattern": "^[A-Za-z][0-9A-Z_a-z]*$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "DbType": {
+      "title": "DB type",
+      "type": "string",
+      "enum": [
+        "mysql"
+      ]
+    },
+    "Timestampable": {
+      "title": "Timestampable",
+      "type": "string",
+      "enum": [
+        "none",
+        "real_time",
+        "context_time"
+      ]
+    },
+    "TimeZone": {
+      "title": "TimeZone",
+      "type": "string",
+      "enum": [
+        "local",
+        "utc"
+      ]
+    },
+    "SoftDelete": {
+      "title": "SoftDelete",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "none",
+            "time",
+            "flag"
+          ]
+        },
+        {
+          "description": "UNIX time for unique index support",
+          "type": "string",
+          "enum": [
+            "unix_time"
+          ]
+        }
+      ]
+    },
+    "Isolation": {
+      "title": "Isolation",
+      "type": "string",
+      "enum": [
+        "repeatable_read",
+        "read_committed",
+        "read_uncommitted",
+        "serializable"
+      ]
+    },
+    "GroupDef": {
+      "title": "Group Def",
+      "type": "object",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GroupType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "GroupType": {
+      "title": "Group Type",
+      "type": "string",
+      "enum": [
+        "model",
+        "enum"
+      ]
+    },
+    "EnumDef": {
+      "title": "Enum Def",
+      "type": "object",
+      "required": [
+        "enum_values"
+      ],
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enum_values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EnumValue"
+          }
+        },
+        "mod_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z][0-9A-Z_a-z]*$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EnumValue": {
+      "title": "Enum Value",
+      "type": "object",
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255.0,
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "ModelDef": {
+      "title": "Model Def",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "table_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ignore_foreign_key": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "timestampable": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Timestampable"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "disable_created_at": {
+          "type": "boolean"
+        },
+        "disable_updated_at": {
+          "type": "boolean"
+        },
+        "soft_delete": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SoftDelete"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "versioned": {
+          "type": "boolean"
+        },
+        "counting": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "use_cache": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_fast_cache": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_cache_all": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "ignore_propagated_insert_cache": {
+          "type": "boolean"
+        },
+        "on_delete_fn": {
+          "type": "boolean"
+        },
+        "abstract": {
+          "type": "boolean"
+        },
+        "inheritance": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Inheritance"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "engine": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "character_set": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "collate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mod_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z][0-9A-Z_a-z]*$"
+        },
+        "columns": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ColumnTypeOrDef"
+          },
+          "propertyNames": {
+            "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
+          }
+        },
+        "relations": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/RelDef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "propertyNames": {
+            "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
+          }
+        },
+        "indexes": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/IndexDef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "propertyNames": {
+            "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Inheritance": {
+      "title": "Inheritance",
+      "type": "object",
+      "required": [
+        "extends",
+        "type"
+      ],
+      "properties": {
+        "extends": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/definitions/InheritanceType"
+        },
+        "key_field": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "key_value": {
+          "default": null,
+          "type": [
+            "boolean",
+            "number",
+            "string",
+            "integer"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "InheritanceType": {
+      "title": "Inheritance Type",
+      "oneOf": [
+        {
+          "description": "単一テーブル継承 子テーブルのカラムも含めたすべてのカラムを親となるテーブルに格納する",
+          "type": "string",
+          "enum": [
+            "simple"
+          ]
+        },
+        {
+          "description": "具象テーブル継承 子クラスごとに共通のカラムとそれぞれのモデルのカラムをすべて含んだ状態で独立したテーブルを作成する",
+          "type": "string",
+          "enum": [
+            "concrete"
+          ]
+        },
+        {
+          "description": "カラム集約テーブル継承 単一テーブル継承と似ているが、型を特定するための _type カラムがある",
+          "type": "string",
+          "enum": [
+            "column_aggregation"
+          ]
+        }
+      ]
+    },
+    "ColumnTypeOrDef": {
+      "title": "Column Type Or Def",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ColumnDef"
+        },
+        {
+          "$ref": "#/definitions/ColumnSubsetType"
+        }
+      ]
+    },
+    "ColumnDef": {
+      "title": "Column Def",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "$ref": "#/definitions/ColumnType"
+        },
+        "signed": {
+          "type": "boolean"
+        },
+        "not_null": {
+          "type": "boolean"
+        },
+        "primary": {
+          "type": "boolean"
+        },
+        "auto_increment": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AutoIncrement"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "length": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "collate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "not_serializable": {
+          "type": "boolean"
+        },
+        "precision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "scale": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "time_zone": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TimeZone"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "enum_values": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/EnumValue"
+          }
+        },
+        "db_enum_values": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/DbEnumValue"
+          }
+        },
+        "enum_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "json_class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exclude_from_cache": {
+          "type": "boolean"
+        },
+        "skip_factory": {
+          "type": "boolean"
+        },
+        "rename": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "srid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "default": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sql_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ColumnType": {
+      "title": "Column Type",
+      "type": "string",
+      "enum": [
+        "tinyint",
+        "smallint",
+        "int",
+        "bigint",
+        "float",
+        "double",
+        "varchar",
+        "boolean",
+        "text",
+        "blob",
+        "timestamp",
+        "datetime",
+        "date",
+        "time",
+        "decimal",
+        "array_int",
+        "array_string",
+        "json",
+        "enum",
+        "db_enum",
+        "db_set",
+        "point"
+      ]
+    },
+    "AutoIncrement": {
+      "title": "Auto Increment",
+      "type": "string",
+      "enum": [
+        "auto"
+      ]
+    },
+    "DbEnumValue": {
+      "title": "DB Enum Value",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ColumnSubsetType": {
+      "title": "Column Subset Type",
+      "type": "string",
+      "enum": [
+        "tinyint",
+        "smallint",
+        "int",
+        "bigint",
+        "float",
+        "double",
+        "varchar",
+        "boolean",
+        "text",
+        "blob",
+        "datetime",
+        "date",
+        "time",
+        "decimal",
+        "array_int",
+        "array_string",
+        "json",
+        "tinyint_not_null",
+        "smallint_not_null",
+        "int_not_null",
+        "bigint_not_null",
+        "float_not_null",
+        "double_not_null",
+        "varchar_not_null",
+        "boolean_not_null",
+        "text_not_null",
+        "blob_not_null",
+        "datetime_not_null",
+        "date_not_null",
+        "time_not_null",
+        "decimal_not_null",
+        "array_int_not_null",
+        "array_string_not_null",
+        "json_not_null"
+      ]
+    },
+    "RelDef": {
+      "title": "Relation Def",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "description": "結合先のモデル　他のグループは::区切りで指定",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RelationsType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "local": {
+          "description": "結合するローカルのカラム名",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "foreign": {
+          "description": "結合先のカラム名",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "in_cache": {
+          "type": "boolean"
+        },
+        "raw_cond": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "order_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "desc": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
+        "use_cache": {
+          "type": "boolean"
+        },
+        "use_cache_with_trashed": {
+          "type": "boolean"
+        },
+        "on_delete": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReferenceOption"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "on_update": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReferenceOption"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "RelationsType": {
+      "title": "Relations Type",
+      "type": "string",
+      "enum": [
+        "many",
+        "one",
+        "one_to_one"
+      ]
+    },
+    "ReferenceOption": {
+      "title": "Reference Option",
+      "type": "string",
+      "enum": [
+        "restrict",
+        "cascade",
+        "set_null",
+        "set_zero"
+      ]
+    },
+    "IndexDef": {
+      "title": "Index Def",
+      "type": "object",
+      "properties": {
+        "fields": {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/IndexFieldDef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "propertyNames": {
+            "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
+          }
+        },
+        "type": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/IndexType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parser": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Parser"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "IndexFieldDef": {
+      "title": "Index Field Def",
+      "type": "object",
+      "properties": {
+        "sorting": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SortType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "length": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "SortType": {
+      "title": "Sort Type",
+      "type": "string",
+      "enum": [
+        "asc",
+        "desc"
+      ]
+    },
+    "IndexType": {
+      "title": "Index Type",
+      "type": "string",
+      "enum": [
+        "index",
+        "unique",
+        "fulltext",
+        "spatial"
+      ]
+    },
+    "Parser": {
+      "title": "Parser",
+      "type": "string",
+      "enum": [
+        "ngram",
+        "mecab"
+      ]
+    },
+    "History": {
+      "title": "History",
+      "type": "object",
+      "required": [
+        "date",
+        "description"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{1,2}-\\d{1,2}$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

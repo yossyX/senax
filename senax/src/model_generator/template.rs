@@ -6,7 +6,7 @@ use std::{collections::BTreeSet, sync::Arc};
 pub mod filters;
 
 #[derive(Template)]
-#[template(path = "model/Cargo.toml", escape = "none")]
+#[template(path = "model/_Cargo.toml", escape = "none")]
 pub struct CargoTemplate<'a> {
     pub db: &'a str,
 }
