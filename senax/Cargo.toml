@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 description = "SenaX ORM for Rust"
 repository = "https://github.com/yossyX/senax"
 homepage = "https://yossyx.github.io/senax/"
-keywords = ["senax", "database", "orm", "sqlx", "mysql", "async"]
+keywords = ["senax", "database", "orm", "sqlx", "async"]
 categories = ["database"]
 readme = "../README.md"
 
