@@ -13,7 +13,7 @@ pub fn gen_schema_md(schema: Value) -> Result<String, anyhow::Error> {
 {%- endfor %}
 {% for key, value in definitions %}
 ---------------------------------------
-<a name="#/definitions/{{key}}"></a>
+<a id="#/definitions/{{key}}"></a>
 ## {{value.title}}
 
 {{value.description | default(value="")}}

@@ -7,10 +7,13 @@ use senax_common::types::blob::FILES;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::RwLock;
 
-use crate::{connection, exec_ddl, DbConn, SEEDS};
+use crate::{connection, exec_ddl, DbConn};
+
+// SEEDS
+include!(concat!(env!("OUT_DIR"), "/seeds.rs"));
 
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[schemars(deny_unknown_fields)]
@@ -20,6 +23,7 @@ pub struct SeedSchema {
 @%- endif %@@% endfor %@
 }
 impl SeedSchema {
+    #[allow(clippy::single_match)]
     async fn seed(data: &str) -> Result<()> {
         let seeds: serde_yaml::Value = serde_yaml::from_str(data)?;
         let mut conns: Vec<_> = DbConn::shard_num_range().map(DbConn::_new).collect();
@@ -43,7 +47,7 @@ impl SeedSchema {
     }
 }
 
-pub fn gen_seed_schema(path: &Path) -> Result<()> {
+pub fn gen_seed_schema() -> Result<String> {
     let settings = SchemaSettings::draft07().with(|s| {
         s.option_nullable = false;
         s.option_add_null_type = true;
@@ -51,11 +55,7 @@ pub fn gen_seed_schema(path: &Path) -> Result<()> {
     let gen = settings.into_generator();
     let schema = gen.into_root_schema_for::<SeedSchema>();
     let schema = serde_json::to_string_pretty(&schema)?;
-
-    let file_path = path.join("seed-schema.json");
-    println!("{}", file_path.display());
-    fs::write(file_path, schema)?;
-    Ok(())
+    Ok(schema)
 }
 
 pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {

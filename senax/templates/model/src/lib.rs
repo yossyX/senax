@@ -32,6 +32,7 @@ pub mod connection;
 pub mod loader;
 pub mod misc;
 @% for (name, defs) in groups %@
+#[allow(clippy::module_inception)]
 pub mod @{ name|to_var_name }@;
 @%- endfor %@
 
@@ -57,9 +58,6 @@ static SYS_STOP: AtomicBool = AtomicBool::new(false);
 static BULK_FETCH_SEMAPHORE: OnceCell<Vec<Semaphore>> = OnceCell::new();
 static BULK_INSERT_MAX_SIZE: OnceCell<usize> = OnceCell::new();
 static LINKER_SENDER: OnceCell<UnboundedSender<Vec<u8>>> = OnceCell::new();
-
-// SEEDS
-include!(concat!(env!("OUT_DIR"), "/seeds.rs"));
 
 pub async fn start(
     handle: &ArbiterHandle,
@@ -350,53 +348,5 @@ pub(crate) fn _clear_cache() {
 @%- for (name, defs) in groups %@
     @{ name|to_var_name }@::clear_cache_all();
 @%- endfor %@
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn init_env() {
-        std::env::set_var("@{ db|upper }@_DB_URL", "mysql://root:root@db/@{ db }@");
-    }
-
-    /// exec migration
-    #[tokio::test]
-    #[ignore]
-    async fn migrate() -> Result<()> {
-        init_env();
-        crate::migrate(false, false).await
-    }
-
-    /// exec clean migration
-    #[tokio::test]
-    #[ignore]
-    async fn clean_migrate() -> Result<()> {
-        init_env();
-        crate::migrate(false, true).await
-    }
-
-    /// generate a seed schema file
-    #[test]
-    #[ignore]
-    fn gen_seed_schema() -> Result<()> {
-        loader::gen_seed_schema(Path::new("."))
-    }
-
-    /// import seed files
-    #[tokio::test]
-    #[ignore]
-    async fn seed() -> Result<()> {
-        init_env();
-        loader::seed(false, None).await
-    }
-
-    /// exec DB check
-    #[tokio::test]
-    #[ignore]
-    async fn check() -> Result<()> {
-        init_env();
-        crate::check(false).await
-    }
 }
 @{-"\n"}@

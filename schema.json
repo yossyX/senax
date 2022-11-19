@@ -214,7 +214,7 @@
       "enum": [
         "none",
         "real_time",
-        "context_time"
+        "fixed_time"
       ]
     },
     "TimeZone": {

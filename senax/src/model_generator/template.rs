@@ -24,6 +24,12 @@ pub struct LibTemplate<'a> {
 }
 
 #[derive(Template)]
+#[template(path = "model/src/main.rs", escape = "none")]
+pub struct MainTemplate<'a> {
+    pub db: &'a str,
+}
+
+#[derive(Template)]
 #[template(path = "model/src/loader.rs", escape = "none")]
 pub struct LoaderTemplate<'a> {
     pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,

@@ -89,7 +89,6 @@ enum Commands {
         #[clap(long, value_parser, value_name = "DB_URI")]
         uri: String,
     },
-    // #[clap(skip)]
     GenConfSchema {
         #[clap(short, long)]
         doc: bool,

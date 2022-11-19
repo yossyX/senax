@@ -278,6 +278,7 @@ impl CacheOp {
         obj
     }
 
+    #[allow(clippy::redundant_clone)]
     pub(crate) fn handle_cache_msg(self, time: MSec, propagated: bool) -> Pin<Box<dyn Future<Output = ()> + Send>> {
         Box::pin(async move {
             _@{pascal_name}@::_receive_update_notice(&self).await;

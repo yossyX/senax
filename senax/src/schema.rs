@@ -172,7 +172,7 @@ pub enum DbType {
 pub enum Timestampable {
     None,
     RealTime,
-    ContextTime,
+    FixedTime,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
