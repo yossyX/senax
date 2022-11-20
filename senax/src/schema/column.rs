@@ -182,6 +182,7 @@ pub struct EnumValue {
     pub title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    /// 0～255の値
     #[schemars(range(min = 0, max = 255))]
     pub value: u8,
 }
@@ -243,8 +244,10 @@ pub struct ColumnDef {
     pub comment: Option<String>,
     #[serde(rename = "type")]
     pub type_def: ColumnType,
+    /// 指定がない場合はunsigned
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub signed: bool,
+    /// 指定がない場合はnullable
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub not_null: bool,
     #[serde(default, skip_serializing_if = "super::is_false")]
@@ -257,28 +260,37 @@ pub struct ColumnDef {
     // pub character_set: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collate: Option<String>,
+    /// serializeに出力しない（パスワード等保護用）
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub not_serializable: bool, // パスワード等保護用
+    pub not_serializable: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub precision: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scale: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_zone: Option<TimeZone>,
+    /// 列挙型の値
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enum_values: Option<Vec<EnumValue>>,
+    /// DBの列挙型を使用する場合の値
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub db_enum_values: Option<Vec<DbEnumValue>>,
+    /// スキーマ内で定義された列挙値名　（名前は::区切り）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enum_model: Option<String>,
+    /// Json型で使用する型名
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub json_class: Option<String>,
+    /// キャッシュからの除外設定
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub exclude_from_cache: bool,
+    /// factoryからの除外設定
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub skip_factory: bool,
+    /// カラム名の別名設定
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rename: Option<String>,
+    /// Point型のSRID
     #[serde(skip_serializing_if = "Option::is_none")]
     pub srid: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -47,8 +47,10 @@ pub struct RelDef {
     /// 結合先のカラム名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub foreign: Option<String>,
+    /// manyあるいはone_to_oneの場合にリレーション先も一緒にキャッシュするか
+    /// 結合深さは1代のみで子テーブルは親に含んだ状態で更新する必要がある
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub in_cache: bool, // 1代のみ 子テーブルは親に含んだ状態で更新する必要がある
+    pub in_cache: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub raw_cond: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -59,10 +61,13 @@ pub struct RelDef {
     pub limit: Option<u32>,
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_cache: bool,
+    /// リレーション先が論理削除されていてもキャッシュを取得する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_cache_with_trashed: bool,
+    /// DBの外部キー制約による削除およびソフトウェア側での削除制御
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_delete: Option<ReferenceOption>,
+    /// DBの外部キー制約による更新
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_update: Option<ReferenceOption>,
 }

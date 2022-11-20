@@ -48,6 +48,15 @@ pub fn gen_schema_md(schema: Value) -> Result<String, anyhow::Error> {
 * [{{anyOf["$ref"] | split(pat="/") | last}}](#{{anyOf["$ref"]}})
 {% endfor %}
 {%- endif %}
+{%- if value.oneOf %}
+**any of the following**
+
+{% for oneOf in value.oneOf -%}
+{% for enum in oneOf.enum -%}
+* `{{enum}}` {%- if oneOf.description %}({{oneOf.description}}){%- endif %}
+{% endfor -%}
+{% endfor %}
+{%- endif %}
 {%- endfor %}
 "##;
     let context = Context::from_serialize(&schema)?;

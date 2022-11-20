@@ -21,10 +21,14 @@ use super::{
 #[schemars(deny_unknown_fields)]
 #[schemars(title = "Inheritance")]
 pub struct Inheritance {
+    /// 継承元
     pub extends: String,
+    /// 継承タイプ
     #[serde(rename = "type")]
     pub type_def: InheritanceType,
+    /// column_aggregationの場合のキーカラム
     pub key_field: Option<String>,
+    /// column_aggregationの場合のキーの値
     #[schemars(default, schema_with = "value_schema")]
     pub key_value: Option<Value>,
 }
@@ -75,55 +79,79 @@ pub struct ModelDef {
     #[serde(default, skip)]
     pub merged_indexes: IndexMap<String, IndexDef>,
 
+    /// 仕様書等のためのタイトル
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// コメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    /// テーブル名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table_name: Option<String>,
+    /// falseの場合は外部キー制約をDDLに出力しない
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore_foreign_key: Option<bool>,
+    /// タイムスタンプ設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestampable: Option<Timestampable>,
+    /// created_atの無効化
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_created_at: bool,
+    /// updated_atの無効化
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_updated_at: bool,
+    /// 論理削除設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub soft_delete: Option<SoftDelete>,
+    /// キャッシュ整合性のためのバージョンを使用するか
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub versioned: bool,
+    /// save_delayedでカウンターを使用するカラム
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub counting: Option<String>,
+    /// キャッシュを使用するか
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_cache: Option<bool>,
+    /// 高速キャッシュを使用するか(experimental)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_fast_cache: Option<bool>,
+    /// 全キャッシュを使用するか
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_cache_all: Option<bool>,
+    /// 他サーバでinsertされたデータをキャッシュするか
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub ignore_propagated_insert_cache: bool,
+    /// 物理削除時の_before_deleteと_after_deleteの呼び出しを行うか
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub on_delete_fn: bool,
+    /// 抽象化モード
     #[serde(default, skip_serializing_if = "super::is_false")]
     #[serde(rename = "abstract")]
     pub abstract_mode: bool,
+    /// 継承モード
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inheritance: Option<Inheritance>,
+    /// MySQLのストレージエンジン
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine: Option<String>,
+    /// 文字セット
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub character_set: Option<String>,
+    /// 文字セット照合順序
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collate: Option<String>,
+    /// 名前にマルチバイトを使用した場合のmod名
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(regex(pattern = r"^[A-Za-z][0-9A-Z_a-z]*$"))]
     pub mod_name: Option<String>,
 
+    /// カラム
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub columns: IndexMap<String, ColumnTypeOrDef>,
+    /// リレーション
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub relations: IndexMap<String, Option<RelDef>>,
+    /// インデックス
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub indexes: IndexMap<String, Option<IndexDef>>,
 }

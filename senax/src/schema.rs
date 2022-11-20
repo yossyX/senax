@@ -54,46 +54,65 @@ pub struct SchemaDef {
     history: HashMap<String, IndexMap<String, Vec<History>>>,
 }
 
+/// データベース設定
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 #[schemars(title = "Config Definition")]
 pub struct ConfigDef {
+    /// 内部で使用されるデータベースナンバー。同一conf.ymlファイル内では自動生成の乱数で重複が発生しないが、設定ファイルが分かれる場合は重複を防ぐため指定できる。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub db_no: Option<u64>,
+    /// 使用するDB。現在のところmysqlのみ対応
     pub db: DbType,
+    /// 仕様書等のためのタイトル
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// 仕様書等のための著者
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
+    /// falseの場合は外部キー制約をDDLに出力しない
     #[serde(default)]
     pub ignore_foreign_key: bool,
+    /// デフォルトのタイムスタンプ設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestampable: Option<Timestampable>,
+    /// 日時型のデフォルトのタイムゾーン設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_zone: Option<TimeZone>,
     /// created_at, updated_at, deleted_atに使用されるタイムゾーン
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp_time_zone: Option<TimeZone>,
+    /// 論理削除のデフォルト設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub soft_delete: Option<SoftDelete>,
+    /// キャッシュ使用のデフォルト設定
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_cache: Option<bool>,
+    /// 高速キャッシュ使用設定（experimental）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_fast_cache: Option<bool>,
+    /// 全キャッシュ使用のデフォルト設定
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_cache_all: Option<bool>,
+    /// 更新トランザクション分離レベル
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tx_isolation: Option<Isolation>,
+    /// 参照トランザクション分離レベル
     #[serde(skip_serializing_if = "Option::is_none")]
     pub read_tx_isolation: Option<Isolation>,
+    /// MySQLのストレージエンジン
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine: Option<String>,
+    /// 文字セット
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub character_set: Option<String>,
+    /// 文字セット照合順序
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collate: Option<String>,
+    /// DDL出力時のカラム順序維持設定
     #[serde(default, skip_serializing_if = "is_false")]
     pub preserve_column_order: bool,
+    /// モデルグループ
     pub groups: IndexMap<String, GroupDef>,
 }
 
@@ -123,14 +142,19 @@ impl ConfigDef {
     }
 }
 
+/// 更新履歴
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[schemars(title = "History")]
 pub struct History {
+    /// 更新日
     #[schemars(regex(pattern = r"^\d{4}-\d{1,2}-\d{1,2}$"))]
     pub date: String,
+    /// 変更内容
     pub description: String,
+    /// 担当者
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
+    /// バージョン
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }
@@ -148,7 +172,9 @@ pub struct GroupDef {
 #[serde(rename_all = "snake_case")]
 #[schemars(title = "Group Type")]
 pub enum GroupType {
+    /// モデル定義
     Model,
+    /// 列挙型定義のみ
     Enum,
 }
 
@@ -171,7 +197,9 @@ pub enum DbType {
 #[schemars(title = "Timestampable")]
 pub enum Timestampable {
     None,
+    /// クエリー実行日時
     RealTime,
+    /// DbConnの生成日時
     FixedTime,
 }
 
@@ -190,6 +218,7 @@ pub enum SoftDelete {
     None,
     Time,
     Flag,
+    /// ユニーク制約に使用するためのUNIXタイムスタンプ
     /// UNIX time for unique index support
     UnixTime,
 }
@@ -222,11 +251,15 @@ pub struct EnumDef {
     #[serde(skip)]
     pub name: String,
 
+    /// タイトル
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// コメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    /// 列挙値
     pub enum_values: Vec<EnumValue>,
+    /// 列挙子の名前にマルチバイトを使用した場合のmod名
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(regex(pattern = r"^[A-Za-z][0-9A-Z_a-z]*$"))]
     pub mod_name: Option<String>,

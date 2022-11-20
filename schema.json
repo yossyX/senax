@@ -56,6 +56,7 @@
   "definitions": {
     "ConfigDef": {
       "title": "Config Definition",
+      "description": "データベース設定",
       "type": "object",
       "required": [
         "db",
@@ -63,6 +64,7 @@
       ],
       "properties": {
         "db_no": {
+          "description": "内部で使用されるデータベースナンバー。同一conf.ymlファイル内では自動生成の乱数で重複が発生しないが、設定ファイルが分かれる場合は重複を防ぐため指定できる。",
           "type": [
             "integer",
             "null"
@@ -71,25 +73,34 @@
           "minimum": 0.0
         },
         "db": {
-          "$ref": "#/definitions/DbType"
+          "description": "使用するDB。現在のところmysqlのみ対応",
+          "allOf": [
+            {
+              "$ref": "#/definitions/DbType"
+            }
+          ]
         },
         "title": {
+          "description": "仕様書等のためのタイトル",
           "type": [
             "string",
             "null"
           ]
         },
         "author": {
+          "description": "仕様書等のための著者",
           "type": [
             "string",
             "null"
           ]
         },
         "ignore_foreign_key": {
+          "description": "falseの場合は外部キー制約をDDLに出力しない",
           "default": false,
           "type": "boolean"
         },
         "timestampable": {
+          "description": "デフォルトのタイムスタンプ設定",
           "anyOf": [
             {
               "$ref": "#/definitions/Timestampable"
@@ -100,6 +111,7 @@
           ]
         },
         "time_zone": {
+          "description": "日時型のデフォルトのタイムゾーン設定",
           "anyOf": [
             {
               "$ref": "#/definitions/TimeZone"
@@ -121,6 +133,7 @@
           ]
         },
         "soft_delete": {
+          "description": "論理削除のデフォルト設定",
           "anyOf": [
             {
               "$ref": "#/definitions/SoftDelete"
@@ -131,24 +144,28 @@
           ]
         },
         "use_cache": {
+          "description": "キャッシュ使用のデフォルト設定",
           "type": [
             "boolean",
             "null"
           ]
         },
         "use_fast_cache": {
+          "description": "高速キャッシュ使用設定（experimental）",
           "type": [
             "boolean",
             "null"
           ]
         },
         "use_cache_all": {
+          "description": "全キャッシュ使用のデフォルト設定",
           "type": [
             "boolean",
             "null"
           ]
         },
         "tx_isolation": {
+          "description": "更新トランザクション分離レベル",
           "anyOf": [
             {
               "$ref": "#/definitions/Isolation"
@@ -159,6 +176,7 @@
           ]
         },
         "read_tx_isolation": {
+          "description": "参照トランザクション分離レベル",
           "anyOf": [
             {
               "$ref": "#/definitions/Isolation"
@@ -169,33 +187,38 @@
           ]
         },
         "engine": {
+          "description": "MySQLのストレージエンジン",
           "type": [
             "string",
             "null"
           ]
         },
         "character_set": {
+          "description": "文字セット",
           "type": [
             "string",
             "null"
           ]
         },
         "collate": {
+          "description": "文字セット照合順序",
           "type": [
             "string",
             "null"
           ]
         },
         "preserve_column_order": {
+          "description": "DDL出力時のカラム順序維持設定",
           "type": "boolean"
         },
         "groups": {
+          "description": "モデルグループ",
           "type": "object",
           "additionalProperties": {
             "$ref": "#/definitions/GroupDef"
           },
           "propertyNames": {
-            "pattern": "^[A-Za-z][0-9A-Z_a-z]*$"
+            "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
           }
         }
       },
@@ -210,11 +233,27 @@
     },
     "Timestampable": {
       "title": "Timestampable",
-      "type": "string",
-      "enum": [
-        "none",
-        "real_time",
-        "fixed_time"
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "none"
+          ]
+        },
+        {
+          "description": "クエリー実行日時",
+          "type": "string",
+          "enum": [
+            "real_time"
+          ]
+        },
+        {
+          "description": "DbConnの生成日時",
+          "type": "string",
+          "enum": [
+            "fixed_time"
+          ]
+        }
       ]
     },
     "TimeZone": {
@@ -237,7 +276,7 @@
           ]
         },
         {
-          "description": "UNIX time for unique index support",
+          "description": "ユニーク制約に使用するためのUNIXタイムスタンプ UNIX time for unique index support",
           "type": "string",
           "enum": [
             "unix_time"
@@ -280,10 +319,21 @@
     },
     "GroupType": {
       "title": "Group Type",
-      "type": "string",
-      "enum": [
-        "model",
-        "enum"
+      "oneOf": [
+        {
+          "description": "モデル定義",
+          "type": "string",
+          "enum": [
+            "model"
+          ]
+        },
+        {
+          "description": "列挙型定義のみ",
+          "type": "string",
+          "enum": [
+            "enum"
+          ]
+        }
       ]
     },
     "EnumDef": {
@@ -294,24 +344,28 @@
       ],
       "properties": {
         "title": {
+          "description": "タイトル",
           "type": [
             "string",
             "null"
           ]
         },
         "comment": {
+          "description": "コメント",
           "type": [
             "string",
             "null"
           ]
         },
         "enum_values": {
+          "description": "列挙値",
           "type": "array",
           "items": {
             "$ref": "#/definitions/EnumValue"
           }
         },
         "mod_name": {
+          "description": "列挙子の名前にマルチバイトを使用した場合のmod名",
           "type": [
             "string",
             "null"
@@ -345,6 +399,7 @@
           ]
         },
         "value": {
+          "description": "0～255の値",
           "type": "integer",
           "format": "uint8",
           "maximum": 255.0,
@@ -358,30 +413,35 @@
       "type": "object",
       "properties": {
         "title": {
+          "description": "仕様書等のためのタイトル",
           "type": [
             "string",
             "null"
           ]
         },
         "comment": {
+          "description": "コメント",
           "type": [
             "string",
             "null"
           ]
         },
         "table_name": {
+          "description": "テーブル名",
           "type": [
             "string",
             "null"
           ]
         },
         "ignore_foreign_key": {
+          "description": "falseの場合は外部キー制約をDDLに出力しない",
           "type": [
             "boolean",
             "null"
           ]
         },
         "timestampable": {
+          "description": "タイムスタンプ設定",
           "anyOf": [
             {
               "$ref": "#/definitions/Timestampable"
@@ -392,12 +452,15 @@
           ]
         },
         "disable_created_at": {
+          "description": "created_atの無効化",
           "type": "boolean"
         },
         "disable_updated_at": {
+          "description": "updated_atの無効化",
           "type": "boolean"
         },
         "soft_delete": {
+          "description": "論理削除設定",
           "anyOf": [
             {
               "$ref": "#/definitions/SoftDelete"
@@ -408,42 +471,51 @@
           ]
         },
         "versioned": {
+          "description": "キャッシュ整合性のためのバージョンを使用するか",
           "type": "boolean"
         },
         "counting": {
+          "description": "save_delayedでカウンターを使用するカラム",
           "type": [
             "string",
             "null"
           ]
         },
         "use_cache": {
+          "description": "キャッシュを使用するか",
           "type": [
             "boolean",
             "null"
           ]
         },
         "use_fast_cache": {
+          "description": "高速キャッシュを使用するか(experimental)",
           "type": [
             "boolean",
             "null"
           ]
         },
         "use_cache_all": {
+          "description": "全キャッシュを使用するか",
           "type": [
             "boolean",
             "null"
           ]
         },
         "ignore_propagated_insert_cache": {
+          "description": "他サーバでinsertされたデータをキャッシュするか",
           "type": "boolean"
         },
         "on_delete_fn": {
+          "description": "物理削除時の_before_deleteと_after_deleteの呼び出しを行うか",
           "type": "boolean"
         },
         "abstract": {
+          "description": "抽象化モード",
           "type": "boolean"
         },
         "inheritance": {
+          "description": "継承モード",
           "anyOf": [
             {
               "$ref": "#/definitions/Inheritance"
@@ -454,24 +526,28 @@
           ]
         },
         "engine": {
+          "description": "MySQLのストレージエンジン",
           "type": [
             "string",
             "null"
           ]
         },
         "character_set": {
+          "description": "文字セット",
           "type": [
             "string",
             "null"
           ]
         },
         "collate": {
+          "description": "文字セット照合順序",
           "type": [
             "string",
             "null"
           ]
         },
         "mod_name": {
+          "description": "名前にマルチバイトを使用した場合のmod名",
           "type": [
             "string",
             "null"
@@ -479,6 +555,7 @@
           "pattern": "^[A-Za-z][0-9A-Z_a-z]*$"
         },
         "columns": {
+          "description": "カラム",
           "type": "object",
           "additionalProperties": {
             "$ref": "#/definitions/ColumnTypeOrDef"
@@ -488,6 +565,7 @@
           }
         },
         "relations": {
+          "description": "リレーション",
           "type": "object",
           "additionalProperties": {
             "anyOf": [
@@ -504,6 +582,7 @@
           }
         },
         "indexes": {
+          "description": "インデックス",
           "type": "object",
           "additionalProperties": {
             "anyOf": [
@@ -531,18 +610,26 @@
       ],
       "properties": {
         "extends": {
+          "description": "継承元",
           "type": "string"
         },
         "type": {
-          "$ref": "#/definitions/InheritanceType"
+          "description": "継承タイプ",
+          "allOf": [
+            {
+              "$ref": "#/definitions/InheritanceType"
+            }
+          ]
         },
         "key_field": {
+          "description": "column_aggregationの場合のキーカラム",
           "type": [
             "string",
             "null"
           ]
         },
         "key_value": {
+          "description": "column_aggregationの場合のキーの値",
           "default": null,
           "type": [
             "boolean",
@@ -614,9 +701,11 @@
           "$ref": "#/definitions/ColumnType"
         },
         "signed": {
+          "description": "指定がない場合はunsigned",
           "type": "boolean"
         },
         "not_null": {
+          "description": "指定がない場合はnullable",
           "type": "boolean"
         },
         "primary": {
@@ -647,6 +736,7 @@
           ]
         },
         "not_serializable": {
+          "description": "serializeに出力しない（パスワード等保護用）",
           "type": "boolean"
         },
         "precision": {
@@ -676,6 +766,7 @@
           ]
         },
         "enum_values": {
+          "description": "列挙型の値",
           "type": [
             "array",
             "null"
@@ -685,6 +776,7 @@
           }
         },
         "db_enum_values": {
+          "description": "DBの列挙型を使用する場合の値",
           "type": [
             "array",
             "null"
@@ -694,30 +786,36 @@
           }
         },
         "enum_model": {
+          "description": "スキーマ内で定義された列挙値名　（名前は::区切り）",
           "type": [
             "string",
             "null"
           ]
         },
         "json_class": {
+          "description": "Json型で使用する型名",
           "type": [
             "string",
             "null"
           ]
         },
         "exclude_from_cache": {
+          "description": "キャッシュからの除外設定",
           "type": "boolean"
         },
         "skip_factory": {
+          "description": "factoryからの除外設定",
           "type": "boolean"
         },
         "rename": {
+          "description": "カラム名の別名設定",
           "type": [
             "string",
             "null"
           ]
         },
         "srid": {
+          "description": "Point型のSRID",
           "type": [
             "integer",
             "null"
@@ -888,6 +986,7 @@
           ]
         },
         "in_cache": {
+          "description": "manyあるいはone_to_oneの場合にリレーション先も一緒にキャッシュするか 結合深さは1代のみで子テーブルは親に含んだ状態で更新する必要がある",
           "type": "boolean"
         },
         "raw_cond": {
@@ -917,9 +1016,11 @@
           "type": "boolean"
         },
         "use_cache_with_trashed": {
+          "description": "リレーション先が論理削除されていてもキャッシュを取得する",
           "type": "boolean"
         },
         "on_delete": {
+          "description": "DBの外部キー制約による削除およびソフトウェア側での削除制御",
           "anyOf": [
             {
               "$ref": "#/definitions/ReferenceOption"
@@ -930,6 +1031,7 @@
           ]
         },
         "on_update": {
+          "description": "DBの外部キー制約による更新",
           "anyOf": [
             {
               "$ref": "#/definitions/ReferenceOption"
@@ -1057,6 +1159,7 @@
     },
     "History": {
       "title": "History",
+      "description": "更新履歴",
       "type": "object",
       "required": [
         "date",
@@ -1064,19 +1167,23 @@
       ],
       "properties": {
         "date": {
+          "description": "更新日",
           "type": "string",
           "pattern": "^\\d{4}-\\d{1,2}-\\d{1,2}$"
         },
         "description": {
+          "description": "変更内容",
           "type": "string"
         },
         "author": {
+          "description": "担当者",
           "type": [
             "string",
             "null"
           ]
         },
         "version": {
+          "description": "バージョン",
           "type": [
             "string",
             "null"
