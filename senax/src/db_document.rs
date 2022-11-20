@@ -57,7 +57,7 @@ pub fn generate(db: &str, group_name: &Option<String>, er: bool) -> Result<()> {
     schema::parse(db)?;
 
     let config = unsafe { CONFIG.get().unwrap() }.clone();
-    let history = unsafe { HISTORY.get().unwrap() }.clone();
+    let history = unsafe { HISTORY.get().cloned().unwrap_or_default() };
     let groups = unsafe { GROUPS.get().unwrap() }.clone();
     let enum_groups = unsafe { ENUM_GROUPS.get().unwrap() }.clone();
     let locale = env::var("LC_ALL").unwrap_or_else(|_| {
