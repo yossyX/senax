@@ -1,0 +1,10 @@
+[book]
+authors = ["yossyX"]
+language = "ja"
+src = "src"
+title = "SenaX"
+
+[[output.i18n.translations]]
+language = "en"
+translators = ["yossyX"]
+title = "yossyX"
