@@ -1358,11 +1358,17 @@ pub trait _@{ pascal_name }@Rel {
 #[async_trait(?Send)]
 impl _@{ pascal_name }@Rel for _@{ pascal_name }@ {
 @{ def.relations_one_except_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        if self.{alias}.is_some() {
+            return Ok(());
+        }
         self.{alias} = Some(
             rel_{class_mod}::{class}::find_optional(conn, &self.{var}()).await?.map(Box::new)
         );
         Ok(())
     }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        if self.{alias}.is_some() {
+            return Ok(());
+        }
         if let Some(id) = self.{var}() {
             self.{alias} = Some(
                 rel_{class_mod}::{class}::find_optional(conn, &id).await?.map(Box::new)
@@ -1373,11 +1379,17 @@ impl _@{ pascal_name }@Rel for _@{ pascal_name }@ {
         Ok(())
     }\n", "") -}@
 @{ def.relations_one_only_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        if self.{alias}.is_some() {
+            return Ok(());
+        }
         self.{alias} = Some(
             rel_{class_mod}::{class}::find_optional_from_cache{with_trashed}(conn, &self.{var}()).await?.map(Box::new)
         );
         Ok(())
     }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        if self.{alias}.is_some() {
+            return Ok(());
+        }
         if let Some(id) = self.{var}() {
             self.{alias} = Some(
                 rel_{class_mod}::{class}::find_optional_from_cache{with_trashed}(conn, &id).await?.map(Box::new)
@@ -1388,6 +1400,9 @@ impl _@{ pascal_name }@Rel for _@{ pascal_name }@ {
         Ok(())
     }\n", "") -}@
 @{ def.relations_many()|fmt_rel_join("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        if self.{alias}.is_some() {
+            return Ok(());
+        }
         let cond = rel_{class_mod}::Cond::Eq(rel_{class_mod}::ColOne::{foreign_var}(self.{local_id}())){and_cond};
         let order_by = vec![{order_by}];
         self.{alias} = Some(rel_{class_mod}::{class}::query().cond(cond).order_by(order_by){limit}.select(conn).await?);
@@ -1398,11 +1413,17 @@ impl _@{ pascal_name }@Rel for _@{ pascal_name }@ {
 #[async_trait(?Send)]
 impl _@{ pascal_name }@Rel for _@{ pascal_name }@ForUpdate {
 @{ def.relations_one_owner()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        if self.{alias}.is_some() {
+            return Ok(());
+        }
         self.{alias} = Some(
             rel_{class_mod}::{class}::find_optional_for_update(conn, &self.{var}().get()).await?.map(Box::new)
         );
         Ok(())
     }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        if self.{alias}.is_some() {
+            return Ok(());
+        }
         if let Some(id) = self.{var}().get() {
             self.{alias} = Some(
                 rel_{class_mod}::{class}::find_optional_for_update(conn, &id).await?.map(Box::new)
@@ -1413,6 +1434,9 @@ impl _@{ pascal_name }@Rel for _@{ pascal_name }@ForUpdate {
         Ok(())
     }\n", "") -}@
 @{ def.relations_many()|fmt_rel_join("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        if self.{alias}.is_some() {
+            return Ok(());
+        }
         let cond = rel_{class_mod}::Cond::Eq(rel_{class_mod}::ColOne::{foreign_var}(self.{local_id}().get())){and_cond};
         let order_by = vec![{order_by}];
         self.{alias} = Some(rel_{class_mod}::{class}::query().cond(cond).order_by(order_by).select_for_update(conn).await?);
@@ -1420,8 +1444,7 @@ impl _@{ pascal_name }@Rel for _@{ pascal_name }@ForUpdate {
     }\n", "") -}@
 }
 
-#[async_trait(?Send)]
-impl _@{ pascal_name }@Rel for CacheWrapper {
+impl CacheWrapper {
 @{ def.relations_one_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
         self.{alias} = rel_{class_mod}::{class}::find_optional_for_cache(conn, &self.{var}()).await?.map(|v| v._wrapper);
         Ok(())
@@ -1606,30 +1629,29 @@ impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@ForUpdate> {
     }\n", "") -}@
 }
 
-#[async_trait(?Send)]
-impl _@{ pascal_name }@Rel for Vec<CacheWrapper> {
-@{ def.relations_one_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
-        let ids: FxHashSet<_> = self.iter().map(|v| v.{var}()).collect();
+impl CacheWrapper {
+@{ def.relations_one_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}_4vec(vec: &mut Vec<CacheWrapper>, conn: &mut DbConn) -> Result<()> {
+        let ids: FxHashSet<_> = vec.iter().map(|v| v.{var}()).collect();
         if ids.is_empty() { return Ok(()); }
         let map: FxHashMap<_, _> = rel_{class_mod}::{class}::find_many_for_cache(conn, ids.iter()).await?.into_iter().map(|(k, v)| (k, v._wrapper)).collect();
-        for val in self.iter_mut() {
+        for val in vec.iter_mut() {
             val.{alias} = map.get(&val.{var}()).cloned();
         }
         Ok(())
-    }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
-        let ids: FxHashSet<_> = self.iter().flat_map(|v| v.{var}()).collect();
+    }\n", "    async fn fetch_{raw_alias}_4vec(vec: &mut Vec<CacheWrapper>, conn: &mut DbConn) -> Result<()> {
+        let ids: FxHashSet<_> = vec.iter().flat_map(|v| v.{var}()).collect();
         if ids.is_empty() { return Ok(()); }
         let map: FxHashMap<_, _> = rel_{class_mod}::{class}::find_many_for_cache(conn, ids.iter()).await?.into_iter().map(|(k, v)| (k, v._wrapper)).collect();
-        for val in self.iter_mut() {
+        for val in vec.iter_mut() {
             if let Some(id) = val.{var}() {
                 val.{alias} = map.get(&id).cloned();
             }
         }
         Ok(())
     }\n", "") -}@
-@{ def.relations_many_cache()|fmt_rel_join_foreign_is_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
-        if self.is_empty() { return Ok(()); }
-        let union: Vec<_> = self.iter().map(|v| {
+@{ def.relations_many_cache()|fmt_rel_join_foreign_is_not_null_or_null("    async fn fetch_{raw_alias}_4vec(vec: &mut Vec<CacheWrapper>, conn: &mut DbConn) -> Result<()> {
+        if vec.is_empty() { return Ok(()); }
+        let union: Vec<_> = vec.iter().map(|v| {
             let cond = rel_{class_mod}::Cond::Eq(rel_{class_mod}::ColOne::{foreign_var}(v.{local_id}())){and_cond};
             let order_by = vec![{order_by}];
             rel_{class_mod}::{class}::query().cond(cond).order_by(order_by){limit}
@@ -1642,14 +1664,14 @@ impl _@{ pascal_name }@Rel for Vec<CacheWrapper> {
                 .or_insert_with(Vec::new)
                 .push(row);
         }
-        for val in self.iter_mut() {
+        for val in vec.iter_mut() {
             val.{alias} = map.remove(&val._inner.{local_id}).unwrap_or_default();
             val.{alias}.shrink_to_fit();
         }
         Ok(())
-    }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
-        if self.is_empty() { return Ok(()); }
-        let union: Vec<_> = self.iter().map(|v| {
+    }\n", "    async fn fetch_{raw_alias}_4vec(vec: &mut Vec<CacheWrapper>, conn: &mut DbConn) -> Result<()> {
+        if vec.is_empty() { return Ok(()); }
+        let union: Vec<_> = vec.iter().map(|v| {
             let cond = rel_{class_mod}::Cond::Eq(rel_{class_mod}::ColOne::{foreign_var}(v.{local_id}())){and_cond};
             let order_by = vec![{order_by}];
             rel_{class_mod}::{class}::query().cond(cond).order_by(order_by){limit}
@@ -1662,7 +1684,7 @@ impl _@{ pascal_name }@Rel for Vec<CacheWrapper> {
                 map.entry(id).or_insert_with(Vec::new).push(row);
             }
         }
-        for val in self.iter_mut() {
+        for val in vec.iter_mut() {
             val.{alias} = map.remove(&val._inner.{local_id}).unwrap_or_default();
             val.{alias}.shrink_to_fit();
         }
@@ -3520,7 +3542,7 @@ impl _@{ pascal_name }@ {
                 let ids: Vec<Primary> = ids.drain().collect();
                 #[allow(unused_mut)]
                 let mut result = Self::_find_many_for_cache(&mut conn, &ids).await?;
-@{- def.relations_cache()|fmt_rel_join("\n                result.fetch_{raw_alias}(&mut conn).await?;", "") }@
+@{- def.relations_cache()|fmt_rel_join("\n                CacheWrapper::fetch_{raw_alias}_4vec(&mut result, &mut conn).await?;", "") }@
                 for v in result.into_iter() {
                     let arc = Arc::new(v);
                     let id = PrimaryHasher(Primary::from(&arc), shard_id);
