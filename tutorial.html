@@ -266,8 +266,8 @@ Symfony 1.xのdoctrine/schema.ymlに近いイメージです。<br />
 <h2 id="モデル生成"><a class="header" href="#モデル生成">モデル生成</a></h2>
 <pre><code>$ senax model sample
 </code></pre>
-<p>senaxのコマンドでdb/sample下のファイルを生成します。<br />
-note.rs等はカスタマイズ用で、_note.rsが本体です。<br />
+<p>senaxのコマンドでdb/sample下にクレートを生成します。<br />
+note.rs等はカスタマイズ用で、_note.rsが本体です。再度モデル生成を実行するとnote.rsは上書きされず、_note.rsは常に上書きされます。<br />
 モデル名が_Tagsのように_が付くのは他のライブラリと被らないようにそのような命名規則にしています。</p>
 <h2 id="マイグレーション生成"><a class="header" href="#マイグレーション生成">マイグレーション生成</a></h2>
 <pre><code>$ senax gen-migrate sample init
