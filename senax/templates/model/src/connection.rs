@@ -468,6 +468,9 @@ pub(crate) async fn get_migrate_connections(is_test: bool) -> Result<Vec<(DbConn
     let mut shards = Vec::new();
     for url in database_url.split('\n') {
         let url = url.trim();
+        if url.is_empty() {
+            continue;
+        }
         let parsed_url = Url::parse(url)?;
         let name = parsed_url.path().trim_start_matches('/').to_string();
         let url = url.trim_end_matches(&name);
@@ -479,7 +482,11 @@ pub(crate) async fn get_migrate_connections(is_test: bool) -> Result<Vec<(DbConn
 async fn get_source(database_url: &str) -> Result<Vec<sqlx::Pool<DbType>>> {
     let mut shards = Vec::new();
     for url in database_url.split('\n') {
-        let mut options: MySqlConnectOptions = url.trim().parse().unwrap();
+        let url = url.trim();
+        if url.is_empty() {
+            continue;
+        }
+        let mut options: MySqlConnectOptions = url.parse().unwrap();
         options.log_statements(LevelFilter::Debug);
         shards.push(
             MySqlPoolOptions::new()
@@ -509,8 +516,12 @@ async fn get_replica(
 ) -> Result<Vec<Vec<sqlx::Pool<DbType>>>> {
     let mut shards = Vec::new();
     for urls in database_url.split('\n') {
+        let urls = urls.trim();
+        if urls.is_empty() {
+            continue;
+        }
         let mut pools = Vec::new();
-        for url in urls.trim().split(',') {
+        for url in urls.split(',') {
             let mut options: MySqlConnectOptions = url.parse().unwrap();
             options.log_statements(LevelFilter::Debug);
             pools.push(
