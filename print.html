@@ -1,0 +1,1243 @@
+<!DOCTYPE HTML>
+<html lang="ja" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>SenaX</title>
+        <meta name="robots" content="noindex" />
+
+
+        <!-- Custom HTML head -->
+        
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">10.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">11.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">12.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">12.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">12.2.</strong> リンカー</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">SenaX</h1>
+
+                    <div class="right-buttons">
+                        <button id="lang-toggle" class="icon-button" type="button" title="Change language" aria-label="Change language" aria-haspopup="true" aria-expanded="false" aria-controls="lang-list">
+                            <i class="fa fa-globe"></i>
+                        </button>
+                        <ul id="lang-list" class="theme-popup" style="left: auto;" aria-label="Languages" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="en">English</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ja">Japanese</button></li>
+                        </ul>
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="senaxについて"><a class="header" href="#senaxについて">SenaXについて</a></h1>
+<p>SenaXはRustで書かれたORMで、キャッシュに特化しており非常に高速に動作します。
+ORMにはよくクエリーキャッシュが実装されていますが、SenaXは一般的なクエリーキャッシュのような動作はせず、エンティティキャッシュを基本にしています。<br>
+具体的な速度例として、DBからの取得とカウンター加算の更新を行うAPIのリクエストを32cpuで42万req/s程度の性能を出すことができます。</p>
+<p>SenaXの特徴として次の点が挙げられます</p>
+<ul>
+<li>クエリー集約</li>
+<li>エンティティキャッシュ</li>
+<li>遅延一括更新</li>
+<li>サーバ間キャッシュ更新同期</li>
+</ul>
+<h3 id="クエリー集約"><a class="header" href="#クエリー集約">クエリー集約</a></h3>
+<p>一般的なORMではAPIへのアクセスごとにそれぞれDBへクエリーを送り、その結果を返します。
+SenaXではほぼ同時に行われたアクセスからのDBへのクエリーを一つにまとめ、一回のクエリーで結果を取得します。
+具体的には主キーでの取得を IN クエリーに変換して取得します。</p>
+<p>これにより、キャッシュにないデータにアクセスが殺到した場合のDBの負荷を低減します。</p>
+<h3 id="エンティティキャッシュ"><a class="header" href="#エンティティキャッシュ">エンティティキャッシュ</a></h3>
+<p>エンティティキャッシュはあらかじめ定義されたone-to-oneあるいはone-to-manyの下位の結合関係を持つテーブルのデータもまとめてキャッシュされます。
+エンティティの取得は主キーだけではなく、ユニークキーからの取得も対応しています。</p>
+<h3 id="遅延一括更新"><a class="header" href="#遅延一括更新">遅延一括更新</a></h3>
+<p>ログなどをDBに保存する際に、同時に受け付けた他のアクセスのログとまとめてバルクインサートで保存することができます。<br>
+また、同一ページへのアクセスカウンタなどは同時にアクセスしたカウントアップ数をまとめてからDB更新も簡単にできます。</p>
+<h3 id="サーバ間キャッシュ更新同期"><a class="header" href="#サーバ間キャッシュ更新同期">サーバ間キャッシュ更新同期</a></h3>
+<p>キャッシュに保存されたデータが更新される場合、他のサーバにも更新内容を伝達してそれぞれのサーバのキャッシュが最新であるように同期されます。<br>
+更新差分はカラムごとに処理されるため、別のサーバで同時に異なるカラムが更新されても問題ありません。
+同じカラムが更新される場合はバージョン管理で競合を防ぐことができます。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="チュートリアル"><a class="header" href="#チュートリアル">チュートリアル</a></h1>
+<h2 id="インストール"><a class="header" href="#インストール">インストール</a></h2>
+<pre><code>cargo install senax
+</code></pre>
+<h2 id="初期ファイル"><a class="header" href="#初期ファイル">初期ファイル</a></h2>
+<p>初期ディレクトリ構成の参考のため、 https://github.com/yossyX/senax から examples/actix のコードを展開してください。
+とりあえず actix-web を使用していますが、tonic や hyper 等でも対応できるはずです。
+また、消費メモリの計算は mimalloc を使用することを想定しています。</p>
+<h2 id="スキーマファイル"><a class="header" href="#スキーマファイル">スキーマファイル</a></h2>
+<p>schema/conf.yml</p>
+<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/conf
+
+sample:
+  title: Sample DB
+  author: author name
+  db: mysql
+  ignore_foreign_key: true
+  timestampable: real_time
+  time_zone: local
+  timestamp_time_zone: utc
+  tx_isolation: read_committed
+  read_tx_isolation: repeatable_read
+  use_cache: true
+  use_fast_cache: true
+  use_cache_all: true
+  preserve_column_order: true
+  groups:
+    note:
+      title: note
+</code></pre>
+<p>複数のデータベース設定のための設定ファイルです。<br />
+yaml-language-serverの設定はVSCodeであればYAMLのプラグインで入力時にアシスタントが効きます。</p>
+<p>トップのsampleはDBのデータベース名です。<br />
+dbはまだMySQLしか対応していません。<br />
+tx_isolationとread_tx_isolationは更新用と参照用のデータベースの接続を分けて、それぞれread_committedとrepeatable_readにしています。<br />
+MySQLはデフォルトでrepeatable_readですが、負荷がかかると結構ギャップロックにやられます。PostgreSQLはread_committedですし、多くの場合read_committedのほうが適切です。ただし、SELECT FOR UPDATEでヒットしなかったときにINSERTの手順はrepeatable_readでないとロックが効きませんが、これこそがギャップロックで死ぬパターンです。この場合、上位テーブルでロックを掛けるか、INSERT IGNOREや、ON DUPLICATE KEY UPDATEなどのupsert構文で対応が必要です。<br />
+参照時のトランザクションはMySQLでは最初にテーブルにアクセスしたときにすべてのテーブルのスナップショットを取得するのでrepeatable_readが安全です。<br />
+groupsは一つのデータベースに数百のテーブルがあるとディレクトリツリーが長くなったり管理が困ることになりますので、1階層分グループ分けできるようになっています。</p>
+<p>schema/sample/note.yml</p>
+<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/model
+
+note:
+  timestampable: fixed_time
+  soft_delete: time
+  versioned: true
+  on_delete_fn: true
+  use_fast_cache: true
+  columns:
+    id:
+      type: int
+      primary: true
+      auto_increment: auto
+    key: varchar
+    category_id: int
+    content:
+      type: text
+      length: 2000
+      not_null: true
+  relations:
+    category:
+      use_cache: true
+    tags:
+      type: many
+      in_cache: true
+  indexes:
+    key:
+      fields:
+        key:
+          length: 20
+      type: unique
+    content:
+      type: fulltext
+      parser: ngram
+
+tags:
+  columns:
+    id:
+      type: int
+      primary: true
+      auto_increment: auto
+    note_id: int_not_null
+    name: varchar_not_null
+  relations:
+    note:
+
+categories:
+  columns:
+    id:
+      type: int
+      primary: true
+      auto_increment: auto
+    name: varchar_not_null
+
+counters:
+  counting: counter
+  timestampable: none
+  columns:
+    note_id:
+      type: int
+      primary: true
+    date:
+      type: date
+      primary: true
+    counter: bigint_not_null
+  relations:
+    note:
+</code></pre>
+<p>グループ内のテーブルの設定ファイルです。<br />
+Symfony 1.xのdoctrine/schema.ymlに近いイメージです。<br />
+テーブル名がマルチバイト文字や複数形にも対応しています。categories テーブルはノートのrelationsのcategoryと紐づいていますが、relationsの方はtypeがデフォルトでoneなので単数形で自動的に紐づきます。<br />
+ちなみに、 Doctrine の inheritance も一通り対応しています。</p>
+<h2 id="モデル生成"><a class="header" href="#モデル生成">モデル生成</a></h2>
+<pre><code>$ senax model sample
+</code></pre>
+<p>senaxのコマンドでdb/sample下のファイルを生成します。<br />
+note.rs等はカスタマイズ用で、_note.rsが本体です。<br />
+モデル名が_Tagsのように_が付くのは他のライブラリと被らないようにそのような命名規則にしています。</p>
+<h2 id="マイグレーション生成"><a class="header" href="#マイグレーション生成">マイグレーション生成</a></h2>
+<pre><code>$ senax gen-migrate sample init
+</code></pre>
+<p>db/sample/migrations下にDDLファイルを生成します。<br />
+DDLは現状のDBを確認して差分を出力します。<br />
+コマンド実行前に .env の SAMPLE_DB_URL で指定されたデータベースを作成しておいてください。</p>
+<h2 id="マイグレーション実行"><a class="header" href="#マイグレーション実行">マイグレーション実行</a></h2>
+<pre><code>$ cargo run -p db_sample -- migrate
+</code></pre>
+<p>もしくは、</p>
+<pre><code>$ target/debug/db_sample migrate
+</code></pre>
+<p>sqlxのマイグレーションを実行します。
+シャーディング設定がある場合すべてのシャードにクエリーを発行するようになっています。</p>
+<h2 id="シードスキーマ生成"><a class="header" href="#シードスキーマ生成">シードスキーマ生成</a></h2>
+<pre><code>$ cargo run -p db_sample -- gen-seed-schema &gt; db/sample/seed-schema.json
+</code></pre>
+<p>もしくは、</p>
+<pre><code>$ target/debug/db_sample gen-seed-schema &gt; db/sample/seed-schema.json
+</code></pre>
+<p>シードファイルの入力アシスタントのためのスキーマファイルを生成します。</p>
+<h2 id="シードファイル生成"><a class="header" href="#シードファイル生成">シードファイル生成</a></h2>
+<pre><code>$ senax gen-seed sample init
+</code></pre>
+<p>シードファイルもマイグレーションと同様にDBに登録済みかのバージョン管理を行いますので、コマンドでシードファイルを生成します。</p>
+<h2 id="シードファイル記述"><a class="header" href="#シードファイル記述">シードファイル記述</a></h2>
+<p>db/sample/seeds/20221120120831_init.yml</p>
+<pre><code class="language-yml"># yaml-language-server: $schema=../seed-schema.json
+
+note:
+  categories:
+    diary:
+      name: diary
+  note:
+    note_1:
+      category_id: diary
+      key: sample
+      content: content
+  tags:
+    tag_1:
+      note_id: note_1
+      name: tag 1
+</code></pre>
+<p>「diary」と「note_1」はそれぞれオートインクリメントで登録されたIDが渡されるようになっています。</p>
+<h2 id="シードデータ投入"><a class="header" href="#シードデータ投入">シードデータ投入</a></h2>
+<pre><code>$ cargo run -p db_sample -- seed
+</code></pre>
+<h2 id="テーブル定義書生成"><a class="header" href="#テーブル定義書生成">テーブル定義書生成</a></h2>
+<pre><code>$ senax gen-db-doc sample &gt; db-document.html
+</code></pre>
+<p>環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。</p>
+<h2 id="コード記述"><a class="header" href="#コード記述">コード記述</a></h2>
+<p>_Noteを取得して日毎のカウンターを加算しています。
+save_delayedではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。</p>
+<p>server/src/routes/api/cache.rs</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[get(&quot;/cache/{key}&quot;)]
+async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl Responder {
+    let ctx = get_ctx_and_log(&amp;http_req);
+    let result = async move {
+        let mut conn = SampleConn::new();
+        let mut note = _Note::find_by_key_from_cache(&amp;conn, &amp;*key) // ユニークキーからのキャシュ取得
+            .await
+            .with_context(|| NotFound::new(&amp;http_req))?;
+        note.fetch_category(&amp;mut conn).await?; // これもキャシュから取得
+
+        let category = match note.category() {
+            None =&gt; None,
+            Some(v) =&gt; Some(v.name().to_owned()),
+        };
+
+        let date = Local::now().date_naive();
+        let counter = _Counters::find_optional_from_cache(&amp;conn, (note.id(), date)).await?;
+        let count = counter.map(|v| v.counter()).unwrap_or_default() + 1; // ここまではキャッシュから当日のカウント取得
+        let mut counter_for_update = _CountersFactory { // 当日のカウントが未登録の場合 INSERT
+            note_id: note.id(),
+            date,
+            counter: 0,
+        }
+        .create(&amp;conn);
+        let _ = counter_for_update.counter().add(1); // UPDATE加算
+        counter_for_update._upsert(); // INSERT ... ON DUPLICATE KEY UPDATE の指示
+        _Counters::save_delayed(&amp;mut conn, counter_for_update).await?;
+
+        Ok(Response {
+            id: note.id(),
+            category,
+            article: note.content().to_string(),
+            tags: note.tags().iter().map(|v| v.name().to_string()).collect(),
+            count,
+        })
+    }
+    .await;
+    json_response(result, &amp;ctx)
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>キャッシュを使用しないバージョンです。</p>
+<p>server/src/routes/api/no_cache.rs</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[get(&quot;/no_cache/{key}&quot;)]
+async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl Responder {
+    let ctx = get_ctx_and_log(&amp;http_req);
+    let result = async move {
+        let mut conn = SampleConn::new();
+        let mut note = _Note::find_by_key(&amp;mut conn, &amp;*key)
+            .await
+            .with_context(|| NotFound::new(&amp;http_req))?;
+        note.fetch_category(&amp;mut conn).await?;
+        note.fetch_tags(&amp;mut conn).await?;
+
+        let category = match note.category() {
+            None =&gt; None,
+            Some(v) =&gt; Some(v.name().to_owned()),
+        };
+        let date = Local::now().date_naive();
+        let counter = _Counters::find_optional(&amp;mut conn, (note.id(), date)).await?;
+        let count = counter.map(|v| v.counter()).unwrap_or_default() + 1;
+
+        let note_id = note.id();
+        let cond = db_sample::cond_note_counters!((note_id=note_id) AND (date=date));
+        conn.begin().await?;
+        let mut update = _Counters::for_update(&amp;mut conn);
+        let _ = update.counter().add(1);
+        _Counters::query()
+            .cond(cond)
+            .update(&amp;mut conn, update)
+            .await?;
+        conn.commit().await?;
+        
+        Ok(Response {
+            id: note.id(),
+            category,
+            article: note.content().to_string(),
+            tags: note.tags().iter().map(|v| v.name().to_string()).collect(),
+            count,
+        })
+    }
+    .await;
+    json_response(result, &amp;ctx)
+}
+<span class="boring">}
+</span></code></pre></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="schema-definition"><a class="header" href="#schema-definition">Schema Definition</a></h1>
+<ul>
+<li><a href="schema.html##/definitions/ConfigDef">properties/conf</a></li>
+<li><a href="schema.html##/definitions/EnumDef">properties/enum</a></li>
+<li><a href="schema.html##/definitions/ModelDef">properties/model</a></li>
+<li><a href="schema.html##/definitions/History">properties/history</a></li>
+</ul>
+<hr />
+<p><a id="#/definitions/ConfigDef"></a></p>
+<h2 id="config-definition"><a class="header" href="#config-definition">Config Definition</a></h2>
+<p>データベース設定</p>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>db_no</strong></td><td>integer</td><td>内部で使用されるデータベースナンバー。同一conf.ymlファイル内では自動生成の乱数で重複が発生しないが、設定ファイルが分かれる場合は重複を防ぐため指定できる。</td><td></td></tr>
+<tr><td><strong>db</strong></td><td><a href="schema.html##/definitions/DbType">DbType</a></td><td>使用するDB。現在のところmysqlのみ対応</td><td>Yes</td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td>仕様書等のためのタイトル</td><td></td></tr>
+<tr><td><strong>author</strong></td><td>string</td><td>仕様書等のための著者</td><td></td></tr>
+<tr><td><strong>ignore_foreign_key</strong></td><td>boolean</td><td>falseの場合は外部キー制約をDDLに出力しない</td><td></td></tr>
+<tr><td><strong>timestampable</strong></td><td><a href="schema.html##/definitions/Timestampable">Timestampable</a></td><td>デフォルトのタイムスタンプ設定</td><td></td></tr>
+<tr><td><strong>time_zone</strong></td><td><a href="schema.html##/definitions/TimeZone">TimeZone</a></td><td>日時型のデフォルトのタイムゾーン設定</td><td></td></tr>
+<tr><td><strong>timestamp_time_zone</strong></td><td><a href="schema.html##/definitions/TimeZone">TimeZone</a></td><td>created_at, updated_at, deleted_atに使用されるタイムゾーン</td><td></td></tr>
+<tr><td><strong>soft_delete</strong></td><td><a href="schema.html##/definitions/SoftDelete">SoftDelete</a></td><td>論理削除のデフォルト設定</td><td></td></tr>
+<tr><td><strong>use_cache</strong></td><td>boolean</td><td>キャッシュ使用のデフォルト設定</td><td></td></tr>
+<tr><td><strong>use_fast_cache</strong></td><td>boolean</td><td>高速キャッシュ使用設定（experimental）</td><td></td></tr>
+<tr><td><strong>use_cache_all</strong></td><td>boolean</td><td>全キャッシュ使用のデフォルト設定</td><td></td></tr>
+<tr><td><strong>tx_isolation</strong></td><td><a href="schema.html##/definitions/Isolation">Isolation</a></td><td>更新トランザクション分離レベル</td><td></td></tr>
+<tr><td><strong>read_tx_isolation</strong></td><td><a href="schema.html##/definitions/Isolation">Isolation</a></td><td>参照トランザクション分離レベル</td><td></td></tr>
+<tr><td><strong>engine</strong></td><td>string</td><td>MySQLのストレージエンジン</td><td></td></tr>
+<tr><td><strong>character_set</strong></td><td>string</td><td>文字セット</td><td></td></tr>
+<tr><td><strong>collate</strong></td><td>string</td><td>文字セット照合順序</td><td></td></tr>
+<tr><td><strong>preserve_column_order</strong></td><td>boolean</td><td>DDL出力時のカラム順序維持設定</td><td></td></tr>
+<tr><td><strong>groups</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/GroupDef">GroupDef</a>&gt;</td><td>モデルグループ</td><td>Yes</td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/DbType"></a></p>
+<h2 id="db-type"><a class="header" href="#db-type">DB type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>mysql</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/Timestampable"></a></p>
+<h2 id="timestampable"><a class="header" href="#timestampable">Timestampable</a></h2>
+<p><strong>any of the following</strong></p>
+<ul>
+<li><code>none</code></li>
+<li><code>real_time</code>(クエリー実行日時)</li>
+<li><code>fixed_time</code>(DbConnの生成日時)</li>
+</ul>
+<hr />
+<p><a id="#/definitions/TimeZone"></a></p>
+<h2 id="timezone"><a class="header" href="#timezone">TimeZone</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>local</code></li>
+<li><code>utc</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/SoftDelete"></a></p>
+<h2 id="softdelete"><a class="header" href="#softdelete">SoftDelete</a></h2>
+<p><strong>any of the following</strong></p>
+<ul>
+<li><code>none</code></li>
+<li><code>time</code></li>
+<li><code>flag</code></li>
+<li><code>unix_time</code>(ユニーク制約に使用するためのUNIXタイムスタンプ UNIX time for unique index support)</li>
+</ul>
+<hr />
+<p><a id="#/definitions/Isolation"></a></p>
+<h2 id="isolation"><a class="header" href="#isolation">Isolation</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>repeatable_read</code></li>
+<li><code>read_committed</code></li>
+<li><code>read_uncommitted</code></li>
+<li><code>serializable</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/GroupDef"></a></p>
+<h2 id="group-def"><a class="header" href="#group-def">Group Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td>Yes</td></tr>
+<tr><td><strong>type</strong></td><td><a href="schema.html##/definitions/GroupType">GroupType</a></td><td></td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/GroupType"></a></p>
+<h2 id="group-type"><a class="header" href="#group-type">Group Type</a></h2>
+<p><strong>any of the following</strong></p>
+<ul>
+<li><code>model</code>(モデル定義)</li>
+<li><code>enum</code>(列挙型定義のみ)</li>
+</ul>
+<hr />
+<p><a id="#/definitions/EnumDef"></a></p>
+<h2 id="enum-def"><a class="header" href="#enum-def">Enum Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>title</strong></td><td>string</td><td>タイトル</td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td>コメント</td><td></td></tr>
+<tr><td><strong>enum_values</strong></td><td>Array&lt;<a href="schema.html##/definitions/EnumValue">EnumValue</a>&gt;</td><td>列挙値</td><td>Yes</td></tr>
+<tr><td><strong>mod_name</strong></td><td>string</td><td>列挙子の名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/EnumValue"></a></p>
+<h2 id="enum-value"><a class="header" href="#enum-value">Enum Value</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>name</strong></td><td>string</td><td></td><td>Yes</td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>value</strong></td><td>integer</td><td>0～255の値</td><td>Yes</td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/ModelDef"></a></p>
+<h2 id="model-def"><a class="header" href="#model-def">Model Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>title</strong></td><td>string</td><td>仕様書等のためのタイトル</td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td>コメント</td><td></td></tr>
+<tr><td><strong>table_name</strong></td><td>string</td><td>テーブル名</td><td></td></tr>
+<tr><td><strong>ignore_foreign_key</strong></td><td>boolean</td><td>falseの場合は外部キー制約をDDLに出力しない</td><td></td></tr>
+<tr><td><strong>timestampable</strong></td><td><a href="schema.html##/definitions/Timestampable">Timestampable</a></td><td>タイムスタンプ設定</td><td></td></tr>
+<tr><td><strong>disable_created_at</strong></td><td>boolean</td><td>created_atの無効化</td><td></td></tr>
+<tr><td><strong>disable_updated_at</strong></td><td>boolean</td><td>updated_atの無効化</td><td></td></tr>
+<tr><td><strong>soft_delete</strong></td><td><a href="schema.html##/definitions/SoftDelete">SoftDelete</a></td><td>論理削除設定</td><td></td></tr>
+<tr><td><strong>versioned</strong></td><td>boolean</td><td>キャッシュ整合性のためのバージョンを使用するか</td><td></td></tr>
+<tr><td><strong>counting</strong></td><td>string</td><td>save_delayedでカウンターを使用するカラム</td><td></td></tr>
+<tr><td><strong>use_cache</strong></td><td>boolean</td><td>キャッシュを使用するか</td><td></td></tr>
+<tr><td><strong>use_fast_cache</strong></td><td>boolean</td><td>高速キャッシュを使用するか(experimental)</td><td></td></tr>
+<tr><td><strong>use_cache_all</strong></td><td>boolean</td><td>全キャッシュを使用するか</td><td></td></tr>
+<tr><td><strong>ignore_propagated_insert_cache</strong></td><td>boolean</td><td>他サーバでinsertされたデータをキャッシュするか</td><td></td></tr>
+<tr><td><strong>on_delete_fn</strong></td><td>boolean</td><td>物理削除時の_before_deleteと_after_deleteの呼び出しを行うか</td><td></td></tr>
+<tr><td><strong>abstract</strong></td><td>boolean</td><td>抽象化モード</td><td></td></tr>
+<tr><td><strong>inheritance</strong></td><td><a href="schema.html##/definitions/Inheritance">Inheritance</a></td><td>継承モード</td><td></td></tr>
+<tr><td><strong>engine</strong></td><td>string</td><td>MySQLのストレージエンジン</td><td></td></tr>
+<tr><td><strong>character_set</strong></td><td>string</td><td>文字セット</td><td></td></tr>
+<tr><td><strong>collate</strong></td><td>string</td><td>文字セット照合順序</td><td></td></tr>
+<tr><td><strong>mod_name</strong></td><td>string</td><td>名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
+<tr><td><strong>columns</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/ColumnTypeOrDef">ColumnTypeOrDef</a>&gt;</td><td>カラム</td><td></td></tr>
+<tr><td><strong>relations</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/RelDef">RelDef</a>&gt;</td><td>リレーション</td><td></td></tr>
+<tr><td><strong>indexes</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/IndexDef">IndexDef</a>&gt;</td><td>インデックス</td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/Inheritance"></a></p>
+<h2 id="inheritance"><a class="header" href="#inheritance">Inheritance</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>extends</strong></td><td>string</td><td>継承元</td><td>Yes</td></tr>
+<tr><td><strong>type</strong></td><td><a href="schema.html##/definitions/InheritanceType">InheritanceType</a></td><td>継承タイプ</td><td>Yes</td></tr>
+<tr><td><strong>key_field</strong></td><td>string</td><td>column_aggregationの場合のキーカラム</td><td></td></tr>
+<tr><td><strong>key_value</strong></td><td>[boolean, number, string, integer]</td><td>column_aggregationの場合のキーの値</td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/InheritanceType"></a></p>
+<h2 id="inheritance-type"><a class="header" href="#inheritance-type">Inheritance Type</a></h2>
+<p><strong>any of the following</strong></p>
+<ul>
+<li><code>simple</code>(単一テーブル継承 子テーブルのカラムも含めたすべてのカラムを親となるテーブルに格納する)</li>
+<li><code>concrete</code>(具象テーブル継承 子クラスごとに共通のカラムとそれぞれのモデルのカラムをすべて含んだ状態で独立したテーブルを作成する)</li>
+<li><code>column_aggregation</code>(カラム集約テーブル継承 単一テーブル継承と似ているが、型を特定するための _type カラムがある)</li>
+</ul>
+<hr />
+<p><a id="#/definitions/ColumnTypeOrDef"></a></p>
+<h2 id="column-type-or-def"><a class="header" href="#column-type-or-def">Column Type Or Def</a></h2>
+<p><strong>any of the following</strong></p>
+<ul>
+<li><a href="schema.html##/definitions/ColumnDef">ColumnDef</a></li>
+<li><a href="schema.html##/definitions/ColumnSubsetType">ColumnSubsetType</a></li>
+</ul>
+<hr />
+<p><a id="#/definitions/ColumnDef"></a></p>
+<h2 id="column-def"><a class="header" href="#column-def">Column Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>type</strong></td><td><a href="schema.html##/definitions/ColumnType">ColumnType</a></td><td></td><td>Yes</td></tr>
+<tr><td><strong>signed</strong></td><td>boolean</td><td>指定がない場合はunsigned</td><td></td></tr>
+<tr><td><strong>not_null</strong></td><td>boolean</td><td>指定がない場合はnullable</td><td></td></tr>
+<tr><td><strong>primary</strong></td><td>boolean</td><td></td><td></td></tr>
+<tr><td><strong>auto_increment</strong></td><td><a href="schema.html##/definitions/AutoIncrement">AutoIncrement</a></td><td></td><td></td></tr>
+<tr><td><strong>length</strong></td><td>integer</td><td></td><td></td></tr>
+<tr><td><strong>collate</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>not_serializable</strong></td><td>boolean</td><td>serializeに出力しない（パスワード等保護用）</td><td></td></tr>
+<tr><td><strong>precision</strong></td><td>integer</td><td></td><td></td></tr>
+<tr><td><strong>scale</strong></td><td>integer</td><td></td><td></td></tr>
+<tr><td><strong>time_zone</strong></td><td><a href="schema.html##/definitions/TimeZone">TimeZone</a></td><td></td><td></td></tr>
+<tr><td><strong>enum_values</strong></td><td>Array&lt;<a href="schema.html##/definitions/EnumValue">EnumValue</a>&gt;</td><td>列挙型の値</td><td></td></tr>
+<tr><td><strong>db_enum_values</strong></td><td>Array&lt;<a href="schema.html##/definitions/DbEnumValue">DbEnumValue</a>&gt;</td><td>DBの列挙型を使用する場合の値</td><td></td></tr>
+<tr><td><strong>enum_model</strong></td><td>string</td><td>スキーマ内で定義された列挙値名　（名前は::区切り）</td><td></td></tr>
+<tr><td><strong>json_class</strong></td><td>string</td><td>Json型で使用する型名</td><td></td></tr>
+<tr><td><strong>exclude_from_cache</strong></td><td>boolean</td><td>キャッシュからの除外設定</td><td></td></tr>
+<tr><td><strong>skip_factory</strong></td><td>boolean</td><td>factoryからの除外設定</td><td></td></tr>
+<tr><td><strong>rename</strong></td><td>string</td><td>カラム名の別名設定</td><td></td></tr>
+<tr><td><strong>srid</strong></td><td>integer</td><td>Point型のSRID</td><td></td></tr>
+<tr><td><strong>default</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>sql_comment</strong></td><td>string</td><td></td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/ColumnType"></a></p>
+<h2 id="column-type"><a class="header" href="#column-type">Column Type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>tinyint</code></li>
+<li><code>smallint</code></li>
+<li><code>int</code></li>
+<li><code>bigint</code></li>
+<li><code>float</code></li>
+<li><code>double</code></li>
+<li><code>varchar</code></li>
+<li><code>boolean</code></li>
+<li><code>text</code></li>
+<li><code>blob</code></li>
+<li><code>timestamp</code></li>
+<li><code>datetime</code></li>
+<li><code>date</code></li>
+<li><code>time</code></li>
+<li><code>decimal</code></li>
+<li><code>array_int</code></li>
+<li><code>array_string</code></li>
+<li><code>json</code></li>
+<li><code>enum</code></li>
+<li><code>db_enum</code></li>
+<li><code>db_set</code></li>
+<li><code>point</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/AutoIncrement"></a></p>
+<h2 id="auto-increment"><a class="header" href="#auto-increment">Auto Increment</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>auto</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/DbEnumValue"></a></p>
+<h2 id="db-enum-value"><a class="header" href="#db-enum-value">DB Enum Value</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>name</strong></td><td>string</td><td></td><td>Yes</td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/ColumnSubsetType"></a></p>
+<h2 id="column-subset-type"><a class="header" href="#column-subset-type">Column Subset Type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>tinyint</code></li>
+<li><code>smallint</code></li>
+<li><code>int</code></li>
+<li><code>bigint</code></li>
+<li><code>float</code></li>
+<li><code>double</code></li>
+<li><code>varchar</code></li>
+<li><code>boolean</code></li>
+<li><code>text</code></li>
+<li><code>blob</code></li>
+<li><code>datetime</code></li>
+<li><code>date</code></li>
+<li><code>time</code></li>
+<li><code>decimal</code></li>
+<li><code>array_int</code></li>
+<li><code>array_string</code></li>
+<li><code>json</code></li>
+<li><code>tinyint_not_null</code></li>
+<li><code>smallint_not_null</code></li>
+<li><code>int_not_null</code></li>
+<li><code>bigint_not_null</code></li>
+<li><code>float_not_null</code></li>
+<li><code>double_not_null</code></li>
+<li><code>varchar_not_null</code></li>
+<li><code>boolean_not_null</code></li>
+<li><code>text_not_null</code></li>
+<li><code>blob_not_null</code></li>
+<li><code>datetime_not_null</code></li>
+<li><code>date_not_null</code></li>
+<li><code>time_not_null</code></li>
+<li><code>decimal_not_null</code></li>
+<li><code>array_int_not_null</code></li>
+<li><code>array_string_not_null</code></li>
+<li><code>json_not_null</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/RelDef"></a></p>
+<h2 id="relation-def"><a class="header" href="#relation-def">Relation Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>model</strong></td><td>string</td><td>結合先のモデル　他のグループは::区切りで指定</td><td></td></tr>
+<tr><td><strong>type</strong></td><td><a href="schema.html##/definitions/RelationsType">RelationsType</a></td><td></td><td></td></tr>
+<tr><td><strong>local</strong></td><td>string</td><td>結合するローカルのカラム名</td><td></td></tr>
+<tr><td><strong>foreign</strong></td><td>string</td><td>結合先のカラム名</td><td></td></tr>
+<tr><td><strong>in_cache</strong></td><td>boolean</td><td>manyあるいはone_to_oneの場合にリレーション先も一緒にキャッシュするか 結合深さは1代のみで子テーブルは親に含んだ状態で更新する必要がある</td><td></td></tr>
+<tr><td><strong>raw_cond</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>order_by</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>desc</strong></td><td>boolean</td><td></td><td></td></tr>
+<tr><td><strong>limit</strong></td><td>integer</td><td></td><td></td></tr>
+<tr><td><strong>use_cache</strong></td><td>boolean</td><td></td><td></td></tr>
+<tr><td><strong>use_cache_with_trashed</strong></td><td>boolean</td><td>リレーション先が論理削除されていてもキャッシュを取得する</td><td></td></tr>
+<tr><td><strong>on_delete</strong></td><td><a href="schema.html##/definitions/ReferenceOption">ReferenceOption</a></td><td>DBの外部キー制約による削除およびソフトウェア側での削除制御</td><td></td></tr>
+<tr><td><strong>on_update</strong></td><td><a href="schema.html##/definitions/ReferenceOption">ReferenceOption</a></td><td>DBの外部キー制約による更新</td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/RelationsType"></a></p>
+<h2 id="relations-type"><a class="header" href="#relations-type">Relations Type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>many</code></li>
+<li><code>one</code></li>
+<li><code>one_to_one</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/ReferenceOption"></a></p>
+<h2 id="reference-option"><a class="header" href="#reference-option">Reference Option</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>restrict</code></li>
+<li><code>cascade</code></li>
+<li><code>set_null</code></li>
+<li><code>set_zero</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/IndexDef"></a></p>
+<h2 id="index-def"><a class="header" href="#index-def">Index Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>fields</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/IndexFieldDef">IndexFieldDef</a>&gt;</td><td></td><td></td></tr>
+<tr><td><strong>type</strong></td><td><a href="schema.html##/definitions/IndexType">IndexType</a></td><td></td><td></td></tr>
+<tr><td><strong>parser</strong></td><td><a href="schema.html##/definitions/Parser">Parser</a></td><td></td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/IndexFieldDef"></a></p>
+<h2 id="index-field-def"><a class="header" href="#index-field-def">Index Field Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>sorting</strong></td><td><a href="schema.html##/definitions/SortType">SortType</a></td><td></td><td></td></tr>
+<tr><td><strong>length</strong></td><td>integer</td><td></td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/SortType"></a></p>
+<h2 id="sort-type"><a class="header" href="#sort-type">Sort Type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>asc</code></li>
+<li><code>desc</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/IndexType"></a></p>
+<h2 id="index-type"><a class="header" href="#index-type">Index Type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>index</code></li>
+<li><code>unique</code></li>
+<li><code>fulltext</code></li>
+<li><code>spatial</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/Parser"></a></p>
+<h2 id="parser"><a class="header" href="#parser">Parser</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>ngram</code></li>
+<li><code>mecab</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/History"></a></p>
+<h2 id="history"><a class="header" href="#history">History</a></h2>
+<p>更新履歴</p>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>date</strong></td><td>string</td><td>更新日</td><td>Yes</td></tr>
+<tr><td><strong>description</strong></td><td>string</td><td>変更内容</td><td>Yes</td></tr>
+<tr><td><strong>author</strong></td><td>string</td><td>担当者</td><td></td></tr>
+<tr><td><strong>version</strong></td><td>string</td><td>バージョン</td><td></td></tr>
+</tbody></table>
+</div><div style="break-before: page; page-break-before: always;"></div><h1 id="envファイル"><a class="header" href="#envファイル">.envファイル</a></h1>
+<p>改行区切りを使用するために dotenv ではなく、 dotenvy を使用してください。</p>
+<h2 id="db設定"><a class="header" href="#db設定">DB設定</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>パラメータ名</th><th>説明</th></tr></thead><tbody>
+<tr><td>{DB名}_DB_URL</td><td>更新用DB接続URL（改行区切りでシャーディング設定）</td></tr>
+<tr><td>{DB名}_REPLICA_DB_URL</td><td>参照用DB接続URL（改行区切りでシャーディング設定、カンマ区切りでレプリカ設定）</td></tr>
+<tr><td>{DB名}_CACHE_DB_URL</td><td>キャッシュ用DB接続URL（改行区切りでシャーディング設定、カンマ区切りでレプリカ設定）</td></tr>
+<tr><td>{DB名}_TEST_DB_URL</td><td>テストDB接続URL</td></tr>
+<tr><td>{DB名}_DB_MAX_CONNECTIONS</td><td>更新用コネクション数</td></tr>
+<tr><td>{DB名}_REPLICA_DB_MAX_CONNECTIONS</td><td>参照用コネクション数</td></tr>
+<tr><td>{DB名}_CACHE_DB_MAX_CONNECTIONS</td><td>キャッシュ用コネクション数</td></tr>
+</tbody></table>
+</div>
+<h2 id="キャッシュ設定"><a class="header" href="#キャッシュ設定">キャッシュ設定</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>パラメータ名</th><th>説明</th></tr></thead><tbody>
+<tr><td>{DB名}_FAST_CACHE_INDEX_SIZE</td><td>高速キャッシュインデックスメモリサイズ</td></tr>
+<tr><td>{DB名}_SHORT_CACHE_CAPACITY</td><td>ショートキャッシュメモリサイズ</td></tr>
+<tr><td>{DB名}_SHORT_CACHE_TIME</td><td>ショートキャッシュ保持時間(秒)</td></tr>
+<tr><td>{DB名}_LONG_CACHE_CAPACITY</td><td>ロングキャッシュメモリサイズ</td></tr>
+<tr><td>{DB名}_LONG_CACHE_TIME</td><td>ロングキャッシュ保持時間(秒)</td></tr>
+<tr><td>{DB名}_LONG_CACHE_IDLE_TIME</td><td>ロングキャッシュアイドル時間(秒)</td></tr>
+<tr><td>{DB名}_DISK_CACHE_INDEX_SIZE</td><td>ディスクキャッシュインデックスメモリサイズ</td></tr>
+<tr><td>{DB名}_DISK_CACHE_FILE_NUM</td><td>ディスクキャッシュ分割ファイル数</td></tr>
+<tr><td>{DB名}_DISK_CACHE_FILE_SIZE</td><td>ディスクキャッシュファイルサイズ</td></tr>
+<tr><td>{DB名}_CACHE_TTL</td><td>キャッシュ保持時間</td></tr>
+<tr><td>DISABLE_{DB名}_CACHE</td><td>そのサーバへのキャッシュと更新通知の無効化(true or false)</td></tr>
+</tbody></table>
+</div>
+<h2 id="リンカー設定"><a class="header" href="#リンカー設定">リンカー設定</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>パラメータ名</th><th>説明</th></tr></thead><tbody>
+<tr><td>LINKER_PORT</td><td>リンカー接続ポート(TCP or UNIX)</td></tr>
+<tr><td>LINKER_PASSWORD</td><td>リンカーパスポート</td></tr>
+</tbody></table>
+</div><div style="break-before: page; page-break-before: always;"></div><h1 id="トランザクション"><a class="header" href="#トランザクション">トランザクション</a></h1>
+<p>トランザクションには更新用トランザクションと参照用トランザクションがあります。<br />
+同時に使用する場合、更新用と参照用の取得順序が混在しているとコネクションプールからの取得がデッドロックする可能性がありますので統一する必要があります。<br />
+また、キャッシュの取得は現在使用しているコネクションとは別コネクションで参照用トランザクションを用いて取得されます。</p>
+<h2 id="更新用トランザクション"><a class="header" href="#更新用トランザクション">更新用トランザクション</a></h2>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut conn = DbConn::new();
+conn.begin().await?;
+
+conn.commit().await?;
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="参照用トランザクション"><a class="header" href="#参照用トランザクション">参照用トランザクション</a></h2>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut conn = DbConn::new();
+conn.begin_read_tx().await?;
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="セーブポイント"><a class="header" href="#セーブポイント">セーブポイント</a></h2>
+<p>更新用トランザクションがネストされているとセーブポイントになります。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="モデルについて"><a class="header" href="#モデルについて">モデルについて</a></h1>
+<h2 id="メソッド"><a class="header" href="#メソッド">メソッド</a></h2>
+<p>モデル名で自動生成されるメソッド</p>
+<div class="table-wrapper"><table><thead><tr><th>メソッド</th><th>説明</th></tr></thead><tbody>
+<tr><td>bulk_insert</td><td></td></tr>
+<tr><td>bulk_upsert</td><td></td></tr>
+<tr><td>clear_cache</td><td></td></tr>
+<tr><td>delete</td><td></td></tr>
+<tr><td>delete_by_ids</td><td></td></tr>
+<tr><td>eq</td><td></td></tr>
+<tr><td>find</td><td></td></tr>
+<tr><td>find_all_from_cache</td><td></td></tr>
+<tr><td>find_by_key</td><td></td></tr>
+<tr><td>find_by_key_from_cache</td><td></td></tr>
+<tr><td>find_for_update</td><td></td></tr>
+<tr><td>find_for_update_with_trashed</td><td></td></tr>
+<tr><td>find_from_cache</td><td></td></tr>
+<tr><td>find_from_cache_with_trashed</td><td></td></tr>
+<tr><td>find_many</td><td></td></tr>
+<tr><td>find_many_for_update</td><td></td></tr>
+<tr><td>find_many_from_cache</td><td></td></tr>
+<tr><td>find_many_from_cache_with_trashed</td><td></td></tr>
+<tr><td>find_many_with_trashed</td><td></td></tr>
+<tr><td>find_optional</td><td></td></tr>
+<tr><td>find_optional_for_update</td><td></td></tr>
+<tr><td>find_optional_from_cache</td><td></td></tr>
+<tr><td>find_optional_from_cache_with_trashed</td><td></td></tr>
+<tr><td>find_optional_with_trashed</td><td></td></tr>
+<tr><td>find_with_trashed</td><td></td></tr>
+<tr><td>for_update</td><td></td></tr>
+<tr><td>force_delete</td><td></td></tr>
+<tr><td>force_delete_all</td><td></td></tr>
+<tr><td>force_delete_by_ids</td><td></td></tr>
+<tr><td>force_delete_relations</td><td></td></tr>
+<tr><td>insert_delayed</td><td></td></tr>
+<tr><td>insert_dummy_cache</td><td></td></tr>
+<tr><td>insert_ignore</td><td></td></tr>
+<tr><td>query</td><td></td></tr>
+<tr><td>restore</td><td></td></tr>
+<tr><td>save</td><td></td></tr>
+<tr><td>save_delayed</td><td></td></tr>
+<tr><td>set</td><td></td></tr>
+<tr><td>upsert_delayed</td><td></td></tr>
+<tr><td>_receive_update_notice</td><td></td></tr>
+</tbody></table>
+</div>
+<h2 id="querybuilder"><a class="header" href="#querybuilder">QueryBuilder</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>メソッド</th><th>説明</th></tr></thead><tbody>
+<tr><td>bind</td><td></td></tr>
+<tr><td>cond</td><td></td></tr>
+<tr><td>count</td><td></td></tr>
+<tr><td>delete</td><td></td></tr>
+<tr><td>fetch_category</td><td></td></tr>
+<tr><td>fetch_tags</td><td></td></tr>
+<tr><td>force_delete</td><td></td></tr>
+<tr><td>limit</td><td></td></tr>
+<tr><td>offset</td><td></td></tr>
+<tr><td>only_trashed</td><td></td></tr>
+<tr><td>order_by</td><td></td></tr>
+<tr><td>raw_query</td><td></td></tr>
+<tr><td>select</td><td></td></tr>
+<tr><td>select_for</td><td>カラム数を削減したサブセット型で取得を行う</td></tr>
+<tr><td>select_for_update</td><td></td></tr>
+<tr><td>select_from_cache</td><td></td></tr>
+<tr><td>select_from_cache_with_count</td><td></td></tr>
+<tr><td>select_one</td><td></td></tr>
+<tr><td>select_one_for</td><td></td></tr>
+<tr><td>select_stream</td><td></td></tr>
+<tr><td>select_stream_for</td><td></td></tr>
+<tr><td>select_with_count</td><td>limit制限付きの場合に、全件検索結果数とlimit分の取得結果を返す</td></tr>
+<tr><td>select_with_count_for</td><td></td></tr>
+<tr><td>update</td><td></td></tr>
+<tr><td>with_trashed</td><td></td></tr>
+</tbody></table>
+</div>
+<h2 id="_モデル名rel"><a class="header" href="#_モデル名rel">_{モデル名}Rel</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>メソッド</th><th>説明</th></tr></thead><tbody>
+<tr><td>fetch_category</td><td></td></tr>
+</tbody></table>
+</div>
+<h1 id="crud"><a class="header" href="#crud">CRUD</a></h1>
+<h2 id="create"><a class="header" href="#create">Create</a></h2>
+<pre><code>let obj = _{モデル名}Factory {
+    ...
+}.create(conn);
+_{モデル名}::save(conn, obj).await?;
+</code></pre>
+<h2 id="read"><a class="header" href="#read">Read</a></h2>
+<p>取得方法は多数ありますので、一例です。</p>
+<pre><code>let obj = _{モデル名}::find(&amp;mut conn, id).await?
+</code></pre>
+<h2 id="update"><a class="header" href="#update">Update</a></h2>
+<p>更新時はカラム名のメソッドでアクセッサを呼び出し、set,add,sub,max,min,bit_and,bit_orを実行して更新します。</p>
+<pre><code>let mut obj = _{モデル名}::find_for_update(&amp;mut conn, id).await?
+obj.{カラム名}().set(1);
+_{モデル名}::save(conn, obj).await?;
+</code></pre>
+<h2 id="delete"><a class="header" href="#delete">Delete</a></h2>
+<pre><code>let obj = _{モデル名}::find_for_update(&amp;mut conn, id).await?
+_{モデル名}::delete(conn, obj).await?;
+</code></pre>
+<pre><code>let obj = _{モデル名}::find_for_update(&amp;mut conn, id).await?
+_{モデル名}::force_delete(conn, obj).await?;
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="クエリー"><a class="header" href="#クエリー">クエリー</a></h1>
+<p>QueryBuilderで使用するクエリーはマクロで記述されます。<br />
+基本的に左側にカラム名、右側に値となります。<br />
+クエリーはそのままテキスト化ではなく、プリペアードステートメントに変換されますので、SQLインジェクションは発生しません。
+他のテーブルとの結合はJOINではなく、EXISTSで判定します。</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let cond = db_{DB名}::cond_{グループ名}_{モデル名}!(クエリー);
+let cond = db_sample::cond_note_note!(color = _Color::c);
+let cond = db_sample::cond_note_note!(content = &quot;ddd&quot;);
+let cond = db_sample::cond_note_note!(NOT(note_id = id));
+let cond = db_sample::cond_note_note!(note_id SEMI_OPEN (3, 5));
+let cond = db_sample::cond_note_note!((note_id &lt; c) AND (note_id &lt; 20) AND (note_id IN (3,3)));
+let cond = db_sample::cond_note_note!((NOT ((note_id &lt; c) AND (note_id &lt; 1) AND (note_id &lt; 2))) OR (note_id &lt; 3) OR (note_id &lt; 4));
+let cond = db_sample::cond_note_note!(note_id ANY_BITS c);
+let cond = db_sample::cond_note_note!(ONLY_TRASHED AND (category EXISTS (name = &quot;diary&quot;)));
+let cond = cond.and(db_sample::cond_note_note!(json CONTAINS [3,5]));
+let result = _Note::query().cond(cond).select(conn).await?;
+<span class="boring">}
+</span></code></pre></pre>
+<p>order by については下記のようになります。
+IS NULL ASCの指定も可能ですが、インデックスの最適化は得られない可能性があります。</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let order = db_sample::order_by_note_note!(note_id IS NULL ASC, note_id ASC);
+let result = _Note::query().order_by(order).select(conn).await?;
+<span class="boring">}
+</span></code></pre></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="キャッシュ"><a class="header" href="#キャッシュ">キャッシュ</a></h1>
+<h2 id="エンティティキャッシュ-1"><a class="header" href="#エンティティキャッシュ-1">エンティティキャッシュ</a></h2>
+<p>テーブルのデータとリレーション先のデータをまとめてキャッシュします。
+リレーション先は1世代のみです。</p>
+<h2 id="ショートキャッシュ"><a class="header" href="#ショートキャッシュ">ショートキャッシュ</a></h2>
+<p>insertされたデータが必ずしも参照されるとは限らないので、参照されるまでTTLの短いショートキャッシュに保存されます。</p>
+<h2 id="高速キャッシュ"><a class="header" href="#高速キャッシュ">高速キャッシュ</a></h2>
+<p>エンティティキャッシュをノンブロッキングでより高速に参照できるキャッシュです。<br />
+キャッシュのみのベンチマークでは高速ですが、全体としての影響は未確認です。</p>
+<h2 id="ディスクキャッシュ"><a class="header" href="#ディスクキャッシュ">ディスクキャッシュ</a></h2>
+<p>キャッシュをディスクに保存します。保存先はSSDを想定しています。<br />
+io_uringを使用しているため、Linuxのみ対応。<br />
+ディスクキャッシュに保存されている位置を示すインデックス領域をメモリ上に必要とするため、大容量のディスクキャッシュは難しいかもしれません。<br />
+ホットデプロイではディスクキャッシュの再利用を行わず、別ファイルとなります。瞬時にディスクキャッシュがフルになって2倍の容量を必要とすることはないと思われますが、前のサーバが速やかに終了しない場合問題が発生する可能性があります。<br />
+単純な追記書き込みのため、容量効率はよくありませんが、下記2点に特化しています。</p>
+<ul>
+<li>ディスクキャッシュ上に保存されているかの判定がメモリ上で瞬時に可能</li>
+<li>指定されたディスク容量を絶対にオーバーしない</li>
+</ul>
+<h2 id="バージョンキャッシュ"><a class="header" href="#バージョンキャッシュ">バージョンキャッシュ</a></h2>
+<p>キャッシュの更新とDBからの取得がほぼ同時の場合に不整合が発生していないかの確認のため、バージョン機能を有効にしている場合にバージョンナンバーをキャッシュします。</p>
+<h2 id="ユニークインデックスキャッシュ"><a class="header" href="#ユニークインデックスキャッシュ">ユニークインデックスキャッシュ</a></h2>
+<p>ユニークインデックスがある場合、ユニークインデックスからIDを検索するためのユニークインデックスキャッシュを使用します。</p>
+<h2 id="ダミーキャッシュ"><a class="header" href="#ダミーキャッシュ">ダミーキャッシュ</a></h2>
+<p>「いいね！」などの表示は押されていなければデータが無いのでキャッシュされず、何度も再取得されることになる。<br />
+その場合、「いいね！」を解除した状態のデータを insert_dummy_cache で登録することで代わりのキャッシュとすることができる。</p>
+<h2 id="キャッシュ更新通知"><a class="header" href="#キャッシュ更新通知">キャッシュ更新通知</a></h2>
+<p>_receive_update_notice で他のサーバからのキャッシュ更新通知を受信することができます。新着やランキングの修正、チャット通知などに利用できます。 </p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="遅延一括更新-1"><a class="header" href="#遅延一括更新-1">遅延一括更新</a></h1>
+<h2 id="insert_delayed"><a class="header" href="#insert_delayed">insert_delayed</a></h2>
+<p>ログやツイートを想定しており、同時にリクエストを受け付けた他の保存データとまとめてバルクインサートを行う。<br />
+DBとの接続が切れている場合はディスクに保存して、接続が復活するとDBに保存される。<br />
+リレーションのデータも同時に保存可能。</p>
+<h2 id="save_delayed"><a class="header" href="#save_delayed">save_delayed</a></h2>
+<p>アクセスカウンタを想定しており、同一のページへのアクセスが複数回行われる場合に、それらのアクセス数を加算してからDBへの加算クエリーが実行される。<br />
+加算後のカウンタ値を取得してmaxクエリーに変換してサーバ間同期が行われるので、サーバ間のキャッシュ不整合が発生しない。<br />
+DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行わる。その間サーバは終了できない。<br />
+リレーションのデータは保存されない。</p>
+<h2 id="upsert_delayed"><a class="header" href="#upsert_delayed">upsert_delayed</a></h2>
+<p>「いいね！」のチェックを想定しており、複数のページへの同一のUPDATEクエリーをまとめて実行される。<br />
+save_delayed ではそれぞれの主キーごとに1クエリーを必要とするが、upsert_delayed では主キーをIN句にまとめるため効率が良い。
+アクセスカウンタにも使用可能であるが、maxクエリーへの変換が行われないので、データを取得するタイミングと加算するタイミングによりサーバ間のキャッシュ不整合が発生する可能性がある。 
+DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行わる。その間サーバは終了できない。<br />
+リレーションのデータは保存されない。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="ドメイン"><a class="header" href="#ドメイン">ドメイン</a></h1>
+<p>ORMのモデル層としてはカスタマイズ用の note.rs にロジックを実装したくなるところですが、自動生成されたクレートのビルドに非常に時間がかかるので、別途ドメイン用のクレートを用意してそちらにビジネスロジックを実装します。<br />
+単純な方法としてはビジネスロジックのトレイトを定義して _Note にトレイトの実装を行うことで、 _Note にメソッドが追加されたように扱うことができます。<br />
+クリーンアーキテクチャの場合はモデルとテーブルの乖離が大きいので、 _Note をそのまま使用することはせず、 Note などの名前で新しい構造体を定義してデータの詰替などを実装する必要があると考えられます。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="テスト"><a class="header" href="#テスト">テスト</a></h1>
+<p>テストはテストDB接続URLで指定されたDBで実行されます。<br />
+start_test()の呼び出しでデータベースは初期化されマイグレーションが実行されます。<br />
+実DBを使用しますので、排他処理により一つずつ実行されます。</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn test() -&gt; Result&lt;()&gt; {
+        dotenvy::dotenv().ok();
+        let _guard = db_sample::start_test().await?;
+        let mut conn = DbConn::new();
+        conn.begin().await?;
+        ...
+        conn.commit().await?;
+        Ok(())
+    }
+}
+<span class="boring">}
+</span></code></pre></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="その他"><a class="header" href="#その他">その他</a></h1>
+<p>その他の項目として下記について説明します。</p>
+<ul>
+<li>ロガー</li>
+<li>リンカー</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="ロガー"><a class="header" href="#ロガー">ロガー</a></h1>
+<p>senax-loggerは下記の特徴があります。</p>
+<ul>
+<li>LTSV形式で出力します。</li>
+<li>1秒毎にzstdで圧縮して出力します。ただし、圧縮率は低くなるため、ローテーション後に再圧縮が必要です。</li>
+<li>1日毎にローテーションします。</li>
+<li>Linuxの場合、io_uringを使用します。</li>
+<li>request, responseなどLOG_FILEで指定されたログは別ファイルに出力できます。</li>
+<li>errorとwarnのログ通知を受けて処理をカスタマイズすることができます。</li>
+</ul>
+<p>コード例</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let (error_rx, warn_rx) = senax_logger::init(Some(time::macros::offset!(+9)))?;
+<span class="boring">}
+</span></code></pre></pre>
+<p>error_rx, warn_rxを使用しない場合は、必ず戻り値を破棄してください。</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>senax_logger::init(Some(time::macros::offset!(+9)))?;
+<span class="boring">}
+</span></code></pre></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="リンカー"><a class="header" href="#リンカー">リンカー</a></h1>
+<p>リンカーはキャッシュの更新内容をサーバ間に送信する中継器の役割を持ちます。<br />
+etcdが必要です。</p>
+<h2 id="インストール-1"><a class="header" href="#インストール-1">インストール</a></h2>
+<pre><code>cargo install senax-linker
+</code></pre>
+<h2 id="自己認証局ファイル生成"><a class="header" href="#自己認証局ファイル生成">自己認証局ファイル生成</a></h2>
+<p>certsディレクトリの下に自己認証局に必要なファイルを生成します。</p>
+<pre><code>senax-linker --cert
+</code></pre>
+<h2 id="env設定"><a class="header" href="#env設定">.env設定</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>パラメータ名</th><th>必須</th><th>説明</th></tr></thead><tbody>
+<tr><td>KEY</td><td></td><td></td></tr>
+<tr><td>CERT</td><td></td><td></td></tr>
+<tr><td>CA</td><td></td><td></td></tr>
+<tr><td>HOST_NAME</td><td></td><td>認証局用ホスト名</td></tr>
+<tr><td>TCP_PORT</td><td></td><td></td></tr>
+<tr><td>UNIX_PORT</td><td></td><td></td></tr>
+<tr><td>LINK_PORT</td><td></td><td></td></tr>
+<tr><td>PASSWORD</td><td>Yes</td><td>サーバとの接続時に使用されるパスワード</td></tr>
+<tr><td>ETCD_PORT</td><td></td><td></td></tr>
+<tr><td>ETCD_USER</td><td></td><td></td></tr>
+<tr><td>ETCD_PW</td><td></td><td></td></tr>
+<tr><td>ETCD_DOMAIN_NAME</td><td></td><td></td></tr>
+<tr><td>ETCD_CA_PEM_FILE</td><td></td><td></td></tr>
+<tr><td>ETCD_CERT_PEM_FILE</td><td></td><td></td></tr>
+<tr><td>ETCD_KEY_PEM_FILE</td><td></td><td></td></tr>
+</tbody></table>
+</div>
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js" charset="utf-8"></script>
+        <script src="mark.min.js" charset="utf-8"></script>
+        <script src="searcher.js" charset="utf-8"></script>
+
+        <script src="clipboard.min.js" charset="utf-8"></script>
+        <script src="highlight.js" charset="utf-8"></script>
+        <script src="book.js" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+        <script type="text/javascript">
+        var langs = [
+            'ja',
+            'en'
+        ];
+
+        (function langs() {
+            var html = document.querySelector('html');
+            var langToggleButton = document.getElementById('lang-toggle');
+            var langPopup = document.getElementById('lang-list');
+
+            function showLangs() {
+                langPopup.style.display = 'block';
+                langToggleButton.setAttribute('aria-expanded', true);
+            }
+
+            function hideLangs() {
+                langPopup.style.display = 'none';
+                langToggleButton.setAttribute('aria-expanded', false);
+                langToggleButton.focus();
+            }
+
+            langToggleButton.addEventListener('click', function () {
+                if (langPopup.style.display === 'block') {
+                    hideLangs();
+                } else {
+                    showLangs();
+                }
+            });
+
+            langPopup.addEventListener('click', function (e) {
+                var lang = e.target.id || e.target.parentElement.id;
+                window.location.pathname = window.location.pathname
+                    .split('/')
+                    .map((s, idx) => {
+                        return idx == 2 ? lang : s;
+                    })
+                    .join('/');
+            });
+
+            langPopup.addEventListener('focusout', function(e) {
+                // e.relatedTarget is null in Safari and Firefox on macOS (see workaround below)
+                if (!!e.relatedTarget && !langToggleButton.contains(e.relatedTarget) && !langPopup.contains(e.relatedTarget)) {
+                    hideLangs();
+                }
+            });
+
+            // Should not be needed, but it works around an issue on macOS & iOS: https://github.com/rust-lang-nursery/mdBook/issues/628
+            document.addEventListener('click', function(e) {
+                if (langPopup.style.display === 'block' && !langToggleButton.contains(e.target) && !langPopup.contains(e.target)) {
+                    hideLangs();
+                }
+            });
+
+        })();
+        </script>
+
+
+    </body>
+</html>
+

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>SenaXについて - SenaX</title>
+        <title>モデル - SenaX</title>
 
 
         <!-- Custom HTML head -->
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html" class="active"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">10.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">11.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">12.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">12.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">12.2.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html" class="active"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">10.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">11.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">12.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">12.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">12.2.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -149,39 +149,120 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="senaxについて"><a class="header" href="#senaxについて">SenaXについて</a></h1>
-<p>SenaXはRustで書かれたORMで、キャッシュに特化しており非常に高速に動作します。
-ORMにはよくクエリーキャッシュが実装されていますが、SenaXは一般的なクエリーキャッシュのような動作はせず、エンティティキャッシュを基本にしています。<br>
-具体的な速度例として、DBからの取得とカウンター加算の更新を行うAPIのリクエストを32cpuで42万req/s程度の性能を出すことができます。</p>
-<p>SenaXの特徴として次の点が挙げられます</p>
-<ul>
-<li>クエリー集約</li>
-<li>エンティティキャッシュ</li>
-<li>遅延一括更新</li>
-<li>サーバ間キャッシュ更新同期</li>
-</ul>
-<h3 id="クエリー集約"><a class="header" href="#クエリー集約">クエリー集約</a></h3>
-<p>一般的なORMではAPIへのアクセスごとにそれぞれDBへクエリーを送り、その結果を返します。
-SenaXではほぼ同時に行われたアクセスからのDBへのクエリーを一つにまとめ、一回のクエリーで結果を取得します。
-具体的には主キーでの取得を IN クエリーに変換して取得します。</p>
-<p>これにより、キャッシュにないデータにアクセスが殺到した場合のDBの負荷を低減します。</p>
-<h3 id="エンティティキャッシュ"><a class="header" href="#エンティティキャッシュ">エンティティキャッシュ</a></h3>
-<p>エンティティキャッシュはあらかじめ定義されたone-to-oneあるいはone-to-manyの下位の結合関係を持つテーブルのデータもまとめてキャッシュされます。
-エンティティの取得は主キーだけではなく、ユニークキーからの取得も対応しています。</p>
-<h3 id="遅延一括更新"><a class="header" href="#遅延一括更新">遅延一括更新</a></h3>
-<p>ログなどをDBに保存する際に、同時に受け付けた他のアクセスのログとまとめてバルクインサートで保存することができます。<br>
-また、同一ページへのアクセスカウンタなどは同時にアクセスしたカウントアップ数をまとめてからDB更新も簡単にできます。</p>
-<h3 id="サーバ間キャッシュ更新同期"><a class="header" href="#サーバ間キャッシュ更新同期">サーバ間キャッシュ更新同期</a></h3>
-<p>キャッシュに保存されたデータが更新される場合、他のサーバにも更新内容を伝達してそれぞれのサーバのキャッシュが最新であるように同期されます。<br>
-更新差分はカラムごとに処理されるため、別のサーバで同時に異なるカラムが更新されても問題ありません。
-同じカラムが更新される場合はバージョン管理で競合を防ぐことができます。</p>
+                        <h1 id="モデルについて"><a class="header" href="#モデルについて">モデルについて</a></h1>
+<h2 id="メソッド"><a class="header" href="#メソッド">メソッド</a></h2>
+<p>モデル名で自動生成されるメソッド</p>
+<div class="table-wrapper"><table><thead><tr><th>メソッド</th><th>説明</th></tr></thead><tbody>
+<tr><td>bulk_insert</td><td></td></tr>
+<tr><td>bulk_upsert</td><td></td></tr>
+<tr><td>clear_cache</td><td></td></tr>
+<tr><td>delete</td><td></td></tr>
+<tr><td>delete_by_ids</td><td></td></tr>
+<tr><td>eq</td><td></td></tr>
+<tr><td>find</td><td></td></tr>
+<tr><td>find_all_from_cache</td><td></td></tr>
+<tr><td>find_by_key</td><td></td></tr>
+<tr><td>find_by_key_from_cache</td><td></td></tr>
+<tr><td>find_for_update</td><td></td></tr>
+<tr><td>find_for_update_with_trashed</td><td></td></tr>
+<tr><td>find_from_cache</td><td></td></tr>
+<tr><td>find_from_cache_with_trashed</td><td></td></tr>
+<tr><td>find_many</td><td></td></tr>
+<tr><td>find_many_for_update</td><td></td></tr>
+<tr><td>find_many_from_cache</td><td></td></tr>
+<tr><td>find_many_from_cache_with_trashed</td><td></td></tr>
+<tr><td>find_many_with_trashed</td><td></td></tr>
+<tr><td>find_optional</td><td></td></tr>
+<tr><td>find_optional_for_update</td><td></td></tr>
+<tr><td>find_optional_from_cache</td><td></td></tr>
+<tr><td>find_optional_from_cache_with_trashed</td><td></td></tr>
+<tr><td>find_optional_with_trashed</td><td></td></tr>
+<tr><td>find_with_trashed</td><td></td></tr>
+<tr><td>for_update</td><td></td></tr>
+<tr><td>force_delete</td><td></td></tr>
+<tr><td>force_delete_all</td><td></td></tr>
+<tr><td>force_delete_by_ids</td><td></td></tr>
+<tr><td>force_delete_relations</td><td></td></tr>
+<tr><td>insert_delayed</td><td></td></tr>
+<tr><td>insert_dummy_cache</td><td></td></tr>
+<tr><td>insert_ignore</td><td></td></tr>
+<tr><td>query</td><td></td></tr>
+<tr><td>restore</td><td></td></tr>
+<tr><td>save</td><td></td></tr>
+<tr><td>save_delayed</td><td></td></tr>
+<tr><td>set</td><td></td></tr>
+<tr><td>upsert_delayed</td><td></td></tr>
+<tr><td>_receive_update_notice</td><td></td></tr>
+</tbody></table>
+</div>
+<h2 id="querybuilder"><a class="header" href="#querybuilder">QueryBuilder</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>メソッド</th><th>説明</th></tr></thead><tbody>
+<tr><td>bind</td><td></td></tr>
+<tr><td>cond</td><td></td></tr>
+<tr><td>count</td><td></td></tr>
+<tr><td>delete</td><td></td></tr>
+<tr><td>fetch_category</td><td></td></tr>
+<tr><td>fetch_tags</td><td></td></tr>
+<tr><td>force_delete</td><td></td></tr>
+<tr><td>limit</td><td></td></tr>
+<tr><td>offset</td><td></td></tr>
+<tr><td>only_trashed</td><td></td></tr>
+<tr><td>order_by</td><td></td></tr>
+<tr><td>raw_query</td><td></td></tr>
+<tr><td>select</td><td></td></tr>
+<tr><td>select_for</td><td>カラム数を削減したサブセット型で取得を行う</td></tr>
+<tr><td>select_for_update</td><td></td></tr>
+<tr><td>select_from_cache</td><td></td></tr>
+<tr><td>select_from_cache_with_count</td><td></td></tr>
+<tr><td>select_one</td><td></td></tr>
+<tr><td>select_one_for</td><td></td></tr>
+<tr><td>select_stream</td><td></td></tr>
+<tr><td>select_stream_for</td><td></td></tr>
+<tr><td>select_with_count</td><td>limit制限付きの場合に、全件検索結果数とlimit分の取得結果を返す</td></tr>
+<tr><td>select_with_count_for</td><td></td></tr>
+<tr><td>update</td><td></td></tr>
+<tr><td>with_trashed</td><td></td></tr>
+</tbody></table>
+</div>
+<h2 id="_モデル名rel"><a class="header" href="#_モデル名rel">_{モデル名}Rel</a></h2>
+<div class="table-wrapper"><table><thead><tr><th>メソッド</th><th>説明</th></tr></thead><tbody>
+<tr><td>fetch_category</td><td></td></tr>
+</tbody></table>
+</div>
+<h1 id="crud"><a class="header" href="#crud">CRUD</a></h1>
+<h2 id="create"><a class="header" href="#create">Create</a></h2>
+<pre><code>let obj = _{モデル名}Factory {
+    ...
+}.create(conn);
+_{モデル名}::save(conn, obj).await?;
+</code></pre>
+<h2 id="read"><a class="header" href="#read">Read</a></h2>
+<p>取得方法は多数ありますので、一例です。</p>
+<pre><code>let obj = _{モデル名}::find(&amp;mut conn, id).await?
+</code></pre>
+<h2 id="update"><a class="header" href="#update">Update</a></h2>
+<p>更新時はカラム名のメソッドでアクセッサを呼び出し、set,add,sub,max,min,bit_and,bit_orを実行して更新します。</p>
+<pre><code>let mut obj = _{モデル名}::find_for_update(&amp;mut conn, id).await?
+obj.{カラム名}().set(1);
+_{モデル名}::save(conn, obj).await?;
+</code></pre>
+<h2 id="delete"><a class="header" href="#delete">Delete</a></h2>
+<pre><code>let obj = _{モデル名}::find_for_update(&amp;mut conn, id).await?
+_{モデル名}::delete(conn, obj).await?;
+</code></pre>
+<pre><code>let obj = _{モデル名}::find_for_update(&amp;mut conn, id).await?
+_{モデル名}::force_delete(conn, obj).await?;
+</code></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="transaction.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
 
-                            <a rel="next" href="tutorial.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="query.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -191,8 +272,11 @@ SenaXではほぼ同時に行われたアクセスからのDBへのクエリー�
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="transaction.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
 
-                    <a rel="next" href="tutorial.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="query.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>SenaXについて - SenaX</title>
+        <title>キャッシュ - SenaX</title>
 
 
         <!-- Custom HTML head -->
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html" class="active"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">10.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">11.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">12.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">12.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">12.2.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html" class="active"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">10.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">11.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">12.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">12.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">12.2.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -149,39 +149,44 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="senaxについて"><a class="header" href="#senaxについて">SenaXについて</a></h1>
-<p>SenaXはRustで書かれたORMで、キャッシュに特化しており非常に高速に動作します。
-ORMにはよくクエリーキャッシュが実装されていますが、SenaXは一般的なクエリーキャッシュのような動作はせず、エンティティキャッシュを基本にしています。<br>
-具体的な速度例として、DBからの取得とカウンター加算の更新を行うAPIのリクエストを32cpuで42万req/s程度の性能を出すことができます。</p>
-<p>SenaXの特徴として次の点が挙げられます</p>
+                        <h1 id="キャッシュ"><a class="header" href="#キャッシュ">キャッシュ</a></h1>
+<h2 id="エンティティキャッシュ"><a class="header" href="#エンティティキャッシュ">エンティティキャッシュ</a></h2>
+<p>テーブルのデータとリレーション先のデータをまとめてキャッシュします。
+リレーション先は1世代のみです。</p>
+<h2 id="ショートキャッシュ"><a class="header" href="#ショートキャッシュ">ショートキャッシュ</a></h2>
+<p>insertされたデータが必ずしも参照されるとは限らないので、参照されるまでTTLの短いショートキャッシュに保存されます。</p>
+<h2 id="高速キャッシュ"><a class="header" href="#高速キャッシュ">高速キャッシュ</a></h2>
+<p>エンティティキャッシュをノンブロッキングでより高速に参照できるキャッシュです。<br />
+キャッシュのみのベンチマークでは高速ですが、全体としての影響は未確認です。</p>
+<h2 id="ディスクキャッシュ"><a class="header" href="#ディスクキャッシュ">ディスクキャッシュ</a></h2>
+<p>キャッシュをディスクに保存します。保存先はSSDを想定しています。<br />
+io_uringを使用しているため、Linuxのみ対応。<br />
+ディスクキャッシュに保存されている位置を示すインデックス領域をメモリ上に必要とするため、大容量のディスクキャッシュは難しいかもしれません。<br />
+ホットデプロイではディスクキャッシュの再利用を行わず、別ファイルとなります。瞬時にディスクキャッシュがフルになって2倍の容量を必要とすることはないと思われますが、前のサーバが速やかに終了しない場合問題が発生する可能性があります。<br />
+単純な追記書き込みのため、容量効率はよくありませんが、下記2点に特化しています。</p>
 <ul>
-<li>クエリー集約</li>
-<li>エンティティキャッシュ</li>
-<li>遅延一括更新</li>
-<li>サーバ間キャッシュ更新同期</li>
+<li>ディスクキャッシュ上に保存されているかの判定がメモリ上で瞬時に可能</li>
+<li>指定されたディスク容量を絶対にオーバーしない</li>
 </ul>
-<h3 id="クエリー集約"><a class="header" href="#クエリー集約">クエリー集約</a></h3>
-<p>一般的なORMではAPIへのアクセスごとにそれぞれDBへクエリーを送り、その結果を返します。
-SenaXではほぼ同時に行われたアクセスからのDBへのクエリーを一つにまとめ、一回のクエリーで結果を取得します。
-具体的には主キーでの取得を IN クエリーに変換して取得します。</p>
-<p>これにより、キャッシュにないデータにアクセスが殺到した場合のDBの負荷を低減します。</p>
-<h3 id="エンティティキャッシュ"><a class="header" href="#エンティティキャッシュ">エンティティキャッシュ</a></h3>
-<p>エンティティキャッシュはあらかじめ定義されたone-to-oneあるいはone-to-manyの下位の結合関係を持つテーブルのデータもまとめてキャッシュされます。
-エンティティの取得は主キーだけではなく、ユニークキーからの取得も対応しています。</p>
-<h3 id="遅延一括更新"><a class="header" href="#遅延一括更新">遅延一括更新</a></h3>
-<p>ログなどをDBに保存する際に、同時に受け付けた他のアクセスのログとまとめてバルクインサートで保存することができます。<br>
-また、同一ページへのアクセスカウンタなどは同時にアクセスしたカウントアップ数をまとめてからDB更新も簡単にできます。</p>
-<h3 id="サーバ間キャッシュ更新同期"><a class="header" href="#サーバ間キャッシュ更新同期">サーバ間キャッシュ更新同期</a></h3>
-<p>キャッシュに保存されたデータが更新される場合、他のサーバにも更新内容を伝達してそれぞれのサーバのキャッシュが最新であるように同期されます。<br>
-更新差分はカラムごとに処理されるため、別のサーバで同時に異なるカラムが更新されても問題ありません。
-同じカラムが更新される場合はバージョン管理で競合を防ぐことができます。</p>
+<h2 id="バージョンキャッシュ"><a class="header" href="#バージョンキャッシュ">バージョンキャッシュ</a></h2>
+<p>キャッシュの更新とDBからの取得がほぼ同時の場合に不整合が発生していないかの確認のため、バージョン機能を有効にしている場合にバージョンナンバーをキャッシュします。</p>
+<h2 id="ユニークインデックスキャッシュ"><a class="header" href="#ユニークインデックスキャッシュ">ユニークインデックスキャッシュ</a></h2>
+<p>ユニークインデックスがある場合、ユニークインデックスからIDを検索するためのユニークインデックスキャッシュを使用します。</p>
+<h2 id="ダミーキャッシュ"><a class="header" href="#ダミーキャッシュ">ダミーキャッシュ</a></h2>
+<p>「いいね！」などの表示は押されていなければデータが無いのでキャッシュされず、何度も再取得されることになる。<br />
+その場合、「いいね！」を解除した状態のデータを insert_dummy_cache で登録することで代わりのキャッシュとすることができる。</p>
+<h2 id="キャッシュ更新通知"><a class="header" href="#キャッシュ更新通知">キャッシュ更新通知</a></h2>
+<p>_receive_update_notice で他のサーバからのキャッシュ更新通知を受信することができます。新着やランキングの修正、チャット通知などに利用できます。 </p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="query.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
 
-                            <a rel="next" href="tutorial.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="delayed.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -191,8 +196,11 @@ SenaXではほぼ同時に行われたアクセスからのDBへのクエリー�
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="query.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
 
-                    <a rel="next" href="tutorial.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="delayed.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

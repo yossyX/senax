@@ -1,0 +1,523 @@
+<!DOCTYPE HTML>
+<html lang="ja" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>チュートリアル - SenaX</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html" class="active"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">10.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">11.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">12.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">12.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">12.2.</strong> リンカー</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">SenaX</h1>
+
+                    <div class="right-buttons">
+                        <button id="lang-toggle" class="icon-button" type="button" title="Change language" aria-label="Change language" aria-haspopup="true" aria-expanded="false" aria-controls="lang-list">
+                            <i class="fa fa-globe"></i>
+                        </button>
+                        <ul id="lang-list" class="theme-popup" style="left: auto;" aria-label="Languages" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="en">English</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ja">Japanese</button></li>
+                        </ul>
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="チュートリアル"><a class="header" href="#チュートリアル">チュートリアル</a></h1>
+<h2 id="インストール"><a class="header" href="#インストール">インストール</a></h2>
+<pre><code>cargo install senax
+</code></pre>
+<h2 id="初期ファイル"><a class="header" href="#初期ファイル">初期ファイル</a></h2>
+<p>初期ディレクトリ構成の参考のため、 https://github.com/yossyX/senax から examples/actix のコードを展開してください。
+とりあえず actix-web を使用していますが、tonic や hyper 等でも対応できるはずです。
+また、消費メモリの計算は mimalloc を使用することを想定しています。</p>
+<h2 id="スキーマファイル"><a class="header" href="#スキーマファイル">スキーマファイル</a></h2>
+<p>schema/conf.yml</p>
+<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/conf
+
+sample:
+  title: Sample DB
+  author: author name
+  db: mysql
+  ignore_foreign_key: true
+  timestampable: real_time
+  time_zone: local
+  timestamp_time_zone: utc
+  tx_isolation: read_committed
+  read_tx_isolation: repeatable_read
+  use_cache: true
+  use_fast_cache: true
+  use_cache_all: true
+  preserve_column_order: true
+  groups:
+    note:
+      title: note
+</code></pre>
+<p>複数のデータベース設定のための設定ファイルです。<br />
+yaml-language-serverの設定はVSCodeであればYAMLのプラグインで入力時にアシスタントが効きます。</p>
+<p>トップのsampleはDBのデータベース名です。<br />
+dbはまだMySQLしか対応していません。<br />
+tx_isolationとread_tx_isolationは更新用と参照用のデータベースの接続を分けて、それぞれread_committedとrepeatable_readにしています。<br />
+MySQLはデフォルトでrepeatable_readですが、負荷がかかると結構ギャップロックにやられます。PostgreSQLはread_committedですし、多くの場合read_committedのほうが適切です。ただし、SELECT FOR UPDATEでヒットしなかったときにINSERTの手順はrepeatable_readでないとロックが効きませんが、これこそがギャップロックで死ぬパターンです。この場合、上位テーブルでロックを掛けるか、INSERT IGNOREや、ON DUPLICATE KEY UPDATEなどのupsert構文で対応が必要です。<br />
+参照時のトランザクションはMySQLでは最初にテーブルにアクセスしたときにすべてのテーブルのスナップショットを取得するのでrepeatable_readが安全です。<br />
+groupsは一つのデータベースに数百のテーブルがあるとディレクトリツリーが長くなったり管理が困ることになりますので、1階層分グループ分けできるようになっています。</p>
+<p>schema/sample/note.yml</p>
+<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/model
+
+note:
+  timestampable: fixed_time
+  soft_delete: time
+  versioned: true
+  on_delete_fn: true
+  use_fast_cache: true
+  columns:
+    id:
+      type: int
+      primary: true
+      auto_increment: auto
+    key: varchar
+    category_id: int
+    content:
+      type: text
+      length: 2000
+      not_null: true
+  relations:
+    category:
+      use_cache: true
+    tags:
+      type: many
+      in_cache: true
+  indexes:
+    key:
+      fields:
+        key:
+          length: 20
+      type: unique
+    content:
+      type: fulltext
+      parser: ngram
+
+tags:
+  columns:
+    id:
+      type: int
+      primary: true
+      auto_increment: auto
+    note_id: int_not_null
+    name: varchar_not_null
+  relations:
+    note:
+
+categories:
+  columns:
+    id:
+      type: int
+      primary: true
+      auto_increment: auto
+    name: varchar_not_null
+
+counters:
+  counting: counter
+  timestampable: none
+  columns:
+    note_id:
+      type: int
+      primary: true
+    date:
+      type: date
+      primary: true
+    counter: bigint_not_null
+  relations:
+    note:
+</code></pre>
+<p>グループ内のテーブルの設定ファイルです。<br />
+Symfony 1.xのdoctrine/schema.ymlに近いイメージです。<br />
+テーブル名がマルチバイト文字や複数形にも対応しています。categories テーブルはノートのrelationsのcategoryと紐づいていますが、relationsの方はtypeがデフォルトでoneなので単数形で自動的に紐づきます。<br />
+ちなみに、 Doctrine の inheritance も一通り対応しています。</p>
+<h2 id="モデル生成"><a class="header" href="#モデル生成">モデル生成</a></h2>
+<pre><code>$ senax model sample
+</code></pre>
+<p>senaxのコマンドでdb/sample下のファイルを生成します。<br />
+note.rs等はカスタマイズ用で、_note.rsが本体です。<br />
+モデル名が_Tagsのように_が付くのは他のライブラリと被らないようにそのような命名規則にしています。</p>
+<h2 id="マイグレーション生成"><a class="header" href="#マイグレーション生成">マイグレーション生成</a></h2>
+<pre><code>$ senax gen-migrate sample init
+</code></pre>
+<p>db/sample/migrations下にDDLファイルを生成します。<br />
+DDLは現状のDBを確認して差分を出力します。<br />
+コマンド実行前に .env の SAMPLE_DB_URL で指定されたデータベースを作成しておいてください。</p>
+<h2 id="マイグレーション実行"><a class="header" href="#マイグレーション実行">マイグレーション実行</a></h2>
+<pre><code>$ cargo run -p db_sample -- migrate
+</code></pre>
+<p>もしくは、</p>
+<pre><code>$ target/debug/db_sample migrate
+</code></pre>
+<p>sqlxのマイグレーションを実行します。
+シャーディング設定がある場合すべてのシャードにクエリーを発行するようになっています。</p>
+<h2 id="シードスキーマ生成"><a class="header" href="#シードスキーマ生成">シードスキーマ生成</a></h2>
+<pre><code>$ cargo run -p db_sample -- gen-seed-schema &gt; db/sample/seed-schema.json
+</code></pre>
+<p>もしくは、</p>
+<pre><code>$ target/debug/db_sample gen-seed-schema &gt; db/sample/seed-schema.json
+</code></pre>
+<p>シードファイルの入力アシスタントのためのスキーマファイルを生成します。</p>
+<h2 id="シードファイル生成"><a class="header" href="#シードファイル生成">シードファイル生成</a></h2>
+<pre><code>$ senax gen-seed sample init
+</code></pre>
+<p>シードファイルもマイグレーションと同様にDBに登録済みかのバージョン管理を行いますので、コマンドでシードファイルを生成します。</p>
+<h2 id="シードファイル記述"><a class="header" href="#シードファイル記述">シードファイル記述</a></h2>
+<p>db/sample/seeds/20221120120831_init.yml</p>
+<pre><code class="language-yml"># yaml-language-server: $schema=../seed-schema.json
+
+note:
+  categories:
+    diary:
+      name: diary
+  note:
+    note_1:
+      category_id: diary
+      key: sample
+      content: content
+  tags:
+    tag_1:
+      note_id: note_1
+      name: tag 1
+</code></pre>
+<p>「diary」と「note_1」はそれぞれオートインクリメントで登録されたIDが渡されるようになっています。</p>
+<h2 id="シードデータ投入"><a class="header" href="#シードデータ投入">シードデータ投入</a></h2>
+<pre><code>$ cargo run -p db_sample -- seed
+</code></pre>
+<h2 id="テーブル定義書生成"><a class="header" href="#テーブル定義書生成">テーブル定義書生成</a></h2>
+<pre><code>$ senax gen-db-doc sample &gt; db-document.html
+</code></pre>
+<p>環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。</p>
+<h2 id="コード記述"><a class="header" href="#コード記述">コード記述</a></h2>
+<p>_Noteを取得して日毎のカウンターを加算しています。
+save_delayedではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。</p>
+<p>server/src/routes/api/cache.rs</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[get(&quot;/cache/{key}&quot;)]
+async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl Responder {
+    let ctx = get_ctx_and_log(&amp;http_req);
+    let result = async move {
+        let mut conn = SampleConn::new();
+        let mut note = _Note::find_by_key_from_cache(&amp;conn, &amp;*key) // ユニークキーからのキャシュ取得
+            .await
+            .with_context(|| NotFound::new(&amp;http_req))?;
+        note.fetch_category(&amp;mut conn).await?; // これもキャシュから取得
+
+        let category = match note.category() {
+            None =&gt; None,
+            Some(v) =&gt; Some(v.name().to_owned()),
+        };
+
+        let date = Local::now().date_naive();
+        let counter = _Counters::find_optional_from_cache(&amp;conn, (note.id(), date)).await?;
+        let count = counter.map(|v| v.counter()).unwrap_or_default() + 1; // ここまではキャッシュから当日のカウント取得
+        let mut counter_for_update = _CountersFactory { // 当日のカウントが未登録の場合 INSERT
+            note_id: note.id(),
+            date,
+            counter: 0,
+        }
+        .create(&amp;conn);
+        let _ = counter_for_update.counter().add(1); // UPDATE加算
+        counter_for_update._upsert(); // INSERT ... ON DUPLICATE KEY UPDATE の指示
+        _Counters::save_delayed(&amp;mut conn, counter_for_update).await?;
+
+        Ok(Response {
+            id: note.id(),
+            category,
+            article: note.content().to_string(),
+            tags: note.tags().iter().map(|v| v.name().to_string()).collect(),
+            count,
+        })
+    }
+    .await;
+    json_response(result, &amp;ctx)
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>キャッシュを使用しないバージョンです。</p>
+<p>server/src/routes/api/no_cache.rs</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[get(&quot;/no_cache/{key}&quot;)]
+async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl Responder {
+    let ctx = get_ctx_and_log(&amp;http_req);
+    let result = async move {
+        let mut conn = SampleConn::new();
+        let mut note = _Note::find_by_key(&amp;mut conn, &amp;*key)
+            .await
+            .with_context(|| NotFound::new(&amp;http_req))?;
+        note.fetch_category(&amp;mut conn).await?;
+        note.fetch_tags(&amp;mut conn).await?;
+
+        let category = match note.category() {
+            None =&gt; None,
+            Some(v) =&gt; Some(v.name().to_owned()),
+        };
+        let date = Local::now().date_naive();
+        let counter = _Counters::find_optional(&amp;mut conn, (note.id(), date)).await?;
+        let count = counter.map(|v| v.counter()).unwrap_or_default() + 1;
+
+        let note_id = note.id();
+        let cond = db_sample::cond_note_counters!((note_id=note_id) AND (date=date));
+        conn.begin().await?;
+        let mut update = _Counters::for_update(&amp;mut conn);
+        let _ = update.counter().add(1);
+        _Counters::query()
+            .cond(cond)
+            .update(&amp;mut conn, update)
+            .await?;
+        conn.commit().await?;
+        
+        Ok(Response {
+            id: note.id(),
+            category,
+            article: note.content().to_string(),
+            tags: note.tags().iter().map(|v| v.name().to_string()).collect(),
+            count,
+        })
+    }
+    .await;
+    json_response(result, &amp;ctx)
+}
+<span class="boring">}
+</span></code></pre></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next" href="schema.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next" href="schema.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js" charset="utf-8"></script>
+        <script src="mark.min.js" charset="utf-8"></script>
+        <script src="searcher.js" charset="utf-8"></script>
+
+        <script src="clipboard.min.js" charset="utf-8"></script>
+        <script src="highlight.js" charset="utf-8"></script>
+        <script src="book.js" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+
+
+        <script type="text/javascript">
+        var langs = [
+            'ja',
+            'en'
+        ];
+
+        (function langs() {
+            var html = document.querySelector('html');
+            var langToggleButton = document.getElementById('lang-toggle');
+            var langPopup = document.getElementById('lang-list');
+
+            function showLangs() {
+                langPopup.style.display = 'block';
+                langToggleButton.setAttribute('aria-expanded', true);
+            }
+
+            function hideLangs() {
+                langPopup.style.display = 'none';
+                langToggleButton.setAttribute('aria-expanded', false);
+                langToggleButton.focus();
+            }
+
+            langToggleButton.addEventListener('click', function () {
+                if (langPopup.style.display === 'block') {
+                    hideLangs();
+                } else {
+                    showLangs();
+                }
+            });
+
+            langPopup.addEventListener('click', function (e) {
+                var lang = e.target.id || e.target.parentElement.id;
+                window.location.pathname = window.location.pathname
+                    .split('/')
+                    .map((s, idx) => {
+                        return idx == 2 ? lang : s;
+                    })
+                    .join('/');
+            });
+
+            langPopup.addEventListener('focusout', function(e) {
+                // e.relatedTarget is null in Safari and Firefox on macOS (see workaround below)
+                if (!!e.relatedTarget && !langToggleButton.contains(e.relatedTarget) && !langPopup.contains(e.relatedTarget)) {
+                    hideLangs();
+                }
+            });
+
+            // Should not be needed, but it works around an issue on macOS & iOS: https://github.com/rust-lang-nursery/mdBook/issues/628
+            document.addEventListener('click', function(e) {
+                if (langPopup.style.display === 'block' && !langToggleButton.contains(e.target) && !langPopup.contains(e.target)) {
+                    hideLangs();
+                }
+            });
+
+        })();
+        </script>
+
+
+    </body>
+</html>
+

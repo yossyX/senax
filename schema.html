@@ -1,0 +1,649 @@
+<!DOCTYPE HTML>
+<html lang="ja" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>スキーマ - SenaX</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html" class="active"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">10.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">11.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">12.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">12.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">12.2.</strong> リンカー</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">SenaX</h1>
+
+                    <div class="right-buttons">
+                        <button id="lang-toggle" class="icon-button" type="button" title="Change language" aria-label="Change language" aria-haspopup="true" aria-expanded="false" aria-controls="lang-list">
+                            <i class="fa fa-globe"></i>
+                        </button>
+                        <ul id="lang-list" class="theme-popup" style="left: auto;" aria-label="Languages" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="en">English</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ja">Japanese</button></li>
+                        </ul>
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="schema-definition"><a class="header" href="#schema-definition">Schema Definition</a></h1>
+<ul>
+<li><a href="##/definitions/ConfigDef">properties/conf</a></li>
+<li><a href="##/definitions/EnumDef">properties/enum</a></li>
+<li><a href="##/definitions/ModelDef">properties/model</a></li>
+<li><a href="##/definitions/History">properties/history</a></li>
+</ul>
+<hr />
+<p><a id="#/definitions/ConfigDef"></a></p>
+<h2 id="config-definition"><a class="header" href="#config-definition">Config Definition</a></h2>
+<p>データベース設定</p>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>db_no</strong></td><td>integer</td><td>内部で使用されるデータベースナンバー。同一conf.ymlファイル内では自動生成の乱数で重複が発生しないが、設定ファイルが分かれる場合は重複を防ぐため指定できる。</td><td></td></tr>
+<tr><td><strong>db</strong></td><td><a href="##/definitions/DbType">DbType</a></td><td>使用するDB。現在のところmysqlのみ対応</td><td>Yes</td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td>仕様書等のためのタイトル</td><td></td></tr>
+<tr><td><strong>author</strong></td><td>string</td><td>仕様書等のための著者</td><td></td></tr>
+<tr><td><strong>ignore_foreign_key</strong></td><td>boolean</td><td>falseの場合は外部キー制約をDDLに出力しない</td><td></td></tr>
+<tr><td><strong>timestampable</strong></td><td><a href="##/definitions/Timestampable">Timestampable</a></td><td>デフォルトのタイムスタンプ設定</td><td></td></tr>
+<tr><td><strong>time_zone</strong></td><td><a href="##/definitions/TimeZone">TimeZone</a></td><td>日時型のデフォルトのタイムゾーン設定</td><td></td></tr>
+<tr><td><strong>timestamp_time_zone</strong></td><td><a href="##/definitions/TimeZone">TimeZone</a></td><td>created_at, updated_at, deleted_atに使用されるタイムゾーン</td><td></td></tr>
+<tr><td><strong>soft_delete</strong></td><td><a href="##/definitions/SoftDelete">SoftDelete</a></td><td>論理削除のデフォルト設定</td><td></td></tr>
+<tr><td><strong>use_cache</strong></td><td>boolean</td><td>キャッシュ使用のデフォルト設定</td><td></td></tr>
+<tr><td><strong>use_fast_cache</strong></td><td>boolean</td><td>高速キャッシュ使用設定（experimental）</td><td></td></tr>
+<tr><td><strong>use_cache_all</strong></td><td>boolean</td><td>全キャッシュ使用のデフォルト設定</td><td></td></tr>
+<tr><td><strong>tx_isolation</strong></td><td><a href="##/definitions/Isolation">Isolation</a></td><td>更新トランザクション分離レベル</td><td></td></tr>
+<tr><td><strong>read_tx_isolation</strong></td><td><a href="##/definitions/Isolation">Isolation</a></td><td>参照トランザクション分離レベル</td><td></td></tr>
+<tr><td><strong>engine</strong></td><td>string</td><td>MySQLのストレージエンジン</td><td></td></tr>
+<tr><td><strong>character_set</strong></td><td>string</td><td>文字セット</td><td></td></tr>
+<tr><td><strong>collate</strong></td><td>string</td><td>文字セット照合順序</td><td></td></tr>
+<tr><td><strong>preserve_column_order</strong></td><td>boolean</td><td>DDL出力時のカラム順序維持設定</td><td></td></tr>
+<tr><td><strong>groups</strong></td><td>Map&lt;property, <a href="##/definitions/GroupDef">GroupDef</a>&gt;</td><td>モデルグループ</td><td>Yes</td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/DbType"></a></p>
+<h2 id="db-type"><a class="header" href="#db-type">DB type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>mysql</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/Timestampable"></a></p>
+<h2 id="timestampable"><a class="header" href="#timestampable">Timestampable</a></h2>
+<p><strong>any of the following</strong></p>
+<ul>
+<li><code>none</code></li>
+<li><code>real_time</code>(クエリー実行日時)</li>
+<li><code>fixed_time</code>(DbConnの生成日時)</li>
+</ul>
+<hr />
+<p><a id="#/definitions/TimeZone"></a></p>
+<h2 id="timezone"><a class="header" href="#timezone">TimeZone</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>local</code></li>
+<li><code>utc</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/SoftDelete"></a></p>
+<h2 id="softdelete"><a class="header" href="#softdelete">SoftDelete</a></h2>
+<p><strong>any of the following</strong></p>
+<ul>
+<li><code>none</code></li>
+<li><code>time</code></li>
+<li><code>flag</code></li>
+<li><code>unix_time</code>(ユニーク制約に使用するためのUNIXタイムスタンプ UNIX time for unique index support)</li>
+</ul>
+<hr />
+<p><a id="#/definitions/Isolation"></a></p>
+<h2 id="isolation"><a class="header" href="#isolation">Isolation</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>repeatable_read</code></li>
+<li><code>read_committed</code></li>
+<li><code>read_uncommitted</code></li>
+<li><code>serializable</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/GroupDef"></a></p>
+<h2 id="group-def"><a class="header" href="#group-def">Group Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td>Yes</td></tr>
+<tr><td><strong>type</strong></td><td><a href="##/definitions/GroupType">GroupType</a></td><td></td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/GroupType"></a></p>
+<h2 id="group-type"><a class="header" href="#group-type">Group Type</a></h2>
+<p><strong>any of the following</strong></p>
+<ul>
+<li><code>model</code>(モデル定義)</li>
+<li><code>enum</code>(列挙型定義のみ)</li>
+</ul>
+<hr />
+<p><a id="#/definitions/EnumDef"></a></p>
+<h2 id="enum-def"><a class="header" href="#enum-def">Enum Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>title</strong></td><td>string</td><td>タイトル</td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td>コメント</td><td></td></tr>
+<tr><td><strong>enum_values</strong></td><td>Array&lt;<a href="##/definitions/EnumValue">EnumValue</a>&gt;</td><td>列挙値</td><td>Yes</td></tr>
+<tr><td><strong>mod_name</strong></td><td>string</td><td>列挙子の名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/EnumValue"></a></p>
+<h2 id="enum-value"><a class="header" href="#enum-value">Enum Value</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>name</strong></td><td>string</td><td></td><td>Yes</td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>value</strong></td><td>integer</td><td>0～255の値</td><td>Yes</td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/ModelDef"></a></p>
+<h2 id="model-def"><a class="header" href="#model-def">Model Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>title</strong></td><td>string</td><td>仕様書等のためのタイトル</td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td>コメント</td><td></td></tr>
+<tr><td><strong>table_name</strong></td><td>string</td><td>テーブル名</td><td></td></tr>
+<tr><td><strong>ignore_foreign_key</strong></td><td>boolean</td><td>falseの場合は外部キー制約をDDLに出力しない</td><td></td></tr>
+<tr><td><strong>timestampable</strong></td><td><a href="##/definitions/Timestampable">Timestampable</a></td><td>タイムスタンプ設定</td><td></td></tr>
+<tr><td><strong>disable_created_at</strong></td><td>boolean</td><td>created_atの無効化</td><td></td></tr>
+<tr><td><strong>disable_updated_at</strong></td><td>boolean</td><td>updated_atの無効化</td><td></td></tr>
+<tr><td><strong>soft_delete</strong></td><td><a href="##/definitions/SoftDelete">SoftDelete</a></td><td>論理削除設定</td><td></td></tr>
+<tr><td><strong>versioned</strong></td><td>boolean</td><td>キャッシュ整合性のためのバージョンを使用するか</td><td></td></tr>
+<tr><td><strong>counting</strong></td><td>string</td><td>save_delayedでカウンターを使用するカラム</td><td></td></tr>
+<tr><td><strong>use_cache</strong></td><td>boolean</td><td>キャッシュを使用するか</td><td></td></tr>
+<tr><td><strong>use_fast_cache</strong></td><td>boolean</td><td>高速キャッシュを使用するか(experimental)</td><td></td></tr>
+<tr><td><strong>use_cache_all</strong></td><td>boolean</td><td>全キャッシュを使用するか</td><td></td></tr>
+<tr><td><strong>ignore_propagated_insert_cache</strong></td><td>boolean</td><td>他サーバでinsertされたデータをキャッシュするか</td><td></td></tr>
+<tr><td><strong>on_delete_fn</strong></td><td>boolean</td><td>物理削除時の_before_deleteと_after_deleteの呼び出しを行うか</td><td></td></tr>
+<tr><td><strong>abstract</strong></td><td>boolean</td><td>抽象化モード</td><td></td></tr>
+<tr><td><strong>inheritance</strong></td><td><a href="##/definitions/Inheritance">Inheritance</a></td><td>継承モード</td><td></td></tr>
+<tr><td><strong>engine</strong></td><td>string</td><td>MySQLのストレージエンジン</td><td></td></tr>
+<tr><td><strong>character_set</strong></td><td>string</td><td>文字セット</td><td></td></tr>
+<tr><td><strong>collate</strong></td><td>string</td><td>文字セット照合順序</td><td></td></tr>
+<tr><td><strong>mod_name</strong></td><td>string</td><td>名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
+<tr><td><strong>columns</strong></td><td>Map&lt;property, <a href="##/definitions/ColumnTypeOrDef">ColumnTypeOrDef</a>&gt;</td><td>カラム</td><td></td></tr>
+<tr><td><strong>relations</strong></td><td>Map&lt;property, <a href="##/definitions/RelDef">RelDef</a>&gt;</td><td>リレーション</td><td></td></tr>
+<tr><td><strong>indexes</strong></td><td>Map&lt;property, <a href="##/definitions/IndexDef">IndexDef</a>&gt;</td><td>インデックス</td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/Inheritance"></a></p>
+<h2 id="inheritance"><a class="header" href="#inheritance">Inheritance</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>extends</strong></td><td>string</td><td>継承元</td><td>Yes</td></tr>
+<tr><td><strong>type</strong></td><td><a href="##/definitions/InheritanceType">InheritanceType</a></td><td>継承タイプ</td><td>Yes</td></tr>
+<tr><td><strong>key_field</strong></td><td>string</td><td>column_aggregationの場合のキーカラム</td><td></td></tr>
+<tr><td><strong>key_value</strong></td><td>[boolean, number, string, integer]</td><td>column_aggregationの場合のキーの値</td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/InheritanceType"></a></p>
+<h2 id="inheritance-type"><a class="header" href="#inheritance-type">Inheritance Type</a></h2>
+<p><strong>any of the following</strong></p>
+<ul>
+<li><code>simple</code>(単一テーブル継承 子テーブルのカラムも含めたすべてのカラムを親となるテーブルに格納する)</li>
+<li><code>concrete</code>(具象テーブル継承 子クラスごとに共通のカラムとそれぞれのモデルのカラムをすべて含んだ状態で独立したテーブルを作成する)</li>
+<li><code>column_aggregation</code>(カラム集約テーブル継承 単一テーブル継承と似ているが、型を特定するための _type カラムがある)</li>
+</ul>
+<hr />
+<p><a id="#/definitions/ColumnTypeOrDef"></a></p>
+<h2 id="column-type-or-def"><a class="header" href="#column-type-or-def">Column Type Or Def</a></h2>
+<p><strong>any of the following</strong></p>
+<ul>
+<li><a href="##/definitions/ColumnDef">ColumnDef</a></li>
+<li><a href="##/definitions/ColumnSubsetType">ColumnSubsetType</a></li>
+</ul>
+<hr />
+<p><a id="#/definitions/ColumnDef"></a></p>
+<h2 id="column-def"><a class="header" href="#column-def">Column Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>type</strong></td><td><a href="##/definitions/ColumnType">ColumnType</a></td><td></td><td>Yes</td></tr>
+<tr><td><strong>signed</strong></td><td>boolean</td><td>指定がない場合はunsigned</td><td></td></tr>
+<tr><td><strong>not_null</strong></td><td>boolean</td><td>指定がない場合はnullable</td><td></td></tr>
+<tr><td><strong>primary</strong></td><td>boolean</td><td></td><td></td></tr>
+<tr><td><strong>auto_increment</strong></td><td><a href="##/definitions/AutoIncrement">AutoIncrement</a></td><td></td><td></td></tr>
+<tr><td><strong>length</strong></td><td>integer</td><td></td><td></td></tr>
+<tr><td><strong>collate</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>not_serializable</strong></td><td>boolean</td><td>serializeに出力しない（パスワード等保護用）</td><td></td></tr>
+<tr><td><strong>precision</strong></td><td>integer</td><td></td><td></td></tr>
+<tr><td><strong>scale</strong></td><td>integer</td><td></td><td></td></tr>
+<tr><td><strong>time_zone</strong></td><td><a href="##/definitions/TimeZone">TimeZone</a></td><td></td><td></td></tr>
+<tr><td><strong>enum_values</strong></td><td>Array&lt;<a href="##/definitions/EnumValue">EnumValue</a>&gt;</td><td>列挙型の値</td><td></td></tr>
+<tr><td><strong>db_enum_values</strong></td><td>Array&lt;<a href="##/definitions/DbEnumValue">DbEnumValue</a>&gt;</td><td>DBの列挙型を使用する場合の値</td><td></td></tr>
+<tr><td><strong>enum_model</strong></td><td>string</td><td>スキーマ内で定義された列挙値名　（名前は::区切り）</td><td></td></tr>
+<tr><td><strong>json_class</strong></td><td>string</td><td>Json型で使用する型名</td><td></td></tr>
+<tr><td><strong>exclude_from_cache</strong></td><td>boolean</td><td>キャッシュからの除外設定</td><td></td></tr>
+<tr><td><strong>skip_factory</strong></td><td>boolean</td><td>factoryからの除外設定</td><td></td></tr>
+<tr><td><strong>rename</strong></td><td>string</td><td>カラム名の別名設定</td><td></td></tr>
+<tr><td><strong>srid</strong></td><td>integer</td><td>Point型のSRID</td><td></td></tr>
+<tr><td><strong>default</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>sql_comment</strong></td><td>string</td><td></td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/ColumnType"></a></p>
+<h2 id="column-type"><a class="header" href="#column-type">Column Type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>tinyint</code></li>
+<li><code>smallint</code></li>
+<li><code>int</code></li>
+<li><code>bigint</code></li>
+<li><code>float</code></li>
+<li><code>double</code></li>
+<li><code>varchar</code></li>
+<li><code>boolean</code></li>
+<li><code>text</code></li>
+<li><code>blob</code></li>
+<li><code>timestamp</code></li>
+<li><code>datetime</code></li>
+<li><code>date</code></li>
+<li><code>time</code></li>
+<li><code>decimal</code></li>
+<li><code>array_int</code></li>
+<li><code>array_string</code></li>
+<li><code>json</code></li>
+<li><code>enum</code></li>
+<li><code>db_enum</code></li>
+<li><code>db_set</code></li>
+<li><code>point</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/AutoIncrement"></a></p>
+<h2 id="auto-increment"><a class="header" href="#auto-increment">Auto Increment</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>auto</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/DbEnumValue"></a></p>
+<h2 id="db-enum-value"><a class="header" href="#db-enum-value">DB Enum Value</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>name</strong></td><td>string</td><td></td><td>Yes</td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/ColumnSubsetType"></a></p>
+<h2 id="column-subset-type"><a class="header" href="#column-subset-type">Column Subset Type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>tinyint</code></li>
+<li><code>smallint</code></li>
+<li><code>int</code></li>
+<li><code>bigint</code></li>
+<li><code>float</code></li>
+<li><code>double</code></li>
+<li><code>varchar</code></li>
+<li><code>boolean</code></li>
+<li><code>text</code></li>
+<li><code>blob</code></li>
+<li><code>datetime</code></li>
+<li><code>date</code></li>
+<li><code>time</code></li>
+<li><code>decimal</code></li>
+<li><code>array_int</code></li>
+<li><code>array_string</code></li>
+<li><code>json</code></li>
+<li><code>tinyint_not_null</code></li>
+<li><code>smallint_not_null</code></li>
+<li><code>int_not_null</code></li>
+<li><code>bigint_not_null</code></li>
+<li><code>float_not_null</code></li>
+<li><code>double_not_null</code></li>
+<li><code>varchar_not_null</code></li>
+<li><code>boolean_not_null</code></li>
+<li><code>text_not_null</code></li>
+<li><code>blob_not_null</code></li>
+<li><code>datetime_not_null</code></li>
+<li><code>date_not_null</code></li>
+<li><code>time_not_null</code></li>
+<li><code>decimal_not_null</code></li>
+<li><code>array_int_not_null</code></li>
+<li><code>array_string_not_null</code></li>
+<li><code>json_not_null</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/RelDef"></a></p>
+<h2 id="relation-def"><a class="header" href="#relation-def">Relation Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>model</strong></td><td>string</td><td>結合先のモデル　他のグループは::区切りで指定</td><td></td></tr>
+<tr><td><strong>type</strong></td><td><a href="##/definitions/RelationsType">RelationsType</a></td><td></td><td></td></tr>
+<tr><td><strong>local</strong></td><td>string</td><td>結合するローカルのカラム名</td><td></td></tr>
+<tr><td><strong>foreign</strong></td><td>string</td><td>結合先のカラム名</td><td></td></tr>
+<tr><td><strong>in_cache</strong></td><td>boolean</td><td>manyあるいはone_to_oneの場合にリレーション先も一緒にキャッシュするか 結合深さは1代のみで子テーブルは親に含んだ状態で更新する必要がある</td><td></td></tr>
+<tr><td><strong>raw_cond</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>order_by</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>desc</strong></td><td>boolean</td><td></td><td></td></tr>
+<tr><td><strong>limit</strong></td><td>integer</td><td></td><td></td></tr>
+<tr><td><strong>use_cache</strong></td><td>boolean</td><td></td><td></td></tr>
+<tr><td><strong>use_cache_with_trashed</strong></td><td>boolean</td><td>リレーション先が論理削除されていてもキャッシュを取得する</td><td></td></tr>
+<tr><td><strong>on_delete</strong></td><td><a href="##/definitions/ReferenceOption">ReferenceOption</a></td><td>DBの外部キー制約による削除およびソフトウェア側での削除制御</td><td></td></tr>
+<tr><td><strong>on_update</strong></td><td><a href="##/definitions/ReferenceOption">ReferenceOption</a></td><td>DBの外部キー制約による更新</td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/RelationsType"></a></p>
+<h2 id="relations-type"><a class="header" href="#relations-type">Relations Type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>many</code></li>
+<li><code>one</code></li>
+<li><code>one_to_one</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/ReferenceOption"></a></p>
+<h2 id="reference-option"><a class="header" href="#reference-option">Reference Option</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>restrict</code></li>
+<li><code>cascade</code></li>
+<li><code>set_null</code></li>
+<li><code>set_zero</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/IndexDef"></a></p>
+<h2 id="index-def"><a class="header" href="#index-def">Index Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>fields</strong></td><td>Map&lt;property, <a href="##/definitions/IndexFieldDef">IndexFieldDef</a>&gt;</td><td></td><td></td></tr>
+<tr><td><strong>type</strong></td><td><a href="##/definitions/IndexType">IndexType</a></td><td></td><td></td></tr>
+<tr><td><strong>parser</strong></td><td><a href="##/definitions/Parser">Parser</a></td><td></td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/IndexFieldDef"></a></p>
+<h2 id="index-field-def"><a class="header" href="#index-field-def">Index Field Def</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>sorting</strong></td><td><a href="##/definitions/SortType">SortType</a></td><td></td><td></td></tr>
+<tr><td><strong>length</strong></td><td>integer</td><td></td><td></td></tr>
+</tbody></table>
+</div>
+<hr />
+<p><a id="#/definitions/SortType"></a></p>
+<h2 id="sort-type"><a class="header" href="#sort-type">Sort Type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>asc</code></li>
+<li><code>desc</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/IndexType"></a></p>
+<h2 id="index-type"><a class="header" href="#index-type">Index Type</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>index</code></li>
+<li><code>unique</code></li>
+<li><code>fulltext</code></li>
+<li><code>spatial</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/Parser"></a></p>
+<h2 id="parser"><a class="header" href="#parser">Parser</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>ngram</code></li>
+<li><code>mecab</code></li>
+</ul>
+<hr />
+<p><a id="#/definitions/History"></a></p>
+<h2 id="history"><a class="header" href="#history">History</a></h2>
+<p>更新履歴</p>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>date</strong></td><td>string</td><td>更新日</td><td>Yes</td></tr>
+<tr><td><strong>description</strong></td><td>string</td><td>変更内容</td><td>Yes</td></tr>
+<tr><td><strong>author</strong></td><td>string</td><td>担当者</td><td></td></tr>
+<tr><td><strong>version</strong></td><td>string</td><td>バージョン</td><td></td></tr>
+</tbody></table>
+</div>
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="tutorial.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next" href="env.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="tutorial.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next" href="env.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js" charset="utf-8"></script>
+        <script src="mark.min.js" charset="utf-8"></script>
+        <script src="searcher.js" charset="utf-8"></script>
+
+        <script src="clipboard.min.js" charset="utf-8"></script>
+        <script src="highlight.js" charset="utf-8"></script>
+        <script src="book.js" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+
+
+        <script type="text/javascript">
+        var langs = [
+            'ja',
+            'en'
+        ];
+
+        (function langs() {
+            var html = document.querySelector('html');
+            var langToggleButton = document.getElementById('lang-toggle');
+            var langPopup = document.getElementById('lang-list');
+
+            function showLangs() {
+                langPopup.style.display = 'block';
+                langToggleButton.setAttribute('aria-expanded', true);
+            }
+
+            function hideLangs() {
+                langPopup.style.display = 'none';
+                langToggleButton.setAttribute('aria-expanded', false);
+                langToggleButton.focus();
+            }
+
+            langToggleButton.addEventListener('click', function () {
+                if (langPopup.style.display === 'block') {
+                    hideLangs();
+                } else {
+                    showLangs();
+                }
+            });
+
+            langPopup.addEventListener('click', function (e) {
+                var lang = e.target.id || e.target.parentElement.id;
+                window.location.pathname = window.location.pathname
+                    .split('/')
+                    .map((s, idx) => {
+                        return idx == 2 ? lang : s;
+                    })
+                    .join('/');
+            });
+
+            langPopup.addEventListener('focusout', function(e) {
+                // e.relatedTarget is null in Safari and Firefox on macOS (see workaround below)
+                if (!!e.relatedTarget && !langToggleButton.contains(e.relatedTarget) && !langPopup.contains(e.relatedTarget)) {
+                    hideLangs();
+                }
+            });
+
+            // Should not be needed, but it works around an issue on macOS & iOS: https://github.com/rust-lang-nursery/mdBook/issues/628
+            document.addEventListener('click', function(e) {
+                if (langPopup.style.display === 'block' && !langToggleButton.contains(e.target) && !langPopup.contains(e.target)) {
+                    hideLangs();
+                }
+            });
+
+        })();
+        </script>
+
+
+    </body>
+</html>
+
