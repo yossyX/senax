@@ -64,18 +64,6 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| "certs/cert.der".into())
         .into();
     let host = env::var("HOST_NAME").unwrap_or_else(|_| HOST_NAME.to_string());
-    let tcp_port: SocketAddr = env::var("TCP_PORT")
-        .unwrap_or_else(|_| "127.0.0.1:25551".to_string())
-        .parse()?;
-    let unix_port = env::var("UNIX_PORT").ok();
-    let pw = env::var("PASSWORD").with_context(|| "PASSWORD required")?;
-    let etcd_port = env::var("ETCD_PORT").unwrap_or_else(|_| "localhost:2379".to_string());
-    let etcd_user = env::var("ETCD_USER").ok();
-    let etcd_pw = env::var("ETCD_PW").ok();
-    let etcd_domain_name = env::var("ETCD_DOMAIN_NAME").ok();
-    let etcd_ca_pem_file = env::var("ETCD_CA_PEM_FILE").ok();
-    let etcd_cert_pem_file = env::var("ETCD_CERT_PEM_FILE").ok();
-    let etcd_key_pem_file = env::var("ETCD_KEY_PEM_FILE").ok();
 
     let arg: AppArg = AppArg::parse();
     if arg.cert {
@@ -92,6 +80,19 @@ async fn main() -> Result<()> {
         // fs::write("certs/key.der", &cert.serialize_private_key_der())?;
         return Ok(());
     }
+
+    let tcp_port: SocketAddr = env::var("TCP_PORT")
+        .unwrap_or_else(|_| "127.0.0.1:25551".to_string())
+        .parse()?;
+    let unix_port = env::var("UNIX_PORT").ok();
+    let pw = env::var("PASSWORD").with_context(|| "PASSWORD required")?;
+    let etcd_port = env::var("ETCD_PORT").unwrap_or_else(|_| "localhost:2379".to_string());
+    let etcd_user = env::var("ETCD_USER").ok();
+    let etcd_pw = env::var("ETCD_PW").ok();
+    let etcd_domain_name = env::var("ETCD_DOMAIN_NAME").ok();
+    let etcd_ca_pem_file = env::var("ETCD_CA_PEM_FILE").ok();
+    let etcd_cert_pem_file = env::var("ETCD_CERT_PEM_FILE").ok();
+    let etcd_key_pem_file = env::var("ETCD_KEY_PEM_FILE").ok();
 
     let link_port = link_port()?;
     let endpoint = client_endpoint(ca_path)?;
