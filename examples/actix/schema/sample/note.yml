@@ -1,0 +1,67 @@
+# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/model
+
+note:
+  timestampable: fixed_time
+  soft_delete: time
+  versioned: true
+  on_delete_fn: true
+  use_fast_cache: true
+  columns:
+    id:
+      type: int
+      primary: true
+      auto_increment: auto
+    key: varchar
+    category_id: int
+    content:
+      type: text
+      length: 2000
+      not_null: true
+  relations:
+    category:
+      use_cache: true
+    tags:
+      type: many
+      in_cache: true
+  indexes:
+    key:
+      fields:
+        key:
+          length: 20
+      type: unique
+    content:
+      type: fulltext
+      parser: ngram
+
+tags:
+  columns:
+    id:
+      type: int
+      primary: true
+      auto_increment: auto
+    note_id: int_not_null
+    name: varchar_not_null
+  relations:
+    note:
+
+categories:
+  columns:
+    id:
+      type: int
+      primary: true
+      auto_increment: auto
+    name: varchar_not_null
+
+counters:
+  counting: counter
+  timestampable: none
+  columns:
+    note_id:
+      type: int
+      primary: true
+    date:
+      type: date
+      primary: true
+    counter: bigint_not_null
+  relations:
+    note:

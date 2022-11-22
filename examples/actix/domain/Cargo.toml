@@ -1,0 +1,10 @@
+[package]
+name = "domain"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+senax-common = "0.1"
+db_sample = { path = "../db/sample" }
+
+async-trait = "0.1"

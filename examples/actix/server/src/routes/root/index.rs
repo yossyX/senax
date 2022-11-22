@@ -1,0 +1,19 @@
+use crate::request::*;
+use actix_web::{get, HttpRequest, HttpResponse, Responder};
+#[allow(unused_imports)]
+use anyhow::{Context as _, Result};
+#[allow(unused_imports)]
+use tracing::trace_span;
+
+#[get("/")]
+pub async fn handler(http_req: HttpRequest) -> impl Responder {
+    let _ctx = get_ctx_and_log(&http_req);
+
+    let span = trace_span!("handler");
+    let _ = span.enter();
+    HttpResponse::Ok().body(
+        r#"
+        Welcome to SenaX example.
+        "#
+    )
+}
