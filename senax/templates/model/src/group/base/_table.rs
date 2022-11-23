@@ -1345,6 +1345,17 @@ pub trait _@{ pascal_name }@Tr {
 ", "") -}@
 }
 
+pub trait _@{ pascal_name }@MutTr {
+@{ def.all_columns()|fmt_join("{title}{comment}    fn {var}(&mut self) -> {outer};
+", "") -}@
+@{ def.relations_one_except_cache()|fmt_rel_join("{title}{comment}    fn {alias}(&mut self) -> Option<&mut rel_{class_mod}::{class}>;
+", "") -}@
+@{ def.relations_one_only_cache()|fmt_rel_join("{title}{comment}    fn {alias}(&mut self) -> Option<&mut rel_{class_mod}::{class}Cache>;
+", "") -}@
+@{ def.relations_many()|fmt_rel_join("{title}{comment}    fn {alias}(&mut self) -> &mut Vec<rel_{class_mod}::{class}>;
+", "") -}@
+}
+    
 #[async_trait(?Send)]
 pub trait _@{ pascal_name }@Rel {
 @{ def.relations_one()|fmt_rel_join("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
@@ -1570,9 +1581,94 @@ impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@> {
 }
 
 #[async_trait(?Send)]
+impl _@{ pascal_name }@Rel for Vec<&mut _@{ pascal_name }@> {
+@{ def.relations_one_except_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        let ids: FxHashSet<_> = self.iter_mut().map(|v| v.{var}()).collect();
+        if ids.is_empty() { return Ok(()); }
+        let map = rel_{class_mod}::{class}::find_many(conn, ids.iter()).await?;
+        for val in self.iter_mut() {
+            val.{alias} = Some(map.get(&val.{var}()).map(|v| Box::new(v.clone())));
+        }
+        Ok(())
+    }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        let ids: FxHashSet<_> = self.iter_mut().flat_map(|v| v.{var}()).collect();
+        if ids.is_empty() { return Ok(()); }
+        let map = rel_{class_mod}::{class}::find_many(conn, ids.iter()).await?;
+        for val in self.iter_mut() {
+            if let Some(id) = val.{var}() {
+                val.{alias} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            }
+        }
+        Ok(())
+    }\n", "") -}@
+@{ def.relations_one_only_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        let ids: FxHashSet<_> = self.iter_mut().map(|v| v.{var}()).collect();
+        if ids.is_empty() { return Ok(()); }
+        let map = rel_{class_mod}::{class}::find_many_from_cache{with_trashed}(conn, ids.iter()).await?;
+        for val in self.iter_mut() {
+            val.{alias} = Some(map.get(&val.{var}()).map(|v| Box::new(v.clone())));
+        }
+        Ok(())
+    }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        let ids: FxHashSet<_> = self.iter_mut().flat_map(|v| v.{var}()).collect();
+        if ids.is_empty() { return Ok(()); }
+        let map = rel_{class_mod}::{class}::find_many_from_cache{with_trashed}(conn, ids.iter()).await?;
+        for val in self.iter_mut() {
+            if let Some(id) = val.{var}() {
+                val.{alias} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            }
+        }
+        Ok(())
+    }\n", "") -}@
+@{ def.relations_many()|fmt_rel_join_foreign_is_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        if self.is_empty() { return Ok(()); }
+        let union: Vec<_> = self.iter_mut().map(|v| {
+            let cond = rel_{class_mod}::Cond::Eq(rel_{class_mod}::ColOne::{foreign_var}(v.{local_id}())){and_cond};
+            let order_by = vec![{order_by}];
+            rel_{class_mod}::{class}::query().cond(cond).order_by(order_by){limit}
+        }).collect();
+        use rel_{class_mod}::UnionBuilder;
+        let list = union.select(conn).await?;
+        let mut map = FxHashMap::default();
+        for row in list {
+            map.entry(row._inner.{foreign})
+                .or_insert_with(Vec::new)
+                .push(row);
+        }
+        for val in self.iter_mut() {
+            val.{alias} = Some(
+                map.remove(&val._inner.{local_id}).unwrap_or_default(),
+            );
+        }
+        Ok(())
+    }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        if self.is_empty() { return Ok(()); }
+        let union: Vec<_> = self.iter_mut().map(|v| {
+            let cond = rel_{class_mod}::Cond::Eq(rel_{class_mod}::ColOne::{foreign_var}(v.{local_id}())){and_cond};
+            let order_by = vec![{order_by}];
+            rel_{class_mod}::{class}::query().cond(cond).order_by(order_by){limit}
+        }).collect();
+        use rel_{class_mod}::UnionBuilder;
+        let list = union.select(conn).await?;
+        let mut map = FxHashMap::default();
+        for row in list {
+            if let Some(id) = row._inner.{foreign} {
+                map.entry(id).or_insert_with(Vec::new).push(row);
+            }
+        }
+        for val in self.iter_mut() {
+            val.{alias} = Some(
+                map.remove(&val._inner.{local_id}).unwrap_or_default(),
+            );
+        }
+        Ok(())
+    }\n", "") -}@
+}
+
+#[async_trait(?Send)]
 impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@ForUpdate> {
 @{ def.relations_one_owner()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
-        let ids: FxHashSet<_> = self.iter_mut().map(|v| v.{var}().get()).collect();
+        let ids: FxHashSet<_> = self.iter().map(|v| v.{var}().get()).collect();
         if ids.is_empty() { return Ok(()); }
         let map = rel_{class_mod}::{class}::find_many_for_update(conn, ids.iter()).await?;
         for val in self.iter_mut() {
@@ -1580,7 +1676,67 @@ impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@ForUpdate> {
         }
         Ok(())
     }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
-        let ids: FxHashSet<_> = self.iter_mut().flat_map(|v| v.{var}().get()).collect();
+        let ids: FxHashSet<_> = self.iter().flat_map(|v| v.{var}().get()).collect();
+        if ids.is_empty() { return Ok(()); }
+        let map = rel_{class_mod}::{class}::find_many_for_update(conn, ids.iter()).await?;
+        for val in self.iter_mut() {
+            if let Some(id) = val.{var}().get() {
+                val.{alias} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            }
+        }
+        Ok(())
+    }\n", "") -}@
+@{ def.relations_many()|fmt_rel_join_foreign_is_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        let ids: Vec<_> = self.iter().map(|v| v.{local_id}().get()).collect();
+        if ids.is_empty() { return Ok(()); }
+        let cond = rel_{class_mod}::Cond::In(rel_{class_mod}::ColMany::{foreign_var}(ids)){and_cond};
+        let order_by = vec![{order_by}];
+        let list = rel_{class_mod}::{class}::query().cond(cond).order_by(order_by).select_for_update(conn).await?;
+        let mut map = FxHashMap::default();
+        for row in list {
+            map.entry(row._data.{foreign})
+                .or_insert_with(Vec::new)
+                .push(row);
+        }
+        for val in self.iter_mut() {
+            val.{alias} = Some(
+                map.remove(&val._data.{local_id}).unwrap_or_default(),
+            );
+        }
+        Ok(())
+    }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        let ids: Vec<_> = self.iter().map(|v| v.{local_id}().get()).collect();
+        if ids.is_empty() { return Ok(()); }
+        let cond = rel_{class_mod}::Cond::In(rel_{class_mod}::ColMany::{foreign_var}(ids)){and_cond};
+        let order_by = vec![{order_by}];
+        let list = rel_{class_mod}::{class}::query().cond(cond).order_by(order_by).select_for_update(conn).await?;
+        let mut map = FxHashMap::default();
+        for row in list {
+            if let Some(id) = row._data.{foreign} {
+                map.entry(id).or_insert_with(Vec::new).push(row);
+            }
+        }
+        for val in self.iter_mut() {
+            val.{alias} = Some(
+                map.remove(&val._data.{local_id}).unwrap_or_default(),
+            );
+        }
+        Ok(())
+    }\n", "") -}@
+}
+
+#[async_trait(?Send)]
+impl _@{ pascal_name }@Rel for Vec<&mut _@{ pascal_name }@ForUpdate> {
+@{ def.relations_one_owner()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        let ids: FxHashSet<_> = self.iter().map(|v| v.{var}().get()).collect();
+        if ids.is_empty() { return Ok(()); }
+        let map = rel_{class_mod}::{class}::find_many_for_update(conn, ids.iter()).await?;
+        for val in self.iter_mut() {
+            val.{alias} = Some(map.get(&val.{var}().get()).map(|v| Box::new(v.clone())));
+        }
+        Ok(())
+    }\n", "    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
+        let ids: FxHashSet<_> = self.iter().flat_map(|v| v.{var}().get()).collect();
         if ids.is_empty() { return Ok(()); }
         let map = rel_{class_mod}::{class}::find_many_for_update(conn, ids.iter()).await?;
         for val in self.iter_mut() {
@@ -2846,6 +3002,25 @@ impl _@{ pascal_name }@Tr for _@{ pascal_name }@ {
     @{- def.relations_many()|fmt_rel_join("
     fn {alias}(&self) -> &Vec<rel_{class_mod}::{class}> {
         self.{alias}.as_ref().expect(\"{alias} is not loaded\")
+    }", "") }@
+}
+
+impl _@{ pascal_name }@MutTr for _@{ pascal_name }@ {
+    @{- def.all_columns()|fmt_join("
+    fn {var}(&mut self) -> {outer} {
+        self._inner.{var}{clone}{convert_outer}
+    }", "") }@
+    @{- def.relations_one_except_cache()|fmt_rel_join("
+    fn {alias}(&mut self) -> Option<&mut rel_{class_mod}::{class}> {
+        self.{alias}.as_mut().expect(\"{alias} is not loaded\").as_mut().map(|b| &mut **b)
+    }", "") }@
+    @{- def.relations_one_only_cache()|fmt_rel_join("
+    fn {alias}(&mut self) -> Option<&mut rel_{class_mod}::{class}Cache> {
+        self.{alias}.as_mut().expect(\"{alias} is not loaded\").as_mut().map(|b| &mut **b)
+    }", "") }@
+    @{- def.relations_many()|fmt_rel_join("
+    fn {alias}(&mut self) -> &mut Vec<rel_{class_mod}::{class}> {
+        self.{alias}.as_mut().expect(\"{alias} is not loaded\")
     }", "") }@
 }
 @%- for parent in def.parents() %@

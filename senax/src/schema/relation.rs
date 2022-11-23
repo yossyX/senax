@@ -51,6 +51,8 @@ pub struct RelDef {
     /// 結合深さは1代のみで子テーブルは親に含んだ状態で更新する必要がある
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub in_cache: bool,
+    /// リレーションを取得する際の追加条件
+    /// 記述例：rel_group_model::Cond::Eq(rel_group_model::ColOne::value(1))
     #[serde(skip_serializing_if = "Option::is_none")]
     pub raw_cond: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

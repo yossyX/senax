@@ -990,6 +990,7 @@
           "type": "boolean"
         },
         "raw_cond": {
+          "description": "リレーションを取得する際の追加条件 記述例：rel_group_model::Cond::Eq(rel_group_model::ColOne::value(1))",
           "type": [
             "string",
             "null"

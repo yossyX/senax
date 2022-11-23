@@ -6,7 +6,7 @@ pub use super::base::_@{ mod_name }@::_@{ enum_name|pascal }@;
 @% endfor -%@
 #[rustfmt::skip]
 pub use super::base::_@{ mod_name }@::{
-    self, _@{ name|pascal }@, _@{ name|pascal }@Cache, _@{ name|pascal }@Factory, _@{ name|pascal }@ForUpdate,@% for id in def.id() %@ @{ id_name }@, @{ id_name }@Tr,@% endfor %@ _@{ name|pascal }@Info, _@{ name|pascal }@Rel, _@{ name|pascal }@Tr,
+    self, _@{ name|pascal }@, _@{ name|pascal }@Cache, _@{ name|pascal }@Factory, _@{ name|pascal }@ForUpdate,@% for id in def.id() %@ @{ id_name }@, @{ id_name }@Tr,@% endfor %@ _@{ name|pascal }@Info, _@{ name|pascal }@Rel, _@{ name|pascal }@Tr, _@{ name|pascal }@MutTr,
 };
 
 use crate::DbConn;
