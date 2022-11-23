@@ -82,6 +82,9 @@ enum Commands {
         /// Include ER diagram
         #[clap(short, long)]
         er: bool,
+        /// Template file
+        #[clap(short, long)]
+        template: Option<PathBuf>,
     },
     /// generate a schema yml file from DB
     GenSchema {
@@ -139,10 +142,15 @@ async fn exec(cli: Cli) -> Result<(), anyhow::Error> {
             ensure!(re.is_match(db), "bad db name!");
             generate_seed_file(db, description)?;
         }
-        Commands::GenDbDoc { db, group, er } => {
+        Commands::GenDbDoc {
+            db,
+            group,
+            er,
+            template,
+        } => {
             let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
             ensure!(re.is_match(db), "bad db name!");
-            db_document::generate(db, group, *er)?;
+            db_document::generate(db, group, *er, template)?;
         }
         Commands::GenSchema { uri } => {
             schema_generator::generate(uri).await?;

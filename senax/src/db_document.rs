@@ -8,6 +8,7 @@ use regex::Regex;
 use serde::Serialize;
 use std::env;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tera::{Context, Tera};
@@ -53,7 +54,12 @@ impl From<&Arc<ModelDef>> for DocModel {
     }
 }
 
-pub fn generate(db: &str, group_name: &Option<String>, er: bool) -> Result<()> {
+pub fn generate(
+    db: &str,
+    group_name: &Option<String>,
+    er: bool,
+    template: &Option<PathBuf>,
+) -> Result<()> {
     schema::parse(db)?;
 
     let config = unsafe { CONFIG.get().unwrap() }.clone();
@@ -139,15 +145,19 @@ pub fn generate(db: &str, group_name: &Option<String>, er: bool) -> Result<()> {
         context.insert("group_list", &group_list);
     }
 
-    let filename = if locale == "ja_JP" {
-        "templates/db-document-jp.html"
+    let tpl = if let Some(template) = template {
+        std::fs::read_to_string(template)?
     } else {
-        "templates/db-document.html"
+        let filename = if locale == "ja_JP" {
+            "templates/db-document-jp.html"
+        } else {
+            "templates/db-document.html"
+        };
+        let tpl = crate::TEMPLATES.get(filename)?;
+        std::str::from_utf8(tpl.as_ref())?.to_string()
     };
-    let tpl = crate::TEMPLATES.get(filename)?;
-    let tpl = std::str::from_utf8(tpl.as_ref())?;
     let mut tera = Tera::default();
-    tera.add_raw_template("db-document.html", tpl)?;
+    tera.add_raw_template("db-document.html", &tpl)?;
     let result = tera.render("db-document.html", &context)?;
     println!("{}", result);
     Ok(())
