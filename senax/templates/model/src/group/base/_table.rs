@@ -3831,7 +3831,7 @@ impl _@{ pascal_name }@ {
         let (obj, cache_msg) = Self::__save(conn, obj).await?;
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
             if let Some(cache_msg) = cache_msg {
-                conn.push_cache_op(cache_msg.wrap());
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
         }
         Ok(obj)
@@ -3870,7 +3870,11 @@ impl _@{ pascal_name }@ {
             VALUES (@{ def.all_columns()|fmt_join("{placeholder}", ",") }@)";
         let query = query_bind(sql, &obj._data);
         let _span = info_span!("query", sql = &query.sql());
-        let result = query.execute(conn.get_tx().await?).await?;
+        let result = if conn.wo_tx() {
+            query.execute(&mut conn.acquire_source().await?).await?
+        } else {
+            query.execute(conn.get_tx().await?).await?
+        };
 @{- def.auto_increments()|fmt_join("
         if obj._data.{var} == 0 {
             obj._data.{var} = result.last_insert_id() as {inner};
@@ -3915,7 +3919,11 @@ impl _@{ pascal_name }@ {
         bind_sql!(obj, query, {var}, {may_null});","") }@
         query = query@{ def.primaries()|fmt_join(".bind(id.{index})", "") }@;
         debug!("{}", &obj);
-        let result = query.execute(conn.get_tx().await?).await?;
+        let result = if conn.wo_tx() {
+            query.execute(&mut conn.acquire_source().await?).await?
+        } else {
+            query.execute(conn.get_tx().await?).await?
+        };
         @%- if def.versioned %@
         obj.@{ version_col }@().set(result.last_insert_id() as u32);
         @%- endif %@
@@ -3965,7 +3973,11 @@ impl _@{ pascal_name }@ {
         let _span = info_span!("query", sql = &query.sql());
 @{- def.non_primaries()|fmt_join("
         bind_sql!(obj, query, {var}, {may_null});","") }@
-        let result = query.execute(conn.get_tx().await?).await?;
+        let result = if conn.wo_tx() {
+            query.execute(&mut conn.acquire_source().await?).await?
+        } else {
+            query.execute(conn.get_tx().await?).await?
+        };
         debug!("{}", &obj);
         if result.rows_affected() == 1 {
             @{- def.auto_increments()|fmt_join("
@@ -4020,7 +4032,11 @@ impl _@{ pascal_name }@ {
             VALUES (@{ def.all_columns()|fmt_join("{placeholder}", ",") }@)";
         let query = query_bind(sql, &obj._data);
         let _span = info_span!("query", sql = &query.sql());
-        let result = query.execute(conn.get_tx().await?).await?;
+        let result = if conn.wo_tx() {
+            query.execute(&mut conn.acquire_source().await?).await?
+        } else {
+            query.execute(conn.get_tx().await?).await?
+        };
         if result.rows_affected() == 0 {
             return Ok(None);
         }
@@ -4038,7 +4054,7 @@ impl _@{ pascal_name }@ {
 @{- def.relations_one_cache()|fmt_rel_join("\n                _{alias}: None,", "") }@
 @{- def.relations_many_cache()|fmt_rel_join("\n                _{alias}: None,", "") }@
             };
-            conn.push_cache_op(cache_msg.wrap());
+            conn.push_cache_op(cache_msg.wrap()).await;
         }
         Ok(Some(obj))
     }
@@ -4138,7 +4154,7 @@ impl _@{ pascal_name }@ {
                     shard_id: conn.shard_id(),
                     list,
                 };
-                conn.push_cache_op(cache_msg.wrap());
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
         }
         Ok(())
@@ -4184,7 +4200,11 @@ impl _@{ pascal_name }@ {
             for data in list {
     @{- def.all_columns()|fmt_join("\n                query = query.bind(&data._data.{var});", "") }@
             }
-            let result = query.execute(conn.get_tx().await?).await?;
+            let result = if conn.wo_tx() {
+                query.execute(&mut conn.acquire_source().await?).await?
+            } else {
+                query.execute(conn.get_tx().await?).await?
+            };
             @{- def.auto_increments()|fmt_join("
             let mut id = result.last_insert_id() as u32;", "") }@
             let mut data_list = Vec::new();
@@ -4313,7 +4333,11 @@ impl _@{ pascal_name }@ {
         }
 @{- def.non_primaries()|fmt_join("
         bind_sql!(obj, query, {var}, {may_null});","") }@
-        query.execute(conn.get_tx().await?).await?;
+        if conn.wo_tx() {
+            query.execute(&mut conn.acquire_source().await?).await?;
+        } else {
+            query.execute(conn.get_tx().await?).await?;
+        }
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
             let cache_msg = CacheOp::BulkUpsert {
                 shard_id: conn.shard_id(),
@@ -4321,7 +4345,7 @@ impl _@{ pascal_name }@ {
                 update: obj._update.clone(),
                 op: obj._op.clone(),
             };
-            conn.push_cache_op(cache_msg.wrap());
+            conn.push_cache_op(cache_msg.wrap()).await;
         }
         Ok(())
     }
@@ -4363,7 +4387,11 @@ impl _@{ pascal_name }@ {
             for id in ids {
                 query = query.bind(&id.0);
             }
-            let result = query.execute(conn.get_tx().await?).await?;
+            let result = if conn.wo_tx() {
+                query.execute(&mut conn.acquire_source().await?).await?
+            } else {
+                query.execute(conn.get_tx().await?).await?
+            };
             rows_affected += result.rows_affected();
         }
         debug!("DELETE @{ table_name }@ {}", vec_pri_to_str(&ids));
@@ -4393,7 +4421,7 @@ impl _@{ pascal_name }@ {
                 update: for_update._update,
                 op: for_update._op,
             };
-            conn.push_cache_op(cache_msg.wrap());
+            conn.push_cache_op(cache_msg.wrap()).await;
         }
         Ok(rows_affected)
 @%- else %@
@@ -4452,7 +4480,7 @@ impl _@{ pascal_name }@ {
         debug!("FORCE DELETE @{ table_name }@ {}", vec_pri_to_str(&ids));
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
             let shard_id = conn.shard_id();
-            conn.push_cache_op(CacheOp::DeleteMany { ids, shard_id }.wrap());
+            conn.push_cache_op(CacheOp::DeleteMany { ids, shard_id }.wrap()).await;
         }
         Ok(rows_affected)
     }
@@ -4467,7 +4495,7 @@ impl _@{ pascal_name }@ {
         let cache_msg = Self::_delete(conn, obj).await?;
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
             if let Some(cache_msg) = cache_msg {
-                conn.push_cache_op(cache_msg.wrap());
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
         }
         Ok(())
@@ -4512,7 +4540,7 @@ impl _@{ pascal_name }@ {
         let (obj, cache_msg) = Self::_save_update(conn, obj).await?;
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
             if let Some(cache_msg) = cache_msg {
-                conn.push_cache_op(cache_msg.wrap());
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
         }
         Ok(obj)
@@ -4547,7 +4575,7 @@ impl _@{ pascal_name }@ {
 @%- endif %@
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
             let shard_id = conn.shard_id();
-            conn.push_cache_op(CacheOp::Delete { id, shard_id }.wrap());
+            conn.push_cache_op(CacheOp::Delete { id, shard_id }.wrap()).await;
         }
         Ok(())
     }
@@ -4563,9 +4591,13 @@ impl _@{ pascal_name }@ {
     pub async fn force_delete_all(conn: &mut DbConn) -> Result<()> {
         let query = sqlx::query(r#"DELETE FROM @{ table_name|db_esc }@"#);
         let _span = info_span!("query", sql = &query.sql());
-        query.execute(conn.get_tx().await?).await?;
+        if conn.wo_tx() {
+            query.execute(&mut conn.acquire_source().await?).await?;
+        } else {
+            query.execute(conn.get_tx().await?).await?;
+        }
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
-            conn.push_cache_op(CacheOp::DeleteAll.wrap());
+            conn.push_cache_op(CacheOp::DeleteAll.wrap()).await;
         }
         Ok(())
     }
@@ -4632,7 +4664,7 @@ impl _@{ pascal_name }@ {
             })).await;
             if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
                 let cache_msg = CacheOp::Cascade { ids: id_list.clone(), shard_id: conn.shard_id() };
-                conn.push_cache_op(cache_msg.wrap());
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
 @%- for on_delete_str in def.on_delete_list %@
             crate::@{ on_delete_str }@::on_delete_@{ group_name }@_@{ name }@(conn, &id_list, cascade_only).await?;
@@ -4651,7 +4683,7 @@ impl _@{ pascal_name }@ {
             let result_num = id_list.len() as u64;
             if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
                 let cache_msg = CacheOp::Cascade { ids: id_list.clone(), shard_id: conn.shard_id() };
-                conn.push_cache_op(cache_msg.wrap());
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
 @%- for on_delete_str in def.on_delete_list %@
             crate::@{ on_delete_str }@::on_delete_@{ group_name }@_@{ name }@(conn, &id_list, cascade_only).await?;
@@ -4732,7 +4764,7 @@ impl _@{ pascal_name }@ {
             let result_num = id_list.len() as u64;
             if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
                 let cache_msg = CacheOp::Reset@{ local|pascal }@@{ val|pascal }@ { ids: id_list.clone(), shard_id: conn.shard_id() };
-                conn.push_cache_op(cache_msg.wrap());
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
             let sql = format!(
                 r#"UPDATE @{ table_name|db_esc }@ SET @{ local|db_esc }@ = @{ val }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ local|db_esc }@ in ({});"#,

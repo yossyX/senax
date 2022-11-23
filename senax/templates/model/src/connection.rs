@@ -121,6 +121,7 @@ pub struct DbConn {
     cache_op_list: Vec<CacheOp>,
     callback_list: VecDeque<Box<dyn FnOnce() -> LocalBoxFuture<'static, ()>>>,
     pub(crate) clear_all_cache: bool,
+    wo_tx: bool,
 }
 
 impl DbConn {
@@ -138,6 +139,7 @@ impl DbConn {
             cache_op_list: Vec::new(),
             callback_list: VecDeque::new(),
             clear_all_cache: false,
+            wo_tx: false,
         }
     }
 
@@ -154,6 +156,7 @@ impl DbConn {
             cache_op_list: Vec::new(),
             callback_list: VecDeque::new(),
             clear_all_cache: false,
+            wo_tx: false,
         }
     }
 
@@ -279,7 +282,14 @@ impl DbConn {
         self.conn.clear();
     }
 
+    pub async fn begin_without_transaction(&mut self) -> Result<()> {
+        ensure!(!self.has_tx(), "Transaction is active.");
+        self.wo_tx = true;
+        Ok(())
+    }
+
     pub async fn begin(&mut self) -> Result<()> {
+        self.wo_tx = false;
         if self.tx.is_empty() {
             let mut tx = SOURCE.get().unwrap()[self.shard_id as usize]
                 .begin()
@@ -303,8 +313,12 @@ impl DbConn {
         !self.tx.is_empty()
     }
 
+    pub(crate) fn wo_tx(&self) -> bool {
+        self.wo_tx
+    }
+
     pub async fn get_tx(&mut self) -> Result<&mut sqlx::Transaction<'static, DbType>> {
-        ensure!(!self.tx.is_empty(), "No transaction is active");
+        ensure!(self.has_tx(), "No transaction is active.");
         match self.tx.entry(self.shard_id) {
             Entry::Occupied(tx) => Ok(tx.into_mut()),
             Entry::Vacant(v) => {
@@ -321,8 +335,12 @@ impl DbConn {
         }
     }
 
-    pub(crate) fn push_cache_op(&mut self, op: CacheOp) {
-        self.cache_op_list.push(op);
+    pub(crate) async fn push_cache_op(&mut self, op: CacheOp) {
+        if self.has_tx() {
+            self.cache_op_list.push(op);
+        } else {
+            CacheMsg(vec![op], MSec::now()).do_send().await;
+        }
     }
 
     pub(crate) async fn push_callback(
