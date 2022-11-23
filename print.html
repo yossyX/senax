@@ -82,7 +82,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">10.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">11.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">12.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">12.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">12.2.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.2.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -153,8 +153,11 @@
                         <h1 id="senaxについて"><a class="header" href="#senaxについて">SenaXについて</a></h1>
 <p>SenaXはRustで書かれたORMで、キャッシュに特化しており非常に高速に動作します。<br />
 ORMにはよくクエリーキャッシュが実装されていますが、SenaXは一般的なクエリーキャッシュのような動作はせず、エンティティキャッシュを基本にしています。<br />
-非常に高速に動作し、具体的な速度例として、DBからの取得とカウンター加算の更新を行うAPIのリクエストを32cpuで42万req/s程度の性能を出すことができます。<br />
-yaml形式のスキーマからDBレイヤーのクレートのコードとマイグレーションDDLを自動生成します。</p>
+SenaXは非常に高速に動作し、具体的な速度例として、DBからの取得とカウンター加算の更新を行うAPIのリクエストを32cpuで42万req/s程度の性能を出すことができます。<br />
+これまでにもキャッシュするORMはあったかと思いますが、そのサーバ単体でのキャッシュでしかなく、他のサーバでデータが更新された場合の責任はプログラマが対応する必要があったはずです。
+SenaXはクエリーの更新内容をすべてのサーバに送信し、自動的にキャッシュを同期します。</p>
+<p>SenaXはyaml形式のスキーマからDBレイヤーのクレートのコードとマイグレーションDDLを自動生成します。
+マクロ生成やライブラリの場合、挙動の理解や部分的な修正が困難ですが、生成されたコードは比較的単純でコピーしてカスタマイズすることも可能です。</p>
 <p>SenaXの特徴として次の点が挙げられます</p>
 <ul>
 <li>クエリー集約</li>
@@ -303,6 +306,7 @@ note.rs等はカスタマイズ用で、_note.rsが本体です。再度モデ�
 <p>db/sample/migrations下にDDLファイルを生成します。<br />
 DDLは現状のDBを確認して差分を出力します。<br />
 コマンド実行前に .env の SAMPLE_DB_URL で指定されたデータベースを作成しておいてください。</p>
+<p>※ テーブル名はデフォルトでグループ名とモデル名を結合した名前になります。変更する場合はスキーマで table_name を指定してください。</p>
 <h2 id="マイグレーション実行"><a class="header" href="#マイグレーション実行">マイグレーション実行</a></h2>
 <pre><code>$ cargo run -p db_sample -- migrate
 </code></pre>
@@ -345,7 +349,7 @@ note:
 <pre><code>$ cargo run -p db_sample -- seed
 </code></pre>
 <h2 id="テーブル定義書生成"><a class="header" href="#テーブル定義書生成">テーブル定義書生成</a></h2>
-<pre><code>$ senax gen-db-doc sample &gt; db-document.html
+<pre><code>$ senax gen-db-doc sample -e &gt; db-document.html
 </code></pre>
 <p>環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。</p>
 <h2 id="コード記述"><a class="header" href="#コード記述">コード記述</a></h2>
@@ -745,7 +749,7 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <tr><td><strong>local</strong></td><td>string</td><td>結合するローカルのカラム名</td><td></td></tr>
 <tr><td><strong>foreign</strong></td><td>string</td><td>結合先のカラム名</td><td></td></tr>
 <tr><td><strong>in_cache</strong></td><td>boolean</td><td>manyあるいはone_to_oneの場合にリレーション先も一緒にキャッシュするか 結合深さは1代のみで子テーブルは親に含んだ状態で更新する必要がある</td><td></td></tr>
-<tr><td><strong>raw_cond</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>raw_cond</strong></td><td>string</td><td>リレーションを取得する際の追加条件 記述例：rel_group_model::Cond::Eq(rel_group_model::ColOne::value(1))</td><td></td></tr>
 <tr><td><strong>order_by</strong></td><td>string</td><td></td><td></td></tr>
 <tr><td><strong>desc</strong></td><td>boolean</td><td></td><td></td></tr>
 <tr><td><strong>limit</strong></td><td>integer</td><td></td><td></td></tr>
@@ -885,6 +889,16 @@ conn.begin_read_tx().await?;
 </span></code></pre></pre>
 <h2 id="セーブポイント"><a class="header" href="#セーブポイント">セーブポイント</a></h2>
 <p>更新用トランザクションがネストされているとセーブポイントになります。</p>
+<h2 id="トランザクションを使用しない場合"><a class="header" href="#トランザクションを使用しない場合">トランザクションを使用しない場合</a></h2>
+<p>トランザクションを使用しない場合は begin_without_transaction() の呼び出しが必要です。<br />
+単純なinsert, updateが可能です。クエリーの実行ごとにコネクションが変わっている可能性がありますので、DB接続のセッションの連続性に依存する処理はできません。<br />
+また、force_delete には対応していませんので、通常のトランザクションが必要です。</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut conn = DbConn::new();
+conn.begin_without_transaction().await?;
+<span class="boring">}
+</span></code></pre></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="モデルについて"><a class="header" href="#モデルについて">モデルについて</a></h1>
 <h2 id="メソッド"><a class="header" href="#メソッド">メソッド</a></h2>
 <p>モデル名で自動生成されるメソッド</p>
@@ -991,9 +1005,9 @@ _{モデル名}::force_delete(conn, obj).await?;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="クエリー"><a class="header" href="#クエリー">クエリー</a></h1>
 <p>QueryBuilderで使用するクエリーはマクロで記述されます。<br />
-基本的に左側にカラム名、右側に値となります。<br />
+基本的に比較演算子の左側にカラム名、右側に値となります。<br />
 クエリーはそのままテキスト化ではなく、プリペアードステートメントに変換されますので、SQLインジェクションは発生しません。
-他のテーブルとの結合はJOINではなく、EXISTSで判定します。</p>
+他のテーブルとの結合はJOINではなく、EXISTSで判定します。膨大なブログから表示可能な新着数件を抽出などではJOINよりもEXISTSのほうが早く取得できます。</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let cond = db_{DB名}::cond_{グループ名}_{モデル名}!(クエリー);
@@ -1043,8 +1057,18 @@ io_uringを使用しているため、Linuxのみ対応。<br />
 <h2 id="ダミーキャッシュ"><a class="header" href="#ダミーキャッシュ">ダミーキャッシュ</a></h2>
 <p>「いいね！」などの表示は押されていなければデータが無いのでキャッシュされず、何度も再取得されることになる。<br />
 その場合、「いいね！」を解除した状態のデータを insert_dummy_cache で登録することで代わりのキャッシュとすることができる。</p>
+<h2 id="サーバ間同期"><a class="header" href="#サーバ間同期">サーバ間同期</a></h2>
+<p>サーバ間の同期は全データを送るのではなく、更新されたカラムのデータのみ送信します。
+受信側はキャッシュを保有していれば受信した更新内容でキャッシュを更新します。
+ですので、同時に異なったサーバで更新されてもそれが異なるカラムであれば問題ありません。<br />
+同じカラムが更新される場合は、add()やmax()などのメソッドで更新していれば、それぞれ加算や現在値と更新値の最大値での更新になりますので、問題が発生しにくくなります。<br />
+更にバージョン機能を有効にすれば同期が確実になります。</p>
 <h2 id="キャッシュ更新通知"><a class="header" href="#キャッシュ更新通知">キャッシュ更新通知</a></h2>
-<p>_receive_update_notice で他のサーバからのキャッシュ更新通知を受信することができます。新着やランキングの修正、チャット通知などに利用できます。 </p>
+<p>_receive_update_notice() で他のサーバからのキャッシュ更新通知を受信して処理をカスタマイズすることができます。新着やランキングの修正、チャット通知などに利用できます。 </p>
+<h2 id="マイクロサービス化"><a class="header" href="#マイクロサービス化">マイクロサービス化</a></h2>
+<p>サービスを再起動するとキャッシュは破棄されます。
+新規のイベントの実装等で既存の安定したサービスのキャッシュが破棄されないようにマイクロサービスアーキテクチャで実装することが望ましいです。
+その場合、必ずしも相互のリモートAPIを呼び出す必要はなく、データの参照程度であればローカルのメソッドを呼び出してデータを取得し、更新はキャッシュ更新通知で受信することができるので、実装が簡単で高速です。</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="遅延一括更新-1"><a class="header" href="#遅延一括更新-1">遅延一括更新</a></h1>
 <h2 id="insert_delayed"><a class="header" href="#insert_delayed">insert_delayed</a></h2>
 <p>ログやツイートを想定しており、同時にリクエストを受け付けた他の保存データとまとめてバルクインサートを行う。<br />
@@ -1061,6 +1085,29 @@ save_delayed ではそれぞれの主キーごとに1クエリーを必要とす
 アクセスカウンタにも使用可能であるが、maxクエリーへの変換が行われないので、データを取得するタイミングと加算するタイミングによりサーバ間のキャッシュ不整合が発生する可能性がある。 
 DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行わる。その間サーバは終了できない。<br />
 リレーションのデータは保存されない。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="リレーション"><a class="header" href="#リレーション">リレーション</a></h1>
+<p>取得時にJOINでのリレーション取得は行わず、eager loading のようにクエリー実行後に主キーをまとめてリレーション先からIN句を使用したクエリーで取得します。</p>
+<h2 id="リレーションの取得"><a class="header" href="#リレーションの取得">リレーションの取得</a></h2>
+<p>取得したオブジェクトや更新用オブジェクト、あるいは Vec&lt;_{モデル名}&gt; などに fetch_{リレーション名} のメソッドを使用すると、そのオブジェクトやリストに必要なリレーションを一回のクエリで取得してそれぞれ元のオブジェクトに保存します。</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut list = _{モデル名}::query().select(&amp;mut conn).await?;
+list.fetch_{リレーション名}(&amp;mut conn).await?;
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="3世代目の取得"><a class="header" href="#3世代目の取得">3世代目の取得</a></h2>
+<p>リレーション先のリレーションのような3世代目の取得については Vec&lt;&amp;mut _{モデル名}&gt; にまとめれば fetch_{リレーション名} のメソッドが使用可能です。<br />
+その際、2世代目のリレーション先のトレイトが必要になります。</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use {2世代目のリレーションmod}::*;
+
+let mut list = _{1世代目モデル名}::query().select(&amp;mut conn).await?;
+list.fetch_{2世代目リレーション名}(&amp;mut conn).await?;
+let mut v: Vec&lt;_&gt; = list.iter_mut().map(|v| v.{2世代目リレーション名}()).flatten().collect();
+v.fetch_{3世代目リレーション名}(&amp;mut conn).await?;
+<span class="boring">}
+</span></code></pre></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ドメイン"><a class="header" href="#ドメイン">ドメイン</a></h1>
 <p>ORMのモデル層としてはカスタマイズ用の note.rs にロジックを実装したくなるところですが、自動生成されたクレートのビルドに非常に時間がかかるので、別途ドメイン用のクレートを用意してそちらにビジネスロジックを実装します。<br />
 単純な方法としてはビジネスロジックのトレイトを定義して _Note にトレイトの実装を行うことで、 _Note にメソッドが追加されたように扱うことができます。<br />

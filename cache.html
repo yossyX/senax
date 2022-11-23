@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html" class="active"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">10.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">11.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">12.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">12.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">12.2.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html" class="active"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.2.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -175,8 +175,18 @@ io_uringを使用しているため、Linuxのみ対応。<br />
 <h2 id="ダミーキャッシュ"><a class="header" href="#ダミーキャッシュ">ダミーキャッシュ</a></h2>
 <p>「いいね！」などの表示は押されていなければデータが無いのでキャッシュされず、何度も再取得されることになる。<br />
 その場合、「いいね！」を解除した状態のデータを insert_dummy_cache で登録することで代わりのキャッシュとすることができる。</p>
+<h2 id="サーバ間同期"><a class="header" href="#サーバ間同期">サーバ間同期</a></h2>
+<p>サーバ間の同期は全データを送るのではなく、更新されたカラムのデータのみ送信します。
+受信側はキャッシュを保有していれば受信した更新内容でキャッシュを更新します。
+ですので、同時に異なったサーバで更新されてもそれが異なるカラムであれば問題ありません。<br />
+同じカラムが更新される場合は、add()やmax()などのメソッドで更新していれば、それぞれ加算や現在値と更新値の最大値での更新になりますので、問題が発生しにくくなります。<br />
+更にバージョン機能を有効にすれば同期が確実になります。</p>
 <h2 id="キャッシュ更新通知"><a class="header" href="#キャッシュ更新通知">キャッシュ更新通知</a></h2>
-<p>_receive_update_notice で他のサーバからのキャッシュ更新通知を受信することができます。新着やランキングの修正、チャット通知などに利用できます。 </p>
+<p>_receive_update_notice() で他のサーバからのキャッシュ更新通知を受信して処理をカスタマイズすることができます。新着やランキングの修正、チャット通知などに利用できます。 </p>
+<h2 id="マイクロサービス化"><a class="header" href="#マイクロサービス化">マイクロサービス化</a></h2>
+<p>サービスを再起動するとキャッシュは破棄されます。
+新規のイベントの実装等で既存の安定したサービスのキャッシュが破棄されないようにマイクロサービスアーキテクチャで実装することが望ましいです。
+その場合、必ずしも相互のリモートAPIを呼び出す必要はなく、データの参照程度であればローカルのメソッドを呼び出してデータを取得し、更新はキャッシュ更新通知で受信することができるので、実装が簡単で高速です。</p>
 
                     </main>
 

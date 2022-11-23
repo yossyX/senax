@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>設定ファイル - SenaX</title>
+        <title>リレーション - SenaX</title>
 
 
         <!-- Custom HTML head -->
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html" class="active"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.2.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html" class="active"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.2.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -149,49 +149,39 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="envファイル"><a class="header" href="#envファイル">.envファイル</a></h1>
-<p>改行区切りを使用するために dotenv ではなく、 dotenvy を使用してください。</p>
-<h2 id="db設定"><a class="header" href="#db設定">DB設定</a></h2>
-<div class="table-wrapper"><table><thead><tr><th>パラメータ名</th><th>説明</th></tr></thead><tbody>
-<tr><td>{DB名}_DB_URL</td><td>更新用DB接続URL（改行区切りでシャーディング設定）</td></tr>
-<tr><td>{DB名}_REPLICA_DB_URL</td><td>参照用DB接続URL（改行区切りでシャーディング設定、カンマ区切りでレプリカ設定）</td></tr>
-<tr><td>{DB名}_CACHE_DB_URL</td><td>キャッシュ用DB接続URL（改行区切りでシャーディング設定、カンマ区切りでレプリカ設定）</td></tr>
-<tr><td>{DB名}_TEST_DB_URL</td><td>テストDB接続URL</td></tr>
-<tr><td>{DB名}_DB_MAX_CONNECTIONS</td><td>更新用コネクション数</td></tr>
-<tr><td>{DB名}_REPLICA_DB_MAX_CONNECTIONS</td><td>参照用コネクション数</td></tr>
-<tr><td>{DB名}_CACHE_DB_MAX_CONNECTIONS</td><td>キャッシュ用コネクション数</td></tr>
-</tbody></table>
-</div>
-<h2 id="キャッシュ設定"><a class="header" href="#キャッシュ設定">キャッシュ設定</a></h2>
-<div class="table-wrapper"><table><thead><tr><th>パラメータ名</th><th>説明</th></tr></thead><tbody>
-<tr><td>{DB名}_FAST_CACHE_INDEX_SIZE</td><td>高速キャッシュインデックスメモリサイズ</td></tr>
-<tr><td>{DB名}_SHORT_CACHE_CAPACITY</td><td>ショートキャッシュメモリサイズ</td></tr>
-<tr><td>{DB名}_SHORT_CACHE_TIME</td><td>ショートキャッシュ保持時間(秒)</td></tr>
-<tr><td>{DB名}_LONG_CACHE_CAPACITY</td><td>ロングキャッシュメモリサイズ</td></tr>
-<tr><td>{DB名}_LONG_CACHE_TIME</td><td>ロングキャッシュ保持時間(秒)</td></tr>
-<tr><td>{DB名}_LONG_CACHE_IDLE_TIME</td><td>ロングキャッシュアイドル時間(秒)</td></tr>
-<tr><td>{DB名}_DISK_CACHE_INDEX_SIZE</td><td>ディスクキャッシュインデックスメモリサイズ</td></tr>
-<tr><td>{DB名}_DISK_CACHE_FILE_NUM</td><td>ディスクキャッシュ分割ファイル数</td></tr>
-<tr><td>{DB名}_DISK_CACHE_FILE_SIZE</td><td>ディスクキャッシュファイルサイズ</td></tr>
-<tr><td>{DB名}_CACHE_TTL</td><td>キャッシュ保持時間</td></tr>
-<tr><td>DISABLE_{DB名}_CACHE</td><td>そのサーバへのキャッシュと更新通知の無効化(true or false)</td></tr>
-</tbody></table>
-</div>
-<h2 id="リンカー設定"><a class="header" href="#リンカー設定">リンカー設定</a></h2>
-<div class="table-wrapper"><table><thead><tr><th>パラメータ名</th><th>説明</th></tr></thead><tbody>
-<tr><td>LINKER_PORT</td><td>リンカー接続ポート(TCP or UNIX)</td></tr>
-<tr><td>LINKER_PASSWORD</td><td>リンカーパスポート</td></tr>
-</tbody></table>
-</div>
+                        <h1 id="リレーション"><a class="header" href="#リレーション">リレーション</a></h1>
+<p>取得時にJOINでのリレーション取得は行わず、eager loading のようにクエリー実行後に主キーをまとめてリレーション先からIN句を使用したクエリーで取得します。</p>
+<h2 id="リレーションの取得"><a class="header" href="#リレーションの取得">リレーションの取得</a></h2>
+<p>取得したオブジェクトや更新用オブジェクト、あるいは Vec&lt;_{モデル名}&gt; などに fetch_{リレーション名} のメソッドを使用すると、そのオブジェクトやリストに必要なリレーションを一回のクエリで取得してそれぞれ元のオブジェクトに保存します。</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut list = _{モデル名}::query().select(&amp;mut conn).await?;
+list.fetch_{リレーション名}(&amp;mut conn).await?;
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="3世代目の取得"><a class="header" href="#3世代目の取得">3世代目の取得</a></h2>
+<p>リレーション先のリレーションのような3世代目の取得については Vec&lt;&amp;mut _{モデル名}&gt; にまとめれば fetch_{リレーション名} のメソッドが使用可能です。<br />
+その際、2世代目のリレーション先のトレイトが必要になります。</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use {2世代目のリレーションmod}::*;
+
+let mut list = _{1世代目モデル名}::query().select(&amp;mut conn).await?;
+list.fetch_{2世代目リレーション名}(&amp;mut conn).await?;
+let mut v: Vec&lt;_&gt; = list.iter_mut().map(|v| v.{2世代目リレーション名}()).flatten().collect();
+v.fetch_{3世代目リレーション名}(&amp;mut conn).await?;
+<span class="boring">}
+</span></code></pre></pre>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="schema.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="delayed.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next" href="transaction.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="domain.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -201,11 +191,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="schema.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="delayed.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next" href="transaction.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="domain.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
