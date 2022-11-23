@@ -1,3 +1,5 @@
+// This code is auto-generated and will always be overwritten.
+
 use anyhow::{ensure, Context as _, Result};
 use futures::future::LocalBoxFuture;
 use fxhash::FxHashMap;

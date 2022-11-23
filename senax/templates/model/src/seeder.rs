@@ -1,3 +1,5 @@
+// This code is auto-generated and will always be overwritten.
+
 use anyhow::{bail, Result};
 use regex::Regex;
 use schemars::gen::SchemaSettings;

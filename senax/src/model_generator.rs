@@ -61,6 +61,34 @@ pub fn generate(db: &str, force: bool) -> Result<()> {
     println!("{}", file_path.display());
     fs_write(file_path, tpl.render()?)?;
 
+    let file_path = src_path.join("accessor.rs");
+    let tpl = template::AccessorTemplate {};
+    println!("{}", file_path.display());
+    fs_write(file_path, tpl.render()?)?;
+
+    let file_path = src_path.join("cache.rs");
+    let tpl = template::CacheTemplate {};
+    println!("{}", file_path.display());
+    fs_write(file_path, tpl.render()?)?;
+
+    let file_path = src_path.join("misc.rs");
+    let tpl = template::MiscTemplate {
+        db,
+        config: &config,
+    };
+    println!("{}", file_path.display());
+    fs_write(file_path, tpl.render()?)?;
+
+    let file_path = src_path.join("connection.rs");
+    let tpl = template::ConnectionTemplate {
+        db,
+        config: &config,
+        tx_isolation: config.tx_isolation.map(|v| v.as_str()),
+        read_tx_isolation: config.read_tx_isolation.map(|v| v.as_str()),
+    };
+    println!("{}", file_path.display());
+    fs_write(file_path, tpl.render()?)?;
+
     let path = base_path.join("migrations");
     if !path.exists() {
         fs::create_dir_all(&path)?;
@@ -104,34 +132,6 @@ pub fn generate(db: &str, force: bool) -> Result<()> {
             mod_names: &mod_names,
             tables: concrete_tables,
             config: &config,
-        };
-        println!("{}", file_path.display());
-        fs_write(file_path, tpl.render()?)?;
-
-        let file_path = src_path.join("accessor.rs");
-        let tpl = template::AccessorTemplate {};
-        println!("{}", file_path.display());
-        fs_write(file_path, tpl.render()?)?;
-
-        let file_path = src_path.join("cache.rs");
-        let tpl = template::CacheTemplate {};
-        println!("{}", file_path.display());
-        fs_write(file_path, tpl.render()?)?;
-
-        let file_path = src_path.join("misc.rs");
-        let tpl = template::MiscTemplate {
-            db,
-            config: &config,
-        };
-        println!("{}", file_path.display());
-        fs_write(file_path, tpl.render()?)?;
-
-        let file_path = src_path.join("connection.rs");
-        let tpl = template::ConnectionTemplate {
-            db,
-            config: &config,
-            tx_isolation: config.tx_isolation.map(|v| v.as_str()),
-            read_tx_isolation: config.read_tx_isolation.map(|v| v.as_str()),
         };
         println!("{}", file_path.display());
         fs_write(file_path, tpl.render()?)?;

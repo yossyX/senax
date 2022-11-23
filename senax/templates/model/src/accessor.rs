@@ -1,3 +1,5 @@
+// This code is auto-generated and will always be overwritten.
+
 #![allow(dead_code)]
 
 use crate::misc::IntoJson;

@@ -1,3 +1,5 @@
+// This code is auto-generated and will always be overwritten.
+
 use actix::{fut::WrapFuture, Actor, Addr, ArbiterHandle, AsyncContext, Context, Handler, Message};
 use ahash::{AHashMap, AHasher};
 use anyhow::{ensure, Context as _, Result};

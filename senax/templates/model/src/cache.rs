@@ -1,3 +1,5 @@
+// This code is auto-generated and will always be overwritten.
+
 use anyhow::Result;
 use futures::future::join_all;
 use fxhash::FxHashMap;

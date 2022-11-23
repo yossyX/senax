@@ -1,3 +1,5 @@
+// This code is auto-generated and will always be overwritten.
+
 use schemars::JsonSchema;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use strum::{EnumMessage, EnumString, IntoStaticStr};
