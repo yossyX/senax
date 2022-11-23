@@ -30,8 +30,8 @@ pub struct MainTemplate<'a> {
 }
 
 #[derive(Template)]
-#[template(path = "model/src/loader.rs", escape = "none")]
-pub struct LoaderTemplate<'a> {
+#[template(path = "model/src/seeder.rs", escape = "none")]
+pub struct SeederTemplate<'a> {
     pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
 }
 

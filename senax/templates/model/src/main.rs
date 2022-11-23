@@ -87,13 +87,13 @@ pub async fn migrate(use_test: bool, clean: bool) -> Result<()> {
 }
 
 pub fn gen_seed_schema() -> Result<()> {
-    let schema = db_@{ db }@::loader::gen_seed_schema()?;
+    let schema = db_@{ db }@::seeder::gen_seed_schema()?;
     println!("{}", schema);
     Ok(())
 }
 
 pub async fn seed(use_test: bool, file_name: Option<PathBuf>) -> Result<()> {
-    db_@{ db }@::loader::seed(use_test, file_name).await
+    db_@{ db }@::seeder::seed(use_test, file_name).await
 }
 
 #[rustfmt::skip]

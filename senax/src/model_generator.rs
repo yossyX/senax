@@ -56,8 +56,8 @@ pub fn generate(db: &str, force: bool) -> Result<()> {
         fs_write(file_path, tpl.render()?)?;
     }
 
-    let file_path = src_path.join("loader.rs");
-    let tpl = template::LoaderTemplate { groups: &groups };
+    let file_path = src_path.join("seeder.rs");
+    let tpl = template::SeederTemplate { groups: &groups };
     println!("{}", file_path.display());
     fs_write(file_path, tpl.render()?)?;
 

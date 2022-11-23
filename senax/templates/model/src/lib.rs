@@ -29,7 +29,7 @@ use tokio::{
 mod accessor;
 pub mod cache;
 pub mod connection;
-pub mod loader;
+pub mod seeder;
 pub mod misc;
 @% for (name, defs) in groups %@
 #[allow(clippy::module_inception)]

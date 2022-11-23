@@ -1002,7 +1002,7 @@ pub struct @{ id_name }@(pub(crate) @{ column_def.get_inner_type(false) }@);
 @% for (name, column_def) in def.id_auto_increment() -%@
 #[derive(Serialize, Hash, Eq, PartialEq, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, JsonSchema)]
 pub struct @{ id_name }@(
-    #[schemars(schema_with = "crate::loader::id_schema")]
+    #[schemars(schema_with = "crate::seeder::id_schema")]
     pub(crate) @{ column_def.get_inner_type(false) }@
 );
 
