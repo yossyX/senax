@@ -61,6 +61,22 @@ pub fn generate(db: &str, force: bool) -> Result<()> {
     println!("{}", file_path.display());
     fs_write(file_path, tpl.render()?)?;
 
+    let path = base_path.join("migrations");
+    if !path.exists() {
+        fs::create_dir_all(&path)?;
+        let file_path = path.join(".gitkeep");
+        println!("{}", file_path.display());
+        fs_write(file_path, "")?;
+    }
+
+    let path = base_path.join("seeds");
+    if !path.exists() {
+        fs::create_dir_all(&path)?;
+        let file_path = path.join(".gitkeep");
+        println!("{}", file_path.display());
+        fs_write(file_path, "")?;
+    }
+
     for (group_name, defs) in &groups {
         unsafe {
             MODELS.take();
