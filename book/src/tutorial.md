@@ -20,7 +20,7 @@ apt-get install graphviz protobuf-compiler
 ## スキーマファイル
 schema/conf.yml
 ```yml
-# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/conf
+# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.2/schema.json#properties/conf
 
 sample:
   title: Sample DB
@@ -52,7 +52,7 @@ groupsは一つのデータベースに数百のテーブルがあるとディ�
 
 schema/sample/note.yml
 ```yml
-# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/model
+# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.2/schema.json#properties/model
 
 note:
   timestampable: fixed_time

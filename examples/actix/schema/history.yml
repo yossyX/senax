@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/history
+# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.2/schema.json#properties/history
 
 sample:
   space:
