@@ -23,3 +23,14 @@ conn.begin_read_tx().await?;
 ## セーブポイント
 
 更新用トランザクションがネストされているとセーブポイントになります。
+
+## トランザクションを使用しない場合
+トランザクションを使用しない場合は begin_without_transaction() の呼び出しが必要です。  
+単純なinsert, updateが可能です。クエリーの実行ごとにコネクションが変わっている可能性がありますので、DB接続のセッションの連続性に依存する処理はできません。  
+また、force_delete には対応していませんので、通常のトランザクションが必要です。
+
+```rust
+let mut conn = DbConn::new();
+conn.begin_without_transaction().await?;
+```
+

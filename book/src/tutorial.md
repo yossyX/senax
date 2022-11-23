@@ -6,6 +6,11 @@
 cargo install senax
 ```
 
+graphviz と protobuf-compiler が必要となります。
+```
+apt-get install graphviz protobuf-compiler
+```
+
 ## 初期ファイル
 
 初期ディレクトリ構成の参考のため、 https://github.com/yossyX/senax から examples/actix のコードを展開してください。
@@ -124,8 +129,8 @@ Symfony 1.xのdoctrine/schema.ymlに近いイメージです。
 ```
 $ senax model sample
 ```
-senaxのコマンドでdb/sample下のファイルを生成します。  
-note.rs等はカスタマイズ用で、_note.rsが本体です。  
+senaxのコマンドでdb/sample下にクレートを生成します。  
+note.rs等はカスタマイズ用で、_note.rsが本体です。再度モデル生成を実行するとnote.rsは上書きされず、_note.rsは常に上書きされます。  
 モデル名が_Tagsのように_が付くのは他のライブラリと被らないようにそのような命名規則にしています。  
 
 ## マイグレーション生成
@@ -135,6 +140,8 @@ $ senax gen-migrate sample init
 db/sample/migrations下にDDLファイルを生成します。  
 DDLは現状のDBを確認して差分を出力します。  
 コマンド実行前に .env の SAMPLE_DB_URL で指定されたデータベースを作成しておいてください。  
+
+※ テーブル名はデフォルトでグループ名とモデル名を結合した名前になります。変更する場合はスキーマで table_name を指定してください。
 
 ## マイグレーション実行
 ```
@@ -193,7 +200,7 @@ $ cargo run -p db_sample -- seed
 
 ## テーブル定義書生成
 ```
-$ senax gen-db-doc sample > db-document.html
+$ senax gen-db-doc sample -e > db-document.html
 ```
 環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。
 

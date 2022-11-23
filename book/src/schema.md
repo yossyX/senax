@@ -374,7 +374,7 @@
 |**local**|string|結合するローカルのカラム名||
 |**foreign**|string|結合先のカラム名||
 |**in_cache**|boolean|manyあるいはone_to_oneの場合にリレーション先も一緒にキャッシュするか 結合深さは1代のみで子テーブルは親に含んだ状態で更新する必要がある||
-|**raw_cond**|string|||
+|**raw_cond**|string|リレーションを取得する際の追加条件 記述例：rel_group_model::Cond::Eq(rel_group_model::ColOne::value(1))||
 |**order_by**|string|||
 |**desc**|boolean|||
 |**limit**|integer|||

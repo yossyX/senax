@@ -9,6 +9,7 @@
 * [クエリー](query.md)
 * [キャッシュ](cache.md)
 * [遅延一括更新](delayed.md)
+* [リレーション](relation.md)
 * [ドメイン](domain.md)
 * [テスト](test.md)
 * [その他](others.md)
