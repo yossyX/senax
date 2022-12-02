@@ -3,7 +3,7 @@ extern crate log;
 
 use actix::{Arbiter, System};
 use actix_web::dev::Service as _;
-use actix_web::{error, middleware, App, HttpMessage, HttpRequest, HttpResponse, HttpServer, web};
+use actix_web::{error, middleware, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 use clap::Parser;
 use dotenvy::dotenv;
@@ -27,11 +27,10 @@ use crate::context::Ctx;
 
 mod context;
 mod db;
-mod request;
 mod response;
 mod routes {
-    pub mod root;
     pub mod api;
+    pub mod root;
 }
 
 const HOST_PORT: &str = "HOST_PORT";
@@ -63,7 +62,7 @@ async fn main() -> Result<()> {
     dotenv().ok();
     let arg: AppArg = AppArg::parse();
 
-    let (_, _) = senax_logger::init(Some(offset!(+9)))?;
+    senax_logger::init(Some(offset!(+9)))?;
 
     let port = env::var(HOST_PORT).unwrap_or_else(|_| DEFAULT_HOST_PORT.to_owned());
     let dir = env::var(WORK_DIR).unwrap_or_else(|_| DEFAULT_WORK_DIR.to_owned());

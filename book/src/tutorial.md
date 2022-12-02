@@ -147,10 +147,6 @@ DDLは現状のDBを確認して差分を出力します。
 ```
 $ cargo run -p db_sample -- migrate
 ```
-もしくは、
-```
-$ target/debug/db_sample migrate
-```
 
 sqlxのマイグレーションを実行します。
 シャーディング設定がある場合すべてのシャードにクエリーを発行するようになっています。

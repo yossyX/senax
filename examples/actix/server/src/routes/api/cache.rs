@@ -1,4 +1,4 @@
-use crate::request::*;
+use crate::context::Ctx;
 use crate::response::*;
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 #[allow(unused_imports)]
@@ -24,7 +24,8 @@ pub struct Response {
 
 #[get("/cache/{key}")]
 async fn handler(key: web::Path<String>, http_req: HttpRequest) -> impl Responder {
-    let ctx = get_ctx_and_log(&http_req);
+    let ctx = Ctx::get(&http_req);
+    ctx.log(&http_req);
     let result = async move {
         let mut conn = SampleConn::new();
         let mut note = _Note::find_by_key_from_cache(&conn, &*key)
