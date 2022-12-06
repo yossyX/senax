@@ -81,6 +81,7 @@ static CACHE_TYPE_ID: u64 = @{ def.get_type_id("CACHE_TYPE_ID") }@;
 pub(crate) async fn init(handle: Option<&ArbiterHandle>) -> Result<()> {
     if CACHE_ALL.get().is_none() {
         CACHE_ALL.set(DbConn::shard_num_range().map(|_| ArcSwapOption::const_empty()).collect()).unwrap();
+        SAVE_DELAYED_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
         UPDATE_DELAYED_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
         UPSERT_DELAYED_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
         BULK_FETCH_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
@@ -591,6 +592,9 @@ static DELAYED_DB_NO: Lazy<AtomicU64> = Lazy::new(|| {
     let time = now.duration_since(UNIX_EPOCH).unwrap();
     AtomicU64::new(time.as_secs() << 20)
 });
+static SAVE_DELAYED_QUEUE: OnceCell<Vec<SegQueue<ForUpdate>>> = OnceCell::new();
+static SAVE_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
+static SAVE_DELAYED_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
 static UPDATE_DELAYED_QUEUE: OnceCell<Vec<SegQueue<ForUpdate>>> = OnceCell::new();
 static UPDATE_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
 static UPDATE_DELAYED_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
@@ -619,6 +623,7 @@ impl Drop for InsertDelayedBuf {
 enum DelayedMsg {
     InsertFromMemory,
     InsertFromDisk,
+    Save,
     Update,
     Upsert,
 }
@@ -659,6 +664,21 @@ impl Handler<DelayedMsg> for DelayedActor {
                     .into_actor(self),
                 );
             }
+            DelayedMsg::Save => {
+                if SAVE_DELAYED_WAITING.load(Ordering::SeqCst) {
+                    return;
+                }
+                ctx.spawn(
+                    async move {
+                        SAVE_DELAYED_WAITING.store(true, Ordering::SeqCst);
+                        let _guard = crate::get_shutdown_guard();
+                        let _semaphore = SAVE_DELAYED_SEMAPHORE.acquire().await;
+                        SAVE_DELAYED_WAITING.store(false, Ordering::SeqCst);
+                        handle_delayed_msg_save().await;
+                    }
+                    .into_actor(self),
+                );
+            }
             DelayedMsg::Update => {
                 if UPDATE_DELAYED_WAITING.load(Ordering::SeqCst) {
                     return;
@@ -691,6 +711,14 @@ impl Handler<DelayedMsg> for DelayedActor {
             }
         }
     }
+}
+
+async fn handle_delayed_msg_save() {
+    let mut handles = Vec::new();
+    for shard_id in DbConn::shard_num_range() {
+        handles.push(_handle_delayed_msg_save(shard_id));
+    }
+    future::join_all(handles).await;
 }
 
 async fn handle_delayed_msg_update() {
@@ -833,9 +861,26 @@ async fn handle_delayed_msg_insert_from_disk(shard_id: ShardId) -> Result<()> {
     Ok(())
 }
 
-async fn _handle_delayed_msg_update(shard_id: ShardId) {
+fn push_delayed_db(list: &Vec<ForInsert>) -> Result<()> {
+    if let Some(db) = INSERT_DELAYED_DB.get() {
+        let no = DELAYED_DB_NO.fetch_add(1, Ordering::SeqCst);
+        let mut buf = encode_all(serde_cbor::to_vec(list)?.as_slice(), 3)?;
+        db.insert(&no.to_be_bytes(), buf)?;
+        tokio::spawn(async move {
+            let _guard = crate::get_shutdown_guard();
+            let _ = db.flush_async().await;
+        });
+    } else {
+        for data in list {
+            INSERT_DELAYED_QUEUE.push(data.clone());
+        }
+    }
+    Ok(())
+}
+
+async fn _handle_delayed_msg_save(shard_id: ShardId) {
     let mut map: BTreeMap<Primary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
-    while let Some(x) = UPDATE_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
+    while let Some(x) = SAVE_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
         let inner_map = map.entry(Primary::from(&x)).or_insert_with(IndexMap::new);
         if let Some(old) = inner_map.get_mut(&x._op) {
             aggregate_update(&x, old);
@@ -855,7 +900,7 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
             loop {
                 let mut conn = DbConn::_new(shard_id);
                 if let Err(err) = conn.begin().await {
-                    error!(model ="@{ name }@"; "UPDATE DELAYED ERROR:{}", err);
+                    error!(model ="@{ name }@"; "SAVE DELAYED ERROR:{}", err);
                     sleep(Duration::from_secs(10)).await;
                     continue;
                 }
@@ -908,6 +953,77 @@ fn is_retry_error<T>(result: Result<T>) -> bool {
 fn aggregate_update(x: &_@{ pascal_name }@ForUpdate, old: &mut _@{ pascal_name }@ForUpdate) {
     @{- def.non_primaries()|fmt_join("
     Accessor{accessor_with_sep_type}::_set(x._op.{var}, &mut old._update.{var}, &x._update.{var});", "") }@
+}
+
+async fn _handle_delayed_msg_update(shard_id: ShardId) {
+    let mut map: BTreeMap<Primary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
+    while let Some(x) = UPDATE_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
+        let inner_map = map.entry(Primary::from(&x)).or_insert_with(IndexMap::new);
+        if let Some(old) = inner_map.get_mut(&x._op) {
+            aggregate_update(&x, old);
+        } else {
+            inner_map.insert(x._op.clone(), x);
+        }
+    }
+    if map.is_empty() {
+        return;
+    }
+    let mut vec: Vec<(OpData, Data, Vec<Primary>)> = Vec::new();
+    for m in map.into_values() {
+        'next: for up in m.into_values() {
+            let id: Primary = (&up).into();
+            for row in vec.iter_mut() {
+                if row.0 == up._op && row.1 == up._update {
+                    row.2.push(id);
+                    continue 'next;
+                }
+            }
+            vec.push((up._op, up._update, vec![id]));
+        }
+    }
+    let local = tokio::task::LocalSet::new();
+    for (op, update, list) in vec {
+        local.spawn_local(async move {
+            loop {
+                let mut conn = DbConn::_new(shard_id);
+                if let Err(err) = conn.begin().await {
+                    error!(model ="@{ name }@"; "UPDATE DELAYED ERROR:{}", err);
+                    sleep(Duration::from_secs(10)).await;
+                    continue;
+                }
+                let mut for_update = ForUpdate {
+                    _data: Default::default(),
+                    _update: update.clone(),
+                    _is_new: false,
+                    _do_delete: false,
+                    _upsert: false,
+                    _is_loaded: true,
+                    _op: op.clone(),
+@{- def.relations_one_owner()|fmt_rel_join("
+                    {alias}: None,", "") }@
+@{- def.relations_many()|fmt_rel_join("
+                    {alias}: None,", "") }@
+                };
+                @%- if def.updated_at_conf().is_some() %@
+                if for_update._op.updated_at == Op::None {
+                    for_update.updated_at().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else("SystemTime::now()","conn.time()")}@.into());
+                }
+                @%- endif %@
+                let result = _@{ pascal_name }@::_update_many(&mut conn, list.clone(), for_update).await;
+                if is_retry_error(result) {
+                    sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+                let result = conn.commit().await;
+                if is_retry_error(result) {
+                    sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+                break;
+            }
+        });
+    }
+    local.await;
 }
 
 async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
@@ -978,23 +1094,6 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
         });
     }
     local.await;
-}
-
-fn push_delayed_db(list: &Vec<ForInsert>) -> Result<()> {
-    if let Some(db) = INSERT_DELAYED_DB.get() {
-        let no = DELAYED_DB_NO.fetch_add(1, Ordering::SeqCst);
-        let mut buf = encode_all(serde_cbor::to_vec(list)?.as_slice(), 3)?;
-        db.insert(&no.to_be_bytes(), buf)?;
-        tokio::spawn(async move {
-            let _guard = crate::get_shutdown_guard();
-            let _ = db.flush_async().await;
-        });
-    } else {
-        for data in list {
-            INSERT_DELAYED_QUEUE.push(data.clone());
-        }
-    }
-    Ok(())
 }
 
 @% for (name, column_def) in def.id_except_auto_increment() -%@
@@ -4089,18 +4188,28 @@ impl _@{ pascal_name }@ {
         @%- if def.counting.is_some() %@
         vec.push("`@{ def.get_counting_col() }@` = LAST_INSERT_ID(`@{ def.get_counting_col() }@`)".to_string());
         @%- endif %@
+        @%- if def.versioned %@
+        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}=?", " AND ") }@ AND `@{ version_col }@`=?"#, &vec.join(","));
+        @%- else %@
         let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}=?", " AND ") }@"#, &vec.join(","));
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = info_span!("query", sql = &query.sql());
         @{- def.non_primaries()|fmt_join("
         bind_sql!(obj, query, {var}, {may_null});","") }@
         query = query@{ def.primaries()|fmt_join(".bind(id.{index})", "") }@;
+        @%- if def.versioned %@
+        query = query.bind(obj._data.@{ version_col }@);
+        @%- endif %@
         debug!("{}", &obj);
         let result = if conn.wo_tx() {
             query.execute(&mut conn.acquire_source().await?).await?
         } else {
             query.execute(conn.get_tx().await?).await?
         };
+        if result.rows_affected() == 0 {
+            anyhow::bail!(err::RowNotFound::new("@{ table_name }@", id.to_string()));
+        }
         @%- if def.versioned %@
         obj.@{ version_col }@().set(result.last_insert_id() as u32);
         @%- endif %@
@@ -4199,6 +4308,79 @@ impl _@{ pascal_name }@ {
         }
     }
 
+    /// update_many ignores versions.
+    pub async fn update_many<I, T>(conn: &mut DbConn, ids: I, mut for_update: _@{ pascal_name }@ForUpdate) -> Result<u64>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+    {
+        let ids: Vec<Primary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
+        @%- if def.updated_at_conf().is_some() %@
+        if for_update._op.updated_at == Op::None {
+            for_update.updated_at().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else("SystemTime::now()","conn.time()")}@.into());
+        }
+        @%- endif %@
+        Ok(Self::_update_many(conn, ids, for_update).await?)
+    }
+
+    async fn _update_many(conn: &mut DbConn, ids: Vec<Primary>, mut obj: ForUpdate) -> Result<u64> {
+        if !obj._is_updated() {
+            return Ok(0);
+        }
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut rows_affected = 0;
+        let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
+        for ids in id_chunks {
+            rows_affected += Self::__update_many(conn, ids, &obj).await?;
+        }
+        debug!("UPDATE MANY @{ table_name }@ {}", vec_pri_to_str(&ids));
+        if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
+            let default = Data::default();
+            @{- def.non_primaries()|fmt_join_cache_or_not("", "
+            obj._op.{var} = Op::None;
+            obj._update.{var} = default.{var};", "") }@
+            let cache_msg = CacheOp::UpdateMany {
+                ids,
+                shard_id: conn.shard_id(),
+                update: obj._update,
+                op: obj._op,
+            };
+            conn.push_cache_op(cache_msg.wrap()).await;
+        }
+        Ok(rows_affected)
+    }
+
+    #[allow(unused_assignments)]
+    #[allow(unused_mut)]
+    async fn __update_many(conn: &mut DbConn, ids: &[Primary], obj: &ForUpdate) -> Result<u64> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut update_cache = false;
+        let mut vec: Vec<String> = Vec::new();
+        @{- def.non_primaries()|fmt_join_cache_or_not("
+        assignment_sql!(obj, vec, {var}, \"{col_esc}\", {may_null}, update_cache, \"{placeholder}\");", "
+        assignment_sql_no_cache_update!(obj, vec, {var}, \"{col_esc}\", {may_null}, \"{placeholder}\");", "") }@
+        let q = "?,".repeat(ids.len());
+        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}", ",") }@ in ({})"#, &vec.join(","), &q[0..q.len() - 1]);
+        let mut query = sqlx::query(&sql);
+        let _span = info_span!("query", sql = &query.sql());
+        @{- def.non_primaries()|fmt_join("
+        bind_sql!(obj, query, {var}, {may_null});","") }@
+        for id in ids {
+            query = query.bind(&id.0);
+        }
+        debug!("{}", &obj);
+        let result = if conn.wo_tx() {
+            query.execute(&mut conn.acquire_source().await?).await?
+        } else {
+            query.execute(conn.get_tx().await?).await?
+        };
+        Ok(result.rows_affected())
+    }
+
     /// insert_delayed does not return an error.
     /// insert_ignore does not save the relations table.
     pub async fn insert_ignore(conn: &mut DbConn, mut obj: _@{ pascal_name }@ForUpdate) -> Result<Option<_@{ pascal_name }@ForUpdate>> {
@@ -4276,6 +4458,32 @@ impl _@{ pascal_name }@ {
         let shard_id = conn.shard_id() as usize;
         conn.push_callback(Box::new(move || {
             async move {
+                SAVE_DELAYED_QUEUE.get().unwrap()[shard_id].push(obj);
+                if let Some(addr) = DELAYED_ADDR.get() {
+                    addr.do_send(DelayedMsg::Save);
+                } else {
+                    handle_delayed_msg_save().await;
+                }
+            }.boxed_local()
+        })).await;
+        Ok(())
+    }
+
+    // The data will be updated collectively later.
+    // update_delayed does not support relational tables and version.
+    pub async fn update_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@ForUpdate) -> Result<()> {
+        obj._data.validate()?;
+        if obj._is_new() {
+            panic!("INSERT is not supported.");
+        }
+        if obj._will_be_deleted() {
+            panic!("DELETE is not supported.");
+        }
+@{- def.relations_one_owner()|fmt_rel_join("\n        obj.{alias} = None;", "") }@
+@{- def.relations_many()|fmt_rel_join("\n        obj.{alias} = None;", "") }@
+        let shard_id = conn.shard_id() as usize;
+        conn.push_callback(Box::new(move || {
+            async move {
                 UPDATE_DELAYED_QUEUE.get().unwrap()[shard_id].push(obj);
                 if let Some(addr) = DELAYED_ADDR.get() {
                     addr.do_send(DelayedMsg::Update);
@@ -4292,7 +4500,7 @@ impl _@{ pascal_name }@ {
     pub async fn upsert_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@ForUpdate) -> Result<()> {
         obj._data.validate()?;
         if obj._will_be_deleted() {
-            panic!("Deletion is not supported.");
+            panic!("DELETE is not supported.");
         }
         obj._set_default_value(conn);
 @{- def.relations_one_owner()|fmt_rel_join("\n        obj.{alias} = None;", "") }@
@@ -4592,6 +4800,10 @@ impl _@{ pascal_name }@ {
 @%- if def.updated_at_conf().is_some() %@
             for_update.updated_at().set(updated_at);
 @%- endif %@
+            let default = Data::default();
+            @{- def.non_primaries()|fmt_join_cache_or_not("", "
+            for_update._op.{var} = Op::None;
+            for_update._update.{var} = default.{var};", "") }@
             let cache_msg = CacheOp::UpdateMany {
                 ids,
                 shard_id: conn.shard_id(),

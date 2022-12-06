@@ -103,3 +103,4 @@ pub async fn check(use_test: bool) -> Result<()> {
     )?;
     Ok(())
 }
+@{-"\n"}@

@@ -29,8 +29,8 @@ use tokio::{
 mod accessor;
 pub mod cache;
 pub mod connection;
-pub mod seeder;
 pub mod misc;
+pub mod seeder;
 @% for (name, defs) in groups %@
 #[allow(clippy::module_inception)]
 pub mod @{ name|to_var_name }@;

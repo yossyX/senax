@@ -20,6 +20,7 @@ use std::{fmt, fmt::Display, marker::PhantomData};
 pub(crate) enum Op {
     #[default]
     None,
+    Skip,
     Set,
     Add,
     Sub,
@@ -33,6 +34,7 @@ impl Op {
     pub fn get_sql(&self, col: &str, nullable: bool, ps: &str) -> String {
         match self {
             Op::None => "".to_string(),
+            Op::Skip => "".to_string(),
             Op::Set => format!("{}={}", col, ps),
             Op::Add if nullable => format!("{}=IFNULL({}, 0)+?", col, col),
             Op::Add => format!("{}={}+?", col, col),
@@ -51,6 +53,7 @@ impl Op {
     pub fn get_bind_num(&self, nullable: bool) -> u32 {
         match self {
             Op::None => 0,
+            Op::Skip => 0,
             Op::Set => 1,
             Op::Add => 1,
             Op::Sub => 1,
@@ -70,7 +73,7 @@ impl Op {
 
 macro_rules! assignment_sql_no_cache_update {
     ( $obj:ident, $vec:ident, $col:ident, $name:expr, $nullable:expr, $ph:expr ) => {
-        if $obj._op.$col != Op::None {
+        if $obj._op.$col != Op::None && $obj._op.$col != Op::Skip {
             $vec.push($obj._op.$col.get_sql($name, $nullable, $ph));
         }
     };
@@ -79,7 +82,7 @@ pub(crate) use assignment_sql_no_cache_update;
 
 macro_rules! assignment_sql {
     ( $obj:ident, $vec:ident, $col:ident, $name:expr, $nullable:expr, $update_cache: ident, $ph:expr ) => {
-        if $obj._op.$col != Op::None {
+        if $obj._op.$col != Op::None && $obj._op.$col != Op::Skip {
             $vec.push($obj._op.$col.get_sql($name, $nullable, $ph));
             $update_cache = true;
         }
@@ -208,7 +211,7 @@ where
         op: Op,
         value: &I,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             write!(f, "{}={}({:?}), ", col, op, value)?;
         }
         Ok(())
@@ -258,7 +261,7 @@ where
         op: Op,
         value: &Option<I>,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             if value.is_none() {
                 write!(f, "{}={}(null), ", col, op)?;
             } else {
@@ -300,7 +303,7 @@ impl<'a> AccessorNotNullBool<'a> {
         op: Op,
         value: &i8,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             write!(f, "{}={}({:?}), ", col, op, value)?;
         }
         Ok(())
@@ -346,7 +349,7 @@ impl<'a> AccessorNullBool<'a> {
         op: Op,
         value: &Option<i8>,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             if value.is_none() {
                 write!(f, "{}={}(null), ", col, op)?;
             } else {
@@ -392,7 +395,7 @@ impl<'a> AccessorNotNullString<'a> {
         op: Op,
         value: &String,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             write!(f, "{}={}({:?}), ", col, op, value)?;
         }
         Ok(())
@@ -437,7 +440,7 @@ impl<'a> AccessorNullString<'a> {
         op: Op,
         value: &Option<String>,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             if value.is_none() {
                 write!(f, "{}={}(null), ", col, op)?;
             } else {
@@ -479,7 +482,7 @@ impl<'a, I: Clone + Debug> AccessorNotNullRef<'a, I> {
         op: Op,
         value: &I,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             write!(f, "{}={}({:?}), ", col, op, value)?;
         }
         Ok(())
@@ -524,7 +527,7 @@ impl<'a, I: Clone + Debug> AccessorNullRef<'a, I> {
         op: Op,
         value: &Option<I>,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             if value.is_none() {
                 write!(f, "{}={}(null), ", col, op)?;
             } else {
@@ -571,7 +574,7 @@ impl<'a, I: Clone + Debug> AccessorNotNullJson<'a, I> {
         op: Op,
         value: &sqlx::types::Json<I>,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             write!(f, "{}={}({:?}), ", col, op, value)?;
         }
         Ok(())
@@ -621,7 +624,7 @@ impl<'a, I: Clone + Debug> AccessorNullJson<'a, I> {
         op: Op,
         value: &Option<sqlx::types::Json<I>>,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             if value.is_none() {
                 write!(f, "{}={}(null), ", col, op)?;
             } else {
@@ -632,15 +635,19 @@ impl<'a, I: Clone + Debug> AccessorNullJson<'a, I> {
     }
 }
 
-pub struct AccessorNotNullOrd<'a, I: Clone + Ord + Debug> {
+pub struct AccessorNotNullOrd<'a, I: Clone + Ord + Debug + Default> {
     pub(crate) op: &'a mut Op,
     pub(crate) val: &'a mut I,
     pub(crate) update: &'a mut I,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Clone + Ord + Debug> AccessorNotNullOrd<'a, I> {
+impl<'a, I: Clone + Ord + Debug + Default> AccessorNotNullOrd<'a, I> {
     pub fn get(&self) -> I {
         self.val.clone()
+    }
+    pub fn skip_update(&mut self) {
+        *self.op = Op::Skip;
+        *self.update = I::default();
     }
     pub fn set(&mut self, val: I) {
         *self.op = Op::Set;
@@ -702,7 +709,7 @@ impl<'a, I: Clone + Ord + Debug> AccessorNotNullOrd<'a, I> {
         op: Op,
         value: &I,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             write!(f, "{}={}({:?}), ", col, op, value)?;
         }
         Ok(())
@@ -786,7 +793,7 @@ impl<'a, I: Clone + Ord + Debug> AccessorNullOrd<'a, I> {
         op: Op,
         value: &Option<I>,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             if value.is_none() {
                 write!(f, "{}={}(null), ", col, op)?;
             } else {
@@ -960,7 +967,7 @@ impl<
         op: Op,
         value: &I,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             write!(f, "{}={}({:?}), ", col, op, value)?;
         }
         Ok(())
@@ -1151,7 +1158,7 @@ impl<
         op: Op,
         value: &Option<I>,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             if value.is_none() {
                 write!(f, "{}={}(null), ", col, op)?;
             } else {
@@ -1256,7 +1263,7 @@ impl<'a, I: Copy + PartialOrd + Float + Debug + Display + ToValue> AccessorNotNu
         op: Op,
         value: &I,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             write!(f, "{}={}({:?}), ", col, op, value)?;
         }
         Ok(())
@@ -1369,7 +1376,7 @@ impl<'a, I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
         op: Op,
         value: &Option<I>,
     ) -> fmt::Result {
-        if op != Op::None {
+        if op != Op::None && op != Op::Skip {
             if value.is_none() {
                 write!(f, "{}={}(null), ", col, op)?;
             } else {
