@@ -136,22 +136,6 @@ impl ConfigDef {
     pub fn use_fast_cache(&self) -> bool {
         self.use_fast_cache.unwrap_or(false)
     }
-
-    pub fn get_sql_character_set(&self) -> String {
-        if let Some(ref character_set) = self.character_set {
-            format!(" CHARACTER SET='{}'", character_set)
-        } else {
-            "".to_string()
-        }
-    }
-
-    pub fn get_sql_collate(&self) -> String {
-        if let Some(ref collate) = self.collate {
-            format!(" COLLATE='{}'", collate)
-        } else {
-            "".to_string()
-        }
-    }
 }
 
 /// 更新履歴

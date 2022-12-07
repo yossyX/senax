@@ -103,6 +103,7 @@ pub struct @{ group_name|pascal }@ {
 }
 
 #[rustfmt::skip]
+#[allow(clippy::single_match)]
 #[allow(clippy::match_single_binding)]
 pub(crate) async fn seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()> {
     if let Some(mapping) = seed.as_mapping() {

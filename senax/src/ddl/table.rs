@@ -1,7 +1,8 @@
 use anyhow::{bail, Result};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use sqlx::{MySqlPool, Row};
+use sqlx::migrate::MigrateDatabase;
+use sqlx::{MySql, MySqlPool, Row};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -230,6 +231,9 @@ fn conv(def: CreateTableStatement) -> Table {
 }
 
 pub async fn parse(database_url: &str) -> Result<HashMap<String, Table>> {
+    if !MySql::database_exists(database_url).await? {
+        return Ok(Default::default());
+    }
     let pool = MySqlPool::connect(database_url).await?;
     let mut conn = pool.acquire().await?;
 

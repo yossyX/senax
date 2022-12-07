@@ -37,7 +37,7 @@ pub mod @{ name|to_var_name }@;
 @%- endfor %@
 
 pub use connection::DbConn;
-use connection::{DbConnection, DbType, REPLICA_MAX_CONNECTIONS};
+use connection::{DbType, REPLICA_MAX_CONNECTIONS};
 
 #[allow(dead_code)]
 const DB_NAME: &str = "@{ db }@";
@@ -164,16 +164,7 @@ pub async fn start_test() -> Result<MutexGuard<'static, u8>> {
 
 pub async fn migrate(use_test: bool, clean: bool) -> Result<()> {
     if clean {
-        let shards = connection::get_migrate_connections(use_test).await?;
-        let local = LocalSet::new();
-        for shard in shards {
-            local.spawn_local(async move {
-                if let Err(err) = exec_clean(shard.0, shard.1).await {
-                    eprintln!("{}", err);
-                }
-            });
-        }
-        local.await;
+        connection::reset_database(use_test).await?;
         _clear_cache();
     }
 
@@ -192,12 +183,6 @@ pub async fn migrate(use_test: bool, clean: bool) -> Result<()> {
     }
     local.await;
     Ok(())
-}
-
-#[rustfmt::skip]
-async fn exec_clean(mut conn: DbConnection, db_name: String) -> Result<()> {
-    exec_ddl(&format!("DROP DATABASE IF EXISTS `{db_name}`;"), &mut conn).await?;
-    exec_ddl(&format!("CREATE DATABASE `{db_name}`@{ config.get_sql_character_set() }@@{ config.get_sql_collate() }@;"), &mut conn).await
 }
 
 async fn exec_ddl<'c, E>(sql: &str, conn: E) -> Result<()>

@@ -1937,7 +1937,7 @@ impl _@{ pascal_name }@Rel for Vec<&mut _@{ pascal_name }@ForUpdate> {
 }
 
 impl CacheWrapper {
-@{ def.relations_one_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}_4vec(vec: &mut Vec<CacheWrapper>, conn: &mut DbConn) -> Result<()> {
+@{ def.relations_one_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}_4vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         let ids: FxHashSet<_> = vec.iter().map(|v| v.{var}()).collect();
         if ids.is_empty() { return Ok(()); }
         let map: FxHashMap<_, _> = rel_{class_mod}::{class}::find_many_for_cache(conn, ids.iter()).await?.into_iter().map(|(k, v)| (k, v._wrapper)).collect();
@@ -1945,7 +1945,7 @@ impl CacheWrapper {
             val.{alias} = map.get(&val.{var}()).cloned();
         }
         Ok(())
-    }\n", "    async fn fetch_{raw_alias}_4vec(vec: &mut Vec<CacheWrapper>, conn: &mut DbConn) -> Result<()> {
+    }\n", "    async fn fetch_{raw_alias}_4vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         let ids: FxHashSet<_> = vec.iter().flat_map(|v| v.{var}()).collect();
         if ids.is_empty() { return Ok(()); }
         let map: FxHashMap<_, _> = rel_{class_mod}::{class}::find_many_for_cache(conn, ids.iter()).await?.into_iter().map(|(k, v)| (k, v._wrapper)).collect();
@@ -1956,7 +1956,7 @@ impl CacheWrapper {
         }
         Ok(())
     }\n", "") -}@
-@{ def.relations_many_cache()|fmt_rel_join_foreign_is_not_null_or_null("    async fn fetch_{raw_alias}_4vec(vec: &mut Vec<CacheWrapper>, conn: &mut DbConn) -> Result<()> {
+@{ def.relations_many_cache()|fmt_rel_join_foreign_is_not_null_or_null("    async fn fetch_{raw_alias}_4vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
         let union: Vec<_> = vec.iter().map(|v| {
             let cond = rel_{class_mod}::Cond::Eq(rel_{class_mod}::ColOne::{foreign_var}(v.{local_id}())){and_cond};
@@ -1976,7 +1976,7 @@ impl CacheWrapper {
             val.{alias}.shrink_to_fit();
         }
         Ok(())
-    }\n", "    async fn fetch_{raw_alias}_4vec(vec: &mut Vec<CacheWrapper>, conn: &mut DbConn) -> Result<()> {
+    }\n", "    async fn fetch_{raw_alias}_4vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
         let union: Vec<_> = vec.iter().map(|v| {
             let cond = rel_{class_mod}::Cond::Eq(rel_{class_mod}::ColOne::{foreign_var}(v.{local_id}())){and_cond};
@@ -2939,9 +2939,9 @@ impl UnionBuilder for Vec<QueryBuilder> {
 
 @% for (name, column_def) in def.id() -%@
 impl std::ops::Deref for @{ id_name }@ {
-    type Target = @{ column_def.get_inner_type(false) }@;
-    fn deref(&self) -> &@{ column_def.get_inner_type(false) }@ {
-        &self.0@{ column_def.clone_str() }@
+    type Target = @{ column_def.get_deref_type(false) }@;
+    fn deref(&self) -> &@{ column_def.get_deref_type(false) }@ {
+        &self.0
     }
 }
 
@@ -3030,7 +3030,7 @@ impl From<@{ column_def.get_inner_type(false) }@> for @{ id_name }@ {
 }
 impl From<@{ id_name }@> for @{ column_def.get_inner_type(false) }@ {
     fn from(id: @{ id_name }@) -> Self {
-        id.0@{ column_def.clone_str() }@
+        id.0
     }
 }
 impl From<&@{ id_name }@> for @{ id_name }@ {
@@ -3042,12 +3042,12 @@ impl From<&@{ id_name }@> for @{ id_name }@ {
 @% if def.primaries().len() == 1 %@
 impl From<&Primary> for @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ {
     fn from(id: &Primary) -> Self {
-        Self(@{ def.primaries()|fmt_join_with_paren("id.{index}", ", ") }@)
+        Self(@{ def.primaries()|fmt_join_with_paren("id.{index}.clone()", ", ") }@)
     }
 }
 impl From<&Arc<Primary>> for @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ {
     fn from(id: &Arc<Primary>) -> Self {
-        Self(@{ def.primaries()|fmt_join_with_paren("id.{index}", ", ") }@)
+        Self(@{ def.primaries()|fmt_join_with_paren("id.{index}.clone()", ", ") }@)
     }
 }
 impl From<@{ def.primaries()|fmt_join_with_paren("{outer_ref}", ", ") }@> for Primary {
@@ -3129,7 +3129,8 @@ impl fmt::Display for Primary {
     }
 }
 
-fn vec_pri_to_str(s: &[Primary]) -> String {
+#[allow(clippy::useless_format)]
+fn primaries_to_str(s: &[Primary]) -> String {
     let v = s.iter().fold(Vec::new(), |mut i, p| {
         i.push(format!("@{ def.primaries()|fmt_join_with_paren("{}", ", ") }@"@{ def.primaries()|fmt_join(", p.{index}", "") }@));
         i
@@ -4247,9 +4248,9 @@ impl _@{ pascal_name }@ {
         let _span = info_span!("query", sql = &query.sql());
         @{- def.non_primaries()|fmt_join("
         bind_sql!(obj, query, {var}, {may_null});","") }@
-        query = query@{ def.primaries()|fmt_join(".bind(id.{index})", "") }@;
+        query = query@{ def.primaries()|fmt_join(".bind(&id.{index})", "") }@;
         @%- if def.versioned %@
-        query = query.bind(obj._data.@{ version_col }@);
+        query = query.bind(&obj._data.@{ version_col }@);
         @%- endif %@
         debug!("{}", &obj);
         let result = if conn.wo_tx() {
@@ -4370,7 +4371,7 @@ impl _@{ pascal_name }@ {
             for_update.updated_at().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else("SystemTime::now()","conn.time()")}@.into());
         }
         @%- endif %@
-        Ok(Self::_update_many(conn, ids, for_update).await?)
+        Self::_update_many(conn, ids, for_update).await
     }
 
     async fn _update_many(conn: &mut DbConn, ids: Vec<Primary>, mut obj: ForUpdate) -> Result<u64> {
@@ -4385,7 +4386,7 @@ impl _@{ pascal_name }@ {
         for ids in id_chunks {
             rows_affected += Self::__update_many(conn, ids, &obj).await?;
         }
-        debug!("UPDATE MANY @{ table_name }@ {}", vec_pri_to_str(&ids));
+        debug!("UPDATE MANY @{ table_name }@ {}", primaries_to_str(&ids));
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
             let default = Data::default();
             @{- def.non_primaries()|fmt_join_cache_or_not("", "
@@ -4837,7 +4838,7 @@ impl _@{ pascal_name }@ {
             };
             rows_affected += result.rows_affected();
         }
-        debug!("DELETE @{ table_name }@ {}", vec_pri_to_str(&ids));
+        debug!("DELETE @{ table_name }@ {}", primaries_to_str(&ids));
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
             let mut for_update = ForUpdate {
                 _data: Data::default(),
@@ -4924,7 +4925,7 @@ impl _@{ pascal_name }@ {
             let result = query.execute(conn.get_tx().await?).await?;
             rows_affected += result.rows_affected();
         }
-        debug!("FORCE DELETE @{ table_name }@ {}", vec_pri_to_str(&ids));
+        debug!("FORCE DELETE @{ table_name }@ {}", primaries_to_str(&ids));
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
             let shard_id = conn.shard_id();
             conn.push_cache_op(CacheOp::DeleteMany { ids, shard_id }.wrap()).await;
@@ -5010,7 +5011,7 @@ impl _@{ pascal_name }@ {
         let mut query = sqlx::query(r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ def.primaries()|fmt_join("{col_esc}=?", " AND ") }@"#);
         let _span = info_span!("query", sql = &query.sql());
         @{- def.primaries()|fmt_join("
-        query = query.bind(id.{index});", "") }@
+        query = query.bind(&id.{index});", "") }@
         query.execute(conn.get_tx().await?).await?;
         debug!("FORCE DELETE @{ table_name }@ {}", id);
 @%- if def.on_delete_fn %@

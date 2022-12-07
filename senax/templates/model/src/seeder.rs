@@ -148,6 +148,7 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub(crate) fn id_schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {
     let schema = SchemaObject {
         instance_type: Some(SingleOrVec::Vec(vec![

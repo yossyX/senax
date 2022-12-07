@@ -7,15 +7,15 @@ use log::LevelFilter;
 use once_cell::sync::{Lazy, OnceCell};
 use senax_common::cache::msec::MSec;
 use senax_common::ShardId;
+use sqlx::migrate::MigrateDatabase;
 use sqlx::mysql::{MySqlConnectOptions, MySqlPool, MySqlPoolOptions};
 use sqlx::pool::PoolConnection;
-use sqlx::{ConnectOptions, Connection, Executor, MySqlConnection, Row, Transaction};
+use sqlx::{ConnectOptions, Executor, MySqlConnection, Row, Transaction};
 use std::collections::hash_map::Entry;
 use std::collections::VecDeque;
 use std::env;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::SystemTime;
-use url::Url;
 
 use crate::{
     CacheMsg, CacheOp, DEFAULT_CACHE_DB_MAX_CONNECTIONS, DEFAULT_DB_MAX_CONNECTIONS,
@@ -86,19 +86,15 @@ pub async fn init() -> Result<()> {
     Ok(())
 }
 
+#[rustfmt::skip]
 pub async fn init_test() -> Result<()> {
     if SOURCE.get().is_some() {
         return Ok(());
     }
-    let database_url =
-        env::var("@{ db|upper }@_TEST_DB_URL").with_context(|| "@{ db|upper }@_TEST_DB_URL is not set in .env file")?;
+    let database_url = env::var("@{ db|upper }@_TEST_DB_URL").with_context(|| "@{ db|upper }@_TEST_DB_URL is not set in .env file")?;
     SOURCE.set(get_source(&database_url).await?).unwrap();
-    REPLICA
-        .set(get_replica(&database_url, *REPLICA_MAX_CONNECTIONS).await?)
-        .unwrap();
-    CACHE
-        .set(get_replica(&database_url, *CACHE_MAX_CONNECTIONS).await?)
-        .unwrap();
+    REPLICA.set(get_replica(&database_url, *REPLICA_MAX_CONNECTIONS).await?).unwrap();
+    CACHE.set(get_replica(&database_url, *CACHE_MAX_CONNECTIONS).await?).unwrap();
 
     ensure!(
         SOURCE.get().unwrap().len() <= ShardId::MAX as usize,
@@ -478,25 +474,25 @@ impl Drop for DbConn {
     }
 }
 
-pub(crate) async fn get_migrate_connections(is_test: bool) -> Result<Vec<(DbConnection, String)>> {
+#[rustfmt::skip]
+pub(crate) async fn reset_database(is_test: bool) -> Result<()> {
     let database_url = if is_test {
         env::var("@{ db|upper }@_TEST_DB_URL").with_context(|| "@{ db|upper }@_TEST_DB_URL is not set in .env file")
     } else {
         env::var("@{ db|upper }@_DB_URL").with_context(|| "@{ db|upper }@_DB_URL is not set in .env file")
     }?;
 
-    let mut shards = Vec::new();
     for url in database_url.split('\n') {
         let url = url.trim();
         if url.is_empty() {
             continue;
         }
-        let parsed_url = Url::parse(url)?;
-        let name = parsed_url.path().trim_start_matches('/').to_string();
-        let url = url.trim_end_matches(&name);
-        shards.push((DbConnection::connect(url).await?, name));
+        if DbType::database_exists(url).await? {
+            DbType::drop_database(url).await?;
+        }
+        DbType::create_database(url).await?;
     }
-    Ok(shards)
+    Ok(())
 }
 
 async fn get_source(database_url: &str) -> Result<Vec<sqlx::Pool<DbType>>> {

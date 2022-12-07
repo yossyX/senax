@@ -502,6 +502,53 @@ impl ColumnDef {
         }
     }
 
+    pub fn get_deref_type(&self, without_option: &bool) -> String {
+        let json_class = self
+            .json_class
+            .as_ref()
+            .map(|v| format!("sqlx::types::Json<{}>", v));
+        let typ = match self.type_def {
+            ColumnType::TinyInt if self.signed => "i8",
+            ColumnType::TinyInt => "u8",
+            ColumnType::SmallInt if self.signed => "i16",
+            ColumnType::SmallInt => "u16",
+            ColumnType::Int if self.signed => "i32",
+            ColumnType::Int => "u32",
+            ColumnType::BigInt if self.signed => "i64",
+            ColumnType::BigInt => "u64",
+            ColumnType::Float => "f32",
+            ColumnType::Double => "f64",
+            ColumnType::Varchar => "str",
+            ColumnType::Boolean => "i8",
+            ColumnType::Text => "str",
+            ColumnType::Blob => "Vec<u8>",
+            ColumnType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
+            ColumnType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
+            ColumnType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
+            ColumnType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+            ColumnType::Date => "chrono::NaiveDate",
+            ColumnType::Time => "chrono::NaiveTime",
+            ColumnType::Decimal => "rust_decimal::Decimal",
+            ColumnType::ArrayInt => "sqlx::types::Json<Vec<u64>>",
+            ColumnType::ArrayString => "sqlx::types::Json<Vec<String>>",
+            ColumnType::Json if json_class.is_some() => json_class.as_ref().unwrap(),
+            ColumnType::Json => "sqlx::types::Json<Value>",
+            ColumnType::Enum => "u8",
+            ColumnType::DbEnum => "str",
+            ColumnType::DbSet => "str",
+            ColumnType::Point => "Vec<u8>",
+            ColumnType::UnSupported => unimplemented!(),
+        };
+        if *without_option {
+            return typ.to_owned();
+        }
+        if self.not_null {
+            typ.to_owned()
+        } else {
+            format!("Option<{}>", typ)
+        }
+    }
+
     pub fn get_may_null(&self) -> &str {
         let may_null = self.get_inner_type(&false).starts_with("Option<");
         if_then_else!(may_null, "true", "false")
