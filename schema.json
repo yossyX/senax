@@ -164,6 +164,34 @@
             "null"
           ]
         },
+        "use_insert_delayed": {
+          "description": "遅延INSERTを使用する",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_save_delayed": {
+          "description": "遅延SAVEを使用する",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_update_delayed": {
+          "description": "遅延UPDATEを使用する",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_upsert_delayed": {
+          "description": "遅延UPSERTを使用する",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "tx_isolation": {
           "description": "更新トランザクション分離レベル",
           "anyOf": [
@@ -497,6 +525,34 @@
         },
         "use_cache_all": {
           "description": "全キャッシュを使用するか",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_insert_delayed": {
+          "description": "遅延INSERTを使用する",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_save_delayed": {
+          "description": "遅延SAVEを使用する",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_update_delayed": {
+          "description": "遅延UPDATEを使用する",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "use_upsert_delayed": {
+          "description": "遅延UPSERTを使用する",
           "type": [
             "boolean",
             "null"

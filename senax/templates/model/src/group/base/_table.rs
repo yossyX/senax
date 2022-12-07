@@ -81,21 +81,29 @@ static CACHE_TYPE_ID: u64 = @{ def.get_type_id("CACHE_TYPE_ID") }@;
 pub(crate) async fn init(handle: Option<&ArbiterHandle>) -> Result<()> {
     if CACHE_ALL.get().is_none() {
         CACHE_ALL.set(DbConn::shard_num_range().map(|_| ArcSwapOption::const_empty()).collect()).unwrap();
+        @%- if def.use_save_delayed() %@
         SAVE_DELAYED_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
+        @%- endif %@
+        @%- if def.use_update_delayed() %@
         UPDATE_DELAYED_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
+        @%- endif %@
+        @%- if def.use_upsert_delayed() %@
         UPSERT_DELAYED_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
+        @%- endif %@
         BULK_FETCH_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
     }
 
     if let Some(handle) = handle {
         let addr = DelayedActor::start_in_arbiter(handle, |_| DelayedActor);
         DELAYED_ADDR.set(addr).unwrap();
+        @%- if def.use_insert_delayed() %@
         handle.spawn(async {
             while !crate::is_stopped() {
                 DELAYED_ADDR.get().unwrap().do_send(DelayedMsg::InsertFromDisk);
                 sleep(Duration::from_secs(10)).await;
             }
         });
+        @%- endif %@
     }
     Ok(())
 }
@@ -107,10 +115,12 @@ pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
 }
 
 pub(crate) async fn init_db(db: &sled::Db) -> Result<()> {
+    @%- if def.use_insert_delayed() %@
     let tree = db.open_tree("@{ name }@")?;
     INSERT_DELAYED_DB.set(tree).unwrap();
     DELAYED_ADDR.get().unwrap().do_send(DelayedMsg::InsertFromMemory);
     DELAYED_ADDR.get().unwrap().do_send(DelayedMsg::InsertFromDisk);
+    @%- endif %@
     Ok(())
 }
 
@@ -584,28 +594,37 @@ pub(crate) fn clear_cache_all() {
 }
 
 static DELAYED_ADDR: OnceCell<Addr<DelayedActor>> = OnceCell::new();
+@%- if def.use_insert_delayed() %@
 static INSERT_DELAYED_QUEUE: Lazy<SegQueue<ForInsert>> = Lazy::new(SegQueue::new);
 static INSERT_DELAYED_DB: OnceCell<sled::Tree> = OnceCell::new();
 static INSERT_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
+@%- endif %@
 static DELAYED_DB_NO: Lazy<AtomicU64> = Lazy::new(|| {
     let now = SystemTime::now();
     let time = now.duration_since(UNIX_EPOCH).unwrap();
     AtomicU64::new(time.as_secs() << 20)
 });
+@%- if def.use_save_delayed() %@
 static SAVE_DELAYED_QUEUE: OnceCell<Vec<SegQueue<ForUpdate>>> = OnceCell::new();
 static SAVE_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
 static SAVE_DELAYED_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
+@%- endif %@
+@%- if def.use_update_delayed() %@
 static UPDATE_DELAYED_QUEUE: OnceCell<Vec<SegQueue<ForUpdate>>> = OnceCell::new();
 static UPDATE_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
 static UPDATE_DELAYED_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
+@%- endif %@
+@%- if def.use_upsert_delayed() %@
 static UPSERT_DELAYED_QUEUE: OnceCell<Vec<SegQueue<ForUpdate>>> = OnceCell::new();
 static UPSERT_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
 static UPSERT_DELAYED_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
+@%- endif %@
 
 struct DelayedActor;
 impl Actor for DelayedActor {
     type Context = Context<Self>;
 }
+@%- if def.use_insert_delayed() %@
 
 struct InsertDelayedBuf(Vec<ForInsert>);
 impl Drop for InsertDelayedBuf {
@@ -617,21 +636,31 @@ impl Drop for InsertDelayedBuf {
         }
     }
 }
+@%- endif %@
 
 #[derive(Message)]
 #[rtype(result = "()")]
 enum DelayedMsg {
+    @%- if def.use_insert_delayed() %@
     InsertFromMemory,
     InsertFromDisk,
+    @%- endif %@
+    @%- if def.use_save_delayed() %@
     Save,
+    @%- endif %@
+    @%- if def.use_update_delayed() %@
     Update,
+    @%- endif %@
+    @%- if def.use_upsert_delayed() %@
     Upsert,
+    @%- endif %@
 }
 impl Handler<DelayedMsg> for DelayedActor {
     type Result = ();
 
     fn handle(&mut self, msg: DelayedMsg, ctx: &mut Self::Context) -> Self::Result {
         match msg {
+            @%- if def.use_insert_delayed() %@
             DelayedMsg::InsertFromMemory => {
                 if INSERT_DELAYED_WAITING.load(Ordering::SeqCst) {
                     return;
@@ -664,6 +693,8 @@ impl Handler<DelayedMsg> for DelayedActor {
                     .into_actor(self),
                 );
             }
+            @%- endif %@
+            @%- if def.use_save_delayed() %@
             DelayedMsg::Save => {
                 if SAVE_DELAYED_WAITING.load(Ordering::SeqCst) {
                     return;
@@ -679,6 +710,8 @@ impl Handler<DelayedMsg> for DelayedActor {
                     .into_actor(self),
                 );
             }
+            @%- endif %@
+            @%- if def.use_update_delayed() %@
             DelayedMsg::Update => {
                 if UPDATE_DELAYED_WAITING.load(Ordering::SeqCst) {
                     return;
@@ -694,6 +727,8 @@ impl Handler<DelayedMsg> for DelayedActor {
                     .into_actor(self),
                 );
             }
+            @%- endif %@
+            @%- if def.use_upsert_delayed() %@
             DelayedMsg::Upsert => {
                 if UPSERT_DELAYED_WAITING.load(Ordering::SeqCst) {
                     return;
@@ -709,9 +744,11 @@ impl Handler<DelayedMsg> for DelayedActor {
                     .into_actor(self),
                 );
             }
+            @%- endif %@
         }
     }
 }
+@%- if def.use_save_delayed() %@
 
 async fn handle_delayed_msg_save() {
     let mut handles = Vec::new();
@@ -720,6 +757,8 @@ async fn handle_delayed_msg_save() {
     }
     future::join_all(handles).await;
 }
+@%- endif %@
+@%- if def.use_update_delayed() %@
 
 async fn handle_delayed_msg_update() {
     let mut handles = Vec::new();
@@ -728,6 +767,8 @@ async fn handle_delayed_msg_update() {
     }
     future::join_all(handles).await;
 }
+@%- endif %@
+@%- if def.use_upsert_delayed() %@
 
 async fn handle_delayed_msg_upsert() {
     let mut handles = Vec::new();
@@ -736,6 +777,8 @@ async fn handle_delayed_msg_upsert() {
     }
     future::join_all(handles).await;
 }
+@%- endif %@
+@%- if def.use_insert_delayed() %@
 
 async fn handle_delayed_msg_insert_from_memory() {
     let mut vec = Vec::with_capacity(INSERT_DELAYED_QUEUE.len() + 10);
@@ -803,7 +846,7 @@ async fn _handle_delayed_msg_insert_from_memory(mut conn: DbConn, vec: Vec<ForIn
         }
     }
     let result = conn.commit().await;
-    if is_retry_error(result) {
+    if is_retryable_error(result) {
         drop(buf);
         return;
     }
@@ -877,6 +920,8 @@ fn push_delayed_db(list: &Vec<ForInsert>) -> Result<()> {
     }
     Ok(())
 }
+@%- endif %@
+@%- if def.use_save_delayed() %@
 
 async fn _handle_delayed_msg_save(shard_id: ShardId) {
     let mut map: BTreeMap<Primary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
@@ -907,14 +952,14 @@ async fn _handle_delayed_msg_save(shard_id: ShardId) {
                 for inner_map in buf.iter() {
                     for (_op, for_update) in inner_map.iter() {
                         let result = _@{ pascal_name }@::_save(&mut conn, for_update.clone()).await;
-                        if is_retry_error(result) {
+                        if is_retryable_error(result) {
                             sleep(Duration::from_secs(1)).await;
                             continue;
                         }
                     }
                 }
                 let result = conn.commit().await;
-                if is_retry_error(result) {
+                if is_retryable_error(result) {
                     sleep(Duration::from_secs(1)).await;
                     continue;
                 }
@@ -924,8 +969,9 @@ async fn _handle_delayed_msg_save(shard_id: ShardId) {
     }
     local.await;
 }
+@%- endif %@
 
-fn is_retry_error<T>(result: Result<T>) -> bool {
+fn is_retryable_error<T>(result: Result<T>) -> bool {
     if let Err(err) = result {
         if let Some(err) = err.downcast_ref::<sqlx::Error>() {
             match err {
@@ -954,6 +1000,7 @@ fn aggregate_update(x: &_@{ pascal_name }@ForUpdate, old: &mut _@{ pascal_name }
     @{- def.non_primaries()|fmt_join("
     Accessor{accessor_with_sep_type}::_set(x._op.{var}, &mut old._update.{var}, &x._update.{var});", "") }@
 }
+@%- if def.use_update_delayed() %@
 
 async fn _handle_delayed_msg_update(shard_id: ShardId) {
     let mut map: BTreeMap<Primary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
@@ -1010,12 +1057,12 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
                 }
                 @%- endif %@
                 let result = _@{ pascal_name }@::_update_many(&mut conn, list.clone(), for_update).await;
-                if is_retry_error(result) {
+                if is_retryable_error(result) {
                     sleep(Duration::from_secs(1)).await;
                     continue;
                 }
                 let result = conn.commit().await;
-                if is_retry_error(result) {
+                if is_retryable_error(result) {
                     sleep(Duration::from_secs(1)).await;
                     continue;
                 }
@@ -1025,6 +1072,8 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
     }
     local.await;
 }
+@%- endif %@
+@%- if def.use_upsert_delayed() %@
 
 async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
     let mut map: BTreeMap<Primary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
@@ -1080,12 +1129,12 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
                 }
                 @%- endif %@
                 let result = _@{ pascal_name }@::_bulk_upsert(&mut conn, &list, &for_update).await;
-                if is_retry_error(result) {
+                if is_retryable_error(result) {
                     sleep(Duration::from_secs(1)).await;
                     continue;
                 }
                 let result = conn.commit().await;
-                if is_retry_error(result) {
+                if is_retryable_error(result) {
                     sleep(Duration::from_secs(1)).await;
                     continue;
                 }
@@ -1095,6 +1144,7 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
     }
     local.await;
 }
+@%- endif %@
 
 @% for (name, column_def) in def.id_except_auto_increment() -%@
 #[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, JsonSchema)]
@@ -4417,6 +4467,7 @@ impl _@{ pascal_name }@ {
         }
         Ok(Some(obj))
     }
+    @%- if def.use_insert_delayed() %@
 
     /// If insert_delayed is used, the data will be collectively registered later.
     /// insert_delayed does not save the relations table.
@@ -4437,6 +4488,8 @@ impl _@{ pascal_name }@ {
         })).await;
         Ok(())
     }
+    @%- endif %@
+    @%- if def.use_save_delayed() %@
 
     // The data will be updated collectively later.
     // save_delayed does not support relational tables.
@@ -4468,6 +4521,8 @@ impl _@{ pascal_name }@ {
         })).await;
         Ok(())
     }
+    @%- endif %@
+    @%- if def.use_update_delayed() %@
 
     // The data will be updated collectively later.
     // update_delayed does not support relational tables and version.
@@ -4494,6 +4549,8 @@ impl _@{ pascal_name }@ {
         })).await;
         Ok(())
     }
+    @%- endif %@
+    @%- if def.use_upsert_delayed() %@
 
     // The data will be updated collectively later.
     // upsert_delayed does not support relational tables.
@@ -4518,6 +4575,7 @@ impl _@{ pascal_name }@ {
         })).await;
         Ok(())
     }
+    @%- endif %@
 
     pub async fn bulk_insert(conn: &mut DbConn, mut list: Vec<_@{ pascal_name }@ForUpdate>, ignore: bool) -> Result<()> {
         let mut vec: Vec<ForInsert> = Vec::new();

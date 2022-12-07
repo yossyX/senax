@@ -118,6 +118,18 @@ pub struct ModelDef {
     /// 全キャッシュを使用するか
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_cache_all: Option<bool>,
+    /// 遅延INSERTを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_insert_delayed: Option<bool>,
+    /// 遅延SAVEを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_save_delayed: Option<bool>,
+    /// 遅延UPDATEを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_update_delayed: Option<bool>,
+    /// 遅延UPSERTを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_upsert_delayed: Option<bool>,
     /// 他サーバでinsertされたデータをキャッシュするか
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub ignore_propagated_insert_cache: bool,
@@ -266,6 +278,30 @@ impl ModelDef {
     pub fn use_cache_all(&self) -> bool {
         self.use_cache_all
             .or(unsafe { CONFIG.get().unwrap() }.use_cache_all)
+            .unwrap_or(false)
+    }
+
+    pub fn use_insert_delayed(&self) -> bool {
+        self.use_insert_delayed
+            .or(unsafe { CONFIG.get().unwrap() }.use_insert_delayed)
+            .unwrap_or(false)
+    }
+
+    pub fn use_save_delayed(&self) -> bool {
+        self.use_save_delayed
+            .or(unsafe { CONFIG.get().unwrap() }.use_save_delayed)
+            .unwrap_or(false)
+    }
+
+    pub fn use_update_delayed(&self) -> bool {
+        self.use_update_delayed
+            .or(unsafe { CONFIG.get().unwrap() }.use_update_delayed)
+            .unwrap_or(false)
+    }
+
+    pub fn use_upsert_delayed(&self) -> bool {
+        self.use_upsert_delayed
+            .or(unsafe { CONFIG.get().unwrap() }.use_upsert_delayed)
             .unwrap_or(false)
     }
 

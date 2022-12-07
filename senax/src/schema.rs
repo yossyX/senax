@@ -94,6 +94,18 @@ pub struct ConfigDef {
     /// 全キャッシュ使用のデフォルト設定
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_cache_all: Option<bool>,
+    /// 遅延INSERTを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_insert_delayed: Option<bool>,
+    /// 遅延SAVEを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_save_delayed: Option<bool>,
+    /// 遅延UPDATEを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_update_delayed: Option<bool>,
+    /// 遅延UPSERTを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_upsert_delayed: Option<bool>,
     /// 更新トランザクション分離レベル
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tx_isolation: Option<Isolation>,
@@ -188,7 +200,6 @@ pub fn get_db_type() -> DbType {
 #[schemars(title = "DB type")]
 pub enum DbType {
     Mysql,
-    // MariaDb,
     // PgSql
 }
 

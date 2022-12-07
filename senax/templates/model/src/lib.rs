@@ -252,6 +252,7 @@ pub fn stop() {
     Cache::stop();
 }
 
+#[allow(dead_code)]
 pub(crate) fn is_stopped() -> bool {
     SYS_STOP.load(Ordering::SeqCst)
 }
