@@ -1,2 +1,2 @@
 [workspace]
-members = ["common", "macros", "linker", "logger", "senax"]
+members = ["common", "macros", "linker", "logger", "actix-session", "senax"]
