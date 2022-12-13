@@ -13,7 +13,7 @@ impl TryFrom<String> for SessionKey {
 
     fn try_from(val: String) -> Result<Self, Self::Error> {
         anyhow::ensure!(
-            val.len() != FULL_KEY_LENGTH,
+            val.len() == FULL_KEY_LENGTH,
             "Session ID length is invalid."
         );
         Ok(SessionKey(val))
