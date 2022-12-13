@@ -21,9 +21,18 @@ pub fn generate(db: &str, force: bool) -> Result<()> {
     let base_path = MODELS_PATH.get().unwrap().join(&db);
     fs::create_dir_all(&base_path)?;
 
+    let mut as_session = false;
+    for (_group_name, defs) in &groups {
+        for (_model_name, def) in defs {
+            if def.as_session() {
+                as_session = true;
+            }
+        }
+    }
+
     let file_path = base_path.join("Cargo.toml");
     if force || !file_path.exists() {
-        let tpl = template::CargoTemplate { db };
+        let tpl = template::CargoTemplate { db, as_session };
         println!("{}", file_path.display());
         fs_write(file_path, tpl.render()?)?;
     }

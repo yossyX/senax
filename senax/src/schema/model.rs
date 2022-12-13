@@ -1,5 +1,6 @@
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
+use rand::RngCore;
 use schemars::schema::{InstanceType, Schema, SchemaObject, SingleOrVec};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -58,6 +59,14 @@ pub enum InheritanceType {
     /// カラム集約テーブル継承
     /// 単一テーブル継承と似ているが、型を特定するための _type カラムがある
     ColumnAggregation,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[schemars(deny_unknown_fields)]
+pub struct ActAs {
+    /// セッションDBとして使用
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub session: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
@@ -156,6 +165,9 @@ pub struct ModelDef {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(regex(pattern = r"^[A-Za-z][0-9A-Z_a-z]*$"))]
     pub mod_name: Option<String>,
+    /// 機能追加
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub act_as: Option<ActAs>,
 
     /// カラム
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
@@ -184,6 +196,18 @@ impl ModelDef {
 
     pub fn mod_name(&self) -> &str {
         self.mod_name.as_ref().unwrap_or(&self.name)
+    }
+
+    pub fn as_session(&self) -> bool {
+        self.act_as.as_ref().map(|v| v.session).unwrap_or_default()
+    }
+
+    pub fn session_secret_key(&self, _dummy: &usize) -> String {
+        let mut rng = rand::thread_rng();
+        let mut value = [0u8; 16];
+        rng.try_fill_bytes(&mut value)
+            .expect("failed to generate `Key` from randomness");
+        value.map(|v| v.to_string()).join(", ")
     }
 
     pub fn inheritance_type(&self) -> Option<InheritanceType> {
@@ -463,6 +487,12 @@ impl ModelDef {
         self.merged_columns
             .iter()
             .filter(|(_k, v)| !v.primary)
+            .collect()
+    }
+    pub fn non_primaries_wo_version(&self) -> Vec<(&String, &ColumnDef)> {
+        self.merged_columns
+            .iter()
+            .filter(|(k, v)| !v.primary && !super::VERSIONED.eq(&**k))
             .collect()
     }
     pub fn cache_cols_without_primary(&self) -> Vec<(&String, &ColumnDef)> {

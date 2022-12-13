@@ -2550,6 +2550,7 @@ impl QueryBuilder {
                 };
             }
         } else if let Some(c) = self.condition {
+            debug!("{:?}", &c);
             query = c.bind(query);
         }
         query
@@ -2606,6 +2607,7 @@ impl QueryBuilder {
                     };
                 }
             } else if let Some(c) = self.condition {
+                debug!("{:?}", &c);
                 query = c.bind(query);
             }
             let mut result = query.fetch(&mut executor);
@@ -2643,6 +2645,7 @@ impl QueryBuilder {
         let mut query = sqlx::query_as::<_, Primary>(&sql);
         let _span = info_span!("query", sql = &query.sql());
         if let Some(c) = self.condition {
+            debug!("{:?}", &c);
             query = c.bind(query);
         }
         let result = crate::misc::fetch!(conn, query, fetch_all);
@@ -2674,6 +2677,7 @@ impl QueryBuilder {
         let mut query = sqlx::query_as::<_, Data>(&sql);
         let _span = info_span!("query", sql = &query.sql());
         if let Some(c) = self.condition {
+            debug!("{:?}", &c);
             query = c.bind(query);
         }
         let result = query.fetch_all(conn.get_tx().await?).await?;
@@ -2785,6 +2789,7 @@ impl QueryBuilder {
         let mut query = sqlx::query_as::<_, Count>(&sql);
         let _span = info_span!("query", sql = &query.sql());
         if let Some(c) = self.condition {
+            debug!("{:?}", &c);
             query = c.bind(query);
         }
         let result = crate::misc::fetch!(conn, query, fetch_one);
@@ -2843,10 +2848,15 @@ impl QueryBuilder {
         @{- def.non_primaries()|fmt_join("
         bind_sql!(obj, query, {var}, {may_null});","") }@
         if let Some(c) = self.condition {
+            debug!("{:?}", &c);
             query = c.bind(query);
         }
         debug!("{}", &obj);
-        query.fetch_optional(conn.get_tx().await?).await?;
+        if conn.wo_tx() {
+            query.fetch_optional(&mut conn.acquire_source().await?).await?;
+        } else {
+            query.fetch_optional(conn.get_tx().await?).await?;
+        }
         Ok(())
     }
 
@@ -2885,9 +2895,14 @@ impl QueryBuilder {
         let mut query = sqlx::query_as::<_, Count>(&sql);
         let _span = info_span!("query", sql = &query.sql());
         if let Some(c) = self.condition {
+            debug!("{:?}", &c);
             query = c.bind(query);
         }
-        query.fetch_optional(conn.get_tx().await?).await?;
+        if conn.wo_tx() {
+            query.fetch_optional(&mut conn.acquire_source().await?).await?;
+        } else {
+            query.fetch_optional(conn.get_tx().await?).await?;
+        }
         Ok(())
     }
 }
@@ -4230,7 +4245,7 @@ impl _@{ pascal_name }@ {
         let id = Primary::from(&obj);
         let mut update_cache = false; // To distinguish from updates that do not require cache updates
         let mut vec: Vec<String> = Vec::new();
-        @{- def.non_primaries()|fmt_join_cache_or_not("
+        @{- def.non_primaries_wo_version()|fmt_join_cache_or_not("
         assignment_sql!(obj, vec, {var}, \"{col_esc}\", {may_null}, update_cache, \"{placeholder}\");", "
         assignment_sql_no_cache_update!(obj, vec, {var}, \"{col_esc}\", {may_null}, \"{placeholder}\");", "") }@
         @%- if def.versioned %@
@@ -4246,7 +4261,7 @@ impl _@{ pascal_name }@ {
         @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = info_span!("query", sql = &query.sql());
-        @{- def.non_primaries()|fmt_join("
+        @{- def.non_primaries_wo_version()|fmt_join("
         bind_sql!(obj, query, {var}, {may_null});","") }@
         query = query@{ def.primaries()|fmt_join(".bind(&id.{index})", "") }@;
         @%- if def.versioned %@
@@ -4922,7 +4937,11 @@ impl _@{ pascal_name }@ {
             for id in ids {
                 query = query.bind(&id.0);
             }
-            let result = query.execute(conn.get_tx().await?).await?;
+            let result = if conn.wo_tx() {
+                query.execute(&mut conn.acquire_source().await?).await?
+            } else {
+                query.execute(conn.get_tx().await?).await?
+            };
             rows_affected += result.rows_affected();
         }
         debug!("FORCE DELETE @{ table_name }@ {}", primaries_to_str(&ids));
@@ -5012,7 +5031,11 @@ impl _@{ pascal_name }@ {
         let _span = info_span!("query", sql = &query.sql());
         @{- def.primaries()|fmt_join("
         query = query.bind(&id.{index});", "") }@
-        query.execute(conn.get_tx().await?).await?;
+        if conn.wo_tx() {
+            query.execute(&mut conn.acquire_source().await?).await?;
+        } else {
+            query.execute(conn.get_tx().await?).await?;
+        }
         debug!("FORCE DELETE @{ table_name }@ {}", id);
 @%- if def.on_delete_fn %@
         conn.push_callback(Box::new(|| {
