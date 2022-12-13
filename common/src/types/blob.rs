@@ -70,6 +70,18 @@ impl From<Blob> for Vec<u8> {
     }
 }
 
+impl From<Vec<u8>> for Blob {
+    fn from(v: Vec<u8>) -> Self {
+        Blob(v)
+    }
+}
+
+impl From<&[u8]> for Blob {
+    fn from(v: &[u8]) -> Self {
+        Blob(v.to_vec())
+    }
+}
+
 impl FromStr for Blob {
     type Err = anyhow::Error;
 
