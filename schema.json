@@ -326,21 +326,35 @@
       "title": "Group Def",
       "type": "object",
       "required": [
-        "title"
+        "type"
       ],
       "properties": {
-        "title": {
-          "type": "string"
-        },
         "type": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/GroupType"
-            },
-            {
-              "type": "null"
-            }
+          "$ref": "#/definitions/GroupType"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
           ]
+        },
+        "models": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ModelDef"
+          },
+          "propertyNames": {
+            "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
+          }
+        },
+        "enums": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/EnumDef"
+          },
+          "propertyNames": {
+            "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
+          }
         }
       },
       "additionalProperties": false
@@ -363,78 +377,6 @@
           ]
         }
       ]
-    },
-    "EnumDef": {
-      "title": "Enum Def",
-      "type": "object",
-      "required": [
-        "enum_values"
-      ],
-      "properties": {
-        "title": {
-          "description": "タイトル",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "comment": {
-          "description": "コメント",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "enum_values": {
-          "description": "列挙値",
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/EnumValue"
-          }
-        },
-        "mod_name": {
-          "description": "列挙子の名前にマルチバイトを使用した場合のmod名",
-          "type": [
-            "string",
-            "null"
-          ],
-          "pattern": "^[A-Za-z][0-9A-Z_a-z]*$"
-        }
-      },
-      "additionalProperties": false
-    },
-    "EnumValue": {
-      "title": "Enum Value",
-      "type": "object",
-      "required": [
-        "name",
-        "value"
-      ],
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "title": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "comment": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "value": {
-          "description": "0～255の値",
-          "type": "integer",
-          "format": "uint8",
-          "maximum": 255.0,
-          "minimum": 0.0
-        }
-      },
-      "additionalProperties": false
     },
     "ModelDef": {
       "title": "Model Def",
@@ -610,6 +552,17 @@
           ],
           "pattern": "^[A-Za-z][0-9A-Z_a-z]*$"
         },
+        "act_as": {
+          "description": "機能追加",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActAs"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "columns": {
           "description": "カラム",
           "type": "object",
@@ -722,6 +675,16 @@
           ]
         }
       ]
+    },
+    "ActAs": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "description": "セッションDBとして使用",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
     },
     "ColumnTypeOrDef": {
       "title": "Column Type Or Def",
@@ -928,6 +891,39 @@
       "enum": [
         "auto"
       ]
+    },
+    "EnumValue": {
+      "title": "Enum Value",
+      "type": "object",
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "description": "0～255の値",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255.0,
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
     },
     "DbEnumValue": {
       "title": "DB Enum Value",
@@ -1213,6 +1209,45 @@
         "ngram",
         "mecab"
       ]
+    },
+    "EnumDef": {
+      "title": "Enum Def",
+      "type": "object",
+      "required": [
+        "enum_values"
+      ],
+      "properties": {
+        "title": {
+          "description": "タイトル",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comment": {
+          "description": "コメント",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enum_values": {
+          "description": "列挙値",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EnumValue"
+          }
+        },
+        "mod_name": {
+          "description": "列挙子の名前にマルチバイトを使用した場合のmod名",
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z][0-9A-Z_a-z]*$"
+        }
+      },
+      "additionalProperties": false
     },
     "History": {
       "title": "History",

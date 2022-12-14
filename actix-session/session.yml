@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#definitions/ConfigDef
+
+db: mysql
+time_zone: local
+timestamp_time_zone: local
+tx_isolation: read_committed
+read_tx_isolation: repeatable_read
+use_cache: true
+use_fast_cache: false
+use_cache_all: false
+groups:
+  session:
+    type: model
+    models:
+      session:
+        table_name: session
+        timestampable: real_time
+        versioned: true
+        use_update_delayed: true
+        act_as:
+          session: true
+        columns:
+          key:
+            primary: true
+            type: varchar
+            length: 80
+            collate: ascii_bin
+          data: blob_not_null
+          eol: int_not_null  # unix_time / 8

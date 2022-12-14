@@ -159,9 +159,13 @@ pub struct History {
 #[schemars(deny_unknown_fields)]
 #[schemars(title = "Group Def")]
 pub struct GroupDef {
-    title: String,
     #[serde(rename = "type")]
-    group_type: Option<GroupType>,
+    group_type: GroupType,
+    title: Option<String>,
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    models: IndexMap<String, ModelDef>,
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    enums: IndexMap<String, EnumDef>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
@@ -272,21 +276,36 @@ pub fn is_false(val: &bool) -> bool {
 
 pub fn parse(db: &str) -> Result<(), anyhow::Error> {
     crate::common::check_ascii_name(db);
-    let path = Path::new("./schema/conf.yml");
-    let content =
-        fs::read_to_string(&path).with_context(|| format!("file cannot read: {:?}", &path))?;
-    let map: HashMap<String, ConfigDef> =
-        serde_yaml::from_str(&content).map_err(|err| SerdeError::new(content.to_string(), err))?;
-    let mut no_set = HashSet::new();
-    for (name, conf) in map.iter() {
-        let no = conf.db_no(name);
-        ensure!(no != 0, "db_no cannot be zero");
-        ensure!(!no_set.contains(&no), "duplicate db_no");
-        no_set.insert(no);
+    let path = Path::new("./schema").join(&format!("{db}.yml"));
+    let mut config = if path.exists() {
+        let content =
+            fs::read_to_string(&path).with_context(|| format!("file cannot read: {:?}", &path))?;
+        let config: ConfigDef = serde_yaml::from_str(&content)
+            .map_err(|err| SerdeError::new(content.to_string(), err))?;
+        config
+    } else {
+        let path = Path::new("./schema/conf.yml");
+        let content =
+            fs::read_to_string(&path).with_context(|| format!("file cannot read: {:?}", &path))?;
+        let map: HashMap<String, ConfigDef> = serde_yaml::from_str(&content)
+            .map_err(|err| SerdeError::new(content.to_string(), err))?;
+        let mut no_set = HashSet::new();
+        for (name, conf) in map.iter() {
+            let no = conf.db_no(name);
+            ensure!(no != 0, "db_no cannot be zero");
+            ensure!(!no_set.contains(&no), "duplicate db_no");
+            no_set.insert(no);
+        }
+        map.get(db)
+            .with_context(|| format!("db not found in conf.yml: {}", &db))?
+            .clone()
+    };
+
+    for (name, def) in config.groups.iter_mut() {
+        if def.title.is_none() {
+            def.title = Some(name.to_case(Case::Title));
+        }
     }
-    let config = map
-        .get(db)
-        .with_context(|| format!("db not found in conf.yml: {}", &db))?;
     unsafe {
         CONFIG.take();
         CONFIG.set(config.clone()).unwrap();
@@ -314,14 +333,18 @@ pub fn parse(db: &str) -> Result<(), anyhow::Error> {
     for (group_name, group_def) in &config.groups {
         let path = path.join(&format!("{group_name}.yml"));
         crate::common::check_ascii_name(group_name);
-        let content =
-            fs::read_to_string(&path).with_context(|| format!("file can not read: {:?}", &path))?;
         let mut enum_map = IndexMap::new();
         let mut model_map = IndexMap::new();
         match group_def.group_type {
-            Some(GroupType::Enum) => {
-                let defs: IndexMap<String, EnumDef> = serde_yaml::from_str(&content)
-                    .map_err(|err| SerdeError::new(content.to_string(), err))?;
+            GroupType::Enum => {
+                let defs: IndexMap<String, EnumDef> = if group_def.enums.is_empty() {
+                    let content = fs::read_to_string(&path)
+                        .with_context(|| format!("file can not read: {:?}", &path))?;
+                    serde_yaml::from_str(&content)
+                        .map_err(|err| SerdeError::new(content.to_string(), err))?
+                } else {
+                    group_def.enums.clone()
+                };
                 for (model_name, mut def) in defs.into_iter() {
                     crate::common::check_name(&model_name);
                     if !crate::common::is_ascii_name(&model_name)
@@ -342,8 +365,14 @@ pub fn parse(db: &str) -> Result<(), anyhow::Error> {
                 }
             }
             _ => {
-                let defs: IndexMap<String, ModelDef> = serde_yaml::from_str(&content)
-                    .map_err(|err| SerdeError::new(content.to_string(), err))?;
+                let defs: IndexMap<String, ModelDef> = if group_def.models.is_empty() {
+                    let content = fs::read_to_string(&path)
+                        .with_context(|| format!("file can not read: {:?}", &path))?;
+                    serde_yaml::from_str(&content)
+                        .map_err(|err| SerdeError::new(content.to_string(), err))?
+                } else {
+                    group_def.models.clone()
+                };
                 for (model_name, mut def) in defs.into_iter() {
                     crate::common::check_name(&model_name);
                     if !crate::common::is_ascii_name(&model_name)
