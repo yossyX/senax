@@ -63,6 +63,7 @@ pub enum InheritanceType {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
 #[schemars(deny_unknown_fields)]
+#[schemars(title = "ActAs Definition")]
 pub struct ActAs {
     /// セッションDBとして使用
     #[serde(default, skip_serializing_if = "super::is_false")]
