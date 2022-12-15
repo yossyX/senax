@@ -1,4 +1,4 @@
-use anyhow::{bail, ensure, Context as _, Result};
+use anyhow::{bail, Context as _, Result};
 use convert_case::{Case, Casing};
 use format_serde_error::SerdeError;
 use indexmap::IndexMap;
@@ -22,8 +22,6 @@ pub mod relation;
 pub use relation::*;
 pub mod index;
 pub use index::*;
-
-use crate::common::hash;
 
 const CREATED_AT: &str = "created_at";
 const UPDATED_AT: &str = "updated_at";
@@ -59,7 +57,7 @@ pub struct SchemaDef {
 #[schemars(deny_unknown_fields)]
 #[schemars(title = "Config Definition")]
 pub struct ConfigDef {
-    /// 内部で使用されるデータベースナンバー。同一conf.ymlファイル内では自動生成の乱数で重複が発生しないが、設定ファイルが分かれる場合は重複を防ぐため指定できる。
+    /// リンカーで使用されるデータベースナンバー　自動生成では毎回現在時刻が使用されるので、強制上書き時に固定する場合に指定する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub db_no: Option<u64>,
     /// 使用するDB。現在のところmysqlのみ対応
@@ -129,8 +127,12 @@ pub struct ConfigDef {
 }
 
 impl ConfigDef {
-    pub fn db_no(&self, name: &str) -> u64 {
-        self.db_no.unwrap_or_else(|| hash(name))
+    pub fn db_no(&self) -> u64 {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+        self.db_no.unwrap_or_else(|| now)
     }
 
     pub fn use_fast_cache(&self) -> bool {
@@ -289,13 +291,6 @@ pub fn parse(db: &str) -> Result<(), anyhow::Error> {
             fs::read_to_string(&path).with_context(|| format!("file cannot read: {:?}", &path))?;
         let map: HashMap<String, ConfigDef> = serde_yaml::from_str(&content)
             .map_err(|err| SerdeError::new(content.to_string(), err))?;
-        let mut no_set = HashSet::new();
-        for (name, conf) in map.iter() {
-            let no = conf.db_no(name);
-            ensure!(no != 0, "db_no cannot be zero");
-            ensure!(!no_set.contains(&no), "duplicate db_no");
-            no_set.insert(no);
-        }
         map.get(db)
             .with_context(|| format!("db not found in conf.yml: {}", &db))?
             .clone()

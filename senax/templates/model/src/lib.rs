@@ -42,7 +42,7 @@ use connection::{DbType, REPLICA_MAX_CONNECTIONS};
 #[allow(dead_code)]
 const DB_NAME: &str = "@{ db }@";
 const DB_UPPER_NAME: &str = "@{ db|upper }@";
-const DB_NO: u64 = @{ config.db_no(db) }@;
+const DB_NO: u64 = @{ config.db_no() }@;
 const IN_CONDITION_LIMIT: usize = 1000;
 const BULK_FETCH_RATE: usize = 20;
 const CACHE_DELAY_SAFETY1: u64 = 1; // replica time lag

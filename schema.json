@@ -64,7 +64,7 @@
       ],
       "properties": {
         "db_no": {
-          "description": "内部で使用されるデータベースナンバー。同一conf.ymlファイル内では自動生成の乱数で重複が発生しないが、設定ファイルが分かれる場合は重複を防ぐため指定できる。",
+          "description": "リンカーで使用されるデータベースナンバー　自動生成では毎回現在時刻が使用されるので、強制上書き時に固定する場合に指定する",
           "type": [
             "integer",
             "null"
@@ -677,6 +677,7 @@
       ]
     },
     "ActAs": {
+      "title": "ActAs Definition",
       "type": "object",
       "properties": {
         "session": {
