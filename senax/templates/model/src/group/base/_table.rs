@@ -3360,6 +3360,12 @@ impl _@{ pascal_name }@ForUpdate {
             val: &mut self.{alias},
         }
     }", "") }@
+    pub async fn _invalidate_cache(&self, conn: &DbConn) {
+        let id: Primary = self.into();
+        CacheMsg(vec![CacheOp::Invalidate{id, shard_id: conn.shard_id()}.wrap()], MSec::now())
+            .do_send()
+            .await;
+    }
     pub(crate) fn _set_default_value(&mut self, conn: &DbConn) {
 @%- if def.created_at_conf().is_some() %@
         if self._op.created_at == Op::None {
