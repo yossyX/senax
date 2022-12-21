@@ -1,16 +1,22 @@
 use anyhow::{bail, Context as _, Result};
 use askama::Template;
+use chrono::DateTime;
 use chrono::Local;
-use chrono::NaiveDate;
+use chrono::NaiveDateTime;
+use chrono::Utc;
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Serialize;
+use serde_json::Value;
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::env;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
+use tera::Filter;
 use tera::{Context, Tera};
 
 use crate::schema::ColumnDef;
@@ -19,16 +25,15 @@ use crate::schema::RelDef;
 use crate::schema::RelationsType;
 use crate::schema::MODEL;
 use crate::schema::MODELS;
-use crate::schema::{self, EnumDef, GroupDef, ModelDef, CONFIG, ENUM_GROUPS, GROUPS, HISTORY};
+use crate::schema::{self, EnumDef, GroupDef, ModelDef, CONFIG, ENUM_GROUPS, GROUPS};
+use crate::MODELS_PATH;
 
 #[derive(Debug, Serialize, Clone)]
 struct Group<'a> {
     group_name: &'a String,
     group_def: &'a GroupDef,
-    history: Option<&'a Vec<serde_yaml::Value>>,
     models: Option<IndexMap<&'a String, DocModel>>,
     enums: Option<&'a IndexMap<String, EnumDef>>,
-    last_update_at: Option<NaiveDate>,
     er: Option<String>,
 }
 
@@ -54,16 +59,23 @@ impl From<&Arc<ModelDef>> for DocModel {
     }
 }
 
+#[derive(Serialize)]
+pub struct History {
+    pub date: DateTime<Local>,
+    pub description: String,
+}
+
 pub fn generate(
     db: &str,
     group_name: &Option<String>,
     er: bool,
+    history_max: &Option<usize>,
+    output: &Option<PathBuf>,
     template: &Option<PathBuf>,
 ) -> Result<()> {
     schema::parse(db)?;
 
     let config = unsafe { CONFIG.get().unwrap() }.clone();
-    let history = unsafe { HISTORY.get().cloned().unwrap_or_default() };
     let groups = unsafe { GROUPS.get().unwrap() }.clone();
     let enum_groups = unsafe { ENUM_GROUPS.get().unwrap() }.clone();
     let locale = env::var("LC_ALL").unwrap_or_else(|_| {
@@ -71,10 +83,65 @@ pub fn generate(
     });
     let locale = locale.split('.').collect::<Vec<_>>()[0];
 
+    let base_path = MODELS_PATH.get().unwrap().join(&db);
+    let ddl_path = base_path.join("migrations");
+    fn file_read(path: &PathBuf) -> Result<String> {
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("file cannot read: {:?}", path))?;
+        let mut result = String::new();
+        for line in content.split('\n') {
+            match line.strip_prefix("-- ") {
+                Some(line) => {
+                    result.push_str(line);
+                    result.push('\n');
+                }
+                None => break,
+            }
+        }
+        Ok(result)
+    }
+    let re = Regex::new(r"^(\d{14})_(.+)\.sql$").unwrap();
+    let mut files = BTreeMap::new();
+    for entry in ddl_path.read_dir()?.flatten() {
+        if entry.file_type()?.is_file() {
+            let path = entry.path();
+            let file_name = path
+                .file_name()
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_default();
+            let caps = re.captures(&file_name);
+            if let Some(caps) = caps {
+                if caps.get(2).unwrap().as_str().ends_with(".down") {
+                    continue;
+                }
+                files.insert(
+                    caps.get(1).unwrap().as_str().to_string(),
+                    entry.path().clone(),
+                );
+            }
+        }
+    }
+    let mut history = Vec::new();
+    if let Some(max) = history_max {
+        for (date, file) in files.into_iter() {
+            let utc = NaiveDateTime::parse_from_str(&date, "%Y%m%d%H%M%S")
+                .map(|ndt| DateTime::<Utc>::from_utc(ndt, Utc))?;
+            let date: DateTime<Local> = DateTime::from(utc);
+            let description = file_read(&file)?;
+            if description.is_empty() {
+                continue;
+            }
+            history.push(History { date, description });
+        }
+        history.reverse();
+        history.truncate(*max);
+    }
+
     let mut context = Context::new();
     context.insert("config", &config);
     context.insert("locale", locale);
     context.insert("date", &Local::now().to_rfc3339());
+    context.insert("history", &history);
     let mut group_list = Vec::new();
     if let Some(group_name) = group_name {
         let models = groups.get(group_name);
@@ -90,7 +157,6 @@ pub fn generate(
                 .groups
                 .get(group_name)
                 .context("The specified group was not found.")?,
-            history: history.get(group_name),
             models: models.map(|i| {
                 i.iter().fold(IndexMap::new(), |mut acc, (k, v)| {
                     if v.has_table() {
@@ -100,13 +166,6 @@ pub fn generate(
                 })
             }),
             enums: enum_groups.get(group_name),
-            last_update_at: history.get(group_name).map(|v| {
-                v.iter().fold(NaiveDate::MIN, |acc, h| {
-                    let k: serde_yaml::Value = "date".to_string().into();
-                    let v = h.as_mapping().unwrap().get(&k).unwrap();
-                    acc.max(v.as_str().unwrap().parse().unwrap())
-                })
-            }),
             er: gen_er(group_name, &models, er)?,
         });
         context.insert("group_list", &group_list);
@@ -122,7 +181,6 @@ pub fn generate(
             group_list.push(Group {
                 group_name,
                 group_def,
-                history: history.get(group_name),
                 models: models.map(|i| {
                     i.iter().fold(IndexMap::new(), |mut acc, (k, v)| {
                         if v.has_table() {
@@ -132,13 +190,6 @@ pub fn generate(
                     })
                 }),
                 enums: enum_groups.get(group_name),
-                last_update_at: history.get(group_name).map(|v| {
-                    v.iter().fold(NaiveDate::MIN, |acc, h| {
-                        let k: serde_yaml::Value = "date".to_string().into();
-                        let v = h.as_mapping().unwrap().get(&k).unwrap();
-                        acc.max(v.as_str().unwrap().parse().unwrap())
-                    })
-                }),
                 er: gen_er(group_name, &models, er)?,
             });
         }
@@ -158,9 +209,83 @@ pub fn generate(
     };
     let mut tera = Tera::default();
     tera.add_raw_template("db-document.html", &tpl)?;
+    tera.register_filter("history_description", ConvHistory(true));
+    tera.register_filter("history_description_wo_esc", ConvHistory(false));
     let result = tera.render("db-document.html", &context)?;
-    println!("{}", result);
+    if let Some(output) = output {
+        std::fs::write(output, result)?;
+    } else {
+        println!("{}", result);
+    }
     Ok(())
+}
+
+struct ConvHistory(bool);
+impl Filter for ConvHistory {
+    fn filter(&self, value: &Value, args: &HashMap<String, Value>) -> tera::Result<Value> {
+        static RE: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r"^(.*)\[([A-Za-z0-9]+):([^,\]]*):([^\]]*)\](.*)$").unwrap());
+        let v = value.as_str().unwrap_or_default();
+        let mut result = String::new();
+        for line in v.split('\n') {
+            let line = line.trim_end();
+            if RE.is_match(line) {
+                let after = RE.replace(line, |c: &regex::Captures<'_>| {
+                    let table = c.get(3).unwrap().as_str();
+                    let column = c.get(4).unwrap().as_str();
+                    let typ = c.get(2).unwrap().as_str();
+                    let replace = if column.contains(',') {
+                        let mut key = typ.to_string();
+                        key.push_str("_Plural");
+                        args.get(&key).or_else(|| args.get(typ))
+                    } else {
+                        args.get(typ)
+                    };
+                    if let Some(replace) = replace {
+                        let mut after = String::new();
+                        let comment = c.get(1).unwrap().as_str();
+                        if self.0 {
+                            after.push_str(&tera::escape_html(comment));
+                        } else {
+                            after.push_str(comment);
+                        }
+                        after.push_str(
+                            &replace
+                                .as_str()
+                                .unwrap()
+                                .replace("{T}", table)
+                                .replace("{C}", column),
+                        );
+                        let comment = c.get(5).unwrap().as_str();
+                        if self.0 {
+                            after.push_str(&tera::escape_html(comment));
+                        } else {
+                            after.push_str(comment);
+                        }
+                        after
+                    } else {
+                        "".to_owned()
+                    }
+                });
+                if !after.is_empty() {
+                    result.push_str(&after);
+                    result.push('\n');
+                }
+            } else {
+                if self.0 {
+                    result.push_str(&tera::escape_html(line));
+                } else {
+                    result.push_str(line);
+                }
+                result.push('\n');
+            }
+        }
+        Ok(result.trim_end().into())
+    }
+
+    fn is_safe(&self) -> bool {
+        true
+    }
 }
 
 fn gen_er(

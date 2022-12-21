@@ -31,7 +31,6 @@ const DEFAULT_TYPE_FIELD: &str = "_type";
 pub const VERSIONED: &str = "_version";
 
 pub static mut CONFIG: OnceCell<ConfigDef> = OnceCell::new();
-pub static mut HISTORY: OnceCell<IndexMap<String, Vec<serde_yaml::Value>>> = OnceCell::new();
 pub static mut GROUPS: OnceCell<IndexMap<String, IndexMap<String, Arc<ModelDef>>>> =
     OnceCell::new();
 pub static mut ENUM_GROUPS: OnceCell<IndexMap<String, IndexMap<String, EnumDef>>> = OnceCell::new();
@@ -48,8 +47,6 @@ pub struct SchemaDef {
     r#enum: HashMap<String, EnumDef>,
     #[schemars(default)]
     model: HashMap<String, ModelDef>,
-    #[schemars(default)]
-    history: HashMap<String, IndexMap<String, Vec<History>>>,
 }
 
 /// データベース設定
@@ -132,29 +129,12 @@ impl ConfigDef {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_micros() as u64;
-        self.db_no.unwrap_or_else(|| now)
+        self.db_no.unwrap_or(now)
     }
 
     pub fn use_fast_cache(&self) -> bool {
         self.use_fast_cache.unwrap_or(false)
     }
-}
-
-/// 更新履歴
-#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
-#[schemars(title = "History")]
-pub struct History {
-    /// 更新日
-    #[schemars(regex(pattern = r"^\d{4}-\d{1,2}-\d{1,2}$"))]
-    pub date: String,
-    /// 変更内容
-    pub description: String,
-    /// 担当者
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub author: Option<String>,
-    /// バージョン
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone, JsonSchema)]
@@ -304,21 +284,6 @@ pub fn parse(db: &str) -> Result<(), anyhow::Error> {
     unsafe {
         CONFIG.take();
         CONFIG.set(config.clone()).unwrap();
-    }
-
-    let path = Path::new("./schema/history.yml");
-    unsafe {
-        HISTORY.take();
-    }
-    if let Ok(content) = fs::read_to_string(&path) {
-        let mut map: HashMap<String, IndexMap<String, Vec<serde_yaml::Value>>> =
-            serde_yaml::from_str(&content)
-                .map_err(|err| SerdeError::new(content.to_string(), err))?;
-        if let Some(history) = map.remove(db) {
-            unsafe {
-                HISTORY.set(history).unwrap();
-            }
-        }
     }
 
     let path = Path::new("./schema").join(&db);

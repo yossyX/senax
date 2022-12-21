@@ -32,25 +32,6 @@
       "propertyNames": {
         "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
       }
-    },
-    "history": {
-      "default": {},
-      "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "additionalProperties": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/History"
-          }
-        },
-        "propertyNames": {
-          "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
-        }
-      },
-      "propertyNames": {
-        "pattern": "^\\p{XID_Start}\\p{XID_Continue}*$"
-      }
     }
   },
   "definitions": {
@@ -1249,40 +1230,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "History": {
-      "title": "History",
-      "description": "更新履歴",
-      "type": "object",
-      "required": [
-        "date",
-        "description"
-      ],
-      "properties": {
-        "date": {
-          "description": "更新日",
-          "type": "string",
-          "pattern": "^\\d{4}-\\d{1,2}-\\d{1,2}$"
-        },
-        "description": {
-          "description": "変更内容",
-          "type": "string"
-        },
-        "author": {
-          "description": "担当者",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "version": {
-          "description": "バージョン",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      }
     }
   }
 }

@@ -1,7 +1,9 @@
 use anyhow::{Context as _, Result};
 use chrono::Utc;
 use convert_case::{Case, Casing};
-use std::collections::HashMap;
+use derive_more::Display;
+use indexmap::IndexMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fmt::Write;
 use std::fs;
@@ -303,16 +305,40 @@ fn escape(s: &String) -> String {
     format!("`{}`", s)
 }
 
+#[derive(Display, Eq, Ord, PartialOrd, PartialEq)]
+enum Type {
+    AddTable,
+    DropTable,
+    AddColumn,
+    ChangeColumn,
+    DropColumn,
+    ChangePrimary,
+    DropPrimary,
+    AddIndex,
+    ChangeIndex,
+    DropIndex,
+    AddForeign,
+    ChangeForeign,
+    DropForeign,
+}
+
 fn make_ddl(
     new_tables: &HashMap<String, Table>,
     old_tables: &HashMap<String, Table>,
 ) -> Result<String> {
     let mut result = String::new();
+    let mut history: BTreeMap<Type, IndexMap<String, Vec<String>>> = BTreeMap::new();
     for (table_name, new_table) in new_tables {
         if let Some(old_table) = old_tables.get(table_name) {
             for name in old_table.constraints.keys() {
                 if !new_table.constraints.contains_key(name) {
                     // Delete foreign key constraints
+                    history
+                        .entry(Type::DropForeign)
+                        .or_default()
+                        .entry(table_name.clone())
+                        .or_default()
+                        .push(name.clone());
                     writeln!(
                         &mut result,
                         "ALTER TABLE {} DROP FOREIGN KEY {};",
@@ -324,6 +350,12 @@ fn make_ddl(
             for name in old_table.indexes.keys() {
                 if !new_table.indexes.contains_key(name) {
                     // Delete indexes
+                    history
+                        .entry(Type::DropIndex)
+                        .or_default()
+                        .entry(table_name.clone())
+                        .or_default()
+                        .push(name.clone());
                     writeln!(
                         &mut result,
                         "ALTER TABLE {} DROP INDEX {};",
@@ -341,7 +373,12 @@ fn make_ddl(
                 // To prevent deletion of _sqlx_migrations
                 continue;
             }
-            writeln!(&mut result, "DROP TABLES {};", &escape(table_name))?;
+            history
+                .entry(Type::DropTable)
+                .or_default()
+                .entry(table_name.clone())
+                .or_default();
+            writeln!(&mut result, "DROP TABLE {};", &escape(table_name))?;
         }
     }
     for (table_name, new_table) in new_tables {
@@ -354,6 +391,12 @@ fn make_ddl(
                 if let Some(old_field) = old_table.columns.get(name) {
                     if new_field != old_field {
                         // fix columns
+                        history
+                            .entry(Type::ChangeColumn)
+                            .or_default()
+                            .entry(table_name.clone())
+                            .or_default()
+                            .push(name.clone());
                         writeln!(
                             &mut result,
                             "ALTER TABLE {} CHANGE COLUMN {} {} {}{};",
@@ -366,6 +409,12 @@ fn make_ddl(
                     }
                 } else {
                     // add columns
+                    history
+                        .entry(Type::AddColumn)
+                        .or_default()
+                        .entry(table_name.clone())
+                        .or_default()
+                        .push(name.clone());
                     writeln!(
                         &mut result,
                         "ALTER TABLE {} ADD COLUMN {} {}{};",
@@ -380,6 +429,12 @@ fn make_ddl(
             for (name, _old_field) in &old_table.columns {
                 if !new_table.columns.contains_key(name) {
                     // Delete columns
+                    history
+                        .entry(Type::DropColumn)
+                        .or_default()
+                        .entry(table_name.clone())
+                        .or_default()
+                        .push(name.clone());
                     writeln!(
                         &mut result,
                         "ALTER TABLE {} DROP COLUMN {};",
@@ -391,6 +446,11 @@ fn make_ddl(
             if new_table.primary != old_table.primary {
                 // Fix primary keys
                 if let Some(ref primary) = new_table.primary {
+                    history
+                        .entry(Type::ChangePrimary)
+                        .or_default()
+                        .entry(table_name.clone())
+                        .or_default();
                     writeln!(
                         &mut result,
                         "ALTER TABLE {} DROP PRIMARY KEY, ADD {};",
@@ -398,6 +458,11 @@ fn make_ddl(
                         primary
                     )?;
                 } else {
+                    history
+                        .entry(Type::DropPrimary)
+                        .or_default()
+                        .entry(table_name.clone())
+                        .or_default();
                     writeln!(
                         &mut result,
                         "ALTER TABLE {} DROP PRIMARY KEY;",
@@ -411,6 +476,11 @@ fn make_ddl(
                 // To prevent adding _sqlx_migrations
                 continue;
             }
+            history
+                .entry(Type::AddTable)
+                .or_default()
+                .entry(table_name.clone())
+                .or_default();
             writeln!(&mut result, "{}", &new_table)?;
         }
     }
@@ -420,6 +490,12 @@ fn make_ddl(
                 if let Some(old_index) = old_table.indexes.get(name) {
                     if old_index != index {
                         // fix indexes
+                        history
+                            .entry(Type::ChangeIndex)
+                            .or_default()
+                            .entry(table_name.clone())
+                            .or_default()
+                            .push(name.clone());
                         writeln!(
                             &mut result,
                             "ALTER TABLE {} DROP INDEX {}, ADD {};",
@@ -430,6 +506,12 @@ fn make_ddl(
                     }
                 } else {
                     // add indexes
+                    history
+                        .entry(Type::AddIndex)
+                        .or_default()
+                        .entry(table_name.clone())
+                        .or_default()
+                        .push(name.clone());
                     writeln!(
                         &mut result,
                         "ALTER TABLE {} ADD {};",
@@ -442,6 +524,12 @@ fn make_ddl(
                 if let Some(old_constraint) = old_table.constraints.get(name) {
                     if old_constraint != constraint {
                         // fix foreign key constraints
+                        history
+                            .entry(Type::ChangeForeign)
+                            .or_default()
+                            .entry(table_name.clone())
+                            .or_default()
+                            .push(name.clone());
                         writeln!(
                             &mut result,
                             "ALTER TABLE {} DROP FOREIGN KEY {}, ADD {};",
@@ -452,6 +540,12 @@ fn make_ddl(
                     }
                 } else {
                     // Add foreign key constraints
+                    history
+                        .entry(Type::AddForeign)
+                        .or_default()
+                        .entry(table_name.clone())
+                        .or_default()
+                        .push(name.clone());
                     writeln!(
                         &mut result,
                         "ALTER TABLE {} ADD {};",
@@ -475,5 +569,13 @@ fn make_ddl(
             }
         }
     }
-    Ok(result)
+    let mut header = String::new();
+    for (typ, tables) in history {
+        for (table, columns) in tables {
+            let columns = columns.join(", ");
+            writeln!(&mut header, "-- [{typ}:{table}:{columns}]")?;
+        }
+    }
+    header.push_str(&result);
+    Ok(header)
 }

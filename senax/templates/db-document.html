@@ -173,6 +173,56 @@
             <p class="author">{{config.author}}</p>
         </div>
     </section>
+    {% if history | length > 0 -%}
+    <section class="sheet history">
+        <div class="frame history">
+            <table>
+                <caption>
+                    <h3>Revision History</h3>
+                </caption>
+                <thead>
+                    <tr>
+                        <th class="updated">Date</th>
+                        <th class="description">Description</th>
+                    </tr>
+                </thead>
+                {% for row in history -%}
+                {% set description = row.description | history_description(
+                    AddTable='Add a table: <a href="#table_{T}">{T}</a>',
+                    DropTable='Drop a table: {T}',
+                    AddColumn='Add a column: <a href="#table_{T}">{T}</a> ({C})',
+                    AddColumn_Plural='Add columns: <a href="#table_{T}">{T}</a> ({C})',
+                    ChangeColumn='Change a column: <a href="#table_{T}">{T}</a> ({C})',
+                    ChangeColumn_Plural='Change columns: <a href="#table_{T}">{T}</a> ({C})',
+                    DropColumn='Drop a column: <a href="#table_{T}">{T}</a> ({C})',
+                    DropColumn_Plural='Drop columns: <a href="#table_{T}">{T}</a> ({C})',
+                    ChangePrimary='Change the primary key: <a href="#table_{T}">{T}</a>',
+                    DropPrimary='Drop the primary key: <a href="#table_{T}">{T}</a>',
+                    AddIndex='Add an index: <a href="#table_{T}">{T}</a> ({C})',
+                    AddIndex_Plural='Add indexes: <a href="#table_{T}">{T}</a> ({C})',
+                    ChangeIndex='Change an index: <a href="#table_{T}">{T}</a> ({C})',
+                    ChangeIndex_Plural='Change indexes: <a href="#table_{T}">{T}</a> ({C})',
+                    DropIndex='Drop an index: <a href="#table_{T}">{T}</a> ({C})',
+                    DropIndex_Plural='Drop indexes: <a href="#table_{T}">{T}</a> ({C})',
+                    AddForeign='Add a foreign key: <a href="#table_{T}">{T}</a> ({C})',
+                    AddForeign_Plural='Add foreign keys: <a href="#table_{T}">{T}</a> ({C})',
+                    ChangeForeign='Change a foreign key: <a href="#table_{T}">{T}</a> ({C})',
+                    ChangeForeign_Plural='Change foreign keys: <a href="#table_{T}">{T}</a> ({C})',
+                    DropForeign='Drop a foreign key: <a href="#table_{T}">{T}</a> ({C})',
+                    DropForeign_Plural='Drop foreign keys: <a href="#table_{T}">{T}</a> ({C})',
+                ) -%}
+                {% if description | length == 0 %}{% continue %}{% endif -%}
+                <tr>
+                    <td class="updated">{{row.date | date(format="%x", locale=locale)}}</td>
+                    <td class="description">
+                        <pre>{{description | safe}}</pre>
+                    </td>
+                </tr>
+                {% endfor -%}
+            </table>
+        </div>
+    </section>
+    {% endif -%}
     {% if group_list | length > 1 -%}
     <section class="sheet model-group-list">
         <div class="frame model-group-list">
@@ -184,17 +234,12 @@
                     <tr>
                         <th class="no narrow">No.</th>
                         <th class="group-name">Name</th>
-                        <th class="updated">Last Updated</th>
                     </tr>
                 </thead>
                 {% for group in group_list -%}
                 <tr>
                     <td class="no center">{{loop.index}}</td>
                     <td class="group-name"><a href="#sub_{{group.group_name}}">{{group.group_def.title}}</a></td>
-                    <td class="updated center">
-                        {%- if group.last_update_at %}
-                        {{- group.last_update_at | date(format="%x", locale=locale)}}
-                        {%- endif %}</td>
                 </tr>
                 {% endfor -%}
             </table>
@@ -208,33 +253,6 @@
         {% if group_list | length > 1 -%}
         <div class="title group-name">
             <h2>{{group.group_def.title}}</h2>
-        </div>
-        {% endif -%}
-        {% if group.history -%}
-        <div class="frame history">
-            <table>
-                <caption>
-                    <h3>Revision History</h3>
-                </caption>
-                <thead>
-                    <tr>
-                        <th class="updated">Date</th>
-                        <th class="version">Version</th>
-                        <th class="description">Description</th>
-                        <th class="author">Author</th>
-                    </tr>
-                </thead>
-                {% for history in group.history -%}
-                <tr>
-                    <td class="updated">{{history.date | date(format="%x", locale=locale)}}</td>
-                    <td class="version">{{history | get(key="version", default="")}}</td>
-                    <td class="description">
-                        <pre>{{history.description}}</pre>
-                    </td>
-                    <td class="author">{{history | get(key="author", default="") }}</td>
-                </tr>
-                {% endfor -%}
-            </table>
         </div>
         {% endif -%}
         {% if group.models -%}
@@ -292,6 +310,7 @@
     {% for model_name, model in group.models -%}
     <section class="sheet table-info">
         <a id="model_{{group.group_name}}::{{model_name}}"></a>
+        <a id="table_{{model.table_name}}"></a>
         <div class="title">
             <h3>{{loop.index}}. {{model_name}}{% if model.title %} ({{model.title}}){% endif %}</h3>
         </div>

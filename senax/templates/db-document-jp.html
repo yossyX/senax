@@ -170,22 +170,55 @@
                     <tr>
                         <th class="no narrow">No.</th>
                         <th class="group-name">モデルグループ</th>
-                        <th class="updated">最終更新日</th>
                     </tr>
                 </thead>
                 {% for group in group_list -%}
                 <tr>
                     <td class="no center">{{loop.index}}</td>
                     <td class="group-name"><a href="#sub_{{group.group_name}}">{{group.group_def.title}}</a></td>
-                    <td class="updated">
-                        {%- if group.last_update_at %}
-                            {{- group.last_update_at | date(format="%x", locale=locale)}}
-                        {%- endif %}
+                </tr>
+                {% endfor -%}
+            </table>
+        </div>
+        {% if history | length > 0 -%}
+        <div class="frame history">
+            <table>
+                <caption>
+                    <h3>更新履歴</h3>
+                </caption>
+                <thead>
+                    <tr>
+                        <th class="updated">更新日</th>
+                        <th class="description">変更内容</th>
+                    </tr>
+                </thead>
+                {% for row in history -%}
+                {% set description = row.description | history_description(
+                    AddTable='テーブル追加 <a href="#table_{T}">{T}</a>',
+                    DropTable='テーブル削除 {T}',
+                    AddColumn='カラム追加 <a href="#table_{T}">{T}</a> ({C})',
+                    ChangeColumn='カラム変更 <a href="#table_{T}">{T}</a> ({C})',
+                    DropColumn='カラム削除 <a href="#table_{T}">{T}</a> ({C})',
+                    ChangePrimary='主キー変更 <a href="#table_{T}">{T}</a>',
+                    DropPrimary='主キー削除 <a href="#table_{T}">{T}</a>',
+                    AddIndex='インデックス追加 <a href="#table_{T}">{T}</a> ({C})',
+                    ChangeIndex='インデックス変更 <a href="#table_{T}">{T}</a> ({C})',
+                    DropIndex='インデックス削除 <a href="#table_{T}">{T}</a> ({C})',
+                    AddForeign='外部キー追加 <a href="#table_{T}">{T}</a> ({C})',
+                    ChangeForeign='外部キー変更 <a href="#table_{T}">{T}</a> ({C})',
+                    DropForeign='外部キー削除 <a href="#table_{T}">{T}</a> ({C})',
+                ) -%}
+                {% if description | length == 0 %}{% continue %}{% endif -%}
+                <tr>
+                    <td class="updated">{{row.date | date(format="%x", locale=locale)}}</td>
+                    <td class="description">
+                        <pre>{{description | safe}}</pre>
                     </td>
                 </tr>
                 {% endfor -%}
             </table>
         </div>
+        {% endif -%}
     </section>
     {%- endif -%}
 
@@ -215,33 +248,6 @@
         {% else -%}
         <div class="title group-name">
             <h2>{{group.group_def.title}}</h2>
-        </div>
-        {% endif -%}
-        {% if group.history -%}
-        <div class="frame history">
-            <table>
-                <caption>
-                    <h3>更新履歴</h3>
-                </caption>
-                <thead>
-                    <tr>
-                        <th class="updated">更新日</th>
-                        <th class="version">バージョン</th>
-                        <th class="description">変更内容</th>
-                        <th class="author">担当</th>
-                    </tr>
-                </thead>
-                {% for history in group.history -%}
-                <tr>
-                    <td class="updated">{{history.date | date(format="%x", locale=locale)}}</td>
-                    <td class="version">{{history | get(key="version", default="")}}</td>
-                    <td class="description">
-                        <pre>{{history.description}}</pre>
-                    </td>
-                    <td class="author">{{history | get(key="author", default="") }}</td>
-                </tr>
-                {% endfor -%}
-            </table>
         </div>
         {% endif -%}
         {% if group.models -%}
@@ -299,6 +305,7 @@
     {% for model_name, model in group.models -%}
     <section class="sheet table-info">
         <a id="model_{{group.group_name}}::{{model_name}}"></a>
+        <a id="table_{{model.table_name}}"></a>
         <div class="title">
             <h3>{{loop.index}}. {{model_name}}{% if model.title %} ({{model.title}}){% endif %}</h3>
         </div>

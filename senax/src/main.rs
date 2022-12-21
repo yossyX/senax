@@ -82,6 +82,12 @@ enum Commands {
         /// Include ER diagram
         #[clap(short, long)]
         er: bool,
+        /// History length
+        #[clap(short('H'), long)]
+        history: Option<usize>,
+        /// Output file
+        #[clap(short, long)]
+        output: Option<PathBuf>,
         /// Template file
         #[clap(short, long)]
         template: Option<PathBuf>,
@@ -146,11 +152,13 @@ async fn exec(cli: Cli) -> Result<(), anyhow::Error> {
             db,
             group,
             er,
+            history,
+            output,
             template,
         } => {
             let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
             ensure!(re.is_match(db), "bad db name!");
-            db_document::generate(db, group, *er, template)?;
+            db_document::generate(db, group, *er, history, output, template)?;
         }
         Commands::GenSchema { uri } => {
             schema_generator::generate(uri).await?;
