@@ -1,5 +1,4 @@
 use convert_case::{Case, Casing};
-use inflector::string::pluralize::to_plural;
 use inflector::string::singularize::to_singular;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -148,10 +147,6 @@ impl RelDef {
         if target_model.merged_columns.contains_key(&id) {
             return id;
         }
-        let id = format!("{}_id", to_singular(&self_model.name));
-        if target_model.merged_columns.contains_key(&id) {
-            return id;
-        }
         "foreign id not found!".to_string()
     }
     pub fn foreign_is_not_null(
@@ -249,20 +244,20 @@ fn get_model(group_name: Option<&str>, stem_name: &str) -> Arc<ModelDef> {
         {
             return model.clone();
         }
-        let plural_name = to_plural(stem_name);
+        let singular_name = to_singular(stem_name);
         unsafe { GROUPS.get().unwrap() }
             .get(group_name)
             .unwrap_or_else(|| panic!("{} group is not defined", group_name))
-            .get(&plural_name)
+            .get(&singular_name)
             .unwrap_or_else(|| panic!("{} model is not defined", stem_name))
             .clone()
     } else {
         if let Some(model) = unsafe { MODELS.get().unwrap() }.get(stem_name) {
             return model.clone();
         }
-        let plural_name = to_plural(stem_name);
+        let singular_name = to_singular(stem_name);
         unsafe { MODELS.get().unwrap() }
-            .get(&plural_name)
+            .get(&singular_name)
             .unwrap_or_else(|| panic!("{} model is not defined", stem_name))
             .clone()
     }
@@ -277,20 +272,20 @@ fn get_model_name(group_name: Option<&str>, stem_name: &str) -> (String, String)
         {
             return (model.mod_name().to_string(), model.name.clone());
         }
-        let plural_name = to_plural(stem_name);
+        let singular_name = to_singular(stem_name);
         let model = unsafe { GROUPS.get().unwrap() }
             .get(group_name)
             .unwrap_or_else(|| panic!("{} group is not defined", group_name))
-            .get(&plural_name)
+            .get(&singular_name)
             .unwrap_or_else(|| panic!("{} model is not defined", stem_name));
         (model.mod_name().to_string(), model.name.clone())
     } else {
         if let Some(model) = unsafe { MODELS.get().unwrap() }.get(stem_name) {
             return (model.mod_name().to_string(), model.name.clone());
         }
-        let plural_name = to_plural(stem_name);
+        let singular_name = to_singular(stem_name);
         let model = unsafe { MODELS.get().unwrap() }
-            .get(&plural_name)
+            .get(&singular_name)
             .unwrap_or_else(|| panic!("{} model is not defined", stem_name));
         (model.mod_name().to_string(), model.name.clone())
     }

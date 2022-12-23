@@ -2,7 +2,6 @@ use anyhow::{bail, Context as _, Result};
 use convert_case::{Case, Casing};
 use format_serde_error::SerdeError;
 use indexmap::IndexMap;
-use inflector::string::pluralize::to_plural;
 use inflector::string::singularize::to_singular;
 use once_cell::sync::{Lazy, OnceCell};
 use schemars::JsonSchema;
@@ -772,15 +771,15 @@ pub fn get_model<'a>(
     if let Some(model) = group.get(&stem_name) {
         return model;
     }
-    let plural_name = to_plural(&stem_name);
+    let singular_name = to_singular(&stem_name);
     let model = group
-        .get(&plural_name)
+        .get(&singular_name)
         .unwrap_or_else(|| panic!("{} {} model is not defined", group_name, stem_name));
     model
 }
 
 pub fn to_id_name(name: &str) -> String {
-    format!("_{}Id", to_singular(name).to_case(Case::Pascal))
+    format!("_{}Id", name.to_case(Case::Pascal))
 }
 pub fn _to_var_name(s: &str) -> String {
     let name = s;
