@@ -60,6 +60,7 @@ const USE_CACHE: bool = @{ def.use_cache()|if_then_else("true", "false") }@;
 const USE_FAST_CACHE: bool = @{ def.use_fast_cache()|if_then_else("true", "false") }@;
 const USE_CACHE_ALL: bool = @{ def.use_cache_all()|if_then_else("true", "false") }@;
 const IGNORE_PROPAGATED_INSERT_CACHE: bool = @{ def.ignore_propagated_insert_cache|if_then_else("true", "false") }@;
+pub const TABLE_NAME: &str = "@{ table_name }@";
 @% if def.primaries().len() == 1 -%@
 @% for (name, column_def) in def.primaries() -%@
 pub const ID_COLUMN: &str = "@{ name }@";

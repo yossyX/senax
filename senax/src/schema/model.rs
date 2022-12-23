@@ -1,5 +1,6 @@
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
+use inflector::string::pluralize::to_plural;
 use rand::RngCore;
 use schemars::schema::{InstanceType, Schema, SchemaObject, SingleOrVec};
 use schemars::JsonSchema;
@@ -185,7 +186,14 @@ impl ModelDef {
     pub fn table_name(&self) -> String {
         match self.table_name {
             Some(ref n) => n.clone(),
-            None => format!("{}_{}", &self.group_name, &self.name),
+            None => {
+                let name = format!("{}_{}", &self.group_name, &self.name);
+                if unsafe { CONFIG.get().unwrap() }.plural_table_name {
+                    to_plural(&name)
+                } else {
+                    name
+                }
+            }
         }
     }
 

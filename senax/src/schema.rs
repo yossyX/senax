@@ -68,6 +68,9 @@ pub struct ConfigDef {
     /// falseの場合は外部キー制約をDDLに出力しない
     #[serde(default)]
     pub ignore_foreign_key: bool,
+    /// テーブル名は複数形にする
+    #[serde(default)]
+    pub plural_table_name: bool,
     /// デフォルトのタイムスタンプ設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestampable: Option<Timestampable>,
