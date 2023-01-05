@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html" class="active"><strong aria-hidden="true">13.2.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">13.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html" class="active"><strong aria-hidden="true">13.3.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -153,11 +153,14 @@
 <p>リンカーはキャッシュの更新内容をサーバ間に送信する中継器の役割を持ちます。<br />
 etcdが必要です。</p>
 <h2 id="インストール"><a class="header" href="#インストール">インストール</a></h2>
-<pre><code>cargo install senax-linker
+<p>etcd接続のため protobuf-compiler が必要となります。</p>
+<pre><code># apt-get install protobuf-compiler
+</code></pre>
+<pre><code># cargo install senax-linker
 </code></pre>
 <h2 id="自己認証局ファイル生成"><a class="header" href="#自己認証局ファイル生成">自己認証局ファイル生成</a></h2>
 <p>certsディレクトリの下に自己認証局に必要なファイルを生成します。</p>
-<pre><code>senax-linker --cert
+<pre><code>$ senax-linker --cert
 </code></pre>
 <h2 id="env設定"><a class="header" href="#env設定">.env設定</a></h2>
 <div class="table-wrapper"><table><thead><tr><th>パラメータ名</th><th>必須</th><th>説明</th></tr></thead><tbody>
@@ -178,11 +181,16 @@ etcdが必要です。</p>
 <tr><td>ETCD_KEY_PEM_FILE</td><td></td><td></td></tr>
 </tbody></table>
 </div>
+<h2 id="実行"><a class="header" href="#実行">実行</a></h2>
+<p>下記コマンド実行されますが、実際にはサービスとして起動する必要があります。</p>
+<pre><code>$ senax-linker
+</code></pre>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="logger.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="session.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -193,7 +201,7 @@ etcdが必要です。</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="logger.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="session.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

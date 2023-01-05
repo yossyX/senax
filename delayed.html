@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html" class="active"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.2.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html" class="active"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">13.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.3.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -156,14 +156,14 @@ DBとの接続が切れている場合はディスクに保存して、接続が
 リレーションのデータも同時に保存可能。</p>
 <h2 id="save_delayed"><a class="header" href="#save_delayed">save_delayed</a></h2>
 <p>アクセスカウンタを想定しており、同一のページへのアクセスが複数回行われる場合に、それらのアクセス数を加算してからDBへの加算クエリーが実行される。<br />
-加算後のカウンタ値を取得してmaxクエリーに変換してサーバ間同期が行われるので、サーバ間のキャッシュ不整合が発生しない。<br />
-DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行わる。その間サーバは終了できない。<br />
+加算後のカウンタ値を取得してmax()メソッドでの更新に変換してサーバ間同期が行われるので、サーバ間のキャッシュ不整合が発生しない。<br />
+DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行われる。その間サーバは終了できない。<br />
 リレーションのデータは保存されない。</p>
 <h2 id="upsert_delayed"><a class="header" href="#upsert_delayed">upsert_delayed</a></h2>
 <p>「いいね！」のチェックを想定しており、複数のページへの同一のUPDATEクエリーをまとめて実行される。<br />
 save_delayed ではそれぞれの主キーごとに1クエリーを必要とするが、upsert_delayed では主キーをIN句にまとめるため効率が良い。
-アクセスカウンタにも使用可能であるが、maxクエリーへの変換が行われないので、データを取得するタイミングと加算するタイミングによりサーバ間のキャッシュ不整合が発生する可能性がある。 
-DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行わる。その間サーバは終了できない。<br />
+アクセスカウンタにも使用可能であるが、max()メソッドでの更新への変換が行われないので、データを取得するタイミングと加算するタイミングによりサーバ間のキャッシュ不整合が発生する可能性がある。 
+DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行われる。その間サーバは終了できない。<br />
 リレーションのデータは保存されない。</p>
 
                     </main>

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>WHRER句マクロ - SenaX</title>
+        <title>セッション - SenaX</title>
 
 
         <!-- Custom HTML head -->
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html" class="active"><strong aria-hidden="true">7.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">13.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.3.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html" class="active"><strong aria-hidden="true">13.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.3.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -149,46 +149,49 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="whrer句マクロ"><a class="header" href="#whrer句マクロ">WHRER句マクロ</a></h1>
-<p>QueryBuilderで使用するWHRER句はマクロで記述されます。<br />
-基本的に比較演算子の左側にカラム名、右側に値となります。<br />
-マクロはそのままテキスト化ではなく、プリペアードステートメントに変換されますので、SQLインジェクションは発生しません。
-他のテーブルとの結合はJOINではなく、EXISTSで判定します。膨大なブログから表示可能な新着数件を抽出などではJOINよりもEXISTSのほうが早く取得できます。</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let cond = db_{DB名}::cond_{グループ名}_{モデル名}!(クエリー);
-let cond = db_sample::cond_note_note!(color = _Color::c);
-let cond = db_sample::cond_note_note!(content = &quot;ddd&quot;);
-let cond = db_sample::cond_note_note!(NOT(note_id = id));
-let cond = db_sample::cond_note_note!(note_id BETWEEN (3, 5));
-let cond = db_sample::cond_note_note!(note_id SEMI_OPEN (3, 5));
-let cond = db_sample::cond_note_note!((note_id &lt; c) AND (note_id &lt; 20) AND (note_id IN (3,3)));
-let cond = db_sample::cond_note_note!((NOT ((note_id &lt; c) AND (note_id &lt; 1) AND (note_id &lt; 2))) OR (note_id &lt; 3) OR (note_id &lt; 4));
-let cond = db_sample::cond_note_note!(note_id ANY_BITS c);
-let cond = db_sample::cond_note_note!(ONLY_TRASHED AND (category EXISTS (name = &quot;diary&quot;)));
-let cond = cond.and(db_sample::cond_note_note!(json CONTAINS [3,5]));
-let result = _Note::query().cond(cond).select(conn).await?;
-<span class="boring">}
-</span></code></pre></pre>
-<p>SEMI_OPENはBETWEENに似ていますが、半開区間 3 &lt;= note_id AND note_id &lt; 5 のように変換されます。</p>
-<p>order by については下記のようになります。
-IS NULL ASCの指定も可能ですが、インデックスの最適化は得られない可能性があります。</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>let order = db_sample::order_by_note_note!(note_id IS NULL ASC, note_id ASC);
-let result = _Note::query().order_by(order).select(conn).await?;
-<span class="boring">}
-</span></code></pre></pre>
+                        <h1 id="セッション"><a class="header" href="#セッション">セッション</a></h1>
+<p>actix-web にはセッションのプラグインがあります。
+actix-web のサイトではクッキーにセッションの内容を保存するタイプのみ紹介されていますが、Redisを使用する場合のサンプルも実装されています。
+ただ、下記の問題がありました。</p>
+<ul>
+<li>ロックしていない</li>
+<li>TTLの更新が毎回か、更新があったときのみ</li>
+</ul>
+<p>1つ目のロックしていない問題について、PHPでは初期の頃からセッションの排他ロックがありました。
+ほぼ1ページが1アクセスの時代から排他ロックがあったのですが、現在では1ページの表示にAjaxで複数回APIを呼び出すことが多く、セッションの排他処理がないとタイミング依存の不具合が発生する可能性があります。</p>
+<p>2つ目のTTLの更新については、更新があったときのみのTTL延長では操作中に突然ログアウトしてしまう可能性がありますので、アクセスごとに毎回TTL更新する必要があります。ただ、より効率的な運用としては10分毎に1回などのほうがセッションタイムアウトまでの時間もほとんど影響がなく、サーバの負荷を下げることが出来ます。</p>
+<p>SenaXではキャッシュを使用することによって非常に高速に動作し、上記の問題を解決したセッションを提供します。</p>
+<ul>
+<li>排他ロックではなくCAS（Compare-and-Swap）を採用</li>
+<li>TTLの更新はTTL期間の1/64の時間経過後のアクセスで更新</li>
+</ul>
+<p>また、セッションの記録領域を base, login, debug の3種類に分けています。
+ログアウトしたときにセッション情報を破棄することがありますが、破棄する情報か否かをログアウト処理に個別に実装するのはあまりスマートではありませんので、ログインしている間だけ有効でログアウト時に破棄するデータを login 領域に保存してログアウト時にまとめて破棄を可能にし、破棄しない情報を base 領域に保存して破棄されないようにします。
+debug 領域は devプロファイルでのみ有効で、releaseプロファイルでは保存されず、参照は常に空になりますので、無駄な処理が実行されることがありません。</p>
+<p>次にセッションをDBに保存するとテーブルにユーザIDのカラムを追加しがちですが、ユーザIDのカラムが必要になりそうな機能の代替実装方法について説明します。</p>
+<ul>
+<li>
+<p>複数セッション同時アクセス禁止
+複数セッション同時アクセス禁止は、複数のユーザが同一アカウントを流用することによりライセンスに違反して利用できることを防ぐために行われます。
+実装としては、ユーザテーブルなどユーザIDが主キーのテーブルに現在ログインしているセッションIDを保存し、有効なセッションであることを確認するようにします。</p>
+</li>
+<li>
+<p>他のセッション無効化
+不正アクセスの疑いがある場合などにパスワード更新のタイミングで他のセッション無効化をすることがあります。
+実装としては、パスワードにバージョンをつけ、セッションにログイン時のパスワードのバージョンを保存し、アクセスのたびにチェックしてバージョンが変更されていないか確認します。
+また、何らかの事情でユーザのアクセス権限を剥奪する可能性がありますので、ユーザアカウントの有効性チェックはアクセスのたびに行うことが望ましいです。</p>
+</li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="model.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="logger.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next" href="cache.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="linker.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -198,11 +201,11 @@ let result = _Note::query().order_by(order).select(conn).await?;
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="model.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="logger.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next" href="cache.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="linker.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

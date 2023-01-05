@@ -82,7 +82,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.2.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">13.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.3.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -152,69 +152,74 @@
                     <main>
                         <h1 id="senaxについて"><a class="header" href="#senaxについて">SenaXについて</a></h1>
 <p>SenaXはRustで書かれたORMで、キャッシュに特化しており非常に高速に動作します。<br />
-ORMにはよくクエリーキャッシュが実装されていますが、SenaXは一般的なクエリーキャッシュのような動作はせず、エンティティキャッシュを基本にしています。<br />
-SenaXは非常に高速に動作し、具体的な速度例として、DBからの取得とカウンター加算の更新を行うAPIのリクエストを32cpuで42万req/s程度の性能を出すことができます。<br />
-これまでにもキャッシュするORMはあったかと思いますが、そのサーバ単体でのキャッシュでしかなく、他のサーバでデータが更新された場合の責任はプログラマが対応する必要があったはずです。
-SenaXはクエリーの更新内容をすべてのサーバに送信し、自動的にキャッシュを同期します。</p>
-<p>SenaXはyaml形式のスキーマからDBレイヤーのクレートのコードとマイグレーションDDLを自動生成します。
-マクロ生成やライブラリの場合、挙動の理解や部分的な修正が困難ですが、生成されたコードは比較的単純でコピーしてカスタマイズすることも可能です。</p>
+非常に高速に動作し、具体的な速度例として、DBからの取得とカウンター加算の更新を行うAPIのリクエストを100%キャッシュヒットであれば32cpuで42万req/s程度の性能を出すことができます。</p>
+<p>他の一般的なORMのキャッシュではそのサーバ単体でのキャッシュでしかなく、他のサーバでデータが更新された場合の同期は自動的には行われないことがほとんどです。
+SenaXはクエリーの更新内容を他のサーバに送信し、自動的にキャッシュを同期します。</p>
+<p>SenaXはyaml形式のスキーマからDBレイヤーのソースコードとマイグレーションDDLを自動生成します。
+マクロ生成やライブラリを使用するORMでは挙動の理解や部分的な修正が困難ですが、SenaXで生成されたコードは比較的単純で理解しやすく、コピーしてカスタマイズすることも可能です。</p>
 <p>SenaXの特徴として次の点が挙げられます</p>
 <ul>
-<li>クエリー集約</li>
+<li>取得クエリー集約</li>
 <li>エンティティキャッシュ</li>
 <li>遅延一括更新</li>
 <li>サーバ間キャッシュ更新同期</li>
 </ul>
-<h3 id="クエリー集約"><a class="header" href="#クエリー集約">クエリー集約</a></h3>
+<h3 id="取得クエリー集約"><a class="header" href="#取得クエリー集約">取得クエリー集約</a></h3>
 <p>一般的なORMではAPIへのアクセスごとにそれぞれDBへクエリーを送り、その結果を返します。<br />
 SenaXではほぼ同時に行われたアクセスからのDBへのクエリーを一つにまとめ、一回のクエリーで結果を取得します。<br />
-具体的には主キーでの取得を IN クエリーに変換して取得します。</p>
+具体的には主キーでの取得をINクエリーに変換して取得します。</p>
 <p>これにより、キャッシュにないデータにアクセスが殺到した場合のDBの負荷を低減します。</p>
 <h3 id="エンティティキャッシュ"><a class="header" href="#エンティティキャッシュ">エンティティキャッシュ</a></h3>
-<p>エンティティキャッシュはあらかじめ定義されたone-to-oneあるいはone-to-manyの下位の結合関係を持つテーブルのデータもまとめてキャッシュされます。<br />
-エンティティの取得は主キーだけではなく、ユニークキーからの取得も対応しています。</p>
+<p>エンティティのリレーションのデータは取得時のJOINクエリーに依存して取得するのではなく、スキーマに定義されたone-to-oneあるいはone-to-manyの下位の結合関係を持つテーブルのデータを常にまとめてキャッシュします。
+キャッシュの取得が主キーからのみでは従属側のテーブルから外部キーでの複数行取得ができませんので、まとめてキャッシュすることによってリレーションのデータ取得を改善できます。<br />
+また、エンティティの取得はユニークキーからの取得も対応しています。</p>
 <h3 id="遅延一括更新"><a class="header" href="#遅延一括更新">遅延一括更新</a></h3>
 <p>ログなどをDBに保存する際に、同時に受け付けた他のアクセスのログとまとめてバルクインサートで保存することができます。<br />
-また、同一ページへのアクセスカウンタなどは同時にアクセスしたカウントアップ数をまとめてからDB更新も簡単にできます。</p>
+また、同一ページへのアクセスカウンタなどは同時にアクセスしたカウントアップ数をまとめて、合計数でのDB更新にも対応しています。</p>
 <h3 id="サーバ間キャッシュ更新同期"><a class="header" href="#サーバ間キャッシュ更新同期">サーバ間キャッシュ更新同期</a></h3>
 <p>キャッシュに保存されたデータが更新される場合、他のサーバにも更新内容を伝達してそれぞれのサーバのキャッシュが最新であるように同期されます。<br />
 更新差分はカラムごとに処理されるため、別のサーバで同時に異なるカラムが更新されても問題ありません。
 同じカラムが更新される場合はバージョン管理で競合を防ぐことができます。</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="チュートリアル"><a class="header" href="#チュートリアル">チュートリアル</a></h1>
 <h2 id="インストール"><a class="header" href="#インストール">インストール</a></h2>
-<pre><code>cargo install senax
-</code></pre>
-<p>graphviz と protobuf-compiler が必要となります。</p>
-<pre><code>apt-get install graphviz protobuf-compiler
+<pre><code># cargo install senax
 </code></pre>
 <h2 id="初期ファイル"><a class="header" href="#初期ファイル">初期ファイル</a></h2>
 <p>初期ディレクトリ構成の参考のため、 https://github.com/yossyX/senax から examples/actix のコードを展開してください。
-とりあえず actix-web を使用していますが、tonic や hyper 等でも対応できるはずです。
-また、消費メモリの計算は mimalloc を使用することを想定しています。</p>
+とりあえずWebフレームワークとしては actix-web を使用しています。
+tonic や hyper 等でも対応できるようにしたいと思いますが、動作は未確認です。
+非同期ランタイムが tokio をそのまま利用しているとasyncブロックが Send である必要があり、その場合 SenaX は動作しません。
+actix-web は tokio 上で動作していますが、非同期については !Send で動作するスレッドごとの動作になっています。
+また、内部での消費メモリの計算はメモリアロケータとして mimalloc を使用することを想定しています。</p>
+<h2 id="envファイル"><a class="header" href="#envファイル">envファイル</a></h2>
+<pre><code>$ cp .env.sample .env
+</code></pre>
+<p>.envのSAMPLE_DB_URLなどのDB設定を必要に応じて変更してください。</p>
 <h2 id="スキーマファイル"><a class="header" href="#スキーマファイル">スキーマファイル</a></h2>
-<p>schema/conf.yml</p>
-<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/conf
+<p>スキーマファイルは基本的には設定ファイルとグループごとのモデル記述ファイルに分けて記述します。
+シンプルなケースでは設定ファイル内にまとめて記述することもできます。</p>
+<p>schema/sample.yml</p>
+<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#definitions/ConfigDef
 
-sample:
-  title: Sample DB
-  author: author name
-  db: mysql
-  ignore_foreign_key: true
-  timestampable: real_time
-  time_zone: local
-  timestamp_time_zone: utc
-  tx_isolation: read_committed
-  read_tx_isolation: repeatable_read
-  use_cache: true
-  use_fast_cache: true
-  use_cache_all: true
-  preserve_column_order: true
-  groups:
-    note:
-      title: note
+title: Sample DB
+author: author name
+db: mysql
+ignore_foreign_key: true
+timestampable: real_time
+time_zone: local
+timestamp_time_zone: utc
+tx_isolation: read_committed
+read_tx_isolation: repeatable_read
+use_cache: true
+use_fast_cache: true
+use_cache_all: true
+preserve_column_order: true
+groups:
+  note:
+    title: note
 </code></pre>
 <p>複数のデータベース設定のための設定ファイルです。<br />
-yaml-language-serverの設定はVSCodeであればYAMLのプラグインで入力時にアシスタントが効きます。</p>
+yaml-language-serverの設定はVSCodeであればYAMLのプラグインを使用することにより、入力時にアシスタントが効きます。</p>
 <p>トップのsampleはDBのデータベース名です。<br />
 dbはまだMySQLしか対応していません。<br />
 tx_isolationとread_tx_isolationは更新用と参照用のデータベースの接続を分けて、それぞれread_committedとrepeatable_readにしています。<br />
@@ -222,7 +227,7 @@ MySQLはデフォルトでrepeatable_readですが、負荷がかかると結構
 参照時のトランザクションはMySQLでは最初にテーブルにアクセスしたときにすべてのテーブルのスナップショットを取得するのでrepeatable_readが安全です。<br />
 groupsは一つのデータベースに数百のテーブルがあるとディレクトリツリーが長くなったり管理が困ることになりますので、1階層分グループ分けできるようになっています。</p>
 <p>schema/sample/note.yml</p>
-<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/model
+<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#properties/model
 
 note:
   timestampable: fixed_time
@@ -257,7 +262,7 @@ note:
       type: fulltext
       parser: ngram
 
-tags:
+tag:
   columns:
     id:
       type: int
@@ -268,7 +273,7 @@ tags:
   relations:
     note:
 
-categories:
+category:
   columns:
     id:
       type: int
@@ -276,9 +281,10 @@ categories:
       auto_increment: auto
     name: varchar_not_null
 
-counters:
+counter:
   counting: counter
   timestampable: none
+  use_save_delayed: true
   columns:
     note_id:
       type: int
@@ -291,30 +297,37 @@ counters:
     note:
 </code></pre>
 <p>グループ内のテーブルの設定ファイルです。<br />
-Symfony 1.xのdoctrine/schema.ymlに近いイメージです。<br />
-テーブル名がマルチバイト文字や複数形にも対応しています。categories テーブルはノートのrelationsのcategoryと紐づいていますが、relationsの方はtypeがデフォルトでoneなので単数形で自動的に紐づきます。<br />
-ちなみに、 Doctrine の inheritance も一通り対応しています。</p>
+Symfony 1.x の doctrine/schema.yml に近いイメージです。<br />
+テーブル名がマルチバイト文字や複数形にも対応しています。
+note モデルは tag と紐づいていますが、 relations の type が many では複数形の tags で自動的に紐づきます。</p>
+<p>ちなみに、 Doctrine の inheritance も一通り対応しています。</p>
+<p>セッション用の設定ファイルをダウンロードします。</p>
+<pre><code>$ wget -O schema/session.yml https://github.com/yossyX/senax/releases/latest/download/session.yml
+</code></pre>
 <h2 id="モデル生成"><a class="header" href="#モデル生成">モデル生成</a></h2>
+<p>senaxのコマンドでdb/sample下にクレートを生成します。</p>
 <pre><code>$ senax model sample
+$ senax model session
 </code></pre>
-<p>senaxのコマンドでdb/sample下にクレートを生成します。<br />
-note.rs等はカスタマイズ用で、_note.rsが本体です。再度モデル生成を実行するとnote.rsは上書きされず、_note.rsは常に上書きされます。<br />
-モデル名が_Tagsのように_が付くのは他のライブラリと被らないようにそのような命名規則にしています。</p>
+<p>note.rs等はカスタマイズ用で、_note.rsが本体です。再度モデル生成を実行するとnote.rsは上書きされず、_note.rsは常に上書きされます。<br />
+モデル名が_Tagsのように_が付くのは他のライブラリと被らないようにそのような命名規則になっています。<br />
+Dockerでの開発環境でVS Code等を使用していてモデルの再生成後に変更が反映されていない場合は、ウィンドウの再読み込みや生成されたモデルのファイルをVS Code上で再度保存するなどしてモデルの更新をVS Codeに認識させる必要があります。</p>
 <h2 id="マイグレーション生成"><a class="header" href="#マイグレーション生成">マイグレーション生成</a></h2>
+<p>db/sample/migrations下にDDLファイルを生成します。</p>
 <pre><code>$ senax gen-migrate sample init
+$ senax gen-migrate session init
 </code></pre>
-<p>db/sample/migrations下にDDLファイルを生成します。<br />
-DDLは現状のDBを確認して差分を出力します。<br />
-コマンド実行前に .env の SAMPLE_DB_URL で指定されたデータベースを作成しておいてください。</p>
-<p>※ テーブル名はデフォルトでグループ名とモデル名を結合した名前になります。変更する場合はスキーマで table_name を指定してください。</p>
+<p>DDLは現状のDBを確認して差分を出力します。<br />
+DB仕様書の更新履歴出力のためにコメント部分に更新内容が出力されています。コメントの追加や不要な更新内容を削除して仕様書に出力される更新内容を変更することができます。</p>
+<p>※ テーブル名はデフォルトでグループ名とモデル名を結合した名前になります。変更する場合はスキーマで table_name を指定してください。
+また、 plural_table_name の設定でテーブル名を複数形で生成することが出来ます。</p>
 <h2 id="マイグレーション実行"><a class="header" href="#マイグレーション実行">マイグレーション実行</a></h2>
-<pre><code>$ cargo run -p db_sample -- migrate
-</code></pre>
-<p>もしくは、</p>
-<pre><code>$ target/debug/db_sample migrate
+<pre><code>$ cargo run -p db_sample -- migrate -c
+$ cargo run -p db_session -- migrate -c
 </code></pre>
 <p>sqlxのマイグレーションを実行します。
-シャーディング設定がある場合すべてのシャードにクエリーを発行するようになっています。</p>
+シャーディング設定がある場合すべてのシャードにクエリーを発行するようになっています。<br />
+-c はクリーンマイグレーションで、DBを作成してからマイグレーションを実行します。</p>
 <h2 id="シードスキーマ生成"><a class="header" href="#シードスキーマ生成">シードスキーマ生成</a></h2>
 <pre><code>$ cargo run -p db_sample -- gen-seed-schema &gt; db/sample/seed-schema.json
 </code></pre>
@@ -327,11 +340,11 @@ DDLは現状のDBを確認して差分を出力します。<br />
 </code></pre>
 <p>シードファイルもマイグレーションと同様にDBに登録済みかのバージョン管理を行いますので、コマンドでシードファイルを生成します。</p>
 <h2 id="シードファイル記述"><a class="header" href="#シードファイル記述">シードファイル記述</a></h2>
-<p>db/sample/seeds/20221120120831_init.yml</p>
+<p>db/sample/seeds/20221120120831_init.yml (数値部分は生成日時によって変化します。)</p>
 <pre><code class="language-yml"># yaml-language-server: $schema=../seed-schema.json
 
 note:
-  categories:
+  category:
     diary:
       name: diary
   note:
@@ -339,19 +352,23 @@ note:
       category_id: diary
       key: sample
       content: content
-  tags:
+  tag:
     tag_1:
       note_id: note_1
       name: tag 1
 </code></pre>
-<p>「diary」と「note_1」はそれぞれオートインクリメントで登録されたIDが渡されるようになっています。</p>
+<p>category_id の「diary」と note_id の「note_1」はそれぞれオートインクリメントで登録されたIDが渡されるようになっています。</p>
 <h2 id="シードデータ投入"><a class="header" href="#シードデータ投入">シードデータ投入</a></h2>
 <pre><code>$ cargo run -p db_sample -- seed
 </code></pre>
-<h2 id="テーブル定義書生成"><a class="header" href="#テーブル定義書生成">テーブル定義書生成</a></h2>
-<pre><code>$ senax gen-db-doc sample -e &gt; db-document.html
+<h2 id="dbテーブル定義書生成"><a class="header" href="#dbテーブル定義書生成">DBテーブル定義書生成</a></h2>
+<p>DB仕様書のER図出力のために graphviz が必要となります。</p>
+<pre><code># apt-get install graphviz
 </code></pre>
-<p>環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。</p>
+<pre><code>$ senax gen-db-doc sample -e -H 10 &gt; db-document.html
+</code></pre>
+<p>環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。
+&quot;-e&quot;はER図出力、&quot;-H 10&quot;は仕様書更新履歴を10件分出力します。</p>
 <h2 id="コード記述"><a class="header" href="#コード記述">コード記述</a></h2>
 <p>_Noteを取得して日毎のカウンターを加算しています。
 save_delayedではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。</p>
@@ -359,9 +376,31 @@ save_delayedではこの処理が終わった後で同一の更新対象をま�
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[get(&quot;/cache/{key}&quot;)]
-async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl Responder {
+async fn handler(
+    key: web::Path&lt;String&gt;,
+    http_req: HttpRequest,
+    session: Session&lt;_SessionStore&gt;,
+) -&gt; impl Responder {
     let ctx = get_ctx_and_log(&amp;http_req);
     let result = async move {
+        // セッションの更新例
+        let session_count = session
+            .update(|s| {
+                let v: Option&lt;u64&gt; = s.get_from_base(SESSION_KEY)?;
+                match v {
+                    Some(mut v) =&gt; {
+                        v += 1;
+                        s.insert_to_base(SESSION_KEY, v)?;
+                        Ok(v)
+                    }
+                    None =&gt; {
+                        s.insert_to_base(SESSION_KEY, 1)?;
+                        Ok(1)
+                    }
+                }
+            })
+            .await?;
+
         let mut conn = SampleConn::new();
         let mut note = _Note::find_by_key_from_cache(&amp;conn, &amp;*key) // ユニークキーからのキャシュ取得
             .await
@@ -374,9 +413,9 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
         };
 
         let date = Local::now().date_naive();
-        let counter = _Counters::find_optional_from_cache(&amp;conn, (note.id(), date)).await?;
+        let counter = _Counter::find_optional_from_cache(&amp;conn, (note.id(), date)).await?;
         let count = counter.map(|v| v.counter()).unwrap_or_default() + 1; // ここまではキャッシュから当日のカウント取得
-        let mut counter_for_update = _CountersFactory { // 当日のカウントが未登録の場合 INSERT
+        let mut counter_for_update = _CounterFactory { // 当日のカウントが未登録の場合 INSERT
             note_id: note.id(),
             date,
             counter: 0,
@@ -384,7 +423,7 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
         .create(&amp;conn);
         let _ = counter_for_update.counter().add(1); // UPDATE加算
         counter_for_update._upsert(); // INSERT ... ON DUPLICATE KEY UPDATE の指示
-        _Counters::save_delayed(&amp;mut conn, counter_for_update).await?;
+        _Counter::update_delayed(&amp;mut conn, counter_for_update).await?;
 
         Ok(Response {
             id: note.id(),
@@ -404,7 +443,11 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[get(&quot;/no_cache/{key}&quot;)]
-async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl Responder {
+async fn handler(
+    key: web::Path&lt;String&gt;,
+    http_req: HttpRequest,
+    session: Session&lt;_SessionStore&gt;,
+) -&gt; impl Responder {
     let ctx = get_ctx_and_log(&amp;http_req);
     let result = async move {
         let mut conn = SampleConn::new();
@@ -419,15 +462,15 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
             Some(v) =&gt; Some(v.name().to_owned()),
         };
         let date = Local::now().date_naive();
-        let counter = _Counters::find_optional(&amp;mut conn, (note.id(), date)).await?;
+        let counter = _Counter::find_optional(&amp;mut conn, (note.id(), date)).await?;
         let count = counter.map(|v| v.counter()).unwrap_or_default() + 1;
 
         let note_id = note.id();
-        let cond = db_sample::cond_note_counters!((note_id=note_id) AND (date=date));
+        let cond = db_sample::cond_note_counter!((note_id=note_id) AND (date=date)); // WHERE句を生成するマクロ
         conn.begin().await?;
-        let mut update = _Counters::for_update(&amp;mut conn);
+        let mut update = _Counter::for_update(&amp;mut conn); // 更新内容を指定するための空のUpdate用オブジェクト生成
         let _ = update.counter().add(1);
-        _Counters::query()
+        _Counter::query()
             .cond(cond)
             .update(&amp;mut conn, update)
             .await?;
@@ -446,12 +489,23 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 }
 <span class="boring">}
 </span></code></pre></pre>
+<p>この例ではWHERE句の使用例のため、UPDATEクエリーで記述しています。
+また、簡略化のため当日のカウンターが未登録の場合を考慮していません。<br />
+upsert を使用すれば未登録の場合は登録、すでに登録されている場合は更新を実行できます。</p>
+<h2 id="サーバ起動"><a class="header" href="#サーバ起動">サーバ起動</a></h2>
+<pre><code>$ cargo run -p server
+</code></pre>
+<p>http://localhost:8080/api/cache/sample にアクセスして結果を確認できます。</p>
+<p>本番環境ではリリースモードでビルドして起動します。</p>
+<pre><code>$ cargo build -p server -r
+$ target/release/server
+</code></pre>
+<p>チュートリアル用のサンプルですが、ホットデプロイにも対応しています。</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="schema-definition"><a class="header" href="#schema-definition">Schema Definition</a></h1>
 <ul>
 <li><a href="schema.html##/definitions/ConfigDef">properties/conf</a></li>
 <li><a href="schema.html##/definitions/EnumDef">properties/enum</a></li>
 <li><a href="schema.html##/definitions/ModelDef">properties/model</a></li>
-<li><a href="schema.html##/definitions/History">properties/history</a></li>
 </ul>
 <hr />
 <p><a id="#/definitions/ConfigDef"></a></p>
@@ -459,11 +513,12 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <p>データベース設定</p>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
-<tr><td><strong>db_no</strong></td><td>integer</td><td>内部で使用されるデータベースナンバー。同一conf.ymlファイル内では自動生成の乱数で重複が発生しないが、設定ファイルが分かれる場合は重複を防ぐため指定できる。</td><td></td></tr>
+<tr><td><strong>db_no</strong></td><td>integer</td><td>リンカーで使用されるデータベースナンバー　自動生成では毎回現在時刻が使用されるので、強制上書き時に固定する場合に指定する</td><td></td></tr>
 <tr><td><strong>db</strong></td><td><a href="schema.html##/definitions/DbType">DbType</a></td><td>使用するDB。現在のところmysqlのみ対応</td><td>Yes</td></tr>
 <tr><td><strong>title</strong></td><td>string</td><td>仕様書等のためのタイトル</td><td></td></tr>
 <tr><td><strong>author</strong></td><td>string</td><td>仕様書等のための著者</td><td></td></tr>
 <tr><td><strong>ignore_foreign_key</strong></td><td>boolean</td><td>falseの場合は外部キー制約をDDLに出力しない</td><td></td></tr>
+<tr><td><strong>plural_table_name</strong></td><td>boolean</td><td>テーブル名を複数形にする</td><td></td></tr>
 <tr><td><strong>timestampable</strong></td><td><a href="schema.html##/definitions/Timestampable">Timestampable</a></td><td>デフォルトのタイムスタンプ設定</td><td></td></tr>
 <tr><td><strong>time_zone</strong></td><td><a href="schema.html##/definitions/TimeZone">TimeZone</a></td><td>日時型のデフォルトのタイムゾーン設定</td><td></td></tr>
 <tr><td><strong>timestamp_time_zone</strong></td><td><a href="schema.html##/definitions/TimeZone">TimeZone</a></td><td>created_at, updated_at, deleted_atに使用されるタイムゾーン</td><td></td></tr>
@@ -471,6 +526,10 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <tr><td><strong>use_cache</strong></td><td>boolean</td><td>キャッシュ使用のデフォルト設定</td><td></td></tr>
 <tr><td><strong>use_fast_cache</strong></td><td>boolean</td><td>高速キャッシュ使用設定（experimental）</td><td></td></tr>
 <tr><td><strong>use_cache_all</strong></td><td>boolean</td><td>全キャッシュ使用のデフォルト設定</td><td></td></tr>
+<tr><td><strong>use_insert_delayed</strong></td><td>boolean</td><td>遅延INSERTを使用する</td><td></td></tr>
+<tr><td><strong>use_save_delayed</strong></td><td>boolean</td><td>遅延SAVEを使用する</td><td></td></tr>
+<tr><td><strong>use_update_delayed</strong></td><td>boolean</td><td>遅延UPDATEを使用する</td><td></td></tr>
+<tr><td><strong>use_upsert_delayed</strong></td><td>boolean</td><td>遅延UPSERTを使用する</td><td></td></tr>
 <tr><td><strong>tx_isolation</strong></td><td><a href="schema.html##/definitions/Isolation">Isolation</a></td><td>更新トランザクション分離レベル</td><td></td></tr>
 <tr><td><strong>read_tx_isolation</strong></td><td><a href="schema.html##/definitions/Isolation">Isolation</a></td><td>参照トランザクション分離レベル</td><td></td></tr>
 <tr><td><strong>engine</strong></td><td>string</td><td>MySQLのストレージエンジン</td><td></td></tr>
@@ -529,8 +588,10 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <h2 id="group-def"><a class="header" href="#group-def">Group Def</a></h2>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
-<tr><td><strong>title</strong></td><td>string</td><td></td><td>Yes</td></tr>
-<tr><td><strong>type</strong></td><td><a href="schema.html##/definitions/GroupType">GroupType</a></td><td></td><td></td></tr>
+<tr><td><strong>type</strong></td><td><a href="schema.html##/definitions/GroupType">GroupType</a></td><td></td><td>Yes</td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>models</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/ModelDef">ModelDef</a>&gt;</td><td></td><td></td></tr>
+<tr><td><strong>enums</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/EnumDef">EnumDef</a>&gt;</td><td></td><td></td></tr>
 </tbody></table>
 </div>
 <hr />
@@ -541,28 +602,6 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <li><code>model</code>(モデル定義)</li>
 <li><code>enum</code>(列挙型定義のみ)</li>
 </ul>
-<hr />
-<p><a id="#/definitions/EnumDef"></a></p>
-<h2 id="enum-def"><a class="header" href="#enum-def">Enum Def</a></h2>
-<p><strong>Properties</strong></p>
-<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
-<tr><td><strong>title</strong></td><td>string</td><td>タイトル</td><td></td></tr>
-<tr><td><strong>comment</strong></td><td>string</td><td>コメント</td><td></td></tr>
-<tr><td><strong>enum_values</strong></td><td>Array&lt;<a href="schema.html##/definitions/EnumValue">EnumValue</a>&gt;</td><td>列挙値</td><td>Yes</td></tr>
-<tr><td><strong>mod_name</strong></td><td>string</td><td>列挙子の名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
-</tbody></table>
-</div>
-<hr />
-<p><a id="#/definitions/EnumValue"></a></p>
-<h2 id="enum-value"><a class="header" href="#enum-value">Enum Value</a></h2>
-<p><strong>Properties</strong></p>
-<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
-<tr><td><strong>name</strong></td><td>string</td><td></td><td>Yes</td></tr>
-<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
-<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
-<tr><td><strong>value</strong></td><td>integer</td><td>0～255の値</td><td>Yes</td></tr>
-</tbody></table>
-</div>
 <hr />
 <p><a id="#/definitions/ModelDef"></a></p>
 <h2 id="model-def"><a class="header" href="#model-def">Model Def</a></h2>
@@ -581,6 +620,10 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <tr><td><strong>use_cache</strong></td><td>boolean</td><td>キャッシュを使用するか</td><td></td></tr>
 <tr><td><strong>use_fast_cache</strong></td><td>boolean</td><td>高速キャッシュを使用するか(experimental)</td><td></td></tr>
 <tr><td><strong>use_cache_all</strong></td><td>boolean</td><td>全キャッシュを使用するか</td><td></td></tr>
+<tr><td><strong>use_insert_delayed</strong></td><td>boolean</td><td>遅延INSERTを使用する</td><td></td></tr>
+<tr><td><strong>use_save_delayed</strong></td><td>boolean</td><td>遅延SAVEを使用する</td><td></td></tr>
+<tr><td><strong>use_update_delayed</strong></td><td>boolean</td><td>遅延UPDATEを使用する</td><td></td></tr>
+<tr><td><strong>use_upsert_delayed</strong></td><td>boolean</td><td>遅延UPSERTを使用する</td><td></td></tr>
 <tr><td><strong>ignore_propagated_insert_cache</strong></td><td>boolean</td><td>他サーバでinsertされたデータをキャッシュするか</td><td></td></tr>
 <tr><td><strong>on_delete_fn</strong></td><td>boolean</td><td>物理削除時の_before_deleteと_after_deleteの呼び出しを行うか</td><td></td></tr>
 <tr><td><strong>abstract</strong></td><td>boolean</td><td>抽象化モード</td><td></td></tr>
@@ -589,6 +632,7 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <tr><td><strong>character_set</strong></td><td>string</td><td>文字セット</td><td></td></tr>
 <tr><td><strong>collate</strong></td><td>string</td><td>文字セット照合順序</td><td></td></tr>
 <tr><td><strong>mod_name</strong></td><td>string</td><td>名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
+<tr><td><strong>act_as</strong></td><td><a href="schema.html##/definitions/ActAs">ActAs</a></td><td>機能追加</td><td></td></tr>
 <tr><td><strong>columns</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/ColumnTypeOrDef">ColumnTypeOrDef</a>&gt;</td><td>カラム</td><td></td></tr>
 <tr><td><strong>relations</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/RelDef">RelDef</a>&gt;</td><td>リレーション</td><td></td></tr>
 <tr><td><strong>indexes</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/IndexDef">IndexDef</a>&gt;</td><td>インデックス</td><td></td></tr>
@@ -614,6 +658,14 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <li><code>concrete</code>(具象テーブル継承 子クラスごとに共通のカラムとそれぞれのモデルのカラムをすべて含んだ状態で独立したテーブルを作成する)</li>
 <li><code>column_aggregation</code>(カラム集約テーブル継承 単一テーブル継承と似ているが、型を特定するための _type カラムがある)</li>
 </ul>
+<hr />
+<p><a id="#/definitions/ActAs"></a></p>
+<h2 id="actas-definition"><a class="header" href="#actas-definition">ActAs Definition</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>session</strong></td><td>boolean</td><td>セッションDBとして使用</td><td></td></tr>
+</tbody></table>
+</div>
 <hr />
 <p><a id="#/definitions/ColumnTypeOrDef"></a></p>
 <h2 id="column-type-or-def"><a class="header" href="#column-type-or-def">Column Type Or Def</a></h2>
@@ -687,6 +739,17 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <ul>
 <li><code>auto</code></li>
 </ul>
+<hr />
+<p><a id="#/definitions/EnumValue"></a></p>
+<h2 id="enum-value"><a class="header" href="#enum-value">Enum Value</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>name</strong></td><td>string</td><td></td><td>Yes</td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>value</strong></td><td>integer</td><td>0～255の値</td><td>Yes</td></tr>
+</tbody></table>
+</div>
 <hr />
 <p><a id="#/definitions/DbEnumValue"></a></p>
 <h2 id="db-enum-value"><a class="header" href="#db-enum-value">DB Enum Value</a></h2>
@@ -824,17 +887,16 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <li><code>mecab</code></li>
 </ul>
 <hr />
-<p><a id="#/definitions/History"></a></p>
-<h2 id="history"><a class="header" href="#history">History</a></h2>
-<p>更新履歴</p>
+<p><a id="#/definitions/EnumDef"></a></p>
+<h2 id="enum-def"><a class="header" href="#enum-def">Enum Def</a></h2>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
-<tr><td><strong>date</strong></td><td>string</td><td>更新日</td><td>Yes</td></tr>
-<tr><td><strong>description</strong></td><td>string</td><td>変更内容</td><td>Yes</td></tr>
-<tr><td><strong>author</strong></td><td>string</td><td>担当者</td><td></td></tr>
-<tr><td><strong>version</strong></td><td>string</td><td>バージョン</td><td></td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td>タイトル</td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td>コメント</td><td></td></tr>
+<tr><td><strong>enum_values</strong></td><td>Array&lt;<a href="schema.html##/definitions/EnumValue">EnumValue</a>&gt;</td><td>列挙値</td><td>Yes</td></tr>
+<tr><td><strong>mod_name</strong></td><td>string</td><td>列挙子の名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
 </tbody></table>
-</div><div style="break-before: page; page-break-before: always;"></div><h1 id="envファイル"><a class="header" href="#envファイル">.envファイル</a></h1>
+</div><div style="break-before: page; page-break-before: always;"></div><h1 id="envファイル-1"><a class="header" href="#envファイル-1">.envファイル</a></h1>
 <p>改行区切りを使用するために dotenv ではなく、 dotenvy を使用してください。</p>
 <h2 id="db設定"><a class="header" href="#db設定">DB設定</a></h2>
 <div class="table-wrapper"><table><thead><tr><th>パラメータ名</th><th>説明</th></tr></thead><tbody>
@@ -869,7 +931,7 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 </tbody></table>
 </div><div style="break-before: page; page-break-before: always;"></div><h1 id="トランザクション"><a class="header" href="#トランザクション">トランザクション</a></h1>
 <p>トランザクションには更新用トランザクションと参照用トランザクションがあります。<br />
-同時に使用する場合、更新用と参照用の取得順序が混在しているとコネクションプールからの取得がデッドロックする可能性がありますので統一する必要があります。<br />
+同時に使用する場合、更新用と参照用の取得順序が混在しているとコネクションプールからの取得がデッドロックする可能性がありますので、取得順序を統一する必要があります。<br />
 また、キャッシュの取得は現在使用しているコネクションとは別コネクションで参照用トランザクションを用いて取得されます。</p>
 <h2 id="更新用トランザクション"><a class="header" href="#更新用トランザクション">更新用トランザクション</a></h2>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -890,9 +952,9 @@ conn.begin_read_tx().await?;
 <h2 id="セーブポイント"><a class="header" href="#セーブポイント">セーブポイント</a></h2>
 <p>更新用トランザクションがネストされているとセーブポイントになります。</p>
 <h2 id="トランザクションを使用しない場合"><a class="header" href="#トランザクションを使用しない場合">トランザクションを使用しない場合</a></h2>
-<p>トランザクションを使用しない場合は begin_without_transaction() の呼び出しが必要です。<br />
+<p>トランザクションを使用しない自動コミットの場合は begin_without_transaction() の呼び出しが必要です。<br />
 単純なinsert, updateが可能です。クエリーの実行ごとにコネクションが変わっている可能性がありますので、DB接続のセッションの連続性に依存する処理はできません。<br />
-また、force_delete には対応していませんので、通常のトランザクションが必要です。</p>
+また、force_delete では通常のトランザクションが必要です。</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let mut conn = DbConn::new();
@@ -1003,10 +1065,10 @@ _{モデル名}::delete(conn, obj).await?;
 <pre><code>let obj = _{モデル名}::find_for_update(&amp;mut conn, id).await?
 _{モデル名}::force_delete(conn, obj).await?;
 </code></pre>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="クエリー"><a class="header" href="#クエリー">クエリー</a></h1>
-<p>QueryBuilderで使用するクエリーはマクロで記述されます。<br />
+<div style="break-before: page; page-break-before: always;"></div><h1 id="whrer句マクロ"><a class="header" href="#whrer句マクロ">WHRER句マクロ</a></h1>
+<p>QueryBuilderで使用するWHRER句はマクロで記述されます。<br />
 基本的に比較演算子の左側にカラム名、右側に値となります。<br />
-クエリーはそのままテキスト化ではなく、プリペアードステートメントに変換されますので、SQLインジェクションは発生しません。
+マクロはそのままテキスト化ではなく、プリペアードステートメントに変換されますので、SQLインジェクションは発生しません。
 他のテーブルとの結合はJOINではなく、EXISTSで判定します。膨大なブログから表示可能な新着数件を抽出などではJOINよりもEXISTSのほうが早く取得できます。</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -1014,6 +1076,7 @@ _{モデル名}::force_delete(conn, obj).await?;
 let cond = db_sample::cond_note_note!(color = _Color::c);
 let cond = db_sample::cond_note_note!(content = &quot;ddd&quot;);
 let cond = db_sample::cond_note_note!(NOT(note_id = id));
+let cond = db_sample::cond_note_note!(note_id BETWEEN (3, 5));
 let cond = db_sample::cond_note_note!(note_id SEMI_OPEN (3, 5));
 let cond = db_sample::cond_note_note!((note_id &lt; c) AND (note_id &lt; 20) AND (note_id IN (3,3)));
 let cond = db_sample::cond_note_note!((NOT ((note_id &lt; c) AND (note_id &lt; 1) AND (note_id &lt; 2))) OR (note_id &lt; 3) OR (note_id &lt; 4));
@@ -1023,6 +1086,7 @@ let cond = cond.and(db_sample::cond_note_note!(json CONTAINS [3,5]));
 let result = _Note::query().cond(cond).select(conn).await?;
 <span class="boring">}
 </span></code></pre></pre>
+<p>SEMI_OPENはBETWEENに似ていますが、半開区間 3 &lt;= note_id AND note_id &lt; 5 のように変換されます。</p>
 <p>order by については下記のようになります。
 IS NULL ASCの指定も可能ですが、インデックスの最適化は得られない可能性があります。</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -1033,18 +1097,19 @@ let result = _Note::query().order_by(order).select(conn).await?;
 </span></code></pre></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="キャッシュ"><a class="header" href="#キャッシュ">キャッシュ</a></h1>
 <h2 id="エンティティキャッシュ-1"><a class="header" href="#エンティティキャッシュ-1">エンティティキャッシュ</a></h2>
-<p>テーブルのデータとリレーション先のデータをまとめてキャッシュします。
+<p>SenaXは一般的なORMのようなクエリーキャッシュの動作はせず、エンティティキャッシュを基本にテーブルのデータとリレーション先のデータをまとめてキャッシュします。
 リレーション先は1世代のみです。</p>
 <h2 id="ショートキャッシュ"><a class="header" href="#ショートキャッシュ">ショートキャッシュ</a></h2>
-<p>insertされたデータが必ずしも参照されるとは限らないので、参照されるまでTTLの短いショートキャッシュに保存されます。</p>
-<h2 id="高速キャッシュ"><a class="header" href="#高速キャッシュ">高速キャッシュ</a></h2>
+<p>insertされたデータが必ずしも参照されるとは限らないので、参照されるまで比較的TTLの短いショートキャッシュに保存されます。</p>
+<h2 id="高速キャッシュ-fast_cache"><a class="header" href="#高速キャッシュ-fast_cache">高速キャッシュ (FAST_CACHE)</a></h2>
 <p>エンティティキャッシュをノンブロッキングでより高速に参照できるキャッシュです。<br />
-キャッシュのみのベンチマークでは高速ですが、全体としての影響は未確認です。</p>
+非常に高いキャッシュヒット率の環境下での速度安定化に貢献します。</p>
 <h2 id="ディスクキャッシュ"><a class="header" href="#ディスクキャッシュ">ディスクキャッシュ</a></h2>
 <p>キャッシュをディスクに保存します。保存先はSSDを想定しています。<br />
-io_uringを使用しているため、Linuxのみ対応。<br />
-ディスクキャッシュに保存されている位置を示すインデックス領域をメモリ上に必要とするため、大容量のディスクキャッシュは難しいかもしれません。<br />
-ホットデプロイではディスクキャッシュの再利用を行わず、別ファイルとなります。瞬時にディスクキャッシュがフルになって2倍の容量を必要とすることはないと思われますが、前のサーバが速やかに終了しない場合問題が発生する可能性があります。<br />
+io_uringを使用しているため、Linuxのみ対応しています。<br />
+ディスクキャッシュに保存されている位置を示すインデックス領域をメモリ上に必要とします。そのため、大容量のディスクキャッシュは難しいかもしれません。<br />
+ホットデプロイの場合でもディスクキャッシュの再利用を行わず、別ファイルとなります。
+瞬時にディスクキャッシュがフルになって2倍の容量を必要とすることはないと思われますが、前のサーバが速やかに終了しない場合は問題が発生する可能性があります。<br />
 単純な追記書き込みのため、容量効率はよくありませんが、下記2点に特化しています。</p>
 <ul>
 <li>ディスクキャッシュ上に保存されているかの判定がメモリ上で瞬時に可能</li>
@@ -1055,20 +1120,20 @@ io_uringを使用しているため、Linuxのみ対応。<br />
 <h2 id="ユニークインデックスキャッシュ"><a class="header" href="#ユニークインデックスキャッシュ">ユニークインデックスキャッシュ</a></h2>
 <p>ユニークインデックスがある場合、ユニークインデックスからIDを検索するためのユニークインデックスキャッシュを使用します。</p>
 <h2 id="ダミーキャッシュ"><a class="header" href="#ダミーキャッシュ">ダミーキャッシュ</a></h2>
-<p>「いいね！」などの表示は押されていなければデータが無いのでキャッシュされず、何度も再取得されることになる。<br />
-その場合、「いいね！」を解除した状態のデータを insert_dummy_cache で登録することで代わりのキャッシュとすることができる。</p>
+<p>「いいね！」などの表示は押されていなければデータがありませんのでキャッシュされず、何度も再取得されることになります。<br />
+その場合、「いいね！」を解除した状態のデータを insert_dummy_cache で登録することで代わりのキャッシュとすることができます。</p>
 <h2 id="サーバ間同期"><a class="header" href="#サーバ間同期">サーバ間同期</a></h2>
 <p>サーバ間の同期は全データを送るのではなく、更新されたカラムのデータのみ送信します。
 受信側はキャッシュを保有していれば受信した更新内容でキャッシュを更新します。
 ですので、同時に異なったサーバで更新されてもそれが異なるカラムであれば問題ありません。<br />
 同じカラムが更新される場合は、add()やmax()などのメソッドで更新していれば、それぞれ加算や現在値と更新値の最大値での更新になりますので、問題が発生しにくくなります。<br />
-更にバージョン機能を有効にすれば同期が確実になります。</p>
+さらにバージョン機能を有効にすれば同期が確実になります。</p>
 <h2 id="キャッシュ更新通知"><a class="header" href="#キャッシュ更新通知">キャッシュ更新通知</a></h2>
-<p>_receive_update_notice() で他のサーバからのキャッシュ更新通知を受信して処理をカスタマイズすることができます。新着やランキングの修正、チャット通知などに利用できます。 </p>
+<p>_receive_update_notice() で他のサーバからのキャッシュ更新通知を受信して処理をカスタマイズすることができます。独自に実装した新着やランキングの修正、チャット通知などに利用できます。 </p>
 <h2 id="マイクロサービス化"><a class="header" href="#マイクロサービス化">マイクロサービス化</a></h2>
 <p>サービスを再起動するとキャッシュは破棄されます。
-新規のイベントの実装等で既存の安定したサービスのキャッシュが破棄されないようにマイクロサービスアーキテクチャで実装することが望ましいです。
-その場合、必ずしも相互のリモートAPIを呼び出す必要はなく、データの参照程度であればローカルのメソッドを呼び出してデータを取得し、更新はキャッシュ更新通知で受信することができるので、実装が簡単で高速です。</p>
+新規のイベントの実装等により、既存の安定したサービスのキャッシュが破棄されないようにマイクロサービスアーキテクチャで実装することが望ましいです。
+その場合、必ずしも相互のリモートAPIを呼び出す必要はなく、データの参照程度であればローカルのメソッドを呼び出してデータを取得すれば、更新はキャッシュ更新通知で受信することができるので実装が簡単で高速です。</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="遅延一括更新-1"><a class="header" href="#遅延一括更新-1">遅延一括更新</a></h1>
 <h2 id="insert_delayed"><a class="header" href="#insert_delayed">insert_delayed</a></h2>
 <p>ログやツイートを想定しており、同時にリクエストを受け付けた他の保存データとまとめてバルクインサートを行う。<br />
@@ -1076,17 +1141,17 @@ DBとの接続が切れている場合はディスクに保存して、接続が
 リレーションのデータも同時に保存可能。</p>
 <h2 id="save_delayed"><a class="header" href="#save_delayed">save_delayed</a></h2>
 <p>アクセスカウンタを想定しており、同一のページへのアクセスが複数回行われる場合に、それらのアクセス数を加算してからDBへの加算クエリーが実行される。<br />
-加算後のカウンタ値を取得してmaxクエリーに変換してサーバ間同期が行われるので、サーバ間のキャッシュ不整合が発生しない。<br />
-DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行わる。その間サーバは終了できない。<br />
+加算後のカウンタ値を取得してmax()メソッドでの更新に変換してサーバ間同期が行われるので、サーバ間のキャッシュ不整合が発生しない。<br />
+DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行われる。その間サーバは終了できない。<br />
 リレーションのデータは保存されない。</p>
 <h2 id="upsert_delayed"><a class="header" href="#upsert_delayed">upsert_delayed</a></h2>
 <p>「いいね！」のチェックを想定しており、複数のページへの同一のUPDATEクエリーをまとめて実行される。<br />
 save_delayed ではそれぞれの主キーごとに1クエリーを必要とするが、upsert_delayed では主キーをIN句にまとめるため効率が良い。
-アクセスカウンタにも使用可能であるが、maxクエリーへの変換が行われないので、データを取得するタイミングと加算するタイミングによりサーバ間のキャッシュ不整合が発生する可能性がある。 
-DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行わる。その間サーバは終了できない。<br />
+アクセスカウンタにも使用可能であるが、max()メソッドでの更新への変換が行われないので、データを取得するタイミングと加算するタイミングによりサーバ間のキャッシュ不整合が発生する可能性がある。 
+DBとの接続が切れている場合はディスクに保存せず、繰り返し再実行が行われる。その間サーバは終了できない。<br />
 リレーションのデータは保存されない。</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="リレーション"><a class="header" href="#リレーション">リレーション</a></h1>
-<p>取得時にJOINでのリレーション取得は行わず、eager loading のようにクエリー実行後に主キーをまとめてリレーション先からIN句を使用したクエリーで取得します。</p>
+<p>取得時にJOINでのリレーション取得は行わず、クエリー実行後に対象の主キーをまとめて、リレーション先からIN句を使用したクエリーで取得します。</p>
 <h2 id="リレーションの取得"><a class="header" href="#リレーションの取得">リレーションの取得</a></h2>
 <p>取得したオブジェクトや更新用オブジェクト、あるいは Vec&lt;_{モデル名}&gt; などに fetch_{リレーション名} のメソッドを使用すると、そのオブジェクトやリストに必要なリレーションを一回のクエリで取得してそれぞれ元のオブジェクトに保存します。</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -1111,7 +1176,8 @@ v.fetch_{3世代目リレーション名}(&amp;mut conn).await?;
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ドメイン"><a class="header" href="#ドメイン">ドメイン</a></h1>
 <p>ORMのモデル層としてはカスタマイズ用の note.rs にロジックを実装したくなるところですが、自動生成されたクレートのビルドに非常に時間がかかるので、別途ドメイン用のクレートを用意してそちらにビジネスロジックを実装します。<br />
 単純な方法としてはビジネスロジックのトレイトを定義して _Note にトレイトの実装を行うことで、 _Note にメソッドが追加されたように扱うことができます。<br />
-クリーンアーキテクチャの場合はモデルとテーブルの乖離が大きいので、 _Note をそのまま使用することはせず、 Note などの名前で新しい構造体を定義してデータの詰替などを実装する必要があると考えられます。</p>
+クリーンアーキテクチャの場合はモデルとテーブルの乖離が大きいので、新しい構造体を定義してデータの詰替などを実装する必要があると考えられます。
+その際に _Note の代わりに Note などの名前で新しい構造体を定義すれば、名前が混乱することもなくクリーンに実装できると思われます。</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="テスト"><a class="header" href="#テスト">テスト</a></h1>
 <p>テストはテストDB接続URLで指定されたDBで実行されます。<br />
 start_test()の呼び出しでデータベースは初期化されマイグレーションが実行されます。<br />
@@ -1136,8 +1202,9 @@ mod tests {
 <div style="break-before: page; page-break-before: always;"></div><h1 id="その他"><a class="header" href="#その他">その他</a></h1>
 <p>その他の項目として下記について説明します。</p>
 <ul>
-<li>ロガー</li>
-<li>リンカー</li>
+<li><a href="logger.html">ロガー</a></li>
+<li><a href="session.html">セッション</a></li>
+<li><a href="linker.html">リンカー</a></li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ロガー"><a class="header" href="#ロガー">ロガー</a></h1>
 <p>senax-loggerは下記の特徴があります。</p>
@@ -1161,15 +1228,51 @@ mod tests {
 </span>senax_logger::init(Some(time::macros::offset!(+9)))?;
 <span class="boring">}
 </span></code></pre></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="セッション"><a class="header" href="#セッション">セッション</a></h1>
+<p>actix-web にはセッションのプラグインがあります。
+actix-web のサイトではクッキーにセッションの内容を保存するタイプのみ紹介されていますが、Redisを使用する場合のサンプルも実装されています。
+ただ、下記の問題がありました。</p>
+<ul>
+<li>ロックしていない</li>
+<li>TTLの更新が毎回か、更新があったときのみ</li>
+</ul>
+<p>1つ目のロックしていない問題について、PHPでは初期の頃からセッションの排他ロックがありました。
+ほぼ1ページが1アクセスの時代から排他ロックがあったのですが、現在では1ページの表示にAjaxで複数回APIを呼び出すことが多く、セッションの排他処理がないとタイミング依存の不具合が発生する可能性があります。</p>
+<p>2つ目のTTLの更新については、更新があったときのみのTTL延長では操作中に突然ログアウトしてしまう可能性がありますので、アクセスごとに毎回TTL更新する必要があります。ただ、より効率的な運用としては10分毎に1回などのほうがセッションタイムアウトまでの時間もほとんど影響がなく、サーバの負荷を下げることが出来ます。</p>
+<p>SenaXではキャッシュを使用することによって非常に高速に動作し、上記の問題を解決したセッションを提供します。</p>
+<ul>
+<li>排他ロックではなくCAS（Compare-and-Swap）を採用</li>
+<li>TTLの更新はTTL期間の1/64の時間経過後のアクセスで更新</li>
+</ul>
+<p>また、セッションの記録領域を base, login, debug の3種類に分けています。
+ログアウトしたときにセッション情報を破棄することがありますが、破棄する情報か否かをログアウト処理に個別に実装するのはあまりスマートではありませんので、ログインしている間だけ有効でログアウト時に破棄するデータを login 領域に保存してログアウト時にまとめて破棄を可能にし、破棄しない情報を base 領域に保存して破棄されないようにします。
+debug 領域は devプロファイルでのみ有効で、releaseプロファイルでは保存されず、参照は常に空になりますので、無駄な処理が実行されることがありません。</p>
+<p>次にセッションをDBに保存するとテーブルにユーザIDのカラムを追加しがちですが、ユーザIDのカラムが必要になりそうな機能の代替実装方法について説明します。</p>
+<ul>
+<li>
+<p>複数セッション同時アクセス禁止
+複数セッション同時アクセス禁止は、複数のユーザが同一アカウントを流用することによりライセンスに違反して利用できることを防ぐために行われます。
+実装としては、ユーザテーブルなどユーザIDが主キーのテーブルに現在ログインしているセッションIDを保存し、有効なセッションであることを確認するようにします。</p>
+</li>
+<li>
+<p>他のセッション無効化
+不正アクセスの疑いがある場合などにパスワード更新のタイミングで他のセッション無効化をすることがあります。
+実装としては、パスワードにバージョンをつけ、セッションにログイン時のパスワードのバージョンを保存し、アクセスのたびにチェックしてバージョンが変更されていないか確認します。
+また、何らかの事情でユーザのアクセス権限を剥奪する可能性がありますので、ユーザアカウントの有効性チェックはアクセスのたびに行うことが望ましいです。</p>
+</li>
+</ul>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="リンカー"><a class="header" href="#リンカー">リンカー</a></h1>
 <p>リンカーはキャッシュの更新内容をサーバ間に送信する中継器の役割を持ちます。<br />
 etcdが必要です。</p>
 <h2 id="インストール-1"><a class="header" href="#インストール-1">インストール</a></h2>
-<pre><code>cargo install senax-linker
+<p>etcd接続のため protobuf-compiler が必要となります。</p>
+<pre><code># apt-get install protobuf-compiler
+</code></pre>
+<pre><code># cargo install senax-linker
 </code></pre>
 <h2 id="自己認証局ファイル生成"><a class="header" href="#自己認証局ファイル生成">自己認証局ファイル生成</a></h2>
 <p>certsディレクトリの下に自己認証局に必要なファイルを生成します。</p>
-<pre><code>senax-linker --cert
+<pre><code>$ senax-linker --cert
 </code></pre>
 <h2 id="env設定"><a class="header" href="#env設定">.env設定</a></h2>
 <div class="table-wrapper"><table><thead><tr><th>パラメータ名</th><th>必須</th><th>説明</th></tr></thead><tbody>
@@ -1190,6 +1293,11 @@ etcdが必要です。</p>
 <tr><td>ETCD_KEY_PEM_FILE</td><td></td><td></td></tr>
 </tbody></table>
 </div>
+<h2 id="実行"><a class="header" href="#実行">実行</a></h2>
+<p>下記コマンド実行されますが、実際にはサービスとして起動する必要があります。</p>
+<pre><code>$ senax-linker
+</code></pre>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">

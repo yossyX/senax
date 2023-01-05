@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html" class="active"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.2.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html" class="active"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">13.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.3.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -154,7 +154,6 @@
 <li><a href="##/definitions/ConfigDef">properties/conf</a></li>
 <li><a href="##/definitions/EnumDef">properties/enum</a></li>
 <li><a href="##/definitions/ModelDef">properties/model</a></li>
-<li><a href="##/definitions/History">properties/history</a></li>
 </ul>
 <hr />
 <p><a id="#/definitions/ConfigDef"></a></p>
@@ -162,11 +161,12 @@
 <p>データベース設定</p>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
-<tr><td><strong>db_no</strong></td><td>integer</td><td>内部で使用されるデータベースナンバー。同一conf.ymlファイル内では自動生成の乱数で重複が発生しないが、設定ファイルが分かれる場合は重複を防ぐため指定できる。</td><td></td></tr>
+<tr><td><strong>db_no</strong></td><td>integer</td><td>リンカーで使用されるデータベースナンバー　自動生成では毎回現在時刻が使用されるので、強制上書き時に固定する場合に指定する</td><td></td></tr>
 <tr><td><strong>db</strong></td><td><a href="##/definitions/DbType">DbType</a></td><td>使用するDB。現在のところmysqlのみ対応</td><td>Yes</td></tr>
 <tr><td><strong>title</strong></td><td>string</td><td>仕様書等のためのタイトル</td><td></td></tr>
 <tr><td><strong>author</strong></td><td>string</td><td>仕様書等のための著者</td><td></td></tr>
 <tr><td><strong>ignore_foreign_key</strong></td><td>boolean</td><td>falseの場合は外部キー制約をDDLに出力しない</td><td></td></tr>
+<tr><td><strong>plural_table_name</strong></td><td>boolean</td><td>テーブル名を複数形にする</td><td></td></tr>
 <tr><td><strong>timestampable</strong></td><td><a href="##/definitions/Timestampable">Timestampable</a></td><td>デフォルトのタイムスタンプ設定</td><td></td></tr>
 <tr><td><strong>time_zone</strong></td><td><a href="##/definitions/TimeZone">TimeZone</a></td><td>日時型のデフォルトのタイムゾーン設定</td><td></td></tr>
 <tr><td><strong>timestamp_time_zone</strong></td><td><a href="##/definitions/TimeZone">TimeZone</a></td><td>created_at, updated_at, deleted_atに使用されるタイムゾーン</td><td></td></tr>
@@ -174,6 +174,10 @@
 <tr><td><strong>use_cache</strong></td><td>boolean</td><td>キャッシュ使用のデフォルト設定</td><td></td></tr>
 <tr><td><strong>use_fast_cache</strong></td><td>boolean</td><td>高速キャッシュ使用設定（experimental）</td><td></td></tr>
 <tr><td><strong>use_cache_all</strong></td><td>boolean</td><td>全キャッシュ使用のデフォルト設定</td><td></td></tr>
+<tr><td><strong>use_insert_delayed</strong></td><td>boolean</td><td>遅延INSERTを使用する</td><td></td></tr>
+<tr><td><strong>use_save_delayed</strong></td><td>boolean</td><td>遅延SAVEを使用する</td><td></td></tr>
+<tr><td><strong>use_update_delayed</strong></td><td>boolean</td><td>遅延UPDATEを使用する</td><td></td></tr>
+<tr><td><strong>use_upsert_delayed</strong></td><td>boolean</td><td>遅延UPSERTを使用する</td><td></td></tr>
 <tr><td><strong>tx_isolation</strong></td><td><a href="##/definitions/Isolation">Isolation</a></td><td>更新トランザクション分離レベル</td><td></td></tr>
 <tr><td><strong>read_tx_isolation</strong></td><td><a href="##/definitions/Isolation">Isolation</a></td><td>参照トランザクション分離レベル</td><td></td></tr>
 <tr><td><strong>engine</strong></td><td>string</td><td>MySQLのストレージエンジン</td><td></td></tr>
@@ -232,8 +236,10 @@
 <h2 id="group-def"><a class="header" href="#group-def">Group Def</a></h2>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
-<tr><td><strong>title</strong></td><td>string</td><td></td><td>Yes</td></tr>
-<tr><td><strong>type</strong></td><td><a href="##/definitions/GroupType">GroupType</a></td><td></td><td></td></tr>
+<tr><td><strong>type</strong></td><td><a href="##/definitions/GroupType">GroupType</a></td><td></td><td>Yes</td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>models</strong></td><td>Map&lt;property, <a href="##/definitions/ModelDef">ModelDef</a>&gt;</td><td></td><td></td></tr>
+<tr><td><strong>enums</strong></td><td>Map&lt;property, <a href="##/definitions/EnumDef">EnumDef</a>&gt;</td><td></td><td></td></tr>
 </tbody></table>
 </div>
 <hr />
@@ -244,28 +250,6 @@
 <li><code>model</code>(モデル定義)</li>
 <li><code>enum</code>(列挙型定義のみ)</li>
 </ul>
-<hr />
-<p><a id="#/definitions/EnumDef"></a></p>
-<h2 id="enum-def"><a class="header" href="#enum-def">Enum Def</a></h2>
-<p><strong>Properties</strong></p>
-<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
-<tr><td><strong>title</strong></td><td>string</td><td>タイトル</td><td></td></tr>
-<tr><td><strong>comment</strong></td><td>string</td><td>コメント</td><td></td></tr>
-<tr><td><strong>enum_values</strong></td><td>Array&lt;<a href="##/definitions/EnumValue">EnumValue</a>&gt;</td><td>列挙値</td><td>Yes</td></tr>
-<tr><td><strong>mod_name</strong></td><td>string</td><td>列挙子の名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
-</tbody></table>
-</div>
-<hr />
-<p><a id="#/definitions/EnumValue"></a></p>
-<h2 id="enum-value"><a class="header" href="#enum-value">Enum Value</a></h2>
-<p><strong>Properties</strong></p>
-<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
-<tr><td><strong>name</strong></td><td>string</td><td></td><td>Yes</td></tr>
-<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
-<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
-<tr><td><strong>value</strong></td><td>integer</td><td>0～255の値</td><td>Yes</td></tr>
-</tbody></table>
-</div>
 <hr />
 <p><a id="#/definitions/ModelDef"></a></p>
 <h2 id="model-def"><a class="header" href="#model-def">Model Def</a></h2>
@@ -284,6 +268,10 @@
 <tr><td><strong>use_cache</strong></td><td>boolean</td><td>キャッシュを使用するか</td><td></td></tr>
 <tr><td><strong>use_fast_cache</strong></td><td>boolean</td><td>高速キャッシュを使用するか(experimental)</td><td></td></tr>
 <tr><td><strong>use_cache_all</strong></td><td>boolean</td><td>全キャッシュを使用するか</td><td></td></tr>
+<tr><td><strong>use_insert_delayed</strong></td><td>boolean</td><td>遅延INSERTを使用する</td><td></td></tr>
+<tr><td><strong>use_save_delayed</strong></td><td>boolean</td><td>遅延SAVEを使用する</td><td></td></tr>
+<tr><td><strong>use_update_delayed</strong></td><td>boolean</td><td>遅延UPDATEを使用する</td><td></td></tr>
+<tr><td><strong>use_upsert_delayed</strong></td><td>boolean</td><td>遅延UPSERTを使用する</td><td></td></tr>
 <tr><td><strong>ignore_propagated_insert_cache</strong></td><td>boolean</td><td>他サーバでinsertされたデータをキャッシュするか</td><td></td></tr>
 <tr><td><strong>on_delete_fn</strong></td><td>boolean</td><td>物理削除時の_before_deleteと_after_deleteの呼び出しを行うか</td><td></td></tr>
 <tr><td><strong>abstract</strong></td><td>boolean</td><td>抽象化モード</td><td></td></tr>
@@ -292,6 +280,7 @@
 <tr><td><strong>character_set</strong></td><td>string</td><td>文字セット</td><td></td></tr>
 <tr><td><strong>collate</strong></td><td>string</td><td>文字セット照合順序</td><td></td></tr>
 <tr><td><strong>mod_name</strong></td><td>string</td><td>名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
+<tr><td><strong>act_as</strong></td><td><a href="##/definitions/ActAs">ActAs</a></td><td>機能追加</td><td></td></tr>
 <tr><td><strong>columns</strong></td><td>Map&lt;property, <a href="##/definitions/ColumnTypeOrDef">ColumnTypeOrDef</a>&gt;</td><td>カラム</td><td></td></tr>
 <tr><td><strong>relations</strong></td><td>Map&lt;property, <a href="##/definitions/RelDef">RelDef</a>&gt;</td><td>リレーション</td><td></td></tr>
 <tr><td><strong>indexes</strong></td><td>Map&lt;property, <a href="##/definitions/IndexDef">IndexDef</a>&gt;</td><td>インデックス</td><td></td></tr>
@@ -317,6 +306,14 @@
 <li><code>concrete</code>(具象テーブル継承 子クラスごとに共通のカラムとそれぞれのモデルのカラムをすべて含んだ状態で独立したテーブルを作成する)</li>
 <li><code>column_aggregation</code>(カラム集約テーブル継承 単一テーブル継承と似ているが、型を特定するための _type カラムがある)</li>
 </ul>
+<hr />
+<p><a id="#/definitions/ActAs"></a></p>
+<h2 id="actas-definition"><a class="header" href="#actas-definition">ActAs Definition</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>session</strong></td><td>boolean</td><td>セッションDBとして使用</td><td></td></tr>
+</tbody></table>
+</div>
 <hr />
 <p><a id="#/definitions/ColumnTypeOrDef"></a></p>
 <h2 id="column-type-or-def"><a class="header" href="#column-type-or-def">Column Type Or Def</a></h2>
@@ -390,6 +387,17 @@
 <ul>
 <li><code>auto</code></li>
 </ul>
+<hr />
+<p><a id="#/definitions/EnumValue"></a></p>
+<h2 id="enum-value"><a class="header" href="#enum-value">Enum Value</a></h2>
+<p><strong>Properties</strong></p>
+<div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
+<tr><td><strong>name</strong></td><td>string</td><td></td><td>Yes</td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>value</strong></td><td>integer</td><td>0～255の値</td><td>Yes</td></tr>
+</tbody></table>
+</div>
 <hr />
 <p><a id="#/definitions/DbEnumValue"></a></p>
 <h2 id="db-enum-value"><a class="header" href="#db-enum-value">DB Enum Value</a></h2>
@@ -527,15 +535,14 @@
 <li><code>mecab</code></li>
 </ul>
 <hr />
-<p><a id="#/definitions/History"></a></p>
-<h2 id="history"><a class="header" href="#history">History</a></h2>
-<p>更新履歴</p>
+<p><a id="#/definitions/EnumDef"></a></p>
+<h2 id="enum-def"><a class="header" href="#enum-def">Enum Def</a></h2>
 <p><strong>Properties</strong></p>
 <div class="table-wrapper"><table><thead><tr><th></th><th>Type</th><th>Description</th><th>Required</th></tr></thead><tbody>
-<tr><td><strong>date</strong></td><td>string</td><td>更新日</td><td>Yes</td></tr>
-<tr><td><strong>description</strong></td><td>string</td><td>変更内容</td><td>Yes</td></tr>
-<tr><td><strong>author</strong></td><td>string</td><td>担当者</td><td></td></tr>
-<tr><td><strong>version</strong></td><td>string</td><td>バージョン</td><td></td></tr>
+<tr><td><strong>title</strong></td><td>string</td><td>タイトル</td><td></td></tr>
+<tr><td><strong>comment</strong></td><td>string</td><td>コメント</td><td></td></tr>
+<tr><td><strong>enum_values</strong></td><td>Array&lt;<a href="##/definitions/EnumValue">EnumValue</a>&gt;</td><td>列挙値</td><td>Yes</td></tr>
+<tr><td><strong>mod_name</strong></td><td>string</td><td>列挙子の名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
 </tbody></table>
 </div>
                     </main>

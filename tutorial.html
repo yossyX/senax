@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html" class="active"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> クエリー</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.2.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html" class="active"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">13.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.3.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -151,39 +151,44 @@
                     <main>
                         <h1 id="チュートリアル"><a class="header" href="#チュートリアル">チュートリアル</a></h1>
 <h2 id="インストール"><a class="header" href="#インストール">インストール</a></h2>
-<pre><code>cargo install senax
-</code></pre>
-<p>graphviz と protobuf-compiler が必要となります。</p>
-<pre><code>apt-get install graphviz protobuf-compiler
+<pre><code># cargo install senax
 </code></pre>
 <h2 id="初期ファイル"><a class="header" href="#初期ファイル">初期ファイル</a></h2>
 <p>初期ディレクトリ構成の参考のため、 https://github.com/yossyX/senax から examples/actix のコードを展開してください。
-とりあえず actix-web を使用していますが、tonic や hyper 等でも対応できるはずです。
-また、消費メモリの計算は mimalloc を使用することを想定しています。</p>
+とりあえずWebフレームワークとしては actix-web を使用しています。
+tonic や hyper 等でも対応できるようにしたいと思いますが、動作は未確認です。
+非同期ランタイムが tokio をそのまま利用しているとasyncブロックが Send である必要があり、その場合 SenaX は動作しません。
+actix-web は tokio 上で動作していますが、非同期については !Send で動作するスレッドごとの動作になっています。
+また、内部での消費メモリの計算はメモリアロケータとして mimalloc を使用することを想定しています。</p>
+<h2 id="envファイル"><a class="header" href="#envファイル">envファイル</a></h2>
+<pre><code>$ cp .env.sample .env
+</code></pre>
+<p>.envのSAMPLE_DB_URLなどのDB設定を必要に応じて変更してください。</p>
 <h2 id="スキーマファイル"><a class="header" href="#スキーマファイル">スキーマファイル</a></h2>
-<p>schema/conf.yml</p>
-<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/conf
+<p>スキーマファイルは基本的には設定ファイルとグループごとのモデル記述ファイルに分けて記述します。
+シンプルなケースでは設定ファイル内にまとめて記述することもできます。</p>
+<p>schema/sample.yml</p>
+<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#definitions/ConfigDef
 
-sample:
-  title: Sample DB
-  author: author name
-  db: mysql
-  ignore_foreign_key: true
-  timestampable: real_time
-  time_zone: local
-  timestamp_time_zone: utc
-  tx_isolation: read_committed
-  read_tx_isolation: repeatable_read
-  use_cache: true
-  use_fast_cache: true
-  use_cache_all: true
-  preserve_column_order: true
-  groups:
-    note:
-      title: note
+title: Sample DB
+author: author name
+db: mysql
+ignore_foreign_key: true
+timestampable: real_time
+time_zone: local
+timestamp_time_zone: utc
+tx_isolation: read_committed
+read_tx_isolation: repeatable_read
+use_cache: true
+use_fast_cache: true
+use_cache_all: true
+preserve_column_order: true
+groups:
+  note:
+    title: note
 </code></pre>
 <p>複数のデータベース設定のための設定ファイルです。<br />
-yaml-language-serverの設定はVSCodeであればYAMLのプラグインで入力時にアシスタントが効きます。</p>
+yaml-language-serverの設定はVSCodeであればYAMLのプラグインを使用することにより、入力時にアシスタントが効きます。</p>
 <p>トップのsampleはDBのデータベース名です。<br />
 dbはまだMySQLしか対応していません。<br />
 tx_isolationとread_tx_isolationは更新用と参照用のデータベースの接続を分けて、それぞれread_committedとrepeatable_readにしています。<br />
@@ -191,7 +196,7 @@ MySQLはデフォルトでrepeatable_readですが、負荷がかかると結構
 参照時のトランザクションはMySQLでは最初にテーブルにアクセスしたときにすべてのテーブルのスナップショットを取得するのでrepeatable_readが安全です。<br />
 groupsは一つのデータベースに数百のテーブルがあるとディレクトリツリーが長くなったり管理が困ることになりますので、1階層分グループ分けできるようになっています。</p>
 <p>schema/sample/note.yml</p>
-<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.1/schema.json#properties/model
+<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#properties/model
 
 note:
   timestampable: fixed_time
@@ -226,7 +231,7 @@ note:
       type: fulltext
       parser: ngram
 
-tags:
+tag:
   columns:
     id:
       type: int
@@ -237,7 +242,7 @@ tags:
   relations:
     note:
 
-categories:
+category:
   columns:
     id:
       type: int
@@ -245,9 +250,10 @@ categories:
       auto_increment: auto
     name: varchar_not_null
 
-counters:
+counter:
   counting: counter
   timestampable: none
+  use_save_delayed: true
   columns:
     note_id:
       type: int
@@ -260,30 +266,37 @@ counters:
     note:
 </code></pre>
 <p>グループ内のテーブルの設定ファイルです。<br />
-Symfony 1.xのdoctrine/schema.ymlに近いイメージです。<br />
-テーブル名がマルチバイト文字や複数形にも対応しています。categories テーブルはノートのrelationsのcategoryと紐づいていますが、relationsの方はtypeがデフォルトでoneなので単数形で自動的に紐づきます。<br />
-ちなみに、 Doctrine の inheritance も一通り対応しています。</p>
+Symfony 1.x の doctrine/schema.yml に近いイメージです。<br />
+テーブル名がマルチバイト文字や複数形にも対応しています。
+note モデルは tag と紐づいていますが、 relations の type が many では複数形の tags で自動的に紐づきます。</p>
+<p>ちなみに、 Doctrine の inheritance も一通り対応しています。</p>
+<p>セッション用の設定ファイルをダウンロードします。</p>
+<pre><code>$ wget -O schema/session.yml https://github.com/yossyX/senax/releases/latest/download/session.yml
+</code></pre>
 <h2 id="モデル生成"><a class="header" href="#モデル生成">モデル生成</a></h2>
+<p>senaxのコマンドでdb/sample下にクレートを生成します。</p>
 <pre><code>$ senax model sample
+$ senax model session
 </code></pre>
-<p>senaxのコマンドでdb/sample下にクレートを生成します。<br />
-note.rs等はカスタマイズ用で、_note.rsが本体です。再度モデル生成を実行するとnote.rsは上書きされず、_note.rsは常に上書きされます。<br />
-モデル名が_Tagsのように_が付くのは他のライブラリと被らないようにそのような命名規則にしています。</p>
+<p>note.rs等はカスタマイズ用で、_note.rsが本体です。再度モデル生成を実行するとnote.rsは上書きされず、_note.rsは常に上書きされます。<br />
+モデル名が_Tagsのように_が付くのは他のライブラリと被らないようにそのような命名規則になっています。<br />
+Dockerでの開発環境でVS Code等を使用していてモデルの再生成後に変更が反映されていない場合は、ウィンドウの再読み込みや生成されたモデルのファイルをVS Code上で再度保存するなどしてモデルの更新をVS Codeに認識させる必要があります。</p>
 <h2 id="マイグレーション生成"><a class="header" href="#マイグレーション生成">マイグレーション生成</a></h2>
+<p>db/sample/migrations下にDDLファイルを生成します。</p>
 <pre><code>$ senax gen-migrate sample init
+$ senax gen-migrate session init
 </code></pre>
-<p>db/sample/migrations下にDDLファイルを生成します。<br />
-DDLは現状のDBを確認して差分を出力します。<br />
-コマンド実行前に .env の SAMPLE_DB_URL で指定されたデータベースを作成しておいてください。</p>
-<p>※ テーブル名はデフォルトでグループ名とモデル名を結合した名前になります。変更する場合はスキーマで table_name を指定してください。</p>
+<p>DDLは現状のDBを確認して差分を出力します。<br />
+DB仕様書の更新履歴出力のためにコメント部分に更新内容が出力されています。コメントの追加や不要な更新内容を削除して仕様書に出力される更新内容を変更することができます。</p>
+<p>※ テーブル名はデフォルトでグループ名とモデル名を結合した名前になります。変更する場合はスキーマで table_name を指定してください。
+また、 plural_table_name の設定でテーブル名を複数形で生成することが出来ます。</p>
 <h2 id="マイグレーション実行"><a class="header" href="#マイグレーション実行">マイグレーション実行</a></h2>
-<pre><code>$ cargo run -p db_sample -- migrate
-</code></pre>
-<p>もしくは、</p>
-<pre><code>$ target/debug/db_sample migrate
+<pre><code>$ cargo run -p db_sample -- migrate -c
+$ cargo run -p db_session -- migrate -c
 </code></pre>
 <p>sqlxのマイグレーションを実行します。
-シャーディング設定がある場合すべてのシャードにクエリーを発行するようになっています。</p>
+シャーディング設定がある場合すべてのシャードにクエリーを発行するようになっています。<br />
+-c はクリーンマイグレーションで、DBを作成してからマイグレーションを実行します。</p>
 <h2 id="シードスキーマ生成"><a class="header" href="#シードスキーマ生成">シードスキーマ生成</a></h2>
 <pre><code>$ cargo run -p db_sample -- gen-seed-schema &gt; db/sample/seed-schema.json
 </code></pre>
@@ -296,11 +309,11 @@ DDLは現状のDBを確認して差分を出力します。<br />
 </code></pre>
 <p>シードファイルもマイグレーションと同様にDBに登録済みかのバージョン管理を行いますので、コマンドでシードファイルを生成します。</p>
 <h2 id="シードファイル記述"><a class="header" href="#シードファイル記述">シードファイル記述</a></h2>
-<p>db/sample/seeds/20221120120831_init.yml</p>
+<p>db/sample/seeds/20221120120831_init.yml (数値部分は生成日時によって変化します。)</p>
 <pre><code class="language-yml"># yaml-language-server: $schema=../seed-schema.json
 
 note:
-  categories:
+  category:
     diary:
       name: diary
   note:
@@ -308,19 +321,23 @@ note:
       category_id: diary
       key: sample
       content: content
-  tags:
+  tag:
     tag_1:
       note_id: note_1
       name: tag 1
 </code></pre>
-<p>「diary」と「note_1」はそれぞれオートインクリメントで登録されたIDが渡されるようになっています。</p>
+<p>category_id の「diary」と note_id の「note_1」はそれぞれオートインクリメントで登録されたIDが渡されるようになっています。</p>
 <h2 id="シードデータ投入"><a class="header" href="#シードデータ投入">シードデータ投入</a></h2>
 <pre><code>$ cargo run -p db_sample -- seed
 </code></pre>
-<h2 id="テーブル定義書生成"><a class="header" href="#テーブル定義書生成">テーブル定義書生成</a></h2>
-<pre><code>$ senax gen-db-doc sample -e &gt; db-document.html
+<h2 id="dbテーブル定義書生成"><a class="header" href="#dbテーブル定義書生成">DBテーブル定義書生成</a></h2>
+<p>DB仕様書のER図出力のために graphviz が必要となります。</p>
+<pre><code># apt-get install graphviz
 </code></pre>
-<p>環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。</p>
+<pre><code>$ senax gen-db-doc sample -e -H 10 &gt; db-document.html
+</code></pre>
+<p>環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。
+&quot;-e&quot;はER図出力、&quot;-H 10&quot;は仕様書更新履歴を10件分出力します。</p>
 <h2 id="コード記述"><a class="header" href="#コード記述">コード記述</a></h2>
 <p>_Noteを取得して日毎のカウンターを加算しています。
 save_delayedではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。</p>
@@ -328,9 +345,31 @@ save_delayedではこの処理が終わった後で同一の更新対象をま�
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[get(&quot;/cache/{key}&quot;)]
-async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl Responder {
+async fn handler(
+    key: web::Path&lt;String&gt;,
+    http_req: HttpRequest,
+    session: Session&lt;_SessionStore&gt;,
+) -&gt; impl Responder {
     let ctx = get_ctx_and_log(&amp;http_req);
     let result = async move {
+        // セッションの更新例
+        let session_count = session
+            .update(|s| {
+                let v: Option&lt;u64&gt; = s.get_from_base(SESSION_KEY)?;
+                match v {
+                    Some(mut v) =&gt; {
+                        v += 1;
+                        s.insert_to_base(SESSION_KEY, v)?;
+                        Ok(v)
+                    }
+                    None =&gt; {
+                        s.insert_to_base(SESSION_KEY, 1)?;
+                        Ok(1)
+                    }
+                }
+            })
+            .await?;
+
         let mut conn = SampleConn::new();
         let mut note = _Note::find_by_key_from_cache(&amp;conn, &amp;*key) // ユニークキーからのキャシュ取得
             .await
@@ -343,9 +382,9 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
         };
 
         let date = Local::now().date_naive();
-        let counter = _Counters::find_optional_from_cache(&amp;conn, (note.id(), date)).await?;
+        let counter = _Counter::find_optional_from_cache(&amp;conn, (note.id(), date)).await?;
         let count = counter.map(|v| v.counter()).unwrap_or_default() + 1; // ここまではキャッシュから当日のカウント取得
-        let mut counter_for_update = _CountersFactory { // 当日のカウントが未登録の場合 INSERT
+        let mut counter_for_update = _CounterFactory { // 当日のカウントが未登録の場合 INSERT
             note_id: note.id(),
             date,
             counter: 0,
@@ -353,7 +392,7 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
         .create(&amp;conn);
         let _ = counter_for_update.counter().add(1); // UPDATE加算
         counter_for_update._upsert(); // INSERT ... ON DUPLICATE KEY UPDATE の指示
-        _Counters::save_delayed(&amp;mut conn, counter_for_update).await?;
+        _Counter::update_delayed(&amp;mut conn, counter_for_update).await?;
 
         Ok(Response {
             id: note.id(),
@@ -373,7 +412,11 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[get(&quot;/no_cache/{key}&quot;)]
-async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl Responder {
+async fn handler(
+    key: web::Path&lt;String&gt;,
+    http_req: HttpRequest,
+    session: Session&lt;_SessionStore&gt;,
+) -&gt; impl Responder {
     let ctx = get_ctx_and_log(&amp;http_req);
     let result = async move {
         let mut conn = SampleConn::new();
@@ -388,15 +431,15 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
             Some(v) =&gt; Some(v.name().to_owned()),
         };
         let date = Local::now().date_naive();
-        let counter = _Counters::find_optional(&amp;mut conn, (note.id(), date)).await?;
+        let counter = _Counter::find_optional(&amp;mut conn, (note.id(), date)).await?;
         let count = counter.map(|v| v.counter()).unwrap_or_default() + 1;
 
         let note_id = note.id();
-        let cond = db_sample::cond_note_counters!((note_id=note_id) AND (date=date));
+        let cond = db_sample::cond_note_counter!((note_id=note_id) AND (date=date)); // WHERE句を生成するマクロ
         conn.begin().await?;
-        let mut update = _Counters::for_update(&amp;mut conn);
+        let mut update = _Counter::for_update(&amp;mut conn); // 更新内容を指定するための空のUpdate用オブジェクト生成
         let _ = update.counter().add(1);
-        _Counters::query()
+        _Counter::query()
             .cond(cond)
             .update(&amp;mut conn, update)
             .await?;
@@ -415,6 +458,18 @@ async fn handler(key: web::Path&lt;String&gt;, http_req: HttpRequest) -&gt; impl
 }
 <span class="boring">}
 </span></code></pre></pre>
+<p>この例ではWHERE句の使用例のため、UPDATEクエリーで記述しています。
+また、簡略化のため当日のカウンターが未登録の場合を考慮していません。<br />
+upsert を使用すれば未登録の場合は登録、すでに登録されている場合は更新を実行できます。</p>
+<h2 id="サーバ起動"><a class="header" href="#サーバ起動">サーバ起動</a></h2>
+<pre><code>$ cargo run -p server
+</code></pre>
+<p>http://localhost:8080/api/cache/sample にアクセスして結果を確認できます。</p>
+<p>本番環境ではリリースモードでビルドして起動します。</p>
+<pre><code>$ cargo build -p server -r
+$ target/release/server
+</code></pre>
+<p>チュートリアル用のサンプルですが、ホットデプロイにも対応しています。</p>
 
                     </main>
 
