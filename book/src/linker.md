@@ -4,14 +4,19 @@
 etcdが必要です。
 
 ## インストール
+etcd接続のため protobuf-compiler が必要となります。
 ```
-cargo install senax-linker
+# apt-get install protobuf-compiler
+```
+
+```
+# cargo install senax-linker
 ```
 
 ## 自己認証局ファイル生成
 certsディレクトリの下に自己認証局に必要なファイルを生成します。
 ```
-senax-linker --cert
+$ senax-linker --cert
 ```
 
 ## .env設定
@@ -34,3 +39,8 @@ senax-linker --cert
 |ETCD_CERT_PEM_FILE|||
 |ETCD_KEY_PEM_FILE|||
 
+## 実行
+下記コマンド実行されますが、実際にはサービスとして起動する必要があります。
+```
+$ senax-linker
+```

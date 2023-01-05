@@ -4,7 +4,6 @@
 * [properties/conf](##/definitions/ConfigDef)
 * [properties/enum](##/definitions/EnumDef)
 * [properties/model](##/definitions/ModelDef)
-* [properties/history](##/definitions/History)
 
 ---------------------------------------
 <a id="#/definitions/ConfigDef"></a>
@@ -16,11 +15,12 @@
 
 |   |Type|Description|Required|
 |---|---|---|---|
-|**db_no**|integer|内部で使用されるデータベースナンバー。同一conf.ymlファイル内では自動生成の乱数で重複が発生しないが、設定ファイルが分かれる場合は重複を防ぐため指定できる。||
+|**db_no**|integer|リンカーで使用されるデータベースナンバー　自動生成では毎回現在時刻が使用されるので、強制上書き時に固定する場合に指定する||
 |**db**|[DbType](##/definitions/DbType)|使用するDB。現在のところmysqlのみ対応|Yes|
 |**title**|string|仕様書等のためのタイトル||
 |**author**|string|仕様書等のための著者||
 |**ignore_foreign_key**|boolean|falseの場合は外部キー制約をDDLに出力しない||
+|**plural_table_name**|boolean|テーブル名を複数形にする||
 |**timestampable**|[Timestampable](##/definitions/Timestampable)|デフォルトのタイムスタンプ設定||
 |**time_zone**|[TimeZone](##/definitions/TimeZone)|日時型のデフォルトのタイムゾーン設定||
 |**timestamp_time_zone**|[TimeZone](##/definitions/TimeZone)|created_at, updated_at, deleted_atに使用されるタイムゾーン||
@@ -28,6 +28,10 @@
 |**use_cache**|boolean|キャッシュ使用のデフォルト設定||
 |**use_fast_cache**|boolean|高速キャッシュ使用設定（experimental）||
 |**use_cache_all**|boolean|全キャッシュ使用のデフォルト設定||
+|**use_insert_delayed**|boolean|遅延INSERTを使用する||
+|**use_save_delayed**|boolean|遅延SAVEを使用する||
+|**use_update_delayed**|boolean|遅延UPDATEを使用する||
+|**use_upsert_delayed**|boolean|遅延UPSERTを使用する||
 |**tx_isolation**|[Isolation](##/definitions/Isolation)|更新トランザクション分離レベル||
 |**read_tx_isolation**|[Isolation](##/definitions/Isolation)|参照トランザクション分離レベル||
 |**engine**|string|MySQLのストレージエンジン||
@@ -109,8 +113,10 @@
 
 |   |Type|Description|Required|
 |---|---|---|---|
-|**title**|string||Yes|
-|**type**|[GroupType](##/definitions/GroupType)|||
+|**type**|[GroupType](##/definitions/GroupType)||Yes|
+|**title**|string|||
+|**models**|Map<property, [ModelDef](##/definitions/ModelDef)>|||
+|**enums**|Map<property, [EnumDef](##/definitions/EnumDef)>|||
 ---------------------------------------
 <a id="#/definitions/GroupType"></a>
 ## Group Type
@@ -123,34 +129,6 @@
 * `model`(モデル定義)
 * `enum`(列挙型定義のみ)
 
----------------------------------------
-<a id="#/definitions/EnumDef"></a>
-## Enum Def
-
-
-
-**Properties**
-
-|   |Type|Description|Required|
-|---|---|---|---|
-|**title**|string|タイトル||
-|**comment**|string|コメント||
-|**enum_values**|Array<[EnumValue](##/definitions/EnumValue)>|列挙値|Yes|
-|**mod_name**|string|列挙子の名前にマルチバイトを使用した場合のmod名||
----------------------------------------
-<a id="#/definitions/EnumValue"></a>
-## Enum Value
-
-
-
-**Properties**
-
-|   |Type|Description|Required|
-|---|---|---|---|
-|**name**|string||Yes|
-|**title**|string|||
-|**comment**|string|||
-|**value**|integer|0～255の値|Yes|
 ---------------------------------------
 <a id="#/definitions/ModelDef"></a>
 ## Model Def
@@ -174,6 +152,10 @@
 |**use_cache**|boolean|キャッシュを使用するか||
 |**use_fast_cache**|boolean|高速キャッシュを使用するか(experimental)||
 |**use_cache_all**|boolean|全キャッシュを使用するか||
+|**use_insert_delayed**|boolean|遅延INSERTを使用する||
+|**use_save_delayed**|boolean|遅延SAVEを使用する||
+|**use_update_delayed**|boolean|遅延UPDATEを使用する||
+|**use_upsert_delayed**|boolean|遅延UPSERTを使用する||
 |**ignore_propagated_insert_cache**|boolean|他サーバでinsertされたデータをキャッシュするか||
 |**on_delete_fn**|boolean|物理削除時の_before_deleteと_after_deleteの呼び出しを行うか||
 |**abstract**|boolean|抽象化モード||
@@ -182,6 +164,7 @@
 |**character_set**|string|文字セット||
 |**collate**|string|文字セット照合順序||
 |**mod_name**|string|名前にマルチバイトを使用した場合のmod名||
+|**act_as**|[ActAs](##/definitions/ActAs)|機能追加||
 |**columns**|Map<property, [ColumnTypeOrDef](##/definitions/ColumnTypeOrDef)>|カラム||
 |**relations**|Map<property, [RelDef](##/definitions/RelDef)>|リレーション||
 |**indexes**|Map<property, [IndexDef](##/definitions/IndexDef)>|インデックス||
@@ -212,6 +195,17 @@
 * `concrete`(具象テーブル継承 子クラスごとに共通のカラムとそれぞれのモデルのカラムをすべて含んだ状態で独立したテーブルを作成する)
 * `column_aggregation`(カラム集約テーブル継承 単一テーブル継承と似ているが、型を特定するための _type カラムがある)
 
+---------------------------------------
+<a id="#/definitions/ActAs"></a>
+## ActAs Definition
+
+
+
+**Properties**
+
+|   |Type|Description|Required|
+|---|---|---|---|
+|**session**|boolean|セッションDBとして使用||
 ---------------------------------------
 <a id="#/definitions/ColumnTypeOrDef"></a>
 ## Column Type Or Def
@@ -300,6 +294,20 @@
 
 * `auto`
 
+---------------------------------------
+<a id="#/definitions/EnumValue"></a>
+## Enum Value
+
+
+
+**Properties**
+
+|   |Type|Description|Required|
+|---|---|---|---|
+|**name**|string||Yes|
+|**title**|string|||
+|**comment**|string|||
+|**value**|integer|0～255の値|Yes|
 ---------------------------------------
 <a id="#/definitions/DbEnumValue"></a>
 ## DB Enum Value
@@ -473,17 +481,17 @@
 * `mecab`
 
 ---------------------------------------
-<a id="#/definitions/History"></a>
-## History
+<a id="#/definitions/EnumDef"></a>
+## Enum Def
 
-更新履歴
+
 
 **Properties**
 
 |   |Type|Description|Required|
 |---|---|---|---|
-|**date**|string|更新日|Yes|
-|**description**|string|変更内容|Yes|
-|**author**|string|担当者||
-|**version**|string|バージョン||
+|**title**|string|タイトル||
+|**comment**|string|コメント||
+|**enum_values**|Array<[EnumValue](##/definitions/EnumValue)>|列挙値|Yes|
+|**mod_name**|string|列挙子の名前にマルチバイトを使用した場合のmod名||
 
