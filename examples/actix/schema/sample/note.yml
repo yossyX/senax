@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.2/schema.json#properties/model
+# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#properties/model
 
 note:
   timestampable: fixed_time
@@ -33,7 +33,7 @@ note:
       type: fulltext
       parser: ngram
 
-tags:
+tag:
   columns:
     id:
       type: int
@@ -44,7 +44,7 @@ tags:
   relations:
     note:
 
-categories:
+category:
   columns:
     id:
       type: int
@@ -52,9 +52,10 @@ categories:
       auto_increment: auto
     name: varchar_not_null
 
-counters:
+counter:
   counting: counter
   timestampable: none
+  use_save_delayed: true
   columns:
     note_id:
       type: int

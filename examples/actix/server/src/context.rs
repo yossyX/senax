@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::SystemTime;
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub struct Ctx {
     req_no: u64,
     time: SystemTime,
@@ -30,6 +31,7 @@ impl Ctx {
         self.req_no
     }
 
+    #[allow(dead_code)]
     pub fn time(&self) -> SystemTime {
         self.time
     }
@@ -45,6 +47,7 @@ impl Ctx {
             http_req.query_string());
     }
 
+    #[allow(dead_code)]
     pub fn log_with_data(&self, http_req: &HttpRequest, data: &impl fmt::Debug) {
         let time: DateTime<Local> = Local::now();
         let time = time.to_rfc3339_opts(chrono::SecondsFormat::Millis, false);

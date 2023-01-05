@@ -1,15 +1,16 @@
 use crate::context::Ctx;
 use crate::response::*;
-use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_web::{get, web, HttpRequest, Responder};
 #[allow(unused_imports)]
 use anyhow::{Context as _, Result};
 use chrono::Local;
-use db_sample::misc::ForUpdateTr;
-use db_sample::note::counters::*;
+use db_sample::note::counter::*;
 use db_sample::note::note::*;
-use db_sample::note::tags::_TagsTr;
+use db_sample::note::tag::_TagTr;
 #[allow(unused_imports)]
 use db_sample::DbConn as SampleConn;
+use db_session::session::session::_SessionStore;
+use senax_actix_session::Session;
 use serde::Serialize;
 #[allow(unused_imports)]
 use tracing::trace_span;
@@ -24,7 +25,11 @@ pub struct Response {
 }
 
 #[get("/no_cache/{key}")]
-async fn handler(key: web::Path<String>, http_req: HttpRequest) -> impl Responder {
+async fn handler(
+    key: web::Path<String>,
+    http_req: HttpRequest,
+    _session: Session<_SessionStore>,
+) -> impl Responder {
     let ctx = Ctx::get(&http_req);
     ctx.log(&http_req);
     let result = async move {
@@ -40,15 +45,15 @@ async fn handler(key: web::Path<String>, http_req: HttpRequest) -> impl Responde
             Some(v) => Some(v.name().to_owned()),
         };
         let date = Local::now().date_naive();
-        let counter = _Counters::find_optional(&mut conn, (note.id(), date)).await?;
+        let counter = _Counter::find_optional(&mut conn, (note.id(), date)).await?;
         let count = counter.map(|v| v.counter()).unwrap_or_default() + 1;
 
         let note_id = note.id();
-        let cond = db_sample::cond_note_counters!((note_id=note_id) AND (date=date));
+        let cond = db_sample::cond_note_counter!((note_id=note_id) AND (date=date));
         conn.begin().await?;
-        let mut update = _Counters::for_update(&mut conn);
+        let mut update = _Counter::for_update(&mut conn);
         let _ = update.counter().add(1);
-        _Counters::query()
+        _Counter::query()
             .cond(cond)
             .update(&mut conn, update)
             .await?;

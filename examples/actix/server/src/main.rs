@@ -6,6 +6,7 @@ use actix_web::dev::Service as _;
 use actix_web::{error, middleware, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 use clap::Parser;
+use db_session::session::session::{_SessionStore, SESSION_SECRET_KEY};
 use dotenvy::dotenv;
 use futures::stream::StreamExt;
 use mimalloc::MiMalloc;
@@ -110,6 +111,14 @@ async fn main() -> Result<()> {
     if use_linker {
         sleep(Duration::from_secs(2)).await;
     }
+    thread::spawn(|| {
+        System::new().block_on(async move {
+            loop {
+                senax_actix_session::SessionMiddleware::gc(_SessionStore, None).await;
+                tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+            }
+        })
+    });
 
     let server = HttpServer::new(move || {
         App::new()
@@ -118,6 +127,11 @@ async fn main() -> Result<()> {
                 req.extensions_mut().insert(Ctx::new());
                 srv.call(req)
             })
+            .wrap(
+                senax_actix_session::SessionMiddleware::builder(_SessionStore, SESSION_SECRET_KEY)
+                    .cookie_secure(!cfg!(debug_assertions))
+                    .build(),
+            )
             .configure(routes::root::init)
             .service(
                 web::scope("/api")

@@ -13,6 +13,7 @@ async-stream = "0.3"
 chrono = { version = "0.4.19", features = ["serde"] }
 clap = { version = "3.2.16", features = ["derive"] }
 db_sample = { path = "../db/sample" }
+db_session = { path = "../db/session" }
 derive_more = "0.99"
 dotenvy = "0.15.6"
 env_logger = "0.9"
@@ -23,6 +24,7 @@ mime = "0.3"
 once_cell = "1.8.0"
 rand = "0.8.0"
 rust_decimal = "1.19"
+senax-actix-session = "0.1.1"
 senax-common = "0.1.3"
 senax-logger = "0.1"
 serde = { version = "1.0.106", features = ["rc"] }
