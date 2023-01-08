@@ -80,6 +80,11 @@
           "default": false,
           "type": "boolean"
         },
+        "plural_table_name": {
+          "description": "テーブル名を複数形にする",
+          "default": false,
+          "type": "boolean"
+        },
         "timestampable": {
           "description": "デフォルトのタイムスタンプ設定",
           "anyOf": [
