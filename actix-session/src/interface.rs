@@ -2,6 +2,7 @@ use actix_web::cookie::time::Duration;
 use anyhow::Result;
 use derive_more::Display;
 use std::time::{SystemTime, UNIX_EPOCH};
+use zstd::{decode_all, stream::copy_encode};
 
 use crate::session_key::SessionKey;
 
@@ -14,12 +15,17 @@ pub struct SessionData {
 
 impl SessionData {
     pub fn new(data: &[u8], eol: u64, version: u32) -> SessionData {
+        let data = if data.len() > 1 && data[0] == 0 {
+            decode_all(&data[1..]).unwrap_or_default()
+        } else {
+            data.to_vec()
+        };
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs() as i64;
         SessionData {
-            data: data.to_vec(),
+            data,
             ttl: Duration::new((eol as i64) - now, 0),
             version,
         }
@@ -29,6 +35,16 @@ impl SessionData {
     }
     pub fn data(&self) -> &[u8] {
         &self.data
+    }
+    pub fn compressed_data(&self) -> Vec<u8> {
+        let mut enc = Vec::<u8>::with_capacity(self.data.len() + 100);
+        enc.push(0);
+        copy_encode(&*self.data, &mut enc, 1).unwrap();
+        if enc.len() < self.data.len() {
+            enc
+        } else {
+            self.data.clone()
+        }
     }
     pub fn ttl(&self) -> i64 {
         self.ttl.whole_seconds()

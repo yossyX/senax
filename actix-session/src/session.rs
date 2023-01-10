@@ -7,6 +7,7 @@ use actix_web::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{de::DeserializeOwned, Serialize};
+use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use crate::{
@@ -165,6 +166,16 @@ impl<Store: SessionStore + 'static> Session<Store> {
         self.0.borrow().session_key.as_ref().cloned()
     }
 
+    pub fn csrf_token(&self) -> Option<String> {
+        self.0.borrow().session_key.as_ref().map(|v| {
+            Sha256::digest(&String::from(v))
+                .iter()
+                .take(8)
+                .map(|x| format!("{:02X}", x))
+                .collect::<String>()
+        })
+    }
+
     pub fn contains_in_base(&self, key: &str) -> bool {
         self.0.borrow().base_data.contains_key(key)
     }
@@ -290,13 +301,15 @@ impl<Store: SessionStore + 'static> Session<Store> {
         inner.base_data.clear();
         inner.login_data.clear();
         inner.debug_data.clear();
+        inner.version = 0;
         Ok(())
     }
 
     /// Update session key.
     /// The old session will not be deleted for the following reasons:
-    /// * Cookies canceled by accesses that occurred at the same time
+    /// * If there are simultaneous accesses, the access that comes after the renew will create a new session and cancel the previous cookie.
     /// * When the modified cookie cannot be received due to a communication error
+    /// Thus, since previous session data is not deleted, RENEW should not be used for logout.
     pub async fn renew<F, R>(&self, f: F) -> Result<R>
     where
         F: Fn(&mut SessionInner<Store>) -> Result<R>,
@@ -390,6 +403,45 @@ impl<Store: SessionStore + 'static> Session<Store> {
         };
         let inner = Rc::new(RefCell::new(inner));
         req.extensions_mut().insert(inner);
+        Ok(())
+    }
+
+    pub async fn reset(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.status = SessionStatus::Unchanged;
+        inner.session_key = None;
+        inner.base_data.clear();
+        inner.login_data.clear();
+        inner.debug_data.clear();
+        inner.version = 0;
+    }
+
+    pub async fn load(&self, key: &str) -> Result<()> {
+        let mut session_key = Some(key.to_string().try_into()?);
+        let (data, mut list) = {
+            let storage = Rc::clone(&self.0.borrow().storage);
+            let data = {
+                let data = storage.load(session_key.as_ref().unwrap()).await?;
+                if let Some(data) = data {
+                    data
+                } else {
+                    session_key = None;
+                    SessionData::default()
+                }
+            };
+            let list: Vec<HashMap<String, Vec<u8>>> = if data.is_empty_data() {
+                Vec::new()
+            } else {
+                serde_cbor::from_slice(data.data())?
+            };
+            (data, list)
+        };
+        let mut inner = self.0.borrow_mut();
+        inner.session_key = session_key;
+        inner.base_data = list.pop().unwrap_or_default();
+        inner.login_data = list.pop().unwrap_or_default();
+        inner.debug_data = list.pop().unwrap_or_default();
+        inner.version = data.version;
         Ok(())
     }
 

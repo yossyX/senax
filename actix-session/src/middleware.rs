@@ -9,7 +9,9 @@ use actix_web::{
 use std::{convert::TryInto, fmt, future::Future, pin::Pin, rc::Rc};
 
 use crate::{
-    config::{self, Configuration, CookieConfiguration, SessionMiddlewareBuilder},
+    config::{
+        self, Configuration, CookieConfiguration, CookieContentSecurity, SessionMiddlewareBuilder,
+    },
     interface::SessionStore,
     session_key::SessionKey,
     Session, SessionStatus,
@@ -148,7 +150,10 @@ fn extract_session_key(req: &ServiceRequest, config: &CookieConfiguration) -> Op
     let mut jar = CookieJar::new();
     jar.add_original(session_cookie.clone());
 
-    let verification_result = jar.private(&config.key).get(&config.name);
+    let verification_result = match config.content_security {
+        CookieContentSecurity::Signed => jar.signed(&config.key).get(&config.name),
+        CookieContentSecurity::Private => jar.private(&config.key).get(&config.name),
+    };
 
     if verification_result.is_none() {
         tracing::warn!("The session cookie failed to decrypt.");
@@ -185,7 +190,10 @@ fn set_session_cookie(
     }
 
     let mut jar = CookieJar::new();
-    jar.private_mut(&config.key).add(cookie);
+    match config.content_security {
+        CookieContentSecurity::Signed => jar.signed_mut(&config.key).add(cookie),
+        CookieContentSecurity::Private => jar.private_mut(&config.key).add(cookie),
+    }
 
     let cookie = jar.delta().next().unwrap();
     let val = HeaderValue::from_str(&cookie.encoded().to_string())?;

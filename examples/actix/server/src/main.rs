@@ -6,18 +6,17 @@ use actix_web::dev::Service as _;
 use actix_web::{error, middleware, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer};
 use anyhow::Result;
 use clap::Parser;
-use db_session::session::session::{_SessionStore, SESSION_SECRET_KEY};
+use db_session::session::session::{self, _SessionStore, senax_actix_session};
 use dotenvy::dotenv;
 use futures::stream::StreamExt;
 use mimalloc::MiMalloc;
 use once_cell::sync::OnceCell;
+use sha2::{Digest, Sha512};
 use std::collections::HashMap;
 use std::fs::File;
-
 use std::io::Write;
 use std::net::TcpListener;
 use std::path::Path;
-
 use std::sync::{Arc, Weak};
 use std::{env, thread};
 use time::macros::offset;
@@ -40,7 +39,7 @@ const DEFAULT_HOST_PORT: &str = "0.0.0.0:8080";
 const DEFAULT_WORK_DIR: &str = "temp";
 const LINKER_PORT: &str = "LINKER_PORT";
 const LINKER_PASSWORD: &str = "LINKER_PASSWORD";
-
+const SESSION_SECRET_KEY: &str = "SESSION_SECRET_KEY";
 // for Hot Deploy
 const SERVER_STARTER_PORT: &str = "SERVER_STARTER_PORT";
 const KILL_PARENT: &str = "KILL_PARENT";
@@ -119,6 +118,9 @@ async fn main() -> Result<()> {
             }
         })
     });
+    let session_secret_key = env::var(SESSION_SECRET_KEY)
+        .map(|v| Sha512::digest(&v).to_vec())
+        .unwrap_or_else(|_| session::SESSION_SECRET_KEY.to_vec());
 
     let server = HttpServer::new(move || {
         App::new()
@@ -128,7 +130,7 @@ async fn main() -> Result<()> {
                 srv.call(req)
             })
             .wrap(
-                senax_actix_session::SessionMiddleware::builder(_SessionStore, SESSION_SECRET_KEY)
+                senax_actix_session::SessionMiddleware::builder(_SessionStore, &session_secret_key)
                     .cookie_secure(!cfg!(debug_assertions))
                     .build(),
             )

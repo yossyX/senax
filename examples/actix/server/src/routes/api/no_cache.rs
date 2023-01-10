@@ -9,8 +9,7 @@ use db_sample::note::note::*;
 use db_sample::note::tag::_TagTr;
 #[allow(unused_imports)]
 use db_sample::DbConn as SampleConn;
-use db_session::session::session::_SessionStore;
-use senax_actix_session::Session;
+use db_session::session::session::{_SessionStore, senax_actix_session::Session};
 use serde::Serialize;
 #[allow(unused_imports)]
 use tracing::trace_span;

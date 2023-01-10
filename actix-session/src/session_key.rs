@@ -38,6 +38,12 @@ impl Default for SessionKey {
     }
 }
 
+impl std::fmt::Display for SessionKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl SessionKey {
     pub fn new() -> SessionKey {
         Self::generate(SystemTime::now())

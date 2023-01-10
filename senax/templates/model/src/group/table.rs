@@ -44,6 +44,7 @@ impl std::fmt::Display for _@{ name|pascal }@Cache {
 }
 @%- if def.as_session() %@
 
+pub extern crate senax_actix_session;
 use senax_actix_session::{
     interface::{SaveError, SessionData, SessionStore},
     SessionKey,
@@ -84,7 +85,7 @@ impl SessionStore for _@{ name|pascal }@Store {
         let s_key: String = (&key).into();
         let session = _@{ name|pascal }@Factory {
             key: s_key.into(),
-            data: data.data().into(),
+            data: data.compressed_data().into(),
             eol: (data.eol() >> EOL_SHIFT) as u32,
         }
         .create(&conn);
@@ -113,7 +114,7 @@ impl SessionStore for _@{ name|pascal }@Store {
         let s_key: String = session_key.into();
         let id: _@{ name|pascal }@Id = s_key.into();
         let mut session = id.for_update(&conn);
-        session.data().set(data.data().into());
+        session.data().set(data.compressed_data().into());
         session.eol().set((data.eol() >> EOL_SHIFT) as u32);
         session._version().set(data.version());
         match _@{ name|pascal }@::save(&mut conn, session).await {

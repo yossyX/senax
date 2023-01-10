@@ -9,6 +9,13 @@ pub enum SessionLifecycle {
     PersistentSession(PersistentSession),
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub enum CookieContentSecurity {
+    #[default]
+    Private,
+    Signed,
+}
+
 #[derive(Debug, Clone)]
 pub struct BrowserSession {
     state_ttl: Duration,
@@ -120,6 +127,21 @@ impl<Store: SessionStore> SessionMiddlewareBuilder<Store> {
         self
     }
 
+    pub fn cookie_content_security(mut self, content_security: CookieContentSecurity) -> Self {
+        self.configuration.cookie.content_security = content_security;
+        self
+    }
+
+    pub fn cookie_security_private(mut self) -> Self {
+        self.configuration.cookie.content_security = CookieContentSecurity::Private;
+        self
+    }
+
+    pub fn cookie_security_signed(mut self) -> Self {
+        self.configuration.cookie.content_security = CookieContentSecurity::Signed;
+        self
+    }
+
     pub fn cookie_http_only(mut self, http_only: bool) -> Self {
         self.configuration.cookie.http_only = http_only;
         self
@@ -151,6 +173,7 @@ pub(crate) struct CookieConfiguration {
     pub(crate) path: String,
     pub(crate) domain: Option<String>,
     pub(crate) max_age: Option<Duration>,
+    pub(crate) content_security: CookieContentSecurity,
     pub(crate) key: Key,
 }
 
@@ -164,6 +187,7 @@ pub(crate) fn default_configuration(key: Key) -> Configuration {
             path: "/".into(),
             domain: None,
             max_age: None,
+            content_security: CookieContentSecurity::default(),
             key,
         },
         session: SessionConfiguration {
