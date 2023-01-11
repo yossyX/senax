@@ -3,3 +3,4 @@
 
 SenaX is a fast async ORM for Rust. Read [the book](https://yossyx.github.io/senax/).
 
+Contact https://twitter.com/yossyX1
