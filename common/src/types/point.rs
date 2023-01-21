@@ -9,6 +9,7 @@ pub struct Point {
     pub x: f64,
     pub y: f64,
 }
+async_graphql::scalar!(Point);
 
 impl From<Vec<u8>> for Point {
     fn from(buf: Vec<u8>) -> Self {
