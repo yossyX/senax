@@ -3138,12 +3138,12 @@ impl From<@{ def.primaries()|fmt_join_with_paren("{outer_ref}", ", ") }@> for Pr
 @% endif -%@
 impl From<&Primary> for InnerPrimary {
     fn from(id: &Primary) -> Self {
-        Self(@{ def.primaries()|fmt_join("id.{index}.into()", ", ") }@)
+        Self(@{ def.primaries()|fmt_join("id.{index}.clone().into()", ", ") }@)
     }
 }
 impl From<&InnerPrimary> for Primary {
     fn from(id: &InnerPrimary) -> Self {
-        Self(@{ def.primaries()|fmt_join("id.{index}.into()", ", ") }@)
+        Self(@{ def.primaries()|fmt_join("id.{index}.clone().into()", ", ") }@)
     }
 }
 impl From<@{ def.primaries()|fmt_join_with_paren("{inner}", ", ") }@> for Primary {

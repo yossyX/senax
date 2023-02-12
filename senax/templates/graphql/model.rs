@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use async_graphql::types::connection::{query, Connection, Edge};
 use async_graphql::{ErrorExtensions, InputObject, Lookahead, Object, SimpleObject, ID};
 use serde::{Deserialize, Serialize};

@@ -62,6 +62,7 @@ impl From<_@{ pascal_name }@Cache> for @{ db|pascal }@@{ group|pascal }@@{ mod_n
 }
 @%- endif %@
 
+#[allow(dead_code)]
 #[allow(unused_variables)]
 async fn fetch_obj(
     obj: &mut _@{ pascal_name }@,
@@ -91,6 +92,7 @@ async fn fetch_list(
 }
 @%- if def.use_cache_all() && !def.use_cache_all_with_condition() ||  def.use_cache() %@
 
+#[allow(dead_code)]
 #[allow(unused_variables)]
 async fn fetch_cache_obj(
     obj: &mut _@{ pascal_name }@Cache,
@@ -104,6 +106,7 @@ async fn fetch_cache_obj(
     Ok(())
 }
 
+#[allow(dead_code)]
 #[allow(clippy::ptr_arg)]
 #[allow(unused_variables)]
 async fn fetch_cache_list(
@@ -136,6 +139,7 @@ pub struct Req@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
 @%- endif %@
 }
 
+#[allow(unused_mut)]
 fn prepare_create(conn: &mut @{ db|pascal }@Conn, data: Req@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@) -> _@{ pascal_name }@ForUpdate {
     let mut obj = _@{ pascal_name }@Factory {
 @{- def.for_factory()|fmt_join("

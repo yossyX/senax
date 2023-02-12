@@ -8,7 +8,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::schema::{self, to_id_name, ModelDef, RelDef, GROUPS, MODEL, _to_var_name};
+use crate::schema::{self, to_id_name, ModelDef, RelDef, _to_var_name, GROUPS, MODEL};
 
 pub mod template;
 
@@ -45,7 +45,15 @@ pub fn generate(
         let group = groups.get(group_name).unwrap();
         let model_names = if let Some(model) = model {
             if let Some(def) = group.get(model) {
-                write_model_file(&db_path.join(group_name), db, group_name, model, def, camel_case, force)?;
+                write_model_file(
+                    &db_path.join(group_name),
+                    db,
+                    group_name,
+                    model,
+                    def,
+                    camel_case,
+                    force,
+                )?;
                 vec![def.mod_name()]
             } else if let Some(tuple) = group.iter().find(|(_, v)| v.mod_name() == model) {
                 write_model_file(
@@ -54,7 +62,7 @@ pub fn generate(
                     group_name,
                     tuple.0,
                     tuple.1,
-                    camel_case, 
+                    camel_case,
                     force,
                 )?;
                 vec![tuple.1.mod_name()]
@@ -66,7 +74,15 @@ pub fn generate(
         } else {
             let model_list: Vec<_> = group.iter().filter(|v| !v.1.abstract_mode).collect();
             for (name, def) in &model_list {
-                write_model_file(&db_path.join(group_name), db, group_name, name, def, camel_case, force)?;
+                write_model_file(
+                    &db_path.join(group_name),
+                    db,
+                    group_name,
+                    name,
+                    def,
+                    camel_case,
+                    force,
+                )?;
             }
             model_list.iter().map(|(_, v)| v.mod_name()).collect()
         };
@@ -226,12 +242,20 @@ fn write_model_file(
     let mut relation_mods: IndexSet<String> = IndexSet::new();
     relation_mods.insert(format!(
         "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
-        db, _to_var_name(group), _to_var_name(mod_name), group, mod_name
+        db,
+        _to_var_name(group),
+        _to_var_name(mod_name),
+        group,
+        mod_name
     ));
     for mod_name in &def.relation_mods() {
         relation_mods.insert(format!(
             "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
-            db, _to_var_name(&mod_name[0]), _to_var_name(&mod_name[1]), mod_name[0], mod_name[1]
+            db,
+            _to_var_name(&mod_name[0]),
+            _to_var_name(&mod_name[1]),
+            mod_name[0],
+            mod_name[1]
         ));
     }
     let mut buf = template::BaseModelTemplate {
@@ -333,8 +357,12 @@ fn write_model_file(
         .map(|v| v.to_string())
         .collect::<Vec<_>>()
         .join("");
+    let msg = "\n// Internal can be modified. However, it will be overwritten by auto-generation.";
     let content = re.replace(&content, |caps: &Captures| {
-        format!("{}{}\n{}{}", &caps[1], &relation_mods, &buf, &caps[2])
+        format!(
+            "{}{}{}\n{}{}",
+            &caps[1], msg, &relation_mods, &buf, &caps[2]
+        )
     });
     fs_write(file_path, &*content)?;
     Ok(())

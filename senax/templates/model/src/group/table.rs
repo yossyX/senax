@@ -42,7 +42,7 @@ impl std::fmt::Display for _@{ name|pascal }@Cache {
         todo!()
     }
 }
-@%- if def.as_session() %@
+@%- if def.as_actix_session() %@
 
 pub extern crate senax_actix_session;
 use senax_actix_session::{

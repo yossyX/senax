@@ -21,11 +21,14 @@ pub fn generate(db: &str, force: bool) -> Result<()> {
     let base_path = MODELS_PATH.get().unwrap().join(&db);
     fs::create_dir_all(&base_path)?;
 
-    let mut as_session = false;
+    let mut as_session = template::SessionType::None;
     for (_group_name, defs) in &groups {
         for (_model_name, def) in defs {
-            if def.as_session() {
-                as_session = true;
+            match def.as_session() {
+                Some(schema::SessionType::Actix) => {
+                    as_session = template::SessionType::Actix;
+                }
+                None => {}
             }
         }
     }

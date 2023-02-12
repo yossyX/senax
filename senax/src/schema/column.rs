@@ -233,6 +233,7 @@ pub enum ApiVisibility {
     Hidden,
 }
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 #[schemars(title = "Column Def")]
@@ -478,36 +479,53 @@ impl ColumnDef {
     }
 
     pub fn get_api_validate(&self) -> String {
-        let required = if_then_else!(!self.primary && self.is_api_required() && !self.not_null, "required, ", "");
+        let required = if_then_else!(
+            !self.primary && self.is_api_required() && !self.not_null,
+            "required, ",
+            ""
+        );
         match self.type_def {
             ColumnType::Varchar => {
                 let length = self.length.unwrap_or(DEFAULT_VARCHAR_LENGTH);
-                format!("    #[validate({}non_control_character, length(max = {}))]\n", required, length)
+                format!(
+                    "    #[validate({}non_control_character, length(max = {}))]\n",
+                    required, length
+                )
             }
             ColumnType::Text => {
                 if let Some(length) = self.length {
-                    format!("    #[validate({}non_control_character, length(max = {}))]\n", required, length)
+                    format!(
+                        "    #[validate({}non_control_character, length(max = {}))]\n",
+                        required, length
+                    )
                 } else {
                     format!("    #[validate({}non_control_character)]\n", required)
                 }
             }
             _ if self.min.is_some() && self.max.is_some() => format!(
-                "    #[validate({}range(min = {}, max = {}))]\n",required, 
+                "    #[validate({}range(min = {}, max = {}))]\n",
+                required,
                 self.min.unwrap(),
                 self.max.unwrap()
             ),
             _ if self.min.is_some() => {
-                format!("    #[validate({}range(min = {}))]\n", required, self.min.unwrap())
+                format!(
+                    "    #[validate({}range(min = {}))]\n",
+                    required,
+                    self.min.unwrap()
+                )
             }
             _ if self.max.is_some() => {
-                format!("    #[validate({}range(max = {}))]\n", required, self.max.unwrap())
+                format!(
+                    "    #[validate({}range(max = {}))]\n",
+                    required,
+                    self.max.unwrap()
+                )
             }
             ColumnType::Double | ColumnType::Float if !self.signed => {
                 format!("    #[validate({}range(min = 0))]\n", required)
             }
-            _ if !required.is_empty() => {
-                "    #[validate(required)]\n".to_owned()
-            }
+            _ if !required.is_empty() => "    #[validate(required)]\n".to_owned(),
             _ => "".to_owned(),
         }
     }

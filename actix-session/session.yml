@@ -18,7 +18,7 @@ groups:
         versioned: true
         use_update_delayed: true
         act_as:
-          session: true
+          session: actix
         columns:
           key:
             primary: true

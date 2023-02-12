@@ -5,11 +5,17 @@ use std::{collections::BTreeSet, sync::Arc};
 
 pub mod filters;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SessionType {
+    None,
+    Actix,
+}
+
 #[derive(Template)]
 #[template(path = "model/_Cargo.toml", escape = "none")]
 pub struct CargoTemplate<'a> {
     pub db: &'a str,
-    pub as_session: bool,
+    pub as_session: SessionType,
 }
 
 #[derive(Template)]

@@ -458,6 +458,13 @@
             "null"
           ]
         },
+        "use_cache_all_with_condition": {
+          "description": "条件付き全キャッシュを使用するか",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "use_insert_delayed": {
           "description": "遅延INSERTを使用する",
           "type": [
@@ -668,10 +675,24 @@
       "properties": {
         "session": {
           "description": "セッションDBとして使用",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SessionType"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
+    },
+    "SessionType": {
+      "title": "Session Type",
+      "type": "string",
+      "enum": [
+        "actix"
+      ]
     },
     "ColumnTypeOrDef": {
       "title": "Column Type Or Def",
@@ -728,12 +749,30 @@
           ]
         },
         "length": {
+          "description": "長さ(文字列の場合はバイト数ではなく、文字数)",
           "type": [
             "integer",
             "null"
           ],
           "format": "uint32",
           "minimum": 0.0
+        },
+        "max": {
+          "description": "最大値(decimalは非対応)",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "min": {
+          "description": "最小値(decimalは非対応)",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
         },
         "collate": {
           "type": [
@@ -840,6 +879,21 @@
             "string",
             "null"
           ]
+        },
+        "api_visibility": {
+          "description": "API可視性",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ApiVisibility"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "api_required": {
+          "description": "API入力時必須",
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -936,6 +990,14 @@
         }
       },
       "additionalProperties": false
+    },
+    "ApiVisibility": {
+      "title": "API Visibility",
+      "type": "string",
+      "enum": [
+        "readonly",
+        "hidden"
+      ]
     },
     "ColumnSubsetType": {
       "title": "Column Subset Type",
