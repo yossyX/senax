@@ -16,9 +16,10 @@ use crate::@{ mod_name[0] }@::@{ mod_name[1] }@::_@{ mod_name[1] }@ as rel_@{ mo
 @% for (name, column_def) in def.enums() -%@
 @% if column_def.enum_values.is_some() -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(Serialize_repr, Deserialize_repr, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
+#[derive(async_graphql::Enum, Serialize_repr, Deserialize_repr, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
+#[graphql(name="@{ group_name|to_pascal_name }@@{ mod_name|to_pascal_name }@@{ name|to_pascal_name }@")]
 pub enum _@{ name|to_pascal_name }@ {
 @% for row in values -%@@{ row.title|comment4 }@@{ row.comment|comment4 }@@{ row.title|strum_message4 }@@{ row.comment|strum_detailed4 }@    @{ row.name }@ = @{ row.value }@,
 @% endfor -%@
@@ -57,8 +58,9 @@ impl From<Option<_@{ name|to_pascal_name }@>> for BindValue {
 @% for (name, column_def) in def.db_enums() -%@
 @% if column_def.db_enum_values.is_some() -%@
 @% let values = column_def.db_enum_values.as_ref().unwrap() -%@
-#[derive(Serialize, Deserialize, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
+#[derive(async_graphql::Enum, Serialize, Deserialize, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
 #[allow(non_camel_case_types)]
+#[graphql(name="@{ group_name|to_pascal_name }@@{ mod_name|to_pascal_name }@@{ name|to_pascal_name }@")]
 pub enum _@{ name|to_pascal_name }@ {
 @% for row in values -%@@{ row.title|comment4 }@@{ row.comment|comment4 }@@{ row.title|strum_message4 }@@{ row.comment|strum_detailed4 }@    @{ row.name }@,
 @% endfor -%@

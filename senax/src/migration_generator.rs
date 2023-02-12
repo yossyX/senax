@@ -14,8 +14,10 @@ use crate::ddl::table::{Column, Constraint, Table};
 use crate::schema::{self, AutoIncrement, CONFIG, GROUPS, MODEL, MODELS};
 use crate::{ddl, MODELS_PATH};
 
+pub const UTF8_BYTE_LEN: u32 = 4;
+
 pub async fn generate(db: &str, description: &Option<String>, revert: bool) -> Result<()> {
-    schema::parse(db)?;
+    schema::parse(db, false)?;
     let groups = unsafe { GROUPS.get().unwrap() }.clone();
     let mut new_tables = HashMap::new();
     for (_group_name, defs) in &groups {
@@ -65,10 +67,14 @@ pub async fn generate(db: &str, description: &Option<String>, revert: bool) -> R
                             SqlType::Varchar(col.length.unwrap_or(schema::DEFAULT_VARCHAR_LENGTH))
                         }
                         schema::ColumnType::Boolean => SqlType::Tinyint,
-                        schema::ColumnType::Text if col.length.unwrap_or(65536) < 256 => {
+                        schema::ColumnType::Text
+                            if col.length.unwrap_or(65536) * UTF8_BYTE_LEN < 256 =>
+                        {
                             SqlType::Tinytext
                         }
-                        schema::ColumnType::Text if col.length.unwrap_or(65536) < 65536 => {
+                        schema::ColumnType::Text
+                            if col.length.unwrap_or(65536) * UTF8_BYTE_LEN < 65536 =>
+                        {
                             SqlType::Text
                         }
                         schema::ColumnType::Text => SqlType::Longtext,
@@ -253,8 +259,11 @@ pub async fn generate(db: &str, description: &Option<String>, revert: bool) -> R
     let db_url =
         env::var(&url_name).with_context(|| format!("{} is not set in the .env file", url_name))?;
     let old_tables = ddl::table::parse(&db_url).await?;
-    let ddl = make_ddl(&new_tables, &old_tables)?;
+    let mut ddl = make_ddl(&new_tables, &old_tables)?;
     if let Some(description) = description {
+        if ddl.is_empty() {
+            ddl.push_str("-- TODO: Fix this file.\n");
+        }
         let description: String = description
             .chars()
             .map(|c| {

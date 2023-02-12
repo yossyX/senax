@@ -52,7 +52,23 @@ pub fn fmt_join(v: &[(&String, &ColumnDef)], f: &str, sep: &str) -> ::askama::Re
     Ok(v.iter()
         .map(|(name, col)| {
             index += 1;
-            _fmt_join(f, name, col, index)
+            _fmt_join(f, name, col, index, "")
+        })
+        .collect::<Vec<_>>()
+        .join(sep))
+}
+
+pub fn fmt_join_with_foreign_default(
+    v: &[(&String, &ColumnDef)],
+    f: &str,
+    sep: &str,
+    foreign: &str,
+) -> ::askama::Result<String> {
+    let mut index = -1;
+    Ok(v.iter()
+        .map(|(name, col)| {
+            index += 1;
+            _fmt_join(f, name, col, index, foreign)
         })
         .collect::<Vec<_>>()
         .join(sep))
@@ -69,16 +85,16 @@ pub fn fmt_join_cache_or_not(
         .map(|(name, col)| {
             index += 1;
             if !col.exclude_from_cache {
-                _fmt_join(th, name, col, index)
+                _fmt_join(th, name, col, index, "")
             } else {
-                _fmt_join(el, name, col, index)
+                _fmt_join(el, name, col, index, "")
             }
         })
         .collect::<Vec<_>>()
         .join(sep))
 }
 
-fn _fmt_join(f: &str, name: &&String, col: &&ColumnDef, index: i32) -> String {
+fn _fmt_join(f: &str, name: &&String, col: &&ColumnDef, index: i32, foreign: &str) -> String {
     f.replace("{col}", &_to_db_col(name, false))
         .replace("{col_esc}", &_to_db_col(&col.get_col_name(name), true))
         .replace("{var}", &_to_var_name(name))
@@ -91,6 +107,7 @@ fn _fmt_join(f: &str, name: &&String, col: &&ColumnDef, index: i32) -> String {
         .replace("{default}", &col.get_serde_default())
         .replace("{rename}", &col.get_rename(name))
         .replace("{validate}", &col.get_validate())
+        .replace("{api_validate}", &col.get_api_validate())
         .replace("{outer}", &col.get_outer_type())
         .replace("{outer_ref}", &col.get_outer_ref_type())
         .replace("{outer_owned}", &col.get_outer_owned_type())
@@ -104,6 +121,17 @@ fn _fmt_join(f: &str, name: &&String, col: &&ColumnDef, index: i32) -> String {
         .replace("{factory}", &col.get_factory_type())
         .replace("{factory_default}", col.get_factory_default())
         .replace("{convert_factory}", &col.convert_factory_type())
+        .replace("{api_option_type}", &col.get_api_type(true))
+        .replace("{api_type}", &col.get_api_type(false))
+        .replace("{to_api_type}", col.get_to_api_type())
+        .replace(
+            "{from_api_type}",
+            &col.get_from_api_type(name, false, foreign),
+        )
+        .replace(
+            "{from_api_rel_type}",
+            &col.get_from_api_type(name, true, foreign),
+        )
         .replace("{cond_type}", &col.get_cond_type())
         .replace("{bind_as}", col.get_bind_as())
         .replace("{index}", &index.to_string())
@@ -169,6 +197,12 @@ fn _fmt_rel(
         .last()
         .unwrap_or("id");
     let foreign_model = RelDef::get_foreign_model(rel, name);
+    let foreign_pk = foreign_model
+        .id()
+        .iter()
+        .map(|(name, _a)| name.as_str())
+        .last()
+        .unwrap_or("id");
     let foreign = RelDef::get_foreign_id(rel, model, &foreign_model);
     let primaries = fmt_join(&foreign_model.primaries(), "{col_esc}", ",").unwrap();
     let asc = if_then_else!(rel.as_ref().map(|v| v.desc).unwrap_or(false), "Desc", "Asc");
@@ -244,11 +278,13 @@ fn _fmt_rel(
         .replace("{alias}", &_to_var_name(name))
         .replace("{raw_alias}", name)
         .replace("{alias_pascal}", &name.to_case(Case::Pascal))
+        .replace("{alias_camel}", &name.to_case(Case::Camel))
         .replace("{class}", &RelDef::get_foreign_class_name(rel, name))
         .replace("{class_mod}", &RelDef::get_group_mod_name(rel, name))
         .replace("{mod_name}", &RelDef::get_mod_name(rel, name))
-        .replace("{local_id}", local_id)
+        .replace("{local_id}", &_to_var_name(local_id))
         .replace("{foreign}", &foreign)
+        .replace("{foreign_pk}", &_to_var_name(foreign_pk))
         .replace("{foreign_esc}", &_to_db_col(&foreign, true))
         .replace("{foreign_var}", &_to_var_name(&foreign))
         .replace("{foreign_pascal}", &foreign.to_case(Case::Pascal))
@@ -539,4 +575,10 @@ pub fn if_then_else<T: std::fmt::Display>(wh: &bool, th: T, el: T) -> ::askama::
 #[allow(dead_code)]
 pub fn is_true(b: &Option<bool>) -> ::askama::Result<bool> {
     Ok(*b == Some(true))
+}
+pub fn replace3(content: &str, r1: &str, r2: &str, r3: &str) -> ::askama::Result<String> {
+    Ok(content
+        .replace("--1--", r1)
+        .replace("--2--", r2)
+        .replace("--3--", r3))
 }

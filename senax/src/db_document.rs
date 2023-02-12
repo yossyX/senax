@@ -73,7 +73,7 @@ pub fn generate(
     output: &Option<PathBuf>,
     template: &Option<PathBuf>,
 ) -> Result<()> {
-    schema::parse(db)?;
+    schema::parse(db, false)?;
 
     let config = unsafe { CONFIG.get().unwrap() }.clone();
     let groups = unsafe { GROUPS.get().unwrap() }.clone();

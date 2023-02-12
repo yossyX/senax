@@ -58,7 +58,7 @@ pub const SESSION_SECRET_KEY: &[u8] = &[
     @{ def.session_secret_key(4) }@,
 ];
 pub struct _@{ name|pascal }@Store;
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl SessionStore for _@{ name|pascal }@Store {
     async fn load(&self, session_key: &SessionKey) -> Result<Option<SessionData>> {
         let conn = DbConn::new();
@@ -114,7 +114,7 @@ impl SessionStore for _@{ name|pascal }@Store {
         let s_key: String = session_key.into();
         let id: _@{ name|pascal }@Id = s_key.into();
         let mut session = id.for_update(&conn);
-        session.data().set(data.compressed_data().into());
+        session.data().set(data.compressed_data());
         session.eol().set((data.eol() >> EOL_SHIFT) as u32);
         session._version().set(data.version());
         match _@{ name|pascal }@::save(&mut conn, session).await {

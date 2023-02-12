@@ -8,9 +8,10 @@ use crate::misc::BindValue;
 
 @{ def.title|comment0 -}@
 @{ def.comment|comment0 -}@
-#[derive(Serialize_repr, Deserialize_repr, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
+#[derive(async_graphql::Enum, Serialize_repr, Deserialize_repr, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
+#[graphql(name="@{ group_name|to_pascal_name }@@{ mod_name|to_pascal_name }@@{ name|to_pascal_name }@")]
 pub enum @{ pascal_name }@ {
 @% for row in def.enum_values -%@@{ row.title|comment4 }@@{ row.comment|comment4 }@@{ row.title|strum_message4 }@@{ row.comment|strum_detailed4 }@    @{ row.name }@ = @{ row.value }@,
 @% endfor -%@

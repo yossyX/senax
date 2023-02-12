@@ -71,7 +71,7 @@ pub struct ActAs {
     pub session: bool,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 #[schemars(title = "Model Def")]
 pub struct ModelDef {
@@ -129,6 +129,9 @@ pub struct ModelDef {
     /// 全キャッシュを使用するか
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_cache_all: Option<bool>,
+    /// 条件付き全キャッシュを使用するか
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_cache_all_with_condition: Option<bool>,
     /// 遅延INSERTを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_insert_delayed: Option<bool>,
@@ -314,6 +317,10 @@ impl ModelDef {
             .unwrap_or(false)
     }
 
+    pub fn use_cache_all_with_condition(&self) -> bool {
+        self.use_cache_all_with_condition.unwrap_or(false)
+    }
+
     pub fn use_insert_delayed(&self) -> bool {
         self.use_insert_delayed
             .or(unsafe { CONFIG.get().unwrap() }.use_insert_delayed)
@@ -492,6 +499,17 @@ impl ModelDef {
             .filter(|(_k, v)| v.primary)
             .collect()
     }
+    pub fn main_primary(&self) -> Vec<(&String, &ColumnDef)> {
+        let primaries = self.primaries();
+        if primaries.len() <= 1 {
+            primaries
+        } else {
+            primaries
+                .into_iter()
+                .filter(|(_k, v)| v.main_primary)
+                .collect()
+        }
+    }
     pub fn non_primaries(&self) -> Vec<(&String, &ColumnDef)> {
         self.merged_columns
             .iter()
@@ -566,6 +584,11 @@ impl ModelDef {
             .collect()
     }
 
+    pub fn has_auto_increments(&self) -> bool {
+        self.merged_columns
+            .iter()
+            .any(|(_k, v)| v.auto_increment == Some(AutoIncrement::Auto))
+    }
     pub fn auto_increments(&self) -> Vec<(&String, &ColumnDef)> {
         self.merged_columns
             .iter()
@@ -588,9 +611,40 @@ impl ModelDef {
     pub fn for_cmp(&self) -> Vec<(&String, &ColumnDef)> {
         self.merged_columns
             .iter()
+            .filter(|(_k, v)| !v.skip_factory && !v.primary)
+            .collect()
+    }
+    pub fn for_api_response(&self) -> Vec<(&String, &ColumnDef)> {
+        self.merged_columns
+            .iter()
             .filter(|(_k, v)| {
-                v.auto_increment != Some(AutoIncrement::Auto) && !v.skip_factory && !v.primary
+                !v.exclude_from_cache && v.type_def != ColumnType::Blob && !v.is_api_hidden()
             })
+            .collect()
+    }
+    pub fn for_api_response_except(&self, except: &str) -> Vec<(&String, &ColumnDef)> {
+        self.for_api_response()
+            .into_iter()
+            .filter(|(k, _v)| !except.eq(*k))
+            .collect()
+    }
+    pub fn for_api_request(&self) -> Vec<(&String, &ColumnDef)> {
+        self.merged_columns
+            .iter()
+            .filter(|(_k, v)| {
+                !v.exclude_from_cache
+                    && !v.skip_factory
+                    && v.auto_increment != Some(AutoIncrement::Auto)
+                    && v.type_def != ColumnType::Blob
+                    && !v.is_api_hidden()
+                    && !v.is_api_readonly()
+            })
+            .collect()
+    }
+    pub fn for_api_request_except(&self, except: &str) -> Vec<(&String, &ColumnDef)> {
+        self.for_api_request()
+            .into_iter()
+            .filter(|(k, _v)| !except.eq(*k))
             .collect()
     }
     // pub fn indexes(&self) -> Vec<(&ModelDef, &String, &IndexDef)> {
@@ -739,6 +793,20 @@ impl ModelDef {
             .filter(|v| {
                 v.1.as_ref().and_then(|v| v.type_def.as_ref()) == Some(&RelationsType::Many)
                     && v.1.as_ref().map(|v| v.in_cache).unwrap_or(false)
+            })
+            .map(|v| (self, v.0, v.1))
+            .collect()
+    }
+    pub fn relations_auto_inc_many_cache(&self) -> Vec<(&ModelDef, &String, &Option<RelDef>)> {
+        self.merged_relations
+            .iter()
+            .filter(|v| {
+                v.1.as_ref().and_then(|v| v.type_def.as_ref()) == Some(&RelationsType::Many)
+                    && v.1.as_ref().map(|v| v.in_cache).unwrap_or(false)
+            })
+            .filter(|v| {
+                let foreign = RelDef::get_foreign_model(v.1, v.0);
+                foreign.has_auto_increments()
             })
             .map(|v| (self, v.0, v.1))
             .collect()

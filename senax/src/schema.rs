@@ -22,6 +22,8 @@ pub use relation::*;
 pub mod index;
 pub use index::*;
 
+use crate::common::if_then_else;
+
 const CREATED_AT: &str = "created_at";
 const UPDATED_AT: &str = "updated_at";
 const DELETED_AT: &str = "deleted_at";
@@ -139,7 +141,7 @@ impl ConfigDef {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 #[schemars(title = "Group Def")]
 pub struct GroupDef {
@@ -258,7 +260,7 @@ pub fn is_false(val: &bool) -> bool {
     !(*val)
 }
 
-pub fn parse(db: &str) -> Result<(), anyhow::Error> {
+pub fn parse(db: &str, outer_crate: bool) -> Result<(), anyhow::Error> {
     crate::common::check_ascii_name(db);
     let path = Path::new("./schema").join(&format!("{db}.yml"));
     let mut config = if path.exists() {
@@ -268,9 +270,9 @@ pub fn parse(db: &str) -> Result<(), anyhow::Error> {
             .map_err(|err| SerdeError::new(content.to_string(), err))?;
         config
     } else {
-        let path = Path::new("./schema/conf.yml");
-        let content =
-            fs::read_to_string(&path).with_context(|| format!("file cannot read: {:?}", &path))?;
+        let conf_path = Path::new("./schema/conf.yml");
+        let content = fs::read_to_string(&conf_path)
+            .with_context(|| format!("file cannot read: {:?}", &path))?;
         let map: HashMap<String, ConfigDef> = serde_yaml::from_str(&content)
             .map_err(|err| SerdeError::new(content.to_string(), err))?;
         map.get(db)
@@ -473,7 +475,12 @@ pub fn parse(db: &str) -> Result<(), anyhow::Error> {
                         if column_def.type_def == ColumnType::Enum {
                             if column_def.enum_values.is_some() {
                                 column_def.class = Some(format!(
-                                    "crate::{}::{}::_{}",
+                                    "{}::{}::{}::_{}",
+                                    if_then_else!(
+                                        outer_crate,
+                                        format!("db_{db}"),
+                                        "crate".to_string()
+                                    ),
                                     _to_var_name(group_name),
                                     _to_var_name(def.mod_name()),
                                     _to_var_name(&column.0.to_case(Case::Pascal))
@@ -489,14 +496,24 @@ pub fn parse(db: &str) -> Result<(), anyhow::Error> {
                                         format!("{stem_name} enum declaration is required first.")
                                     })?;
                                     column_def.class = Some(format!(
-                                        "crate::{}::{}::_{}",
+                                        "{}::{}::{}::_{}",
+                                        if_then_else!(
+                                            outer_crate,
+                                            format!("db_{db}"),
+                                            "crate".to_string()
+                                        ),
                                         _to_var_name(group_name),
                                         _to_var_name(b.mod_name()),
                                         _to_var_name(&stem_name.to_case(Case::Pascal))
                                     ));
                                 } else {
                                     column_def.class = Some(format!(
-                                        "crate::{}::{}::_{}",
+                                        "{}::{}::{}::_{}",
+                                        if_then_else!(
+                                            outer_crate,
+                                            format!("db_{db}"),
+                                            "crate".to_string()
+                                        ),
                                         _to_var_name(group_name),
                                         _to_var_name(def.mod_name()),
                                         _to_var_name(&name.to_case(Case::Pascal))

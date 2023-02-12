@@ -73,7 +73,7 @@ pub const ONLY_TRASHED_SQL: &str = r#"@{ def.soft_delete_tpl("","deleted_at IS N
 static CACHE_ALL: OnceCell<Vec<ArcSwapOption<Vec<_@{ pascal_name }@Cache>>>> = OnceCell::new();
 static CACHE_ALL_DIRTY_FLAG: AtomicBool = AtomicBool::new(false);
 static CACHE_RESET_TIME: AtomicU64 = AtomicU64::new(0);
-static BULK_FETCH_QUEUE: OnceCell<Vec<SegQueue<Primary>>> = OnceCell::new();
+static BULK_FETCH_QUEUE: OnceCell<Vec<SegQueue<InnerPrimary>>> = OnceCell::new();
 static PRIMARY_TYPE_ID: u64 = @{ def.get_type_id("PRIMARY_TYPE_ID") }@;
 static COL_KEY_TYPE_ID: u64 = @{ def.get_type_id("COL_KEY_TYPE_ID") }@;
 static VERSION_TYPE_ID: u64 = @{ def.get_type_id("VERSION_TYPE_ID") }@;
@@ -142,7 +142,7 @@ pub(crate) enum CacheOp {
         list: Vec<ForInsert>,
     },
     Update {
-        id: Primary,
+        id: InnerPrimary,
         shard_id: ShardId,
         update: Data,
         op: OpData,
@@ -154,7 +154,7 @@ pub(crate) enum CacheOp {
         _{alias}: Option<Vec<rel_{class_mod}::CacheOp>>,", "") }@
     },
     UpdateMany {
-        ids: Vec<Primary>,
+        ids: Vec<InnerPrimary>,
         shard_id: ShardId,
         update: Data,
         op: OpData,
@@ -166,26 +166,26 @@ pub(crate) enum CacheOp {
         op: OpData,
     },
     Delete {
-        id: Primary,
+        id: InnerPrimary,
         shard_id: ShardId,
     },
     DeleteMany {
-        ids: Vec<Primary>,
+        ids: Vec<InnerPrimary>,
         shard_id: ShardId,
     },
     DeleteAll,
     Cascade {
-        ids: Vec<Primary>,
+        ids: Vec<InnerPrimary>,
         shard_id: ShardId,
     },
     Invalidate {
-        id: Primary,
+        id: InnerPrimary,
         shard_id: ShardId,
     },
     InvalidateAll,
 @%- for (mod_name, local, val, val2) in def.relations_on_delete_not_cascade() %@
     Reset@{ local|pascal }@@{ val|pascal }@ {
-        ids: Vec<Primary>,
+        ids: Vec<InnerPrimary>,
         shard_id: ShardId,
     },
 @%- endfor %@
@@ -230,11 +230,11 @@ impl CacheOp {
     }
 
     pub(crate) fn apply_to_list(list: &[Arc<CacheWrapper>], msgs: &[CacheOp], shard_id: ShardId, time: MSec) -> Vec<Arc<CacheWrapper>> {
-        let mut map = list.iter().map(|v| (Primary::from(&v._inner), Arc::clone(v))).collect::<IndexMap<_, _>>();
+        let mut map = list.iter().map(|v| (InnerPrimary::from(&v._inner), Arc::clone(v))).collect::<IndexMap<_, _>>();
         for msg in msgs {
             match msg {
                 CacheOp::Insert { data, .. } => {
-                    map.insert(Primary::from(data), Arc::new(CacheWrapper::_from_data(data.clone(), shard_id, time)));
+                    map.insert(InnerPrimary::from(data), Arc::new(CacheWrapper::_from_data(data.clone(), shard_id, time)));
                 }
                 CacheOp::BulkInsert { .. } => {},
                 CacheOp::Update { id, update, op, .. } => {
@@ -319,7 +319,7 @@ impl CacheOp {
                                 msg.handle_cache_msg(time, propagated).await;
                             }
                         }", "") }@
-                        let id = PrimaryHasher(Primary::from(&cache._inner), shard_id);
+                        let id = PrimaryHasher(InnerPrimary::from(&cache._inner), shard_id);
                         @%- if def.versioned %@
                         let vw = VersionWrapper{
                             id: id.0.clone(),
@@ -331,7 +331,7 @@ impl CacheOp {
                             Cache::insert_short(&id, Arc::new(cache)).await;
                         }
                         @%- else %@
-                        if Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| Primary::from(o) == id.0).is_none() {
+                        if Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0).is_none() {
                             Cache::insert_short(&id, Arc::new(cache)).await;
                         }
                         @%- endif %@
@@ -359,7 +359,7 @@ impl CacheOp {
                                 {list_sort}
                                 {list_limit}
                             }", "") }@
-                            let id = PrimaryHasher(Primary::from(&cache._inner), shard_id);
+                            let id = PrimaryHasher(InnerPrimary::from(&cache._inner), shard_id);
                             @%- if def.versioned %@
                             let vw = VersionWrapper{
                                 id: id.0.clone(),
@@ -371,7 +371,7 @@ impl CacheOp {
                                 Cache::insert_short(&id, Arc::new(cache)).await;
                             }
                             @%- else %@
-                            if Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| Primary::from(o) == id.0).is_none() {
+                            if Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0).is_none() {
                                 Cache::insert_short(&id, Arc::new(cache)).await;
                             }
                             @%- endif %@
@@ -406,7 +406,7 @@ impl CacheOp {
                             Cache::insert_version(&vw, Arc::new(vw.clone())).await;
                         }
                         @%- endif %@
-                        if let Some(cache) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| Primary::from(o) == id.0) {
+                        if let Some(cache) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
                             let mut cache = cache.as_ref().clone();
                             @%- if def.versioned %@
                             if op.@{ version_col }@ == Op::Set {
@@ -443,7 +443,7 @@ impl CacheOp {
                             sleep(Duration::from_secs(CACHE_DELAY_SAFETY1)).await;
                             Cache::invalidate(&id, shard_id).await;
                             sleep(Duration::from_secs(CACHE_DELAY_SAFETY2)).await;
-                            if let Some(cache) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| Primary::from(o) == id.0) {
+                            if let Some(cache) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
                                 if cache._time().less_than(time) {
                                     Cache::invalidate(&id, shard_id).await;
                                 }
@@ -457,7 +457,7 @@ impl CacheOp {
                         let mut rest_ids = Vec::new();
                         for id in &ids {
                             let id = PrimaryHasher(id.clone(), shard_id);
-                            if let Some(cache) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| Primary::from(o) == id.0) {
+                            if let Some(cache) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
                                 let mut cache = cache.as_ref().clone();
                                 cache._inner = CacheOp::update_with_unique_cache(&id, cache._inner.clone(), &update, &op, time).await;
                                 Cache::insert_long(&id, Arc::new(cache), USE_FAST_CACHE).await;
@@ -482,8 +482,8 @@ impl CacheOp {
                     if USE_CACHE {
                         let mut rest_ids = Vec::new();
                         for data in &data_list {
-                            let id = PrimaryHasher(Primary::from(data), shard_id);
-                            if let Some(cache) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| Primary::from(o) == id.0) {
+                            let id = PrimaryHasher(InnerPrimary::from(data), shard_id);
+                            if let Some(cache) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
                                 let mut cache = cache.as_ref().clone();
                                 cache._inner = CacheOp::update_with_unique_cache(&id, cache._inner.clone(), &update, &op, time).await;
                                 Cache::insert_long(&id, Arc::new(cache), USE_FAST_CACHE).await;
@@ -556,7 +556,7 @@ impl CacheOp {
                             let mut op = OpData::default();
                             update.@{ local }@ = @{ val2 }@;
                             op.@{ local }@ = Op::Set;
-                            if let Some(cache) = Cache::get::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| Primary::from(o) == id.0) {
+                            if let Some(cache) = Cache::get::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
                                 let mut cache = cache.as_ref().clone();
                                 cache._inner = CacheOp::update(cache._inner.clone(), &update, &op);
                                 Cache::insert_long(&id, Arc::new(cache), USE_FAST_CACHE).await;
@@ -925,9 +925,9 @@ fn push_delayed_db(list: &Vec<ForInsert>) -> Result<()> {
 @%- if def.use_save_delayed() %@
 
 async fn _handle_delayed_msg_save(shard_id: ShardId) {
-    let mut map: BTreeMap<Primary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
+    let mut map: BTreeMap<InnerPrimary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
     while let Some(x) = SAVE_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
-        let inner_map = map.entry(Primary::from(&x)).or_insert_with(IndexMap::new);
+        let inner_map = map.entry(InnerPrimary::from(&x)).or_insert_with(IndexMap::new);
         if let Some(old) = inner_map.get_mut(&x._op) {
             aggregate_update(&x, old);
         } else {
@@ -939,10 +939,10 @@ async fn _handle_delayed_msg_save(shard_id: ShardId) {
     }
     let mut vec: Vec<IndexMap<OpData, ForUpdate>> = map.into_iter().map(|(_k, v)| v).collect();
     let chunk_num = cmp::max(10, vec.len() * 2 / (*crate::connection::SOURCE_MAX_CONNECTIONS as usize) + 1);
-    let local = tokio::task::LocalSet::new();
+    let mut join_set = tokio::task::JoinSet::new();
     while !vec.is_empty() {
         let mut buf = vec.split_off(vec.len().saturating_sub(chunk_num));
-        local.spawn_local(async move {
+        join_set.spawn(async move {
             loop {
                 let mut conn = DbConn::_new(shard_id);
                 if let Err(err) = conn.begin().await {
@@ -968,7 +968,7 @@ async fn _handle_delayed_msg_save(shard_id: ShardId) {
             }
         });
     }
-    local.await;
+    while join_set.join_next().await.is_some() {};
 }
 @%- endif %@
 
@@ -1004,9 +1004,9 @@ fn aggregate_update(x: &_@{ pascal_name }@ForUpdate, old: &mut _@{ pascal_name }
 @%- if def.use_update_delayed() %@
 
 async fn _handle_delayed_msg_update(shard_id: ShardId) {
-    let mut map: BTreeMap<Primary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
+    let mut map: BTreeMap<InnerPrimary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
     while let Some(x) = UPDATE_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
-        let inner_map = map.entry(Primary::from(&x)).or_insert_with(IndexMap::new);
+        let inner_map = map.entry(InnerPrimary::from(&x)).or_insert_with(IndexMap::new);
         if let Some(old) = inner_map.get_mut(&x._op) {
             aggregate_update(&x, old);
         } else {
@@ -1016,10 +1016,10 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
     if map.is_empty() {
         return;
     }
-    let mut vec: Vec<(OpData, Data, Vec<Primary>)> = Vec::new();
+    let mut vec: Vec<(OpData, Data, Vec<InnerPrimary>)> = Vec::new();
     for m in map.into_values() {
         'next: for up in m.into_values() {
-            let id: Primary = (&up).into();
+            let id: InnerPrimary = (&up).into();
             for row in vec.iter_mut() {
                 if row.0 == up._op && row.1 == up._update {
                     row.2.push(id);
@@ -1029,9 +1029,9 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
             vec.push((up._op, up._update, vec![id]));
         }
     }
-    let local = tokio::task::LocalSet::new();
+    let mut join_set = tokio::task::JoinSet::new();
     for (op, update, list) in vec {
-        local.spawn_local(async move {
+        join_set.spawn(async move {
             loop {
                 let mut conn = DbConn::_new(shard_id);
                 if let Err(err) = conn.begin().await {
@@ -1071,15 +1071,15 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
             }
         });
     }
-    local.await;
+    while join_set.join_next().await.is_some() {};
 }
 @%- endif %@
 @%- if def.use_upsert_delayed() %@
 
 async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
-    let mut map: BTreeMap<Primary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
+    let mut map: BTreeMap<InnerPrimary, IndexMap<OpData, ForUpdate>> = BTreeMap::new();
     while let Some(x) = UPSERT_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
-        let inner_map = map.entry(Primary::from(&x)).or_insert_with(IndexMap::new);
+        let inner_map = map.entry(InnerPrimary::from(&x)).or_insert_with(IndexMap::new);
         if let Some(old) = inner_map.get_mut(&x._op) {
             aggregate_update(&x, old);
         } else {
@@ -1101,9 +1101,9 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
             vec.push((up._op, up._update, vec![up._data]));
         }
     }
-    let local = tokio::task::LocalSet::new();
+    let mut join_set = tokio::task::JoinSet::new();
     for (op, update, list) in vec {
-        local.spawn_local(async move {
+        join_set.spawn(async move {
             loop {
                 let mut conn = DbConn::_new(shard_id);
                 if let Err(err) = conn.begin().await {
@@ -1143,20 +1143,21 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
             }
         });
     }
-    local.await;
+    while join_set.join_next().await.is_some() {};
 }
 @%- endif %@
 
 @% for (name, column_def) in def.id_except_auto_increment() -%@
-#[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, JsonSchema)]
+#[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Ord, PartialOrd, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, JsonSchema)]
 pub struct @{ id_name }@(pub(crate) @{ column_def.get_inner_type(false) }@);
 @% endfor -%@
 @% for (name, column_def) in def.id_auto_increment() -%@
-#[derive(Serialize, Hash, Eq, PartialEq, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, JsonSchema)]
+#[derive(Serialize, Hash, Eq, PartialEq, Ord, PartialOrd, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, JsonSchema)]
 pub struct @{ id_name }@(
     #[schemars(schema_with = "crate::seeder::id_schema")]
     pub(crate) @{ column_def.get_inner_type(false) }@
 );
+async_graphql::scalar!(@{ id_name }@);
 
 static GENERATED_IDS: OnceCell<RwLock<HashMap<String, @{ id_name }@>>> = OnceCell::new();
 
@@ -1202,13 +1203,15 @@ impl<'de> serde::Deserialize<'de> for @{ id_name }@ {
 }
 
 @% endfor -%@
+#[derive(Clone)]
+pub struct Primary(@{ def.primaries()|fmt_join("pub {outer_owned}", ", ") }@);
 #[derive(
     sqlx::FromRow, Hash, Eq, PartialEq, Deserialize, Serialize, Clone, Debug, Ord, PartialOrd,
 )]
-pub(crate) struct Primary(@{ def.primaries()|fmt_join("pub {inner}", ", ") }@);
+pub(crate) struct InnerPrimary(@{ def.primaries()|fmt_join("pub {inner}", ", ") }@);
 
 #[derive(Hash, Eq, PartialEq, Deserialize, Serialize, Clone, Debug)]
-struct PrimaryHasher(Primary, ShardId);
+struct PrimaryHasher(InnerPrimary, ShardId);
 
 impl HashVal for PrimaryHasher {
     fn hash_val(&self, shard_id: ShardId) -> u128 {
@@ -1235,7 +1238,7 @@ impl PrimaryHasher {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct PrimaryWrapper(Primary, ShardId, MSec);
+struct PrimaryWrapper(InnerPrimary, ShardId, MSec);
 
 impl CacheVal for PrimaryWrapper {
     fn _size(&self) -> u32 {
@@ -1297,9 +1300,10 @@ pub(crate) struct CacheData {
 @% for (name, column_def) in def.enums() -%@
 @% if column_def.enum_values.is_some() -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(Serialize_repr, Deserialize_repr, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
+#[derive(async_graphql::Enum, Serialize_repr, Deserialize_repr, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
+#[graphql(name="@{ group_name|to_pascal_name }@@{ mod_name|to_pascal_name }@@{ name|to_pascal_name }@")]
 pub enum _@{ name|to_pascal_name }@ {
 @% for row in values -%@@{ row.title|comment4 }@@{ row.comment|comment4 }@@{ row.title|strum_message4 }@@{ row.comment|strum_detailed4 }@    @{ row.name }@ = @{ row.value }@,
 @% endfor -%@
@@ -1338,8 +1342,9 @@ impl From<Option<_@{ name|to_pascal_name }@>> for BindValue {
 @% for (name, column_def) in def.db_enums() -%@
 @% if column_def.db_enum_values.is_some() -%@
 @% let values = column_def.db_enum_values.as_ref().unwrap() -%@
-#[derive(Serialize, Deserialize, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
+#[derive(async_graphql::Enum, Serialize, Deserialize, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
 #[allow(non_camel_case_types)]
+#[graphql(name="@{ group_name|to_pascal_name }@@{ mod_name|to_pascal_name }@@{ name|to_pascal_name }@")]
 pub enum _@{ name|to_pascal_name }@ {
 @% for row in values -%@@{ row.title|comment4 }@@{ row.comment|comment4 }@@{ row.title|strum_message4 }@@{ row.comment|strum_detailed4 }@    @{ row.name }@,
 @% endfor -%@
@@ -1382,7 +1387,7 @@ pub struct _@{ pascal_name }@Cache {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub(crate) struct VersionWrapper {
-    id: Primary,
+    id: InnerPrimary,
     shard_id: ShardId,
     time: MSec,
     version: u32,
@@ -1508,7 +1513,7 @@ pub trait _@{ pascal_name }@MutTr {
 ", "") -}@
 }
     
-#[async_trait(?Send)]
+#[async_trait]
 pub trait _@{ pascal_name }@Rel {
 @{ def.relations_one()|fmt_rel_join("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
         unimplemented!(\"fetch_{raw_alias} is not implemented\")
@@ -1518,7 +1523,7 @@ pub trait _@{ pascal_name }@Rel {
     }\n", "") -}@
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl _@{ pascal_name }@Rel for _@{ pascal_name }@ {
 @{ def.relations_one_except_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
         if self.{alias}.is_some() {
@@ -1573,7 +1578,7 @@ impl _@{ pascal_name }@Rel for _@{ pascal_name }@ {
     }\n", "") -}@
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl _@{ pascal_name }@Rel for _@{ pascal_name }@ForUpdate {
 @{ def.relations_one_owner()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
         if self.{alias}.is_some() {
@@ -1628,7 +1633,7 @@ impl CacheWrapper {
     }\n", "") -}@
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl _@{ pascal_name }@Rel for _@{ pascal_name }@Cache {
 @{ def.relations_one_only_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
         self.{alias} = Some(
@@ -1647,7 +1652,7 @@ impl _@{ pascal_name }@Rel for _@{ pascal_name }@Cache {
     }\n", "") -}@
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@> {
 @{ def.relations_one_except_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().map(|v| v.{var}()).collect();
@@ -1664,6 +1669,8 @@ impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@> {
         for val in self.iter_mut() {
             if let Some(id) = val.{var}() {
                 val.{alias} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            } else {
+                val.{alias} = Some(None);
             }
         }
         Ok(())
@@ -1683,6 +1690,8 @@ impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@> {
         for val in self.iter_mut() {
             if let Some(id) = val.{var}() {
                 val.{alias} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            } else {
+                val.{alias} = Some(None);
             }
         }
         Ok(())
@@ -1732,7 +1741,7 @@ impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@> {
     }\n", "") -}@
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl _@{ pascal_name }@Rel for Vec<&mut _@{ pascal_name }@> {
 @{ def.relations_one_except_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
         let ids: FxHashSet<_> = self.iter_mut().map(|v| v.{var}()).collect();
@@ -1749,6 +1758,8 @@ impl _@{ pascal_name }@Rel for Vec<&mut _@{ pascal_name }@> {
         for val in self.iter_mut() {
             if let Some(id) = val.{var}() {
                 val.{alias} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            } else {
+                val.{alias} = Some(None);
             }
         }
         Ok(())
@@ -1768,6 +1779,8 @@ impl _@{ pascal_name }@Rel for Vec<&mut _@{ pascal_name }@> {
         for val in self.iter_mut() {
             if let Some(id) = val.{var}() {
                 val.{alias} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            } else {
+                val.{alias} = Some(None);
             }
         }
         Ok(())
@@ -1817,7 +1830,7 @@ impl _@{ pascal_name }@Rel for Vec<&mut _@{ pascal_name }@> {
     }\n", "") -}@
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@ForUpdate> {
 @{ def.relations_one_owner()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().map(|v| v.{var}().get()).collect();
@@ -1834,6 +1847,8 @@ impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@ForUpdate> {
         for val in self.iter_mut() {
             if let Some(id) = val.{var}().get() {
                 val.{alias} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            } else {
+                val.{alias} = Some(None);
             }
         }
         Ok(())
@@ -1877,7 +1892,7 @@ impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@ForUpdate> {
     }\n", "") -}@
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl _@{ pascal_name }@Rel for Vec<&mut _@{ pascal_name }@ForUpdate> {
 @{ def.relations_one_owner()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().map(|v| v.{var}().get()).collect();
@@ -1894,6 +1909,8 @@ impl _@{ pascal_name }@Rel for Vec<&mut _@{ pascal_name }@ForUpdate> {
         for val in self.iter_mut() {
             if let Some(id) = val.{var}().get() {
                 val.{alias} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            } else {
+                val.{alias} = Some(None);
             }
         }
         Ok(())
@@ -1953,6 +1970,8 @@ impl CacheWrapper {
         for val in vec.iter_mut() {
             if let Some(id) = val.{var}() {
                 val.{alias} = map.get(&id).cloned();
+            } else {
+                val.{alias} = Some(None);
             }
         }
         Ok(())
@@ -2000,7 +2019,7 @@ impl CacheWrapper {
     }\n", "") -}@
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@Cache> {
 @{ def.relations_one_only_cache()|fmt_rel_join_not_null_or_null("    async fn fetch_{raw_alias}(&mut self, conn: &mut DbConn) -> Result<()> {
         let mut ids = FxHashSet::default();
@@ -2025,6 +2044,8 @@ impl _@{ pascal_name }@Rel for Vec<_@{ pascal_name }@Cache> {
         for val in self.iter_mut() {
             if let Some(id) = val.{var}() {
                 val.{alias} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            } else {
+                val.{alias} = Some(None);
             }
         }
         Ok(())
@@ -2307,11 +2328,30 @@ impl Cond {
             }
         };
     }
+    pub fn when<F>(mut self, condition: bool, f: F) -> Self
+     where F: FnOnce(Self) -> Self {
+        if condition {
+            f(self)
+        } else {
+            self
+        }
+    }
+    pub fn if_let_some<T, F>(mut self, value: &Option<T>, f: F) -> Self
+    where
+        T: Clone,
+        F: FnOnce(Self, T) -> Self,
+    {
+        if let Some(v) = value {
+            f(self, v.clone())
+        } else {
+            self
+        }
+    }
     crate::misc::condition!(Data);
 }
 
 @% let cond_macro_name = "cond_{}_{}"|format(group_name, name) -%@
-@% let model_path = "db_{}::{}::{}::_{}"|format(db, group_name, name|to_var_name, name) -%@
+@% let model_path = "db_{}::{}::{}::_{}"|format(db, group_name, mod_name|to_var_name, mod_name) -%@
 @% let macro_path = "db_{}"|format(db) -%@
 #[macro_export]
 macro_rules! @{ cond_macro_name }@_null {
@@ -2364,6 +2404,7 @@ pub use @{ cond_macro_name }@_rel;
 
 #[macro_export]
 macro_rules! @{ cond_macro_name }@ {
+    () => (@{ model_path }@::Cond::new_and());
     (($($t:tt)*)) => (@{ macro_path }@::@{ cond_macro_name }@!($($t)*));
     (NOT $t:tt) => (@{ model_path }@::Cond::Not(std::boxed::Box::new(@{ macro_path }@::@{ cond_macro_name }@!($t))));
     (WITH_TRASHED) => (@{ model_path }@::Cond::WithTrashed);
@@ -2485,6 +2526,25 @@ impl QueryBuilder {
     pub fn bind<T: Into<BindValue>>(mut self, value: T) -> Self {
         self.bind.push(value.into());
         self
+    }
+    pub fn when<F>(mut self, condition: bool, f: F) -> Self
+     where F: FnOnce(Self) -> Self {
+        if condition {
+            f(self)
+        } else {
+            self
+        }
+    }
+    pub fn if_let_some<T, F>(mut self, value: &Option<T>, f: F) -> Self
+    where
+        T: Clone,
+        F: FnOnce(Self, T) -> Self,
+    {
+        if let Some(v) = value {
+            f(self, v.clone())
+        } else {
+            self
+        }
     }
 @{- def.relations()|fmt_rel_join("
     pub fn fetch_{raw_alias}(mut self) -> Self {
@@ -2643,7 +2703,7 @@ impl QueryBuilder {
         if let Some(offset) = self.offset {
             let _ = write!(sql, " offset {}", offset);
         }
-        let mut query = sqlx::query_as::<_, Primary>(&sql);
+        let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
         let _span = info_span!("query", sql = &query.sql());
         if let Some(c) = self.condition {
             debug!("{:?}", &c);
@@ -2908,7 +2968,7 @@ impl QueryBuilder {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 pub trait UnionBuilder {
     async fn select(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@>>;
     async fn select_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>>;
@@ -2928,7 +2988,7 @@ where
     Ok(result)
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl UnionBuilder for Vec<QueryBuilder> {
     async fn select(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@>> {
         if self.is_empty() {
@@ -3011,14 +3071,14 @@ impl @{ id_name }@ {
 @% endif -%@
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 pub trait @{ id_name }@Tr {
     async fn fetch_from_cache(&self, conn: &DbConn) -> Result<Option<_@{ pascal_name }@Cache>>;
     async fn fetch_from_cache_with_trashed(&self, conn: &DbConn) -> Result<Option<_@{ pascal_name }@Cache>>;
 }
 @%- if def.primaries().len() == 1 && def.use_cache() %@
 
-#[async_trait(?Send)]
+#[async_trait]
 impl @{ id_name }@Tr for Option<@{ id_name }@> {
     async fn fetch_from_cache(&self, conn: &DbConn) -> Result<Option<_@{ pascal_name }@Cache>> {
         if let Some(id) = self {
@@ -3056,56 +3116,78 @@ impl From<&@{ id_name }@> for @{ id_name }@ {
 }
 @%- endfor  %@
 @% if def.primaries().len() == 1 %@
-impl From<&Primary> for @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ {
-    fn from(id: &Primary) -> Self {
+impl From<&InnerPrimary> for @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ {
+    fn from(id: &InnerPrimary) -> Self {
         Self(@{ def.primaries()|fmt_join_with_paren("id.{index}.clone()", ", ") }@)
     }
 }
-impl From<&Arc<Primary>> for @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ {
-    fn from(id: &Arc<Primary>) -> Self {
+impl From<&Arc<InnerPrimary>> for @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ {
+    fn from(id: &Arc<InnerPrimary>) -> Self {
         Self(@{ def.primaries()|fmt_join_with_paren("id.{index}.clone()", ", ") }@)
     }
 }
 impl From<@{ def.primaries()|fmt_join_with_paren("{outer_ref}", ", ") }@> for Primary {
-    fn from(obj: @{ def.primaries()|fmt_join_with_paren("{outer_ref}", ", ") }@) -> Self {
+    fn from(id: @{ def.primaries()|fmt_join_with_paren("{outer_ref}", ", ") }@) -> Self {
         @% if def.primaries().len() == 1 -%@
-        Self(obj.get())
+        Self(id.clone())
         @%- else -%@
-        Self(@{ def.primaries()|fmt_join("obj.{index}.get()", ", ") }@)
+        Self(@{ def.primaries()|fmt_join("id.{index}.clone()", ", ") }@)
         @%- endif %@
     }
 }
 @% endif -%@
+impl From<&Primary> for InnerPrimary {
+    fn from(id: &Primary) -> Self {
+        Self(@{ def.primaries()|fmt_join("id.{index}.into()", ", ") }@)
+    }
+}
+impl From<&InnerPrimary> for Primary {
+    fn from(id: &InnerPrimary) -> Self {
+        Self(@{ def.primaries()|fmt_join("id.{index}.into()", ", ") }@)
+    }
+}
 impl From<@{ def.primaries()|fmt_join_with_paren("{inner}", ", ") }@> for Primary {
     fn from(id: @{ def.primaries()|fmt_join_with_paren("{inner}", ", ") }@) -> Self {
+        @% if def.primaries().len() == 1 %@Self(id.into())@% else %@Self(@{ def.primaries()|fmt_join("id.{index}.into()", ", ") }@)@% endif %@
+    }
+}
+@%- if def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") != def.primaries()|fmt_join_with_paren("{inner}", ", ") %@
+impl From<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> for Primary {
+    fn from(id: @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@) -> Self {
         @% if def.primaries().len() == 1 %@Self(id)@% else %@Self(@{ def.primaries()|fmt_join("id.{index}", ", ") }@)@% endif %@
     }
 }
+@%- endif %@
 @% if def.primaries().len() > 1 -%@
 impl From<&@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> for Primary {
     fn from(id: &@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@) -> Self {
-        @% if def.primaries().len() == 1 %@Self(id)@% else %@Self(@{ def.primaries()|fmt_join("id.{index}.into()", ", ") }@)@% endif %@
+        Self(@{ def.primaries()|fmt_join("id.{index}", ", ") }@)
     }
 }
-impl From<&Primary> for @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ {
-    fn from(id: &Primary) -> Self {
+impl From<&InnerPrimary> for @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ {
+    fn from(id: &InnerPrimary) -> Self {
         @{ def.primaries()|fmt_join_with_paren("id.{index}.into()", ", ") }@
     }
 }
 @% endif -%@
 impl From<&_@{ pascal_name }@> for Primary {
     fn from(obj: &_@{ pascal_name }@) -> Self {
+        Self(@{ def.primaries()|fmt_join("obj._inner.{var}{clone}.into()", ", ") }@)
+    }
+}
+impl From<&_@{ pascal_name }@> for InnerPrimary {
+    fn from(obj: &_@{ pascal_name }@) -> Self {
         Self(@{ def.primaries()|fmt_join("obj._inner.{var}{clone}", ", ") }@)
     }
 }
 
-impl From<&Data> for Primary {
+impl From<&Data> for InnerPrimary {
     fn from(obj: &Data) -> Self {
         Self(@{ def.primaries()|fmt_join("obj.{var}{clone}", ", ") }@)
     }
 }
 
-impl From<&CacheData> for Primary {
+impl From<&CacheData> for InnerPrimary {
     fn from(obj: &CacheData) -> Self {
         Self(@{ def.primaries()|fmt_join("obj.{var}{clone}", ", ") }@)
     }
@@ -3113,40 +3195,45 @@ impl From<&CacheData> for Primary {
 
 impl From<&_@{ pascal_name }@Cache> for Primary {
     fn from(obj: &_@{ pascal_name }@Cache) -> Self {
+        Self(@{ def.primaries()|fmt_join("obj._wrapper._inner.{var}{clone}.into()", ", ") }@)
+    }
+}
+impl From<&_@{ pascal_name }@Cache> for InnerPrimary {
+    fn from(obj: &_@{ pascal_name }@Cache) -> Self {
         Self(@{ def.primaries()|fmt_join("obj._wrapper._inner.{var}{clone}", ", ") }@)
     }
 }
 
-impl From<&Arc<CacheWrapper>> for Primary {
+impl From<&Arc<CacheWrapper>> for InnerPrimary {
     fn from(obj: &Arc<CacheWrapper>) -> Self {
         Self(@{ def.primaries()|fmt_join("obj._inner.{var}{clone}", ", ") }@)
     }
 }
 
-impl From<&_@{ pascal_name }@ForUpdate> for Primary {
+impl From<&_@{ pascal_name }@ForUpdate> for InnerPrimary {
     fn from(obj: &_@{ pascal_name }@ForUpdate) -> Self {
         Self(@{ def.primaries()|fmt_join("obj._data.{var}{clone}", ", ") }@)
     }
 }
 
-impl From<&mut _@{ pascal_name }@ForUpdate> for Primary {
+impl From<&mut _@{ pascal_name }@ForUpdate> for InnerPrimary {
     fn from(obj: &mut _@{ pascal_name }@ForUpdate) -> Self {
         Self(@{ def.primaries()|fmt_join("obj._data.{var}{clone}", ", ") }@)
     }
 }
 
-fn id_to_string(id: &@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@) -> String {
+fn id_to_string(id: &InnerPrimary) -> String {
     format!("@{ def.primaries()|fmt_join("{col}={}", ", ") }@"@{ def.primaries()|fmt_join(", id.{index}", "") }@)
 }
 
-impl fmt::Display for Primary {
+impl fmt::Display for InnerPrimary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "@{ def.primaries()|fmt_join("{col}={}", ", ") }@"@{ def.primaries()|fmt_join(", self.{index}", "") }@)
     }
 }
 
 #[allow(clippy::useless_format)]
-fn primaries_to_str(s: &[Primary]) -> String {
+fn primaries_to_str(s: &[InnerPrimary]) -> String {
     let v = s.iter().fold(Vec::new(), |mut i, p| {
         i.push(format!("@{ def.primaries()|fmt_join_with_paren("{}", ", ") }@"@{ def.primaries()|fmt_join(", p.{index}", "") }@));
         i
@@ -3293,11 +3380,16 @@ impl _@{ pascal_name }@Cache {
         self.{alias}.as_ref().expect(\"{alias} is not loaded\").as_ref().map(|b| &**b)
     }", "") }@
     pub async fn _invalidate(&self, conn: &DbConn) {
-        let id: Primary = self.into();
+        let id: InnerPrimary = self.into();
         CacheMsg(vec![CacheOp::Invalidate{id, shard_id: conn.shard_id()}.wrap()], MSec::now())
             .do_send()
             .await;
     }
+    @%- if def.use_cache() %@
+    pub async fn _find_self(&self, conn: &DbConn) -> Result<Self> {
+        _@{ pascal_name }@::find_from_cache_with_trashed(conn, Primary::from(self)).await
+    }
+    @%- endif %@
 }
 
 impl ForUpdateTr for _@{ pascal_name }@ForUpdate {
@@ -3307,26 +3399,47 @@ impl ForUpdateTr for _@{ pascal_name }@ForUpdate {
     fn _has_been_deleted(&self) -> bool {
         @{ def.soft_delete_tpl("false","self._data.deleted_at.is_some()","self._data.deleted != 0")}@
     }
-    fn _delete(&mut self) {
+    fn _set_delete(&mut self) {
         self._do_delete = true;
+    }
+    fn _set_delete_and_return_self(mut self) -> Self {
+        self._do_delete = true;
+        self
+    }
+    fn _cancel_delete(&mut self) {
+        self._do_delete = false;
     }
     fn _will_be_deleted(&self) -> bool {
         self._do_delete
     }
-    fn _upsert(&mut self) {
+    fn _set_upsert(&mut self) {
         self._upsert = true;
         @{- def.auto_increments()|fmt_join("
         panic!(\"Tables using auto increment are not supported.\");", "") }@
     }
     fn _is_updated(&self) -> bool {
-        self._is_new
-        || self._do_delete
+        false
         @{- def.non_primaries()|fmt_join("
         || self._op.{var} != Op::None", "") }@
-        @{- def.relations_one_owner()|fmt_rel_join("
-        || self.{alias}.as_ref().and_then(|v| v.as_ref().map(|v| v._is_updated())).unwrap_or_default()", "") }@
-        @{- def.relations_many()|fmt_rel_join("
-        || self.{alias}.as_ref().map(|v| v.iter().any(|v| v._is_updated())).unwrap_or_default()", "") }@
+    }
+    fn _eq(&self, update: &Self) -> bool {
+        true
+        @{- def.for_cmp()|fmt_join("
+        && self._data.{var} == update._data.{var}", "") }@
+    }
+    fn _set(&mut self, update: Self) {
+        @{- def.for_cmp()|fmt_join("
+        self._op.{var} = Op::Set;
+        self._data.{var} = update._data.{var}.clone();
+        self._update.{var} = update._data.{var};", "") }@
+    }
+    fn _update(&mut self, update: Self) {
+        @{- def.for_cmp()|fmt_join("
+        if self._data.{var} != update._data.{var} {
+            self._op.{var} = Op::Set;
+            self._data.{var} = update._data.{var}.clone();
+            self._update.{var} = update._data.{var};
+        }", "") }@
     }
 }
 
@@ -3362,31 +3475,53 @@ impl _@{ pascal_name }@ForUpdate {
         }
     }", "") }@
     pub async fn _invalidate_cache(&self, conn: &DbConn) {
-        let id: Primary = self.into();
+        let id: InnerPrimary = self.into();
         CacheMsg(vec![CacheOp::Invalidate{id, shard_id: conn.shard_id()}.wrap()], MSec::now())
             .do_send()
             .await;
     }
+    pub(crate) fn _validate(&self) -> Result<()> {
+        self._data.validate()?;
+@{- def.relations_one_owner()|fmt_rel_join("
+        if let Some(Some(v)) = self.{alias}.as_ref() {
+            v._validate()?;
+        }", "") }@
+@{- def.relations_many()|fmt_rel_join("
+        if let Some(v) = self.{alias}.as_ref() {
+            for v in v.iter() {
+                v._validate()?;
+            }
+        }", "") }@
+        Ok(())
+    }
     pub(crate) fn _set_default_value(&mut self, conn: &DbConn) {
-@%- if def.created_at_conf().is_some() %@
-        if self._op.created_at == Op::None {
-            self._data.created_at = @{(def.created_at_conf().unwrap() == Timestampable::RealTime)|if_then_else("SystemTime::now()","conn.time()")}@.into();
+        if self._is_new() {
+            @%- if def.created_at_conf().is_some() %@
+            if self._op.created_at == Op::None {
+                self._data.created_at = @{(def.created_at_conf().unwrap() == Timestampable::RealTime)|if_then_else("SystemTime::now()","conn.time()")}@.into();
+            }
+            @%- endif %@
+            @%- if def.updated_at_conf().is_some() %@
+            if self._op.updated_at == Op::None {
+                self._data.updated_at = @{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else("SystemTime::now()","conn.time()")}@.into();
+            }
+            @%- endif %@
+            @%- if def.versioned %@
+            self._data.@{ version_col }@ = 1;
+            @%- endif %@
+            @{ def.inheritance_set() }@
         }
-@%- endif %@
-@%- if def.updated_at_conf().is_some() %@
-        if self._op.updated_at == Op::None {
-            self._data.updated_at = @{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else("SystemTime::now()","conn.time()")}@.into();
+        @%- if def.updated_at_conf().is_some() %@
+        if (self._is_updated() || self._will_be_deleted()) && self._op.updated_at == Op::None {
+            self.updated_at().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else("SystemTime::now()","conn.time()")}@.into());
         }
-@%- endif %@
-@%- if def.versioned %@
-        self._data.@{ version_col }@ = 1;
-@%- endif %@
-        @{ def.inheritance_set() }@
+        @%- endif %@
 @{- def.relations_one_owner()|fmt_rel_join("
         self.{alias}.as_mut().map(|v| v.as_mut().map(|v| v._set_default_value(conn)));", "") }@
 @{- def.relations_many()|fmt_rel_join("
         if let Some(v) = self.{alias}.as_mut() {
             for v in v.iter_mut() {
+                v._op.{foreign} = Op::None;
                 v._set_default_value(conn);
             }
         }", "") }@
@@ -3395,7 +3530,7 @@ impl _@{ pascal_name }@ForUpdate {
 
 impl fmt::Display for _@{ pascal_name }@ForUpdate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let id = Primary::from(self);
+        let id = InnerPrimary::from(self);
         if self._is_new() {
             write!(f, "INSERT @{ table_name }@: ")?;
             @{- def.all_columns()|fmt_join("
@@ -3551,6 +3686,7 @@ impl _@{ pascal_name }@ {
     }
 @%- endfor %@
 @%- if def.use_cache_all() %@
+@%- if def.use_cache_all_with_condition() %@
 
     pub async fn find_all_from_cache(
         conn: &DbConn,
@@ -3588,7 +3724,9 @@ impl _@{ pascal_name }@ {
             query = c.bind(query);
         }
         let result = crate::misc::fetch!(conn, query, fetch_all);
-        let list: Vec<_@{ pascal_name }@Cache> = result.into_iter().map(|data| Arc::new(CacheWrapper::_from_inner(data, conn.shard_id(), conn.begin_time())).into()).collect();
+        let mut list: Vec<CacheWrapper> = result.into_iter().map(|data| CacheWrapper::_from_inner(data, conn.shard_id(), conn.begin_time())).collect();
+        @{- def.relations_cache()|fmt_rel_join("\n        CacheWrapper::fetch_{raw_alias}_4vec(&mut list, &mut conn).await?;", "") }@
+        let list: Vec<_@{ pascal_name }@Cache> = list.into_iter().map(|v| Arc::new(v).into()).collect();
         let arc = Arc::new(list);
         if MSec::from(CACHE_RESET_TIME.load(Ordering::Relaxed)).less_than(conn.begin_time())
         {
@@ -3596,7 +3734,49 @@ impl _@{ pascal_name }@ {
         }
         Ok(arc)
     }
-    @%- endif %@
+@%- else %@
+
+    pub async fn find_all_from_cache(
+        conn: &DbConn,
+        order_by: Option<Vec<OrderBy>>,
+    ) -> Result<Arc<Vec<_@{ pascal_name }@Cache>>> {
+        if let Some(arc) = CACHE_ALL.get().unwrap()[conn.shard_id() as usize].load_full() {
+            return Ok(arc);
+        }
+        let _guard = BULK_FETCH_SEMAPHORE.get().unwrap()[conn.shard_id() as usize].acquire().await?;
+        if let Some(arc) = CACHE_ALL.get().unwrap()[conn.shard_id() as usize].load_full() {
+            return Ok(arc);
+        }
+        let mut conn = DbConn::_new(conn.shard_id());
+        conn.begin_cache_tx().await?;
+        let mut sql = format!(
+            r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {} {}"#,
+            CacheData::_sql_cols("`"),
+            Cond::write_where(
+                &None,
+                TrashMode::Not,
+                TRASHED_SQL,
+                NOT_TRASHED_SQL,
+                ONLY_TRASHED_SQL
+            ),
+            OrderBy::write_order_by(&order_by)
+        );
+        let mut query = sqlx::query_as::<_, CacheData>(&sql);
+        let _span = info_span!("query", sql = &query.sql());
+        let result = crate::misc::fetch!(conn, query, fetch_all);
+        #[allow(clippy::needless_collect)]
+        let mut list: Vec<CacheWrapper> = result.into_iter().map(|data| CacheWrapper::_from_inner(data, conn.shard_id(), conn.begin_time())).collect();
+        @{- def.relations_cache()|fmt_rel_join("\n        CacheWrapper::fetch_{raw_alias}_4vec(&mut list, &mut conn).await?;", "") }@
+        let list: Vec<_@{ pascal_name }@Cache> = list.into_iter().map(|v| Arc::new(v).into()).collect();
+        let arc = Arc::new(list);
+        if MSec::from(CACHE_RESET_TIME.load(Ordering::Relaxed)).less_than(conn.begin_time())
+        {
+            CACHE_ALL.get().unwrap()[conn.shard_id() as usize].swap(Some(Arc::clone(&arc)));
+        }
+        Ok(arc)
+    }
+@%- endif %@
+@%- endif %@
 
     pub fn query() -> QueryBuilder {
         QueryBuilder::default()
@@ -3620,7 +3800,7 @@ impl _@{ pascal_name }@ {
 
     async fn _find_many(
         conn: &mut DbConn,
-        ids: &[Primary],
+        ids: &[InnerPrimary],
     ) -> Result<Vec<Data>> {
         if ids.is_empty() {
             return Ok(Vec::new());
@@ -3649,7 +3829,7 @@ impl _@{ pascal_name }@ {
         Ok(id)
     }
 
-    async fn __find_many<T>(conn: &mut DbConn, ids: &[Primary]) -> Result<Vec<T>>
+    async fn __find_many<T>(conn: &mut DbConn, ids: &[InnerPrimary]) -> Result<Vec<T>>
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Unpin,
     {
@@ -3690,7 +3870,7 @@ impl _@{ pascal_name }@ {
         Ok(list)
     }
 @%- else %@
-    async fn __find_many<T>(conn: &mut DbConn, ids: &[Primary]) -> Result<Vec<T>>
+    async fn __find_many<T>(conn: &mut DbConn, ids: &[InnerPrimary]) -> Result<Vec<T>>
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Unpin,
     {
@@ -3718,9 +3898,9 @@ impl _@{ pascal_name }@ {
     pub(crate) async fn find_many_for_cache<I, T>(conn: &mut DbConn, ids: I) -> Result<FxHashMap<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@, _@{ pascal_name }@Cache>>
     where
         I: IntoIterator<Item = T>,
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let ids: Vec<Primary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         let list = Self::_find_many_for_cache(conn, &ids).await?;
         let map = list.into_iter()@{- def.soft_delete_tpl("",".filter(|data| data._inner.deleted_at.is_none())",".filter(|data| data._inner.deleted == 0)")}@.fold(FxHashMap::default(), |mut map, v| {
             map.insert(@{ def.primaries()|fmt_join_with_paren("v._inner.{var}{clone}.into()", ", ") }@, Arc::new(v).into());
@@ -3731,7 +3911,7 @@ impl _@{ pascal_name }@ {
 
     async fn _find_many_for_cache(
         conn: &mut DbConn,
-        ids: &[Primary],
+        ids: &[InnerPrimary],
     ) -> Result<Vec<CacheWrapper>> {
         if ids.is_empty() {
             return Ok(Vec::new());
@@ -3749,30 +3929,30 @@ impl _@{ pascal_name }@ {
 
     pub async fn find<T>(conn: &mut DbConn, id: T) -> Result<_@{ pascal_name }@>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let id: @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ = id.into();
+        let id: Primary = id.into();
         Self::find_optional(conn, id.clone())
             .await?
-            .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&id)))
+            .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&(&id).into())))
     }
 
     pub async fn find_with_trashed<T>(conn: &mut DbConn, id: T) -> Result<_@{ pascal_name }@>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let id: @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ = id.into();
+        let id: Primary = id.into();
         Self::find_optional_with_trashed(conn, id.clone())
             .await?
-            .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&id)))
+            .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&(&id).into())))
     }
     @%- if def.use_cache() %@
 
     pub async fn find_from_cache<T>(conn: &DbConn, id: T) -> Result<_@{ pascal_name }@Cache>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let id: @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ = id.into();
+        let id: InnerPrimary = (&id.into()).into();
         Self::_find_optional_from_cache(conn, id.clone())
             .await?
 @{- def.soft_delete_tpl("","\n            .filter(|data| data._wrapper._inner.deleted_at.is_none())","\n            .filter(|data| data._wrapper._inner.deleted == 0)")}@
@@ -3781,9 +3961,9 @@ impl _@{ pascal_name }@ {
 
     pub async fn find_from_cache_with_trashed<T>(conn: &DbConn, id: T) -> Result<_@{ pascal_name }@Cache>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let id: @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ = id.into();
+        let id: InnerPrimary = (&id.into()).into();
         Self::_find_optional_from_cache(conn, id.clone())
             .await?
             .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&id)))
@@ -3793,9 +3973,9 @@ impl _@{ pascal_name }@ {
     pub async fn find_many<I, T>(conn: &mut DbConn, ids: I) -> Result<AHashMap<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@, _@{ pascal_name }@>>
     where
         I: IntoIterator<Item = T>,
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let ids: Vec<Primary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         let list = Self::_find_many(conn, &ids).await?;
         let map = list.into_iter()@{ def.soft_delete_tpl("",".filter(|data| data.deleted_at.is_none())",".filter(|data| data.deleted == 0)")}@.fold(AHashMap::default(), |mut map, v| {
             map.insert(@{ def.primaries()|fmt_join_with_paren("v.{var}{clone}.into()", ", ") }@, v.into());
@@ -3807,9 +3987,9 @@ impl _@{ pascal_name }@ {
     pub async fn find_many_with_trashed<I, T>(conn: &mut DbConn, ids: I) -> Result<AHashMap<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@, _@{ pascal_name }@>>
     where
         I: IntoIterator<Item = T>,
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let ids: Vec<Primary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         let list = Self::_find_many(conn, &ids).await?;
         let map = list.into_iter().fold(AHashMap::default(), |mut map, v| {
             map.insert(@{ def.primaries()|fmt_join_with_paren("v.{var}{clone}.into()", ", ") }@, v.into());
@@ -3822,8 +4002,9 @@ impl _@{ pascal_name }@ {
     pub async fn find_many_from_cache<I, T>(conn: &DbConn, ids: I) -> Result<AHashMap<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@, _@{ pascal_name }@Cache>>
     where
         I: IntoIterator<Item = T>,
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         let list = Self::_find_many_from_cache(conn, ids).await?;
         let map = list.into_iter()@{ def.soft_delete_tpl("",".filter(|data| data._wrapper._inner.deleted_at.is_none())",".filter(|data| data._wrapper._inner.deleted == 0)")}@.fold(AHashMap::default(), |mut map, v| {
             map.insert(@{ def.primaries()|fmt_join_with_paren("v._wrapper._inner.{var}{clone}.into()", ", ") }@, v);
@@ -3835,8 +4016,9 @@ impl _@{ pascal_name }@ {
     pub async fn find_many_from_cache_with_trashed<I, T>(conn: &DbConn, ids: I) -> Result<AHashMap<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@, _@{ pascal_name }@Cache>>
     where
         I: IntoIterator<Item = T>,
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         let list = Self::_find_many_from_cache(conn, ids).await?;
         let map = list.into_iter().fold(AHashMap::default(), |mut map, v| {
             map.insert(@{ def.primaries()|fmt_join_with_paren("v._wrapper._inner.{var}{clone}.into()", ", ") }@, v);
@@ -3848,16 +4030,16 @@ impl _@{ pascal_name }@ {
     async fn _find_many_from_cache<I, T>(conn: &DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Cache>>
     where
         I: IntoIterator<Item = T>,
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<InnerPrimary>,
     {
         let mut list: Vec<_@{ pascal_name }@Cache> = Vec::new();
         let mut rest_ids = Vec::new();
         let shard_id = conn.shard_id();
         let mut conn = DbConn::_new(shard_id);
-        let ids: Vec<_> = ids.into_iter().map(|id| PrimaryHasher((&id.into()).into(), shard_id)).collect();
+        let ids: Vec<_> = ids.into_iter().map(|id| PrimaryHasher(id.into(), shard_id)).collect();
         let cache_map = Cache::get_many::<CacheWrapper>(&ids.iter().map(|id| id.hash_val(shard_id)).collect(), shard_id, USE_FAST_CACHE).await;
         for id in ids {
-            if let Some(obj) = cache_map.get(&id.hash_val(shard_id)).filter(|o| Primary::from(*o) == id.0) {
+            if let Some(obj) = cache_map.get(&id.hash_val(shard_id)).filter(|o| InnerPrimary::from(*o) == id.0) {
                 list.push(obj.clone().into());
             } else {
                 rest_ids.push(id);
@@ -3870,7 +4052,7 @@ impl _@{ pascal_name }@ {
             let _guard = BULK_FETCH_SEMAPHORE.get().unwrap()[shard_id as usize].acquire().await?;
             let mut rest_ids2 = FxHashSet::with_capacity_and_hasher(rest_ids.len(), Default::default());
             for id in rest_ids.into_iter() {
-                if let Some(obj) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| Primary::from(o) == id.0) {
+                if let Some(obj) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
                     list.push(obj.into());
                 } else {
                     rest_ids2.insert(id);
@@ -3888,13 +4070,13 @@ impl _@{ pascal_name }@ {
                 while let Some(x) = BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].pop() {
                     ids.insert(x);
                 }
-                let ids: Vec<Primary> = ids.drain().collect();
+                let ids: Vec<InnerPrimary> = ids.drain().collect();
                 #[allow(unused_mut)]
                 let mut result = Self::_find_many_for_cache(&mut conn, &ids).await?;
 @{- def.relations_cache()|fmt_rel_join("\n                CacheWrapper::fetch_{raw_alias}_4vec(&mut result, &mut conn).await?;", "") }@
                 for v in result.into_iter() {
                     let arc = Arc::new(v);
-                    let id = PrimaryHasher(Primary::from(&arc), shard_id);
+                    let id = PrimaryHasher(InnerPrimary::from(&arc), shard_id);
                     @%- if def.versioned %@
                     let vw = VersionWrapper{
                         id: id.0.clone(),
@@ -3922,25 +4104,24 @@ impl _@{ pascal_name }@ {
             }
         }
         conn.release_cache_tx();
-@{- def.relations_one_only_cache()|fmt_rel_join("\n        list.fetch_{raw_alias}(&mut conn).await?;", "") }@
         Ok(list)
     }
     @%- endif %@
 
     pub async fn find_optional<T>(conn: &mut DbConn, id: T) -> Result<Option<_@{ pascal_name }@>>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let id: Primary = (&id.into()).into();
+        let id: InnerPrimary = (&id.into()).into();
         let data: Option<Data> = Self::_find_optional(conn, id).await?;
         Ok(data@{ def.soft_delete_tpl("",".filter(|data| data.deleted_at.is_none())",".filter(|data| data.deleted == 0)")}@.map(_@{ pascal_name }@::from))
     }
 
     pub async fn find_optional_for_update<T>(conn: &mut DbConn, id: T) -> Result<Option<_@{ pascal_name }@ForUpdate>>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let id: Primary = (&id.into()).into();
+        let id: InnerPrimary = (&id.into()).into();
         let result = Self::_find_for_update(conn, &id).await?@{ def.soft_delete_tpl("",".filter(|data| data.deleted_at.is_none())",".filter(|data| data.deleted == 0)")}@;
         Ok(result@{ def.soft_delete_tpl("",".filter(|data| data.deleted_at.is_none())",".filter(|data| data.deleted == 0)")}@.map(|data| ForUpdate {
             _data: data,
@@ -3957,9 +4138,9 @@ impl _@{ pascal_name }@ {
 
     pub async fn find_optional_with_trashed<T>(conn: &mut DbConn, id: T) -> Result<Option<_@{ pascal_name }@>>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let id: Primary = (&id.into()).into();
+        let id: InnerPrimary = (&id.into()).into();
         let data: Option<Data> = Self::_find_optional(conn, id).await?;
         Ok(data.map(_@{ pascal_name }@::from))
     }
@@ -3967,15 +4148,15 @@ impl _@{ pascal_name }@ {
 
     pub(crate) async fn find_optional_for_cache<T>(conn: &mut DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let id: Primary = (&id.into()).into();
+        let id: InnerPrimary = (&id.into()).into();
         let data: Option<CacheData> = Self::_find_optional(conn, id).await?;
         Ok(data@{ def.soft_delete_tpl("",".filter(|data| data.deleted_at.is_none())",".filter(|data| data.deleted == 0)")}@.map(|v| Arc::new(CacheWrapper::_from_inner(v, conn.shard_id(), conn.begin_time())).into()))
     }
     @%- endif %@
 
-    async fn _find_optional<T>(conn: &mut DbConn, id: Primary) -> Result<Option<T>>
+    async fn _find_optional<T>(conn: &mut DbConn, id: InnerPrimary) -> Result<Option<T>>
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Unpin,
     {
@@ -3991,23 +4172,25 @@ impl _@{ pascal_name }@ {
     #[allow(clippy::needless_question_mark)]
     pub async fn find_optional_from_cache<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
+        let id: InnerPrimary = (&id.into()).into();
         Ok(Self::_find_optional_from_cache(conn, id).await?@{- def.soft_delete_tpl("",".filter(|data| data._wrapper._inner.deleted_at.is_none())",".filter(|data| data._wrapper._inner.deleted == 0)")}@)
     }
 
     pub async fn find_optional_from_cache_with_trashed<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
+        let id: InnerPrimary = (&id.into()).into();
         Self::_find_optional_from_cache(conn, id).await
     }
 
     async fn _find_optional_from_cache<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<InnerPrimary>,
     {
-        let id: @{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@ = id.into();
+        let id: InnerPrimary = id.into();
         let mut result = Self::_find_many_from_cache(conn, [id]).await?;
         Ok(result.pop())
     }
@@ -4015,9 +4198,9 @@ impl _@{ pascal_name }@ {
 
     pub async fn find_for_update<T>(conn: &mut DbConn, id: T) -> Result<_@{ pascal_name }@ForUpdate>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let id: Primary = (&id.into()).into();
+        let id: InnerPrimary = (&id.into()).into();
         let result = Self::_find_for_update(conn, &id).await?@{ def.soft_delete_tpl("",".filter(|data| data.deleted_at.is_none())",".filter(|data| data.deleted == 0)")}@;
         let data = result.with_context(|| err::RowNotFound::new("@{ table_name }@", id.to_string()))?;
         Ok(ForUpdate {
@@ -4035,9 +4218,9 @@ impl _@{ pascal_name }@ {
 
     pub async fn find_for_update_with_trashed<T>(conn: &mut DbConn, id: T) -> Result<_@{ pascal_name }@ForUpdate>
     where
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let id: Primary = (&id.into()).into();
+        let id: InnerPrimary = (&id.into()).into();
         let result = Self::_find_for_update(conn, &id).await?;
         let data = result.with_context(|| err::RowNotFound::new("@{ table_name }@", id.to_string()))?;
         Ok(ForUpdate {
@@ -4053,7 +4236,7 @@ impl _@{ pascal_name }@ {
         })
     }
 
-    async fn _find_for_update(conn: &mut DbConn, id: &Primary) -> Result<Option<Data>> {
+    async fn _find_for_update(conn: &mut DbConn, id: &InnerPrimary) -> Result<Option<Data>> {
         let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}=?", " AND ") }@ FOR UPDATE"#, Data::_sql_cols("`"));
         let mut query = sqlx::query_as::<_, Data>(&sql);
         let _span = info_span!("query", sql = &query.sql());
@@ -4066,9 +4249,9 @@ impl _@{ pascal_name }@ {
     pub async fn find_many_for_update<I, T>(conn: &mut DbConn, ids: I) -> Result<FxHashMap<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@, _@{ pascal_name }@ForUpdate>>
     where
         I: IntoIterator<Item = T>,
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let ids: Vec<Primary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         if ids.is_empty() {
             return Ok(FxHashMap::default());
         }
@@ -4146,7 +4329,7 @@ impl _@{ pascal_name }@ {
         conn.begin_cache_tx().await?;
         let obj = Self::query().cond(cond.clone()).select_from_cache(&mut conn).await?.pop()
             .with_context(|| err::RowNotFound::new("@{ table_name }@", format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("val{index}", ", ") }@)))?;
-        let id = PrimaryWrapper(Primary::from(&obj), conn.shard_id(), conn.begin_time());
+        let id = PrimaryWrapper(InnerPrimary::from(&obj), conn.shard_id(), conn.begin_time());
         Cache::insert_long(&key, Arc::new(id), true).await;
         Ok(obj)
     }
@@ -4164,15 +4347,8 @@ impl _@{ pascal_name }@ {
     }
 
     pub async fn save(conn: &mut DbConn, mut obj: _@{ pascal_name }@ForUpdate) -> Result<Option<_@{ pascal_name }@>> {
-        obj._data.validate()?;
-        if obj._is_new() {
-            obj._set_default_value(conn);
-        }
-        @%- if def.updated_at_conf().is_some() %@
-        if obj._op.updated_at == Op::None {
-            obj.updated_at().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else("SystemTime::now()","conn.time()")}@.into());
-        }
-        @%- endif %@
+        obj._validate()?;
+        obj._set_default_value(conn);
         Self::_save(conn, obj).await
     }
 
@@ -4190,7 +4366,7 @@ impl _@{ pascal_name }@ {
     pub(crate) fn __save<'a>(
         conn: &'a mut DbConn,
         obj: _@{ pascal_name }@ForUpdate,
-    ) -> Pin<Box<dyn futures::Future<Output = Result<(Option<_@{ pascal_name }@>, Option<CacheOp>)>> + 'a>>
+    ) -> Pin<Box<dyn futures::Future<Output = Result<(Option<_@{ pascal_name }@>, Option<CacheOp>)>> + Send + 'a>>
     {
         Box::pin(async move {
             if obj._will_be_deleted() {
@@ -4246,55 +4422,52 @@ impl _@{ pascal_name }@ {
 
     #[allow(unused_mut)]
     async fn _save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@ForUpdate) -> Result<(_@{ pascal_name }@, Option<CacheOp>)> {
-        if !obj._is_updated() {
-            return Ok((obj.into(), None));
-        }
-        let id = Primary::from(&obj);
+        let id = InnerPrimary::from(&obj);
         let mut update_cache = false; // To distinguish from updates that do not require cache updates
-        let mut vec: Vec<String> = Vec::new();
-        @{- def.non_primaries_wo_version()|fmt_join_cache_or_not("
-        assignment_sql!(obj, vec, {var}, \"{col_esc}\", {may_null}, update_cache, \"{placeholder}\");", "
-        assignment_sql_no_cache_update!(obj, vec, {var}, \"{col_esc}\", {may_null}, \"{placeholder}\");", "") }@
-        @%- if def.versioned %@
-        vec.push("`@{ version_col }@` = LAST_INSERT_ID(IF(`@{ version_col }@` < 4294967295, `@{ version_col }@` + 1, 0))".to_string());
-        @%- endif %@
-        @%- if def.counting.is_some() %@
-        vec.push("`@{ def.get_counting_col() }@` = LAST_INSERT_ID(`@{ def.get_counting_col() }@`)".to_string());
-        @%- endif %@
-        @%- if def.versioned %@
-        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}=?", " AND ") }@ AND `@{ version_col }@`=?"#, &vec.join(","));
-        @%- else %@
-        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}=?", " AND ") }@"#, &vec.join(","));
-        @%- endif %@
-        let mut query = sqlx::query(&sql);
-        let _span = info_span!("query", sql = &query.sql());
-        @{- def.non_primaries_wo_version()|fmt_join("
-        bind_sql!(obj, query, {var}, {may_null});","") }@
-        query = query@{ def.primaries()|fmt_join(".bind(&id.{index})", "") }@;
-        @%- if def.versioned %@
-        query = query.bind(&obj._data.@{ version_col }@);
-        @%- endif %@
-        debug!("{}", &obj);
-        let result = if conn.wo_tx() {
-            query.execute(&mut conn.acquire_source().await?).await?
-        } else {
-            query.execute(conn.get_tx().await?).await?
-        };
-        if result.rows_affected() == 0 {
-            anyhow::bail!(err::RowNotFound::new("@{ table_name }@", id.to_string()));
+        if obj._is_updated() {
+            let mut vec: Vec<String> = Vec::new();
+            @{- def.non_primaries_wo_version()|fmt_join_cache_or_not("
+            assignment_sql!(obj, vec, {var}, \"{col_esc}\", {may_null}, update_cache, \"{placeholder}\");", "
+            assignment_sql_no_cache_update!(obj, vec, {var}, \"{col_esc}\", {may_null}, \"{placeholder}\");", "") }@
+            @%- if def.versioned %@
+            vec.push("`@{ version_col }@` = LAST_INSERT_ID(IF(`@{ version_col }@` < 4294967295, `@{ version_col }@` + 1, 0))".to_string());
+            @%- endif %@
+            @%- if def.counting.is_some() %@
+            vec.push("`@{ def.get_counting_col() }@` = LAST_INSERT_ID(`@{ def.get_counting_col() }@`)".to_string());
+            @%- endif %@
+            @%- if def.versioned %@
+            let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}=?", " AND ") }@ AND `@{ version_col }@`=?"#, &vec.join(","));
+            @%- else %@
+            let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}=?", " AND ") }@"#, &vec.join(","));
+            @%- endif %@
+            let mut query = sqlx::query(&sql);
+            let _span = info_span!("query", sql = &query.sql());
+            @{- def.non_primaries_wo_version()|fmt_join("
+            bind_sql!(obj, query, {var}, {may_null});","") }@
+            query = query@{ def.primaries()|fmt_join(".bind(&id.{index})", "") }@;
+            @%- if def.versioned %@
+            query = query.bind(&obj._data.@{ version_col }@);
+            @%- endif %@
+            debug!("{}", &obj);
+            let result = if conn.wo_tx() {
+                query.execute(&mut conn.acquire_source().await?).await?
+            } else {
+                query.execute(conn.get_tx().await?).await?
+            };
+            if result.rows_affected() == 0 {
+                anyhow::bail!(err::RowNotFound::new("@{ table_name }@", id.to_string()));
+            }
+            @%- if def.versioned %@
+            obj.@{ version_col }@().set(result.last_insert_id() as u32);
+            @%- endif %@
+            @%- if def.counting.is_some() %@
+            if obj._op.@{ def.get_counting() }@ == Op::Add {
+                obj._op.@{ def.get_counting() }@ = Op::Max;
+                obj._update.@{ def.get_counting() }@ = result.last_insert_id().try_into().unwrap_or(@{ def.get_counting_type() }@::MAX);
+            }
+            @%- endif %@
         }
-        @%- if def.versioned %@
-        obj.@{ version_col }@().set(result.last_insert_id() as u32);
-        @%- endif %@
-        @%- if def.counting.is_some() %@
-        if obj._op.@{ def.get_counting() }@ == Op::Add {
-            obj._op.@{ def.get_counting() }@ = Op::Max;
-            obj._update.@{ def.get_counting() }@ = result.last_insert_id().try_into().unwrap_or(@{ def.get_counting_type() }@::MAX);
-        }
-        @%- endif %@
-
         let mut obj2: _@{ pascal_name }@ = obj._data.into();
-
         let default = Data::default();
         @{- def.non_primaries()|fmt_join_cache_or_not("", "
         obj._op.{var} = Op::None;
@@ -4361,7 +4534,7 @@ impl _@{ pascal_name }@ {
                 obj._update.@{ def.get_counting() }@ = result.last_insert_id().try_into().unwrap_or(@{ def.get_counting_type() }@::MAX);
             }
             @%- endif %@
-            let id = Primary::from(&obj);
+            let id = InnerPrimary::from(&obj);
             let mut obj2: _@{ pascal_name }@ = obj._data.into();
             let mut cache_msg = Some(CacheOp::Update {
                 id,
@@ -4385,9 +4558,9 @@ impl _@{ pascal_name }@ {
     pub async fn update_many<I, T>(conn: &mut DbConn, ids: I, mut for_update: _@{ pascal_name }@ForUpdate) -> Result<u64>
     where
         I: IntoIterator<Item = T>,
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let ids: Vec<Primary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         @%- if def.updated_at_conf().is_some() %@
         if for_update._op.updated_at == Op::None {
             for_update.updated_at().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else("SystemTime::now()","conn.time()")}@.into());
@@ -4396,7 +4569,7 @@ impl _@{ pascal_name }@ {
         Self::_update_many(conn, ids, for_update).await
     }
 
-    async fn _update_many(conn: &mut DbConn, ids: Vec<Primary>, mut obj: ForUpdate) -> Result<u64> {
+    async fn _update_many(conn: &mut DbConn, ids: Vec<InnerPrimary>, mut obj: ForUpdate) -> Result<u64> {
         if !obj._is_updated() {
             return Ok(0);
         }
@@ -4427,7 +4600,7 @@ impl _@{ pascal_name }@ {
 
     #[allow(unused_assignments)]
     #[allow(unused_mut)]
-    async fn __update_many(conn: &mut DbConn, ids: &[Primary], obj: &ForUpdate) -> Result<u64> {
+    async fn __update_many(conn: &mut DbConn, ids: &[InnerPrimary], obj: &ForUpdate) -> Result<u64> {
         if ids.is_empty() {
             return Ok(0);
         }
@@ -4457,7 +4630,7 @@ impl _@{ pascal_name }@ {
     /// insert_delayed does not return an error.
     /// insert_ignore does not save the relations table.
     pub async fn insert_ignore(conn: &mut DbConn, mut obj: _@{ pascal_name }@ForUpdate) -> Result<Option<_@{ pascal_name }@ForUpdate>> {
-        obj._data.validate()?;
+        obj._validate()?;
         ensure!(obj._is_new(), "The obj is not new.");
         obj._set_default_value(conn);
         let sql = "INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_columns()|fmt_join("{col_esc}", ",") }@) \
@@ -4496,7 +4669,7 @@ impl _@{ pascal_name }@ {
     /// insert_delayed does not save the relations table.
     pub async fn insert_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@ForUpdate) -> Result<()> {
         ensure!(obj._is_new(), "The obj is not new.");
-        obj._data.validate()?;
+        obj._validate()?;
         obj._set_default_value(conn);
         debug!("{}", &obj);
         conn.push_callback(Box::new(|| {
@@ -4507,7 +4680,7 @@ impl _@{ pascal_name }@ {
                 } else {
                     handle_delayed_msg_insert_from_memory().await;
                 }
-            }.boxed_local()
+            }.boxed()
         })).await;
         Ok(())
     }
@@ -4517,15 +4690,8 @@ impl _@{ pascal_name }@ {
     // The data will be updated collectively later.
     // save_delayed does not support relational tables.
     pub async fn save_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@ForUpdate) -> Result<()> {
-        obj._data.validate()?;
-        if obj._is_new() {
-            obj._set_default_value(conn);
-        }
-        @%- if def.updated_at_conf().is_some() %@
-        if obj._op.updated_at == Op::None {
-            obj.updated_at().set(conn.time().into());
-        }
-        @%- endif %@
+        obj._validate()?;
+        obj._set_default_value(conn);
         if obj._will_be_deleted() {
             obj._op = OpData::default();
         }
@@ -4540,7 +4706,7 @@ impl _@{ pascal_name }@ {
                 } else {
                     handle_delayed_msg_save().await;
                 }
-            }.boxed_local()
+            }.boxed()
         })).await;
         Ok(())
     }
@@ -4550,7 +4716,7 @@ impl _@{ pascal_name }@ {
     // The data will be updated collectively later.
     // update_delayed does not support relational tables and version.
     pub async fn update_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@ForUpdate) -> Result<()> {
-        obj._data.validate()?;
+        obj._validate()?;
         if obj._is_new() {
             panic!("INSERT is not supported.");
         }
@@ -4568,7 +4734,7 @@ impl _@{ pascal_name }@ {
                 } else {
                     handle_delayed_msg_update().await;
                 }
-            }.boxed_local()
+            }.boxed()
         })).await;
         Ok(())
     }
@@ -4578,7 +4744,7 @@ impl _@{ pascal_name }@ {
     // The data will be updated collectively later.
     // upsert_delayed does not support relational tables.
     pub async fn upsert_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@ForUpdate) -> Result<()> {
-        obj._data.validate()?;
+        obj._validate()?;
         if obj._will_be_deleted() {
             panic!("DELETE is not supported.");
         }
@@ -4594,7 +4760,7 @@ impl _@{ pascal_name }@ {
                 } else {
                     handle_delayed_msg_upsert().await;
                 }
-            }.boxed_local()
+            }.boxed()
         })).await;
         Ok(())
     }
@@ -4604,7 +4770,7 @@ impl _@{ pascal_name }@ {
         let mut vec: Vec<ForInsert> = Vec::new();
         while let Some(mut obj) = list.pop() {
             ensure!(obj._is_new(), "The obj is not new.");
-            obj._data.validate()?;
+            obj._validate()?;
             obj._set_default_value(conn);
             debug!("{}", &obj);
             vec.push(obj.into());
@@ -4640,7 +4806,7 @@ impl _@{ pascal_name }@ {
         Ok(result)
     }
 
-    fn ___bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool) -> future::LocalBoxFuture<'a, Result<Vec<ForInsert>>> {
+    fn ___bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool) -> future::BoxFuture<'a, Result<Vec<ForInsert>>> {
         async move {
             if list.is_empty() {
                 return Ok(Vec::new());
@@ -4735,7 +4901,7 @@ impl _@{ pascal_name }@ {
                 _data: v,
             }).collect();
             Ok(data_list)
-        }.boxed_local()
+        }.boxed()
     }
 
     pub async fn bulk_upsert(conn: &mut DbConn, mut list: Vec<_@{ pascal_name }@ForUpdate>) -> Result<()> {
@@ -4745,7 +4911,7 @@ impl _@{ pascal_name }@ {
         let mut vec = Vec::new();
         while let Some(mut obj) = list.pop() {
             ensure!(obj._is_new(), "The obj is not new.");
-            obj._data.validate()?;
+            obj._validate()?;
             obj._set_default_value(conn);
             debug!("{}", &obj);
             vec.push(obj._data);
@@ -4820,10 +4986,10 @@ impl _@{ pascal_name }@ {
     pub async fn delete_by_ids<I, T>(conn: &mut DbConn, ids: I) -> Result<u64>
     where
         I: IntoIterator<Item = T>,
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
 @%- if def.soft_delete().is_some() %@
-        let ids: Vec<Primary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         if ids.is_empty() {
             return Ok(0);
         }
@@ -4902,9 +5068,9 @@ impl _@{ pascal_name }@ {
     pub async fn force_delete_by_ids<I, T>(conn: &mut DbConn, ids: I) -> Result<u64>
     where
         I: IntoIterator<Item = T>,
-        T: Into<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@>,
+        T: Into<Primary>,
     {
-        let ids: Vec<Primary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         if ids.is_empty() {
             return Ok(0);
         }
@@ -4929,7 +5095,7 @@ impl _@{ pascal_name }@ {
             conn.push_callback(Box::new(|| {
                 async move {
                     Self::_after_delete(&list).await;
-                }.boxed_local()
+                }.boxed()
             })).await;
 @%- endif %@
 @%- for on_delete_str in def.on_delete_list %@
@@ -5022,7 +5188,7 @@ impl _@{ pascal_name }@ {
 @%- endif %@
 
     pub async fn force_delete(conn: &mut DbConn, obj: _@{ pascal_name }@ForUpdate) -> Result<()> {
-        let id: Primary = (&obj).into();
+        let id: InnerPrimary = (&obj).into();
 @%- if def.on_delete_fn %@
         let notify_obj: Self = if obj._is_loaded {
             Self::from(obj.clone())
@@ -5048,7 +5214,7 @@ impl _@{ pascal_name }@ {
         conn.push_callback(Box::new(|| {
             async {
                 Self::_after_delete(&[notify_obj]).await;
-            }.boxed_local()
+            }.boxed()
         })).await;
 @%- endif %@
         if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
@@ -5059,7 +5225,7 @@ impl _@{ pascal_name }@ {
     }
 
     pub async fn force_delete_relations(conn: &mut DbConn, obj: _@{ pascal_name }@ForUpdate) -> Result<()> {
-        let id: Primary = (&obj).into();
+        let id: InnerPrimary = (&obj).into();
 @%- for on_delete_str in def.on_delete_list %@
         crate::@{ on_delete_str }@::on_delete_@{ group_name }@_@{ name }@(conn, &[id.clone()], true).await?;
 @%- endfor %@
@@ -5083,9 +5249,9 @@ impl _@{ pascal_name }@ {
 
     pub(crate) fn on_delete_@{ base_mod_name }@<'a>(
         conn: &'a mut DbConn,
-        ids: &'a [rel_@{ base_mod_name }@::Primary],
+        ids: &'a [rel_@{ base_mod_name }@::InnerPrimary],
         cascade_only: bool,
-    ) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
         Box::pin(async move {
             @%- for (mod_name, local) in def.relations_on_delete_cascade() %@
             @%- if base_mod_name == mod_name %@
@@ -5110,7 +5276,7 @@ impl _@{ pascal_name }@ {
 
     async fn on_delete_@{ mod_name }@_for_@{ local }@(
         conn: &mut DbConn,
-        ids: &[rel_@{ mod_name }@::Primary],
+        ids: &[rel_@{ mod_name }@::InnerPrimary],
         cascade_only: bool,
     ) -> Result<()> {
         if ids.is_empty() {
@@ -5133,12 +5299,12 @@ impl _@{ pascal_name }@ {
             let result = query.fetch_all(conn.get_tx().await?).await?;
             let result_num = result.len() as u64;
             let list: Vec<Self> = result.into_iter().map(|v| v.into()).collect();
-            let id_list: Vec<Primary> = list.iter().map(|v| v.into()).collect();
+            let id_list: Vec<InnerPrimary> = list.iter().map(|v| v.into()).collect();
             Self::_before_delete(conn, &list).await?;
             conn.push_callback(Box::new(|| {
                 async move {
                     Self::_after_delete(&list).await;
-                }.boxed_local()
+                }.boxed()
             })).await;
             if !conn.clear_all_cache && (USE_CACHE || USE_CACHE_ALL) {
                 let cache_msg = CacheOp::Cascade { ids: id_list.clone(), shard_id: conn.shard_id() };
@@ -5152,7 +5318,7 @@ impl _@{ pascal_name }@ {
                 r#"SELECT @{ def.primaries()|fmt_join("{col_esc}", "") }@ FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ local|db_esc }@ in ({});"#,
                 &q[0..q.len() - 1]
             );
-            let mut query = sqlx::query_as::<_, Primary>(&sql);
+            let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
             let _span = info_span!("query", sql = &query.sql());
             for id in ids {
                 query = query.bind(&id.0);
@@ -5189,7 +5355,7 @@ impl _@{ pascal_name }@ {
 
     async fn on_delete_@{ mod_name }@_for_@{ local }@(
         conn: &mut DbConn,
-        ids: &[rel_@{ mod_name }@::Primary],
+        ids: &[rel_@{ mod_name }@::InnerPrimary],
         cascade_only: bool,
     ) -> Result<()> {
         if ids.is_empty() || cascade_only {
@@ -5220,7 +5386,7 @@ impl _@{ pascal_name }@ {
 
     async fn on_delete_@{ mod_name }@_for_@{ local }@(
         conn: &mut DbConn,
-        ids: &[rel_@{ mod_name }@::Primary],
+        ids: &[rel_@{ mod_name }@::InnerPrimary],
         cascade_only: bool,
     ) -> Result<()> {
         if ids.is_empty() || cascade_only {
@@ -5233,7 +5399,7 @@ impl _@{ pascal_name }@ {
                 r#"SELECT @{ def.primaries()|fmt_join("{col_esc}", "") }@ FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ local|db_esc }@ in ({});"#,
                 &q[0..q.len() - 1]
             );
-            let mut query = sqlx::query_as::<_, Primary>(&sql);
+            let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
             let _span = info_span!("query", sql = &query.sql());
             for id in ids {
                 query = query.bind(&id.0);
@@ -5262,19 +5428,6 @@ impl _@{ pascal_name }@ {
         Ok(())
     }
 @%- endfor %@
-
-    pub fn eq(base: &_@{ pascal_name }@ForUpdate, update: &_@{ pascal_name }@ForUpdate) -> bool {
-        true
-        @{- def.for_cmp()|fmt_join("
-        && base._data.{var} == update._data.{var}", "") }@
-    }
-
-    pub fn set(base: &mut _@{ pascal_name }@ForUpdate, update: _@{ pascal_name }@ForUpdate) {
-        @{- def.for_cmp()|fmt_join("
-        base._op.{var} = Op::Set;
-        base._data.{var} = update._data.{var}.clone();
-        base._update.{var} = update._data.{var};", "") }@
-    }
 }
 
 fn query_bind<'a>(sql: &'a str, data: &'a Data) -> Query<'a, DbType, DbArguments> {
@@ -5416,7 +5569,10 @@ fn _save_{alias}(
                 update_list.push(row);
             }
         }
-        for row in update_list.into_iter() {
+        for mut row in update_list.into_iter() {
+            row._data.{foreign} = id.clone().into();
+            row._update.{foreign} = id.clone().into();
+            row._op.{foreign} = Op::None;
             yield rel_{class_mod}::{class}::__save(conn, row).await?;
         }
         for mut row in insert_list.into_iter() {
@@ -5473,7 +5629,10 @@ fn _save_{alias}(
                 update_list.push(row);
             }
         }
-        for row in update_list.into_iter() {
+        for mut row in update_list.into_iter() {
+            row._data.{foreign} = Some(id.clone().into());
+            row._update.{foreign} = Some(id.clone().into());
+            row._op.{foreign} = Op::None;
             yield rel_{class_mod}::{class}::__save(conn, row).await?;
         }
         for mut row in insert_list.into_iter() {

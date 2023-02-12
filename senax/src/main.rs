@@ -17,6 +17,7 @@ pub(crate) mod ddl {
     pub mod parser;
     pub mod table;
 }
+mod graphql_generator;
 mod migration_generator;
 mod model_generator;
 pub(crate) mod schema;
@@ -46,6 +47,27 @@ enum Commands {
         /// Specify the DB
         #[clap(value_parser)]
         db: String,
+        /// Force overwrite
+        #[clap(short, long)]
+        force: bool,
+    },
+    /// generate graphql api
+    Graphql {
+        /// Specify the crate path
+        #[clap(value_parser)]
+        path: PathBuf,
+        /// Specify the DB
+        #[clap(value_parser)]
+        db: String,
+        /// Specify the group
+        #[clap(value_parser)]
+        group: Option<String>,
+        /// Specify the model
+        #[clap(value_parser)]
+        model: Option<String>,
+        /// Use camel case
+        #[clap(long)]
+        camel_case: bool,
         /// Force overwrite
         #[clap(short, long)]
         force: bool,
@@ -108,7 +130,8 @@ enum Commands {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     if let Some(ref base_dir) = cli.base_dir {
-        env::set_current_dir(base_dir).context("directory error!")?;
+        env::set_current_dir(base_dir)
+            .with_context(|| format!("directory error!: {}", base_dir.to_string_lossy()))?;
     }
     MODELS_PATH
         .set(cli.dir.as_ref().cloned().unwrap_or("./db".parse()?))
@@ -133,6 +156,18 @@ async fn exec(cli: Cli) -> Result<(), anyhow::Error> {
             let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
             ensure!(re.is_match(db), "bad db name!");
             model_generator::generate(db, *force)?;
+        }
+        Commands::Graphql {
+            path,
+            db,
+            group,
+            model,
+            camel_case,
+            force,
+        } => {
+            let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
+            ensure!(re.is_match(db), "bad db name!");
+            graphql_generator::generate(path, db, group, model, *camel_case, *force)?;
         }
         Commands::GenMigrate {
             db,

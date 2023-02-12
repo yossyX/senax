@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-use crate::common::if_then_else;
+use crate::{common::if_then_else, migration_generator::UTF8_BYTE_LEN};
 
 use super::{RelDef, TimeZone, CONFIG};
 
@@ -198,7 +198,7 @@ pub struct DbEnumValue {
     pub comment: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(untagged)]
 #[schemars(title = "Column Type Or Def")]
 #[allow(clippy::large_enum_variant)]
@@ -225,7 +225,15 @@ impl From<ColumnDef> for ColumnTypeOrDef {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+#[schemars(title = "API Visibility")]
+pub enum ApiVisibility {
+    Readonly,
+    Hidden,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 #[schemars(title = "Column Def")]
 pub struct ColumnDef {
@@ -254,8 +262,15 @@ pub struct ColumnDef {
     pub primary: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auto_increment: Option<AutoIncrement>,
+    /// 長さ(文字列の場合はバイト数ではなく、文字数)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub length: Option<u32>,
+    /// 最大値(decimalは非対応)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max: Option<u64>,
+    /// 最小値(decimalは非対応)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min: Option<i64>,
     // #[serde(default, skip_serializing_if = "Option::is_none")]
     // pub character_set: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -297,6 +312,12 @@ pub struct ColumnDef {
     pub default: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sql_comment: Option<String>,
+    /// API可視性
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_visibility: Option<ApiVisibility>,
+    /// API入力時必須
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub api_required: bool,
 }
 
 impl ColumnDef {
@@ -429,7 +450,7 @@ impl ColumnDef {
                 format!("    #[validate(length(max = {}))]\n", length)
             }
             ColumnType::Text => {
-                let length = self.length.unwrap_or(65536);
+                let length = self.length.unwrap_or(65536) * UTF8_BYTE_LEN;
                 if length < 256 {
                     "    #[validate(custom = \"crate::misc::validate_tinytext_length\")]\n"
                         .to_owned()
@@ -446,10 +467,46 @@ impl ColumnDef {
                     "".to_owned()
                 }
             }
-            ColumnType::Double if !self.signed => "    #[validate(range(min = 0))]\n".to_owned(),
-            ColumnType::Float if !self.signed => "    #[validate(range(min = 0))]\n".to_owned(),
+            ColumnType::Double | ColumnType::Float if !self.signed => {
+                "    #[validate(range(min = 0))]\n".to_owned()
+            }
             ColumnType::Decimal if !self.signed => {
                 "    #[validate(custom = \"crate::misc::validate_unsigned_decimal\")]\n".to_owned()
+            }
+            _ => "".to_owned(),
+        }
+    }
+
+    pub fn get_api_validate(&self) -> String {
+        let required = if_then_else!(!self.primary && self.is_api_required() && !self.not_null, "required, ", "");
+        match self.type_def {
+            ColumnType::Varchar => {
+                let length = self.length.unwrap_or(DEFAULT_VARCHAR_LENGTH);
+                format!("    #[validate({}non_control_character, length(max = {}))]\n", required, length)
+            }
+            ColumnType::Text => {
+                if let Some(length) = self.length {
+                    format!("    #[validate({}non_control_character, length(max = {}))]\n", required, length)
+                } else {
+                    format!("    #[validate({}non_control_character)]\n", required)
+                }
+            }
+            _ if self.min.is_some() && self.max.is_some() => format!(
+                "    #[validate({}range(min = {}, max = {}))]\n",required, 
+                self.min.unwrap(),
+                self.max.unwrap()
+            ),
+            _ if self.min.is_some() => {
+                format!("    #[validate({}range(min = {}))]\n", required, self.min.unwrap())
+            }
+            _ if self.max.is_some() => {
+                format!("    #[validate({}range(max = {}))]\n", required, self.max.unwrap())
+            }
+            ColumnType::Double | ColumnType::Float if !self.signed => {
+                format!("    #[validate({}range(min = 0))]\n", required)
+            }
+            _ if !required.is_empty() => {
+                "    #[validate(required)]\n".to_owned()
             }
             _ => "".to_owned(),
         }
@@ -614,7 +671,7 @@ impl ColumnDef {
             ColumnType::Varchar => "String",
             ColumnType::Boolean => "bool",
             ColumnType::Text => "String",
-            ColumnType::Blob => "Blob",
+            ColumnType::Blob => "senax_common::types::blob::Blob",
             ColumnType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
             ColumnType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
             ColumnType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
@@ -625,11 +682,11 @@ impl ColumnDef {
             ColumnType::ArrayInt => "Vec<u64>",
             ColumnType::ArrayString => "Vec<String>",
             ColumnType::Json if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
-            ColumnType::Json => "Value",
+            ColumnType::Json => "serde_json::Value",
             ColumnType::Enum => "",
             ColumnType::DbEnum => "String",
             ColumnType::DbSet => "String",
-            ColumnType::Point => "Point",
+            ColumnType::Point => "senax_common::types::point::Point",
             ColumnType::UnSupported => unimplemented!(),
         }
         .to_string();
@@ -706,6 +763,150 @@ impl ColumnDef {
             format!("{}{}", id_str, conv_str)
         }
     }
+
+    pub fn get_api_type(&self, option: bool) -> String {
+        let mut typ = match self.type_def {
+            ColumnType::TinyInt if self.signed => "i8",
+            ColumnType::TinyInt => "u8",
+            ColumnType::SmallInt if self.signed => "i16",
+            ColumnType::SmallInt => "u16",
+            ColumnType::Int if self.signed => "i32",
+            ColumnType::Int => "u32",
+            ColumnType::BigInt if self.signed => "i64",
+            ColumnType::BigInt => "u64",
+            ColumnType::Float => "f32",
+            ColumnType::Double => "f64",
+            ColumnType::Varchar => "String",
+            ColumnType::Boolean => "bool",
+            ColumnType::Text => "String",
+            ColumnType::Blob => "senax_common::types::blob::Blob",
+            ColumnType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
+            ColumnType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
+            ColumnType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
+            ColumnType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+            ColumnType::Date => "chrono::NaiveDate",
+            ColumnType::Time => "chrono::NaiveTime",
+            ColumnType::Decimal => "rust_decimal::Decimal",
+            ColumnType::ArrayInt => "Vec<u64>",
+            ColumnType::ArrayString => "Vec<String>",
+            ColumnType::Json if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
+            ColumnType::Json => "serde_json::Value",
+            ColumnType::Enum => "",
+            ColumnType::DbEnum => "String",
+            ColumnType::DbSet => "String",
+            ColumnType::Point => "senax_common::types::point::Point",
+            ColumnType::UnSupported => unimplemented!(),
+        }
+        .to_string();
+        if typ.is_empty() {
+            typ = if let Some(ref name) = self.class {
+                name.to_string()
+            } else {
+                typ
+            };
+        }
+        if self.not_null && !option {
+            typ
+        } else {
+            format!("Option<{}>", typ)
+        }
+    }
+
+    pub fn get_to_api_type(&self) -> &str {
+        let id_type = self.class.is_some() || self.rel.is_some();
+        match self.type_def {
+            ColumnType::TinyInt if id_type && !self.not_null => ".map(|v| v.into())",
+            ColumnType::TinyInt if id_type => ".into()",
+            ColumnType::TinyInt => "",
+            ColumnType::SmallInt if id_type && !self.not_null => ".map(|v| v.into())",
+            ColumnType::SmallInt if id_type => ".into()",
+            ColumnType::SmallInt => "",
+            ColumnType::Int if id_type && !self.not_null => ".map(|v| v.into())",
+            ColumnType::Int if id_type => ".into()",
+            ColumnType::Int => "",
+            ColumnType::BigInt if id_type && !self.not_null => ".map(|v| v.into())",
+            ColumnType::BigInt if id_type => ".into()",
+            ColumnType::BigInt => "",
+            ColumnType::Float => "",
+            ColumnType::Double => "",
+            ColumnType::Varchar if !self.not_null => ".map(|v| v.to_string())",
+            ColumnType::Varchar => ".to_string()",
+            ColumnType::Boolean => "",
+            ColumnType::Text if !self.not_null => ".map(|v| v.to_string())",
+            ColumnType::Text => ".to_string()",
+            ColumnType::Blob if !self.not_null => ".cloned()",
+            ColumnType::Blob => ".clone()",
+            ColumnType::Timestamp => "",
+            ColumnType::DateTime => "",
+            ColumnType::Date => "",
+            ColumnType::Time => "",
+            ColumnType::Decimal => "",
+            ColumnType::ArrayInt if !self.not_null => ".cloned()",
+            ColumnType::ArrayInt => ".clone()",
+            ColumnType::ArrayString if !self.not_null => ".cloned()",
+            ColumnType::ArrayString => ".clone()",
+            ColumnType::Json if !self.not_null => ".cloned()",
+            ColumnType::Json => ".clone()",
+            ColumnType::Enum => "",
+            ColumnType::DbEnum if !self.not_null => ".map(|v| v.to_string())",
+            ColumnType::DbEnum => ".to_string()",
+            ColumnType::DbSet if !self.not_null => ".map(|v| v.to_string())",
+            ColumnType::DbSet => ".to_string()",
+            ColumnType::Point => "",
+            ColumnType::UnSupported => unimplemented!(),
+        }
+    }
+
+    pub fn get_from_api_type(&self, name: &str, rel: bool, foreign: &str) -> String {
+        let var = super::_to_var_name(name);
+        let id_type = self.class.is_some() || self.rel.is_some();
+        if self.auto_increment == Some(AutoIncrement::Auto) {
+            if rel {
+                return format!("data.{var}.unwrap_or_default()");
+            } else {
+                return "0".to_owned();
+            }
+        }
+        if rel && name == foreign {
+            if !self.not_null {
+                return "None".to_owned();
+            }
+            match self.type_def {
+                ColumnType::TinyInt
+                | ColumnType::SmallInt
+                | ColumnType::Int
+                | ColumnType::BigInt => {
+                    return "0.into()".to_owned();
+                }
+                ColumnType::Varchar => {
+                    return "\"\".to_string().into()".to_owned();
+                }
+                _ => {
+                    unimplemented!();
+                }
+            }
+        }
+        match self.type_def {
+            ColumnType::TinyInt | ColumnType::SmallInt | ColumnType::Int | ColumnType::BigInt
+                if id_type && !self.not_null =>
+            {
+                format!("data.{var}.map(|v| v.into())")
+            }
+            ColumnType::TinyInt | ColumnType::SmallInt | ColumnType::Int | ColumnType::BigInt
+                if id_type =>
+            {
+                format!("data.{var}.into()")
+            }
+            ColumnType::Varchar if id_type && !self.not_null => {
+                format!("data.{var}.map(|v| v.into())")
+            }
+            ColumnType::Varchar if id_type => format!("data.{var}.into()"),
+            ColumnType::Blob if !self.not_null => "None".to_string(),
+            ColumnType::Blob => "senax_common::types::blob::Blob::default()".to_string(),
+            _ => format!("data.{var}"),
+        }
+    }
+
     pub fn get_outer_type(&self) -> String {
         let typ = if let Some(ref name) = self.class {
             name.to_string()
@@ -741,11 +942,11 @@ impl ColumnDef {
                 ColumnType::ArrayInt => "&Vec<u64>",
                 ColumnType::ArrayString => "&Vec<String>",
                 ColumnType::Json if json_class.is_some() => json_class.as_ref().unwrap(),
-                ColumnType::Json => "&Value",
+                ColumnType::Json => "&serde_json::Value",
                 ColumnType::Enum => "",
                 ColumnType::DbEnum => "&str",
                 ColumnType::DbSet => "&str",
-                ColumnType::Point => "Point",
+                ColumnType::Point => "senax_common::types::point::Point",
                 ColumnType::UnSupported => unimplemented!(),
             }
             .to_string()
@@ -1207,5 +1408,17 @@ impl ColumnDef {
         } else {
             ".clone()"
         }
+    }
+
+    pub fn is_api_required(&self) -> bool {
+        self.api_required
+    }
+
+    pub fn is_api_readonly(&self) -> bool {
+        self.api_visibility == Some(ApiVisibility::Readonly)
+    }
+
+    pub fn is_api_hidden(&self) -> bool {
+        self.api_visibility == Some(ApiVisibility::Hidden)
     }
 }

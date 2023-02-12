@@ -13,7 +13,7 @@ use crate::{
 pub mod template;
 
 pub fn generate(db: &str, force: bool) -> Result<()> {
-    schema::parse(db)?;
+    schema::parse(db, false)?;
 
     let config = unsafe { CONFIG.get().unwrap() }.clone();
     let groups = unsafe { GROUPS.get().unwrap() }.clone();

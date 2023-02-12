@@ -354,10 +354,15 @@ impl Size for Value {
 pub trait ForUpdateTr {
     fn _is_new(&self) -> bool;
     fn _has_been_deleted(&self) -> bool;
-    fn _delete(&mut self);
+    fn _set_delete(&mut self);
+    fn _set_delete_and_return_self(self) -> Self;
+    fn _cancel_delete(&mut self);
     fn _will_be_deleted(&self) -> bool;
-    fn _upsert(&mut self);
+    fn _set_upsert(&mut self);
     fn _is_updated(&self) -> bool;
+    fn _eq(&self, update: &Self) -> bool;
+    fn _set(&mut self, update: Self);
+    fn _update(&mut self, update: Self);
 }
 
 #[derive(Clone, Debug)]

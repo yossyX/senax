@@ -1,7 +1,7 @@
 // This code is auto-generated and will always be overwritten.
 
 use anyhow::{ensure, Context as _, Result};
-use futures::future::LocalBoxFuture;
+use futures::future::BoxFuture;
 use fxhash::FxHashMap;
 use log::LevelFilter;
 use once_cell::sync::{Lazy, OnceCell};
@@ -117,7 +117,7 @@ pub struct DbConn {
     cache_tx: FxHashMap<ShardId, sqlx::Transaction<'static, DbType>>,
     conn: FxHashMap<ShardId, PoolConnection<DbType>>,
     cache_op_list: Vec<CacheOp>,
-    callback_list: VecDeque<Box<dyn FnOnce() -> LocalBoxFuture<'static, ()> + Send + Sync>>,
+    callback_list: VecDeque<Box<dyn FnOnce() -> BoxFuture<'static, ()> + Send + Sync>>,
     pub(crate) clear_all_cache: bool,
     wo_tx: bool,
 }
@@ -343,7 +343,7 @@ impl DbConn {
 
     pub(crate) async fn push_callback(
         &mut self,
-        cb: Box<dyn FnOnce() -> LocalBoxFuture<'static, ()> + Send + Sync>,
+        cb: Box<dyn FnOnce() -> BoxFuture<'static, ()> + Send + Sync>,
     ) {
         if self.has_tx() {
             self.callback_list.push_back(cb);
@@ -469,7 +469,7 @@ impl Drop for DbConn {
         if cfg!(debug_assertions)
             && (self.has_tx() || !self.callback_list.is_empty() || !self.cache_op_list.is_empty())
         {
-            log::warn!("implicit rollback");
+            log::debug!("implicit rollback");
         }
     }
 }

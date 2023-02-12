@@ -28,6 +28,6 @@ regex = "1"
 rustls = { version = "0.20", features = [ "quic" ] }
 rustls-pemfile = "1.0"
 sha2 = "0.10"
-tokio = { version = "1.20", features = [ "macros", "rt-multi-thread", "sync", "signal", "time" ] }
+tokio = { version = "1.25", features = [ "macros", "rt-multi-thread", "sync", "signal", "time" ] }
 tokio-uring = { version = "0.3", features = [ "bytes" ] }
 zstd = "0.11"
