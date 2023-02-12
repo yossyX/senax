@@ -6,7 +6,7 @@ use actix_web::{
     http::header::{HeaderValue, SET_COOKIE},
     HttpResponse,
 };
-use std::{convert::TryInto, fmt, future::Future, pin::Pin, rc::Rc};
+use std::{convert::TryInto, fmt, future::Future, pin::Pin, rc::Rc, sync::Arc};
 
 use crate::{
     config::{
@@ -19,7 +19,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct SessionMiddleware<Store: SessionStore> {
-    storage_backend: Rc<Store>,
+    storage_backend: Arc<Store>,
     configuration: Rc<Configuration>,
 }
 
@@ -50,7 +50,7 @@ impl<Store: SessionStore> SessionMiddleware<Store> {
 
     pub(crate) fn from_parts(store: Store, configuration: Configuration) -> Self {
         Self {
-            storage_backend: Rc::new(store),
+            storage_backend: Arc::new(store),
             configuration: Rc::new(configuration),
         }
     }
@@ -73,7 +73,7 @@ where
         ready(Ok(InnerSessionMiddleware {
             service: Rc::new(service),
             configuration: Rc::clone(&self.configuration),
-            storage_backend: Rc::clone(&self.storage_backend),
+            storage_backend: Arc::clone(&self.storage_backend),
         }))
     }
 }
@@ -91,7 +91,7 @@ pub(crate) fn e500<E: fmt::Debug + fmt::Display + 'static>(err: E) -> actix_web:
 pub struct InnerSessionMiddleware<S, Store: SessionStore + 'static> {
     service: Rc<S>,
     configuration: Rc<Configuration>,
-    storage_backend: Rc<Store>,
+    storage_backend: Arc<Store>,
 }
 
 impl<S, B, Store> Service<ServiceRequest> for InnerSessionMiddleware<S, Store>
@@ -109,7 +109,7 @@ where
 
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let service = Rc::clone(&self.service);
-        let storage_backend = Rc::clone(&self.storage_backend);
+        let storage_backend = Arc::clone(&self.storage_backend);
         let configuration = Rc::clone(&self.configuration);
 
         Box::pin(async move {

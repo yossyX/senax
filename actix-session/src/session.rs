@@ -8,7 +8,7 @@ use actix_web::{
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
-use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
+use std::{collections::HashMap, mem, sync::Arc, sync::Mutex};
 
 use crate::{
     config::Configuration,
@@ -20,7 +20,7 @@ use crate::{
 const MAX_RETRY_COUNT: usize = 5;
 
 #[derive(Clone)]
-pub struct Session<Store: SessionStore + 'static>(Rc<RefCell<SessionInner<Store>>>);
+pub struct Session<Store: SessionStore + 'static>(Arc<Mutex<SessionInner<Store>>>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionStatus {
@@ -38,7 +38,7 @@ pub struct SessionInner<Store: SessionStore + 'static> {
     status: SessionStatus,
     state_ttl: Duration,
     version: u32,
-    storage: Rc<Store>,
+    storage: Arc<Store>,
 }
 
 impl<Store: SessionStore + 'static> SessionInner<Store> {
@@ -163,11 +163,11 @@ impl<Store: SessionStore + 'static> SessionInner<Store> {
 
 impl<Store: SessionStore + 'static> Session<Store> {
     pub fn session_key(&self) -> Option<SessionKey> {
-        self.0.borrow().session_key.as_ref().cloned()
+        self.0.lock().unwrap().session_key.as_ref().cloned()
     }
 
     pub fn csrf_token(&self) -> Option<String> {
-        self.0.borrow().session_key.as_ref().map(|v| {
+        self.0.lock().unwrap().session_key.as_ref().map(|v| {
             Sha256::digest(&String::from(v))
                 .iter()
                 .take(8)
@@ -177,23 +177,23 @@ impl<Store: SessionStore + 'static> Session<Store> {
     }
 
     pub fn contains_in_base(&self, key: &str) -> bool {
-        self.0.borrow().base_data.contains_key(key)
+        self.0.lock().unwrap().base_data.contains_key(key)
     }
 
     pub fn contains_in_login(&self, key: &str) -> bool {
-        self.0.borrow().login_data.contains_key(key)
+        self.0.lock().unwrap().login_data.contains_key(key)
     }
 
     pub fn contains_in_debug(&self, key: &str) -> bool {
         if cfg!(debug_assertions) {
-            self.0.borrow().debug_data.contains_key(key)
+            self.0.lock().unwrap().debug_data.contains_key(key)
         } else {
             false
         }
     }
 
     pub fn get_from_base<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
-        if let Some(val) = self.0.borrow().base_data.get(key) {
+        if let Some(val) = self.0.lock().unwrap().base_data.get(key) {
             Ok(Some(serde_cbor::from_slice(val)?))
         } else {
             Ok(None)
@@ -201,7 +201,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
     }
 
     pub fn get_from_login<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
-        if let Some(val) = self.0.borrow().login_data.get(key) {
+        if let Some(val) = self.0.lock().unwrap().login_data.get(key) {
             Ok(Some(serde_cbor::from_slice(val)?))
         } else {
             Ok(None)
@@ -210,7 +210,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
 
     pub fn get_from_debug<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
         if cfg!(debug_assertions) {
-            if let Some(val) = self.0.borrow().debug_data.get(key) {
+            if let Some(val) = self.0.lock().unwrap().debug_data.get(key) {
                 Ok(Some(serde_cbor::from_slice(val)?))
             } else {
                 Ok(None)
@@ -221,19 +221,19 @@ impl<Store: SessionStore + 'static> Session<Store> {
     }
 
     pub fn keys_of_base(&self) -> Vec<String> {
-        self.0.borrow().base_data.keys().cloned().collect()
+        self.0.lock().unwrap().base_data.keys().cloned().collect()
     }
 
     pub fn keys_of_login(&self) -> Vec<String> {
-        self.0.borrow().login_data.keys().cloned().collect()
+        self.0.lock().unwrap().login_data.keys().cloned().collect()
     }
 
     pub fn keys_of_debug(&self) -> Vec<String> {
-        self.0.borrow().debug_data.keys().cloned().collect()
+        self.0.lock().unwrap().debug_data.keys().cloned().collect()
     }
 
     pub fn status(&self) -> SessionStatus {
-        self.0.borrow().status
+        self.0.lock().unwrap().status
     }
 
     pub async fn update<F, R>(&self, f: F) -> Result<R>
@@ -243,7 +243,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
         let mut retry_count = 0;
         loop {
             let (f_result, session_data, key, storage) = {
-                let mut inner = self.0.borrow_mut();
+                let mut inner = self.0.lock().unwrap();
                 let f_result = f(&mut inner);
                 if !inner.update {
                     return f_result;
@@ -257,7 +257,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
                     version: inner.version,
                 };
                 let key = inner.session_key.as_ref().cloned();
-                let storage = Rc::clone(&inner.storage);
+                let storage = Arc::clone(&inner.storage);
                 (f_result, session_data, key, storage)
             };
             let result = if key.is_some() {
@@ -267,7 +267,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
             };
             match result {
                 Ok(key) => {
-                    let mut inner = self.0.borrow_mut();
+                    let mut inner = self.0.lock().unwrap();
                     if !matches!(&inner.session_key, Some(x) if x == &key) {
                         inner.status = SessionStatus::Changed;
                         inner.session_key = Some(key);
@@ -290,12 +290,12 @@ impl<Store: SessionStore + 'static> Session<Store> {
     }
 
     pub async fn purge(&self) -> Result<()> {
-        let key = self.0.borrow().session_key.as_ref().cloned();
-        let storage = Rc::clone(&self.0.borrow().storage);
+        let key = self.0.lock().unwrap().session_key.as_ref().cloned();
+        let storage = Arc::clone(&self.0.lock().unwrap().storage);
         if key.is_some() {
             storage.delete(key.as_ref().unwrap()).await?;
         }
-        let mut inner = self.0.borrow_mut();
+        let mut inner = self.0.lock().unwrap();
         inner.status = SessionStatus::Purged;
         inner.session_key = None;
         inner.base_data.clear();
@@ -318,7 +318,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
         let mut retry_count = 0;
         loop {
             let (f_result, session_data, storage) = {
-                let mut inner = self.0.borrow_mut();
+                let mut inner = self.0.lock().unwrap();
                 let f_result = f(&mut inner);
                 inner.update = false;
                 let list = vec![&inner.debug_data, &inner.login_data, &inner.base_data];
@@ -328,12 +328,12 @@ impl<Store: SessionStore + 'static> Session<Store> {
                     ttl: inner.state_ttl,
                     version: inner.version,
                 };
-                let storage = Rc::clone(&inner.storage);
+                let storage = Arc::clone(&inner.storage);
                 (f_result, session_data, storage)
             };
             match storage.save(session_data).await {
                 Ok(key) => {
-                    let mut inner = self.0.borrow_mut();
+                    let mut inner = self.0.lock().unwrap();
                     inner.status = SessionStatus::Changed;
                     inner.session_key = Some(key);
                 }
@@ -355,7 +355,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
     pub(crate) async fn set_session(
         req: &mut ServiceRequest,
         session_key: Option<SessionKey>,
-        storage: Rc<Store>,
+        storage: Arc<Store>,
         configuration: &Configuration,
     ) -> Result<()> {
         let (session_key, mut data) = if let Some(session_key) = session_key {
@@ -401,13 +401,13 @@ impl<Store: SessionStore + 'static> Session<Store> {
             version: data.version,
             storage,
         };
-        let inner = Rc::new(RefCell::new(inner));
+        let inner = Arc::new(Mutex::new(inner));
         req.extensions_mut().insert(inner);
         Ok(())
     }
 
     pub async fn reset(&self) {
-        let mut inner = self.0.borrow_mut();
+        let mut inner = self.0.lock().unwrap();
         inner.status = SessionStatus::Unchanged;
         inner.session_key = None;
         inner.base_data.clear();
@@ -419,7 +419,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
     pub async fn load(&self, key: &str) -> Result<()> {
         let mut session_key = Some(key.to_string().try_into()?);
         let (data, mut list) = {
-            let storage = Rc::clone(&self.0.borrow().storage);
+            let storage = Arc::clone(&self.0.lock().unwrap().storage);
             let data = {
                 let data = storage.load(session_key.as_ref().unwrap()).await?;
                 if let Some(data) = data {
@@ -436,7 +436,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
             };
             (data, list)
         };
-        let mut inner = self.0.borrow_mut();
+        let mut inner = self.0.lock().unwrap();
         inner.session_key = session_key;
         inner.base_data = list.pop().unwrap_or_default();
         inner.login_data = list.pop().unwrap_or_default();
@@ -447,14 +447,14 @@ impl<Store: SessionStore + 'static> Session<Store> {
 
     pub(crate) async fn reload(&self) -> Result<()> {
         let (data, mut list) = {
-            let key = self.0.borrow().session_key.as_ref().cloned();
-            let storage = Rc::clone(&self.0.borrow().storage);
+            let key = self.0.lock().unwrap().session_key.as_ref().cloned();
+            let storage = Arc::clone(&self.0.lock().unwrap().storage);
             let data = if let Some(session_key) = key {
                 let data = storage.reload(&session_key).await?;
                 if let Some(data) = data {
                     data
                 } else {
-                    self.0.borrow_mut().session_key = None;
+                    self.0.lock().unwrap().session_key = None;
                     return Ok(());
                 }
             } else {
@@ -467,7 +467,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
             };
             (data, list)
         };
-        let mut inner = self.0.borrow_mut();
+        let mut inner = self.0.lock().unwrap();
         inner.base_data = list.pop().unwrap_or_default();
         inner.login_data = list.pop().unwrap_or_default();
         inner.debug_data = list.pop().unwrap_or_default();
@@ -481,10 +481,10 @@ impl<Store: SessionStore + 'static> Session<Store> {
         if let Some(s_impl) = res
             .request()
             .extensions()
-            .get::<Rc<RefCell<SessionInner<Store>>>>()
+            .get::<Arc<Mutex<SessionInner<Store>>>>()
         {
-            let session_key = mem::take(&mut s_impl.borrow_mut().session_key);
-            (s_impl.borrow().status, session_key)
+            let session_key = mem::take(&mut s_impl.lock().unwrap().session_key);
+            (s_impl.lock().unwrap().status, session_key)
         } else {
             (SessionStatus::Unchanged, None)
         }
@@ -492,15 +492,15 @@ impl<Store: SessionStore + 'static> Session<Store> {
 
     pub(crate) fn get_session(extensions: &mut Extensions) -> Result<Session<Store>> {
         let s_impl = extensions
-            .get::<Rc<RefCell<SessionInner<Store>>>>()
+            .get::<Arc<Mutex<SessionInner<Store>>>>()
             .with_context(|| "No session is set up.")?;
-        Ok(Session(Rc::clone(s_impl)))
+        Ok(Session(Arc::clone(s_impl)))
     }
 }
 
 impl<Store: SessionStore + 'static> std::fmt::Debug for Session<Store> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let inner = self.0.borrow();
+        let inner = self.0.lock().unwrap();
         let list: Vec<HashMap<&String, serde_cbor::Value>> = vec![
             inner
                 .base_data

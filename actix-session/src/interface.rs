@@ -64,7 +64,7 @@ impl SessionData {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait SessionStore {
     async fn load(&self, session_key: &SessionKey) -> Result<Option<SessionData>>;
     async fn reload(&self, session_key: &SessionKey) -> Result<Option<SessionData>>;
