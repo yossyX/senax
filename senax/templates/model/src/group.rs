@@ -6,7 +6,6 @@
 #![allow(unused_mut)]
 #![allow(unreachable_patterns)]
 
-use actix::ArbiterHandle;
 use anyhow::Result;
 use indexmap::IndexMap;
 use schemars::JsonSchema;
@@ -33,14 +32,14 @@ pub mod @{ name|to_var_name }@;
 @%- endfor %@
 
 #[rustfmt::skip]
-pub(crate) async fn start(handle: Option<&ArbiterHandle>, db_dir: Option<&Path>) -> Result<()> {
+pub(crate) async fn start(db_dir: Option<&Path>) -> Result<()> {
 @%- for (name, defs) in tables  %@
-    @{ defs.mod_name()|to_var_name }@::_@{ defs.mod_name() }@::init(handle).await?;
+    @{ defs.mod_name()|to_var_name }@::_@{ defs.mod_name() }@::init().await?;
 @%- endfor %@
 
-    if let Some(handle) = handle {
+    if !crate::is_test_mode() {
         let path = db_dir.unwrap().join(DELAYED_DB_DIR).join("@{ group_name }@");
-        handle.spawn(async move {
+        tokio::spawn(async move {
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
                 let db = sled::open(&path);

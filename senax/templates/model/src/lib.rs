@@ -1,4 +1,3 @@
-use actix::{Actor, Addr, ArbiterHandle, AsyncContext, Context, Handler, Message, WrapFuture};
 use anyhow::{Context as _, Result};
 use cache::Cache;
 use futures::TryStreamExt;
@@ -55,12 +54,12 @@ const DEFAULT_CACHE_DB_MAX_CONNECTIONS: &str = "10";
 
 static SHUTDOWN_GUARD: OnceCell<Weak<mpsc::Sender<u8>>> = OnceCell::new();
 static SYS_STOP: AtomicBool = AtomicBool::new(false);
+static TEST_MODE: AtomicBool = AtomicBool::new(false);
 static BULK_FETCH_SEMAPHORE: OnceCell<Vec<Semaphore>> = OnceCell::new();
 static BULK_INSERT_MAX_SIZE: OnceCell<usize> = OnceCell::new();
 static LINKER_SENDER: OnceCell<UnboundedSender<Vec<u8>>> = OnceCell::new();
 
 pub async fn start(
-    handle: &ArbiterHandle,
     is_hot_deploy: bool,
     exit_tx: mpsc::Sender<i32>,
     guard: Weak<mpsc::Sender<u8>>,
@@ -68,15 +67,14 @@ pub async fn start(
     linker_port: &Option<String>,
     pw: &Option<String>,
 ) -> Result<()> {
-    SHUTDOWN_GUARD.set(guard).unwrap();
+    SHUTDOWN_GUARD
+        .set(guard)
+        .expect("SHUTDOWN_GUARD duplicate setting error");
+    TEST_MODE.store(false, Ordering::SeqCst);
     connection::init().await?;
 
     set_bulk_fetch_lane();
     set_bulk_insert_max_size().await?;
-
-    let actor = CacheActor {};
-    let addr = CacheActor::start_in_arbiter(handle, |_| actor);
-    CACHE_ADDR.set(addr).unwrap();
 
     let disable_cache = std::env::var("DISABLE_@{ db|upper }@_CACHE")
         .unwrap_or_else(|_| "false".to_owned())
@@ -87,7 +85,7 @@ pub async fn start(
         Cache::start(is_hot_deploy, Some(&db_dir.join(CACHE_DB_DIR)), @{ config.use_fast_cache()|if_then_else("true", "false") }@, true)?;
     }
 
-@% for (name, defs) in groups  %@    @{ name|to_var_name }@::start(Some(handle), Some(db_dir)).await?;
+@% for (name, defs) in groups  %@    @{ name|to_var_name }@::start(Some(db_dir)).await?;
 @% endfor %@
     if let Some(port) = linker_port {
         let pw = pw
@@ -97,7 +95,7 @@ pub async fn start(
         let (to_linker, mut from_linker) =
             LinkerClient::start(port, DB_NO, pw, exit_tx.clone(), disable_cache)?;
         LINKER_SENDER.set(to_linker).unwrap();
-        handle.spawn(async move {
+        tokio::spawn(async move {
             while let Some(data) = from_linker.recv().await {
                 if data.is_empty() {
                     warn!("cache clear received");
@@ -151,12 +149,13 @@ static TEST_LOCK: Lazy<Mutex<u8>> = Lazy::new(|| Mutex::new(0));
 
 pub async fn start_test() -> Result<MutexGuard<'static, u8>> {
     let guard = TEST_LOCK.lock().await;
+    TEST_MODE.store(true, Ordering::SeqCst);
     migrate(true, true).await?;
 
     set_bulk_fetch_lane();
     set_bulk_insert_max_size().await?;
 
-@% for (name, defs) in groups  %@    @{ name|to_var_name }@::start(None, None).await?;
+@% for (name, defs) in groups  %@    @{ name|to_var_name }@::start(None).await?;
 @% endfor %@
     _clear_cache();
     Ok(guard)
@@ -246,19 +245,18 @@ pub(crate) fn get_shutdown_guard() -> Option<Arc<mpsc::Sender<u8>>> {
     if let Some(guard) = SHUTDOWN_GUARD.get() {
         guard.upgrade()
     } else {
+        warn!("SHUTDOWN_GUARD lost!");
         None
     }
 }
 
-static CACHE_ADDR: OnceCell<Addr<CacheActor>> = OnceCell::new();
-
-pub(crate) struct CacheActor;
-impl Actor for CacheActor {
-    type Context = Context<Self>;
+pub fn is_test_mode() -> bool {
+    TEST_MODE.load(Ordering::Relaxed)
 }
 
-#[derive(Message, Deserialize, Serialize, Clone, Debug)]
-#[rtype(result = "()")]
+pub(crate) struct CacheActor;
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub(crate) struct CacheMsg(Vec<CacheOp>, MSec);
 
 #[allow(clippy::large_enum_variant)]
@@ -283,8 +281,8 @@ impl CacheMsg {
     }
 
     pub(crate) async fn do_send(self) {
-        if let Some(addr) = CACHE_ADDR.get() {
-            addr.do_send(self);
+        if !is_test_mode() {
+            CacheActor::handle(self);
         } else {
             self.handle_cache_msg(false).await;
         }
@@ -299,11 +297,9 @@ impl CacheMsg {
 }
 
 #[rustfmt::skip]
-impl Handler<CacheMsg> for CacheActor {
-    type Result = ();
-
-    fn handle(&mut self, msg: CacheMsg, ctx: &mut Self::Context) -> Self::Result {
-        ctx.spawn(
+impl CacheActor {
+    pub fn handle(msg: CacheMsg) {
+        tokio::spawn(
             async move {
                 let _guard = get_shutdown_guard();
                 if let Some(linker) = LINKER_SENDER.get() {
@@ -318,7 +314,6 @@ impl Handler<CacheMsg> for CacheActor {
                 }
                 msg.handle_cache_msg(false).await;
             }
-            .into_actor(self),
         );
     }
 }

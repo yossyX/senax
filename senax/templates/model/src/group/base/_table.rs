@@ -1,6 +1,5 @@
 // This code is auto-generated and will always be overwritten.
 
-use actix::{fut::WrapFuture, Actor, Addr, ArbiterHandle, AsyncContext, Context, Handler, Message};
 use ahash::{AHashMap, AHasher};
 use anyhow::{ensure, Context as _, Result};
 use arc_swap::ArcSwapOption;
@@ -79,7 +78,7 @@ static COL_KEY_TYPE_ID: u64 = @{ def.get_type_id("COL_KEY_TYPE_ID") }@;
 static VERSION_TYPE_ID: u64 = @{ def.get_type_id("VERSION_TYPE_ID") }@;
 static CACHE_TYPE_ID: u64 = @{ def.get_type_id("CACHE_TYPE_ID") }@;
 
-pub(crate) async fn init(handle: Option<&ArbiterHandle>) -> Result<()> {
+pub(crate) async fn init() -> Result<()> {
     if CACHE_ALL.get().is_none() {
         CACHE_ALL.set(DbConn::shard_num_range().map(|_| ArcSwapOption::const_empty()).collect()).unwrap();
         @%- if def.use_save_delayed() %@
@@ -94,13 +93,11 @@ pub(crate) async fn init(handle: Option<&ArbiterHandle>) -> Result<()> {
         BULK_FETCH_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
     }
 
-    if let Some(handle) = handle {
-        let addr = DelayedActor::start_in_arbiter(handle, |_| DelayedActor);
-        DELAYED_ADDR.set(addr).unwrap();
+    if !crate::is_test_mode() {
         @%- if def.use_insert_delayed() %@
-        handle.spawn(async {
+        tokio::spawn(async {
             while !crate::is_stopped() {
-                DELAYED_ADDR.get().unwrap().do_send(DelayedMsg::InsertFromDisk);
+                DelayedActor::handle(DelayedMsg::InsertFromDisk);
                 sleep(Duration::from_secs(10)).await;
             }
         });
@@ -119,8 +116,8 @@ pub(crate) async fn init_db(db: &sled::Db) -> Result<()> {
     @%- if def.use_insert_delayed() %@
     let tree = db.open_tree("@{ name }@")?;
     INSERT_DELAYED_DB.set(tree).unwrap();
-    DELAYED_ADDR.get().unwrap().do_send(DelayedMsg::InsertFromMemory);
-    DELAYED_ADDR.get().unwrap().do_send(DelayedMsg::InsertFromDisk);
+    DelayedActor::handle(DelayedMsg::InsertFromMemory);
+    DelayedActor::handle(DelayedMsg::InsertFromDisk);
     @%- endif %@
     Ok(())
 }
@@ -594,7 +591,6 @@ pub(crate) fn clear_cache_all() {
     if let Some(ids) = GENERATED_IDS.get() { ids.write().unwrap().clear() }", "") }@
 }
 
-static DELAYED_ADDR: OnceCell<Addr<DelayedActor>> = OnceCell::new();
 @%- if def.use_insert_delayed() %@
 static INSERT_DELAYED_QUEUE: Lazy<SegQueue<ForInsert>> = Lazy::new(SegQueue::new);
 static INSERT_DELAYED_DB: OnceCell<sled::Tree> = OnceCell::new();
@@ -622,9 +618,6 @@ static UPSERT_DELAYED_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1
 @%- endif %@
 
 struct DelayedActor;
-impl Actor for DelayedActor {
-    type Context = Context<Self>;
-}
 @%- if def.use_insert_delayed() %@
 
 struct InsertDelayedBuf(Vec<ForInsert>);
@@ -639,8 +632,6 @@ impl Drop for InsertDelayedBuf {
 }
 @%- endif %@
 
-#[derive(Message)]
-#[rtype(result = "()")]
 enum DelayedMsg {
     @%- if def.use_insert_delayed() %@
     InsertFromMemory,
@@ -656,17 +647,15 @@ enum DelayedMsg {
     Upsert,
     @%- endif %@
 }
-impl Handler<DelayedMsg> for DelayedActor {
-    type Result = ();
-
-    fn handle(&mut self, msg: DelayedMsg, ctx: &mut Self::Context) -> Self::Result {
+impl DelayedActor {
+    fn handle(msg: DelayedMsg) {
         match msg {
             @%- if def.use_insert_delayed() %@
             DelayedMsg::InsertFromMemory => {
                 if INSERT_DELAYED_WAITING.load(Ordering::SeqCst) {
                     return;
                 }
-                ctx.spawn(
+                tokio::spawn(
                     async move {
                         INSERT_DELAYED_WAITING.store(true, Ordering::SeqCst);
                         let _guard = crate::get_shutdown_guard();
@@ -674,11 +663,10 @@ impl Handler<DelayedMsg> for DelayedActor {
                         INSERT_DELAYED_WAITING.store(false, Ordering::SeqCst);
                         handle_delayed_msg_insert_from_memory().await;
                     }
-                    .into_actor(self),
                 );
             }
             DelayedMsg::InsertFromDisk => {
-                ctx.spawn(
+                tokio::spawn(
                     async move {
                         let _guard = crate::get_shutdown_guard();
                         let mut handles = Vec::new();
@@ -691,7 +679,6 @@ impl Handler<DelayedMsg> for DelayedActor {
                             }
                         });
                     }
-                    .into_actor(self),
                 );
             }
             @%- endif %@
@@ -700,7 +687,7 @@ impl Handler<DelayedMsg> for DelayedActor {
                 if SAVE_DELAYED_WAITING.load(Ordering::SeqCst) {
                     return;
                 }
-                ctx.spawn(
+                tokio::spawn(
                     async move {
                         SAVE_DELAYED_WAITING.store(true, Ordering::SeqCst);
                         let _guard = crate::get_shutdown_guard();
@@ -708,7 +695,6 @@ impl Handler<DelayedMsg> for DelayedActor {
                         SAVE_DELAYED_WAITING.store(false, Ordering::SeqCst);
                         handle_delayed_msg_save().await;
                     }
-                    .into_actor(self),
                 );
             }
             @%- endif %@
@@ -717,7 +703,7 @@ impl Handler<DelayedMsg> for DelayedActor {
                 if UPDATE_DELAYED_WAITING.load(Ordering::SeqCst) {
                     return;
                 }
-                ctx.spawn(
+                tokio::spawn(
                     async move {
                         UPDATE_DELAYED_WAITING.store(true, Ordering::SeqCst);
                         let _guard = crate::get_shutdown_guard();
@@ -725,7 +711,6 @@ impl Handler<DelayedMsg> for DelayedActor {
                         UPDATE_DELAYED_WAITING.store(false, Ordering::SeqCst);
                         handle_delayed_msg_update().await;
                     }
-                    .into_actor(self),
                 );
             }
             @%- endif %@
@@ -734,7 +719,7 @@ impl Handler<DelayedMsg> for DelayedActor {
                 if UPSERT_DELAYED_WAITING.load(Ordering::SeqCst) {
                     return;
                 }
-                ctx.spawn(
+                tokio::spawn(
                     async move {
                         UPSERT_DELAYED_WAITING.store(true, Ordering::SeqCst);
                         let _guard = crate::get_shutdown_guard();
@@ -742,7 +727,6 @@ impl Handler<DelayedMsg> for DelayedActor {
                         UPSERT_DELAYED_WAITING.store(false, Ordering::SeqCst);
                         handle_delayed_msg_upsert().await;
                     }
-                    .into_actor(self),
                 );
             }
             @%- endif %@
@@ -896,7 +880,7 @@ async fn handle_delayed_msg_insert_from_disk(shard_id: ShardId) -> Result<()> {
     if db.is_empty() {
         info!("Insert delayed successfully recovered.");
     } else if !crate::is_stopped() {
-        DELAYED_ADDR.get().unwrap().do_send(DelayedMsg::InsertFromDisk);
+        DelayedActor::handle(DelayedMsg::InsertFromDisk);
     }
     tokio::spawn(async move {
         let _guard = crate::get_shutdown_guard();
@@ -4675,8 +4659,8 @@ impl _@{ pascal_name }@ {
         conn.push_callback(Box::new(|| {
             async move {
                 INSERT_DELAYED_QUEUE.push(obj.into());
-                if let Some(addr) = DELAYED_ADDR.get() {
-                    addr.do_send(DelayedMsg::InsertFromMemory);
+                if !crate::is_test_mode() {
+                    DelayedActor::handle(DelayedMsg::InsertFromMemory);
                 } else {
                     handle_delayed_msg_insert_from_memory().await;
                 }
@@ -4701,8 +4685,8 @@ impl _@{ pascal_name }@ {
         conn.push_callback(Box::new(move || {
             async move {
                 SAVE_DELAYED_QUEUE.get().unwrap()[shard_id].push(obj);
-                if let Some(addr) = DELAYED_ADDR.get() {
-                    addr.do_send(DelayedMsg::Save);
+                if !crate::is_test_mode() {
+                    DelayedActor::handle(DelayedMsg::Save);
                 } else {
                     handle_delayed_msg_save().await;
                 }
@@ -4729,8 +4713,8 @@ impl _@{ pascal_name }@ {
         conn.push_callback(Box::new(move || {
             async move {
                 UPDATE_DELAYED_QUEUE.get().unwrap()[shard_id].push(obj);
-                if let Some(addr) = DELAYED_ADDR.get() {
-                    addr.do_send(DelayedMsg::Update);
+                if !crate::is_test_mode() {
+                    DelayedActor::handle(DelayedMsg::Update);
                 } else {
                     handle_delayed_msg_update().await;
                 }
@@ -4755,8 +4739,8 @@ impl _@{ pascal_name }@ {
         conn.push_callback(Box::new(move || {
             async move {
                 UPSERT_DELAYED_QUEUE.get().unwrap()[shard_id].push(obj);
-                if let Some(addr) = DELAYED_ADDR.get() {
-                    addr.do_send(DelayedMsg::Upsert);
+                if !crate::is_test_mode() {
+                    DelayedActor::handle(DelayedMsg::Upsert);
                 } else {
                     handle_delayed_msg_upsert().await;
                 }
