@@ -180,6 +180,9 @@ pub struct ModelDef {
     /// 機能追加
     #[serde(skip_serializing_if = "Option::is_none")]
     pub act_as: Option<ActAs>,
+    /// API生成から除外する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub exclude_from_api: bool,
 
     /// カラム
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]

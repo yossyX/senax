@@ -1,9 +1,8 @@
 use anyhow::{bail, ensure, Context, Result};
 use askama::Template;
 use convert_case::{Case, Casing};
-use indexmap::IndexSet;
 use regex::{Captures, Regex};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -72,7 +71,10 @@ pub fn generate(
                 ));
             }
         } else {
-            let model_list: Vec<_> = group.iter().filter(|v| !v.1.abstract_mode).collect();
+            let model_list: Vec<_> = group
+                .iter()
+                .filter(|v| !v.1.abstract_mode && !v.1.exclude_from_api)
+                .collect();
             for (name, def) in &model_list {
                 write_model_file(
                     &db_path.join(group_name),
@@ -239,24 +241,30 @@ fn write_model_file(
     let re = Regex::new(r"(?s)(// Do not modify this line\. \(GqiModelBegin\)).+(// Do not modify this line\. \(GqiModelEnd\))").unwrap();
     println!("{}", file_path.display());
     ensure!(re.is_match(&content), "File contents are invalid.");
-    let mut relation_mods: IndexSet<String> = IndexSet::new();
-    relation_mods.insert(format!(
-        "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
-        db,
-        _to_var_name(group),
-        _to_var_name(mod_name),
-        group,
-        mod_name
-    ));
-    for mod_name in &def.relation_mods() {
-        relation_mods.insert(format!(
+    let mut relation_mods: BTreeMap<(String, String), String> = BTreeMap::new();
+    relation_mods.insert(
+        (_to_var_name(group), _to_var_name(mod_name)),
+        format!(
             "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
             db,
-            _to_var_name(&mod_name[0]),
-            _to_var_name(&mod_name[1]),
-            mod_name[0],
-            mod_name[1]
-        ));
+            _to_var_name(group),
+            _to_var_name(mod_name),
+            group,
+            mod_name
+        ),
+    );
+    for mod_name in &def.relation_mods() {
+        relation_mods.insert(
+            (_to_var_name(&mod_name[0]), _to_var_name(&mod_name[1])),
+            format!(
+                "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
+                db,
+                _to_var_name(&mod_name[0]),
+                _to_var_name(&mod_name[1]),
+                mod_name[0],
+                mod_name[1]
+            ),
+        );
     }
     let mut buf = template::BaseModelTemplate {
         db,
@@ -274,10 +282,13 @@ fn write_model_file(
             MODEL.set(rel_model.clone()).unwrap();
         }
         for mod_name in &rel_model.relation_mods() {
-            relation_mods.insert(format!(
-                "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
-                db, mod_name[0], mod_name[1], mod_name[0], mod_name[1]
-            ));
+            relation_mods.insert(
+                (mod_name[0].clone(), mod_name[1].clone()),
+                format!(
+                    "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
+                    db, mod_name[0], mod_name[1], mod_name[0], mod_name[1]
+                ),
+            );
         }
         let pascal_name = &rel_model.name.to_case(Case::Pascal);
         let class_mod = &RelDef::get_group_mod_name(rel, rel_name);
@@ -303,10 +314,13 @@ fn write_model_file(
             MODEL.set(rel_model.clone()).unwrap();
         }
         for mod_name in &rel_model.relation_mods() {
-            relation_mods.insert(format!(
-                "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
-                db, mod_name[0], mod_name[1], mod_name[0], mod_name[1]
-            ));
+            relation_mods.insert(
+                (mod_name[0].clone(), mod_name[1].clone()),
+                format!(
+                    "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
+                    db, mod_name[0], mod_name[1], mod_name[0], mod_name[1]
+                ),
+            );
         }
         let pascal_name = &rel_model.name.to_case(Case::Pascal);
         let class_mod = &RelDef::get_group_mod_name(rel, rel_name);
@@ -332,10 +346,13 @@ fn write_model_file(
             MODEL.set(rel_model.clone()).unwrap();
         }
         for mod_name in &rel_model.relation_mods() {
-            relation_mods.insert(format!(
-                "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
-                db, mod_name[0], mod_name[1], mod_name[0], mod_name[1]
-            ));
+            relation_mods.insert(
+                (mod_name[0].clone(), mod_name[1].clone()),
+                format!(
+                    "\n#[allow(unused_imports)]\nuse db_{}::{}::{}::{{self as rel_{}_{}, *}};",
+                    db, mod_name[0], mod_name[1], mod_name[0], mod_name[1]
+                ),
+            );
         }
         let pascal_name = &rel_model.name.to_case(Case::Pascal);
         let class_mod = &RelDef::get_group_mod_name(rel, rel_name);
@@ -354,7 +371,7 @@ fn write_model_file(
     }
     let relation_mods = relation_mods
         .iter()
-        .map(|v| v.to_string())
+        .map(|(_, v)| v.to_string())
         .collect::<Vec<_>>()
         .join("");
     let msg = "\n// Internal can be modified. However, it will be overwritten by auto-generation.";

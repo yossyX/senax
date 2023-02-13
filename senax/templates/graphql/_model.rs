@@ -139,6 +139,7 @@ pub struct Req@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
 @%- endif %@
 }
 
+#[allow(clippy::let_and_return)]
 #[allow(unused_mut)]
 fn prepare_create(conn: &mut @{ db|pascal }@Conn, data: Req@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@) -> _@{ pascal_name }@ForUpdate {
     let mut obj = _@{ pascal_name }@Factory {

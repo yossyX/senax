@@ -39,7 +39,7 @@ impl GqiQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         &self,
         ctx: &async_graphql::Context<'_>,
         @{- def.primaries()|fmt_join("
-        {var}: {inner}", ", ") }@,
+        {var}: {inner},", "") }@
     ) -> async_graphql::Result<@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@> {
         let mut conn = @{ db|pascal }@Conn::new();
         let mut obj = _@{ pascal_name }@::find_optional_from_cache(&conn, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@)
@@ -53,8 +53,8 @@ impl GqiQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     async fn find(
         &self,
         ctx: &async_graphql::Context<'_>,
-        @{ def.primaries()|fmt_join("
-        {var}: {inner}", ", ") }@,
+        @{- def.primaries()|fmt_join("
+        {var}: {inner},", "") }@
     ) -> async_graphql::Result<@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@> {
         let mut conn = @{ db|pascal }@Conn::new();
         let mut obj = _@{ pascal_name }@::find_optional(&mut conn, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@)

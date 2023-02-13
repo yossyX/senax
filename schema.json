@@ -556,6 +556,10 @@
             }
           ]
         },
+        "exclude_from_api": {
+          "description": "API生成から除外する",
+          "type": "boolean"
+        },
         "columns": {
           "description": "カラム",
           "type": "object",
