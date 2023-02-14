@@ -3404,7 +3404,7 @@ impl ForUpdateTr for _@{ pascal_name }@ForUpdate {
     fn _is_updated(&self) -> bool {
         false
         @{- def.non_primaries()|fmt_join("
-        || self._op.{var} != Op::None", "") }@
+        || self._op.{var} != Op::None && self._op.{var} != Op::Skip", "") }@
     }
     fn _eq(&self, update: &Self) -> bool {
         true
@@ -3417,9 +3417,15 @@ impl ForUpdateTr for _@{ pascal_name }@ForUpdate {
         self._data.{var} = update._data.{var}.clone();
         self._update.{var} = update._data.{var};", "") }@
     }
-    fn _update(&mut self, update: Self) {
+    fn _update_except_skip(&mut self, update: Self) {
+        self._update(update, false)
+    }
+    fn _update_only_set(&mut self, update: Self) {
+        self._update(update, true)
+    }
+    fn _update(&mut self, update: Self, set_only: bool) {
         @{- def.for_cmp()|fmt_join("
-        if self._data.{var} != update._data.{var} {
+        if (if set_only { update._op.{var} == Op::Set } else { update._op.{var} != Op::Skip }) && self._data.{var} != update._data.{var} {
             self._op.{var} = Op::Set;
             self._data.{var} = update._data.{var}.clone();
             self._update.{var} = update._data.{var};

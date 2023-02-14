@@ -169,6 +169,8 @@ where
     pub fn get(&self) -> O {
         self.val.clone().into()
     }
+    pub fn mark_skip(&self) {}
+    pub fn mark_set(&mut self) {}
 
     pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, col: &str, value: &I) -> fmt::Result {
         write!(f, "{}={:?}, ", col, value)
@@ -188,6 +190,12 @@ where
 {
     pub fn get(&self) -> O {
         self.val.clone().into()
+    }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
     }
     pub fn set(&mut self, val: O) {
         *self.op = Op::Set;
@@ -230,6 +238,12 @@ where
 {
     pub fn get(&self) -> Option<O> {
         self.val.as_ref().map(|v| v.clone().into())
+    }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<O>) {
         *self.op = Op::Set;
@@ -282,6 +296,12 @@ impl<'a> AccessorNotNullBool<'a> {
     pub fn get(&self) -> bool {
         (*self.val) == 1
     }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
+    }
     pub fn set(&mut self, val: bool) {
         *self.op = Op::Set;
         *self.val = val.into();
@@ -318,6 +338,12 @@ pub struct AccessorNullBool<'a> {
 impl<'a> AccessorNullBool<'a> {
     pub fn get(&self) -> Option<bool> {
         self.val.map(|v| v == 1)
+    }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<bool>) {
         *self.op = Op::Set;
@@ -370,6 +396,12 @@ impl<'a> AccessorNotNullString<'a> {
     pub fn get(&self) -> &str {
         &*self.val
     }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
+    }
     pub fn set(&mut self, val: &str) {
         *self.op = Op::Set;
         *self.val = val.to_string();
@@ -410,6 +442,12 @@ pub struct AccessorNullString<'a> {
 impl<'a> AccessorNullString<'a> {
     pub fn get(&self) -> Option<&str> {
         self.val.as_deref()
+    }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<&str>) {
         *self.op = Op::Set;
@@ -461,6 +499,12 @@ impl<'a, I: Clone + Debug> AccessorNotNullRef<'a, I> {
     pub fn get(&self) -> &I {
         self.val
     }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
+    }
     pub fn set(&mut self, val: I) {
         *self.op = Op::Set;
         *self.val = val.clone();
@@ -497,6 +541,12 @@ pub struct AccessorNullRef<'a, I: Clone + Debug> {
 impl<'a, I: Clone + Debug> AccessorNullRef<'a, I> {
     pub fn get(&self) -> Option<&I> {
         self.val.as_ref()
+    }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<I>) {
         *self.op = Op::Set;
@@ -548,6 +598,12 @@ impl<'a, I: Clone + Debug> AccessorNotNullJson<'a, I> {
     pub fn get(&self) -> &I {
         self.val.as_ref()
     }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
+    }
     pub fn set(&mut self, val: I) {
         *self.op = Op::Set;
         let val = val._into_json();
@@ -589,6 +645,12 @@ pub struct AccessorNullJson<'a, I: Clone + Debug> {
 impl<'a, I: Clone + Debug> AccessorNullJson<'a, I> {
     pub fn get(&self) -> Option<&I> {
         self.val.as_deref()
+    }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<I>) {
         *self.op = Op::Set;
@@ -645,7 +707,13 @@ impl<'a, I: Clone + Ord + Debug + Default> AccessorNotNullOrd<'a, I> {
     pub fn get(&self) -> I {
         self.val.clone()
     }
-    pub fn skip_update(&mut self) {
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
+    }
+    pub(crate) fn skip_and_empty(&mut self) {
         *self.op = Op::Skip;
         *self.update = I::default();
     }
@@ -724,6 +792,12 @@ pub struct AccessorNullOrd<'a, I: Clone + Ord + Debug> {
 impl<'a, I: Clone + Ord + Debug> AccessorNullOrd<'a, I> {
     pub fn get(&self) -> Option<I> {
         self.val.clone()
+    }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<I>) {
         *self.op = Op::Set;
@@ -840,6 +914,12 @@ impl<
 {
     pub fn get(&self) -> I {
         *self.val
+    }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
     }
     pub fn set(&mut self, val: I) {
         *self.op = Op::Set;
@@ -1012,6 +1092,12 @@ impl<
     pub fn get(&self) -> Option<I> {
         *self.val
     }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
+    }
     pub fn set(&mut self, val: Option<I>) {
         *self.op = Op::Set;
         *self.val = val;
@@ -1179,6 +1265,12 @@ impl<'a, I: Copy + PartialOrd + Float + Debug + Display + ToValue> AccessorNotNu
     pub fn get(&self) -> I {
         *self.val
     }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
+    }
     pub fn set(&mut self, val: I) {
         *self.op = Op::Set;
         *self.val = val;
@@ -1281,6 +1373,12 @@ impl<'a, I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
 {
     pub fn get(&self) -> Option<I> {
         *self.val
+    }
+    pub fn mark_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_set(&mut self) {
+        *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<I>) {
         *self.op = Op::Set;

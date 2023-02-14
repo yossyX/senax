@@ -875,6 +875,12 @@ impl ColumnDef {
         }
     }
 
+    pub fn is_skip_update(&self) -> bool {
+        self.is_cascade_on_delete()
+            || self.api_visibility == Some(ApiVisibility::Readonly)
+            || self.api_visibility == Some(ApiVisibility::Hidden)
+    }
+
     pub fn get_from_api_type(&self, name: &str, rel: bool, foreign: &str) -> String {
         let var = super::_to_var_name(name);
         let id_type = self.class.is_some() || self.rel.is_some();
@@ -885,7 +891,7 @@ impl ColumnDef {
                 return "0".to_owned();
             }
         }
-        if rel && name == foreign {
+        if (rel && name == foreign) || self.is_skip_update() {
             if !self.not_null {
                 return "None".to_owned();
             }
@@ -1432,8 +1438,16 @@ impl ColumnDef {
         self.api_required
     }
 
+    pub fn is_cascade_on_delete(&self) -> bool {
+        if let Some((_, Some(rel))) = &self.rel {
+            rel.on_delete == Some(super::ReferenceOption::Cascade)
+        } else {
+            false
+        }
+    }
+
     pub fn is_api_readonly(&self) -> bool {
-        self.api_visibility == Some(ApiVisibility::Readonly)
+        self.api_visibility == Some(ApiVisibility::Readonly) || self.is_cascade_on_delete()
     }
 
     pub fn is_api_hidden(&self) -> bool {

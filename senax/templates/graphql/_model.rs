@@ -5,25 +5,25 @@ pub struct @{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     pub _id: ID,
 @%- if camel_case %@
 @{- def.for_api_response()|fmt_join("
-    pub {var}: {api_type},", "") }@
+{title}{comment}    pub {var}: {api_type},", "") }@
 @{- def.relations_one_cache()|fmt_rel_join("
-    pub {alias}: Option<--1----2----3--{alias_pascal}>,", "")|replace3(db|pascal, group|pascal, mod_name|pascal) }@
+{title}{comment}    pub {alias}: Option<--1----2----3--{alias_pascal}>,", "")|replace3(db|pascal, group|pascal, mod_name|pascal) }@
 @{- def.relations_many_cache()|fmt_rel_join("
-    pub {alias}: Vec<--1----2----3--{alias_pascal}>,", "")|replace3(db|pascal, group|pascal, mod_name|pascal) }@
+{title}{comment}    pub {alias}: Vec<--1----2----3--{alias_pascal}>,", "")|replace3(db|pascal, group|pascal, mod_name|pascal) }@
 @{- def.relations_one_only_cache()|fmt_rel_join("
-    pub {alias}: Option<--1----2----3--{alias_pascal}>,", "")|replace3(db|pascal, group|pascal, mod_name|pascal) }@
+{title}{comment}    pub {alias}: Option<--1----2----3--{alias_pascal}>,", "")|replace3(db|pascal, group|pascal, mod_name|pascal) }@
 @%- else %@
 @{- def.for_api_response()|fmt_join("
-    #[graphql(name = \"{raw_var}\")]
+{title}{comment}    #[graphql(name = \"{raw_var}\")]
     pub {var}: {api_type},", "") }@
 @{- def.relations_one_cache()|fmt_rel_join("
-    #[graphql(name = \"{raw_alias}\")]
+{title}{comment}    #[graphql(name = \"{raw_alias}\")]
     pub {alias}: Option<--1----2----3--{alias_pascal}>,", "")|replace3(db|pascal, group|pascal, mod_name|pascal) }@
 @{- def.relations_many_cache()|fmt_rel_join("
-    #[graphql(name = \"{raw_alias}\")]
+{title}{comment}    #[graphql(name = \"{raw_alias}\")]
     pub {alias}: Vec<--1----2----3--{alias_pascal}>,", "")|replace3(db|pascal, group|pascal, mod_name|pascal) }@
 @{- def.relations_one_only_cache()|fmt_rel_join("
-    #[graphql(name = \"{raw_alias}\")]
+{title}{comment}    #[graphql(name = \"{raw_alias}\")]
     pub {alias}: Option<--1----2----3--{alias_pascal}>,", "")|replace3(db|pascal, group|pascal, mod_name|pascal) }@
 @%- endif %@
 }
@@ -157,17 +157,20 @@ fn prepare_create(conn: &mut @{ db|pascal }@Conn, data: Req@{ db|pascal }@@{ gro
     obj
 }
 
+#[allow(unused_mut)]
 async fn prepare_update(
     conn: &mut @{ db|pascal }@Conn,
     obj: &mut _@{ pascal_name }@ForUpdate,
     data: Req@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@,
 ) -> anyhow::Result<()> {
-    let update = _@{ pascal_name }@Factory {
+    let mut update = _@{ pascal_name }@Factory {
 @{- def.for_factory()|fmt_join("
         {var}: {from_api_type},", "") }@
     }
     .create(conn);
-    obj._update(update);
+@{- def.for_api_request()|fmt_join("
+    update.{var}().mark_set();", "") }@
+    obj._update_only_set(update);
     
     @{- def.relations_auto_inc_many_cache()|fmt_rel_join("
 
@@ -181,11 +184,11 @@ async fn prepare_update(
     let mut list = Vec::new();
     for row in data.{alias}.into_iter() {
         if row.{foreign_pk}.is_some() {
-            let update = {class}Factory::from(row).create(conn);
-            if let Some(mut v) = map.remove(&update.{foreign_pk}().get()) {
-                v._cancel_delete();
-                v._update(update);
-                list.push(v);
+            let mut update = {class}Factory::from(row).create(conn);
+            if let Some(mut org) = map.remove(&update.{foreign_pk}().get()) {
+                org._cancel_delete();
+                _update_{raw_alias}(&mut org, update);
+                list.push(org);
             } else {
                 anyhow::bail!(\"The {foreign_pk} of {raw_alias} is invalid.\");
             }

@@ -1,6 +1,12 @@
 use crate::{common::if_then_else, model_generator::schema::*};
 use convert_case::{Case, Casing};
-use std::fmt::Write;
+use std::{
+    fmt::Write,
+    sync::atomic::{AtomicBool, Ordering},
+};
+
+pub static SHOW_TITLE: AtomicBool = AtomicBool::new(true);
+pub static SHOW_COMMNET: AtomicBool = AtomicBool::new(true);
 
 fn _to_db_col(s: &str, esc: bool) -> String {
     if esc {
@@ -137,8 +143,24 @@ fn _fmt_join(f: &str, name: &&String, col: &&ColumnDef, index: i32, foreign: &st
         .replace("{index}", &index.to_string())
         .replace("{clone}", col.clone_str())
         .replace("{placeholder}", &col.placeholder())
-        .replace("{title}", &comment4(&col.title).unwrap())
-        .replace("{comment}", &comment4(&col.comment).unwrap())
+        .replace(
+            "{title}",
+            &comment4(if_then_else!(
+                SHOW_TITLE.load(Ordering::Relaxed),
+                &col.title,
+                &None
+            ))
+            .unwrap(),
+        )
+        .replace(
+            "{comment}",
+            &comment4(if_then_else!(
+                SHOW_COMMNET.load(Ordering::Relaxed),
+                &col.comment,
+                &None
+            ))
+            .unwrap(),
+        )
 }
 
 pub fn fmt_rel_join_foreign_is_not_null_or_null(
@@ -295,8 +317,24 @@ fn _fmt_rel(
         )
         .replace("{raw_table}", &RelDef::get_foreign_table_name(rel, name))
         .replace("{index}", &index.to_string())
-        .replace("{title}", &comment4(title).unwrap())
-        .replace("{comment}", &comment4(comment).unwrap())
+        .replace(
+            "{title}",
+            &comment4(if_then_else!(
+                SHOW_TITLE.load(Ordering::Relaxed),
+                title,
+                &None
+            ))
+            .unwrap(),
+        )
+        .replace(
+            "{comment}",
+            &comment4(if_then_else!(
+                SHOW_COMMNET.load(Ordering::Relaxed),
+                comment,
+                &None
+            ))
+            .unwrap(),
+        )
         .replace("{constraint}", &constraint)
         .replace("{primaries}", &primaries)
         .replace("{and_cond}", &and_cond)

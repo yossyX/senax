@@ -89,15 +89,20 @@ pub fn generate(
             model_list.iter().map(|(_, v)| v.mod_name()).collect()
         };
         if !model_names.is_empty() {
-            write_group_file(&db_path, db, group_name, &model_names)?;
+            write_group_file(&db_path, db, group_name, &model_names, camel_case)?;
             db_file_group_names.push(group_name.clone());
         }
     }
-    write_db_file(&base_path, db, &db_file_group_names)?;
+    write_db_file(&base_path, db, &db_file_group_names, camel_case)?;
     Ok(())
 }
 
-fn write_db_file(path: &Path, db: &str, group_names: &[String]) -> Result<(), anyhow::Error> {
+fn write_db_file(
+    path: &Path,
+    db: &str,
+    group_names: &[String],
+    camel_case: bool,
+) -> Result<(), anyhow::Error> {
     let file_path = path.join(&format!("{}.rs", db));
     if !file_path.exists() {
         let tpl = template::DbTemplate { db };
@@ -129,12 +134,20 @@ fn write_db_file(path: &Path, db: &str, group_names: &[String]) -> Result<(), an
         let all = all.iter().cloned().collect::<Vec<_>>().join(",");
         let tpl = template::DbModTemplate { all, add_groups };
         let content = re.replace(&content, tpl.render()?);
-        let tpl = template::DbQueryTemplate { db, add_groups };
+        let tpl = template::DbQueryTemplate {
+            db,
+            add_groups,
+            camel_case,
+        };
         let content = content.replace(
             "\n    // Do not modify this line. (GqiQuery)",
             &tpl.render()?,
         );
-        let tpl = template::DbMutationTemplate { db, add_groups };
+        let tpl = template::DbMutationTemplate {
+            db,
+            add_groups,
+            camel_case,
+        };
         let content = content.replace(
             "\n    // Do not modify this line. (GqiMutation)",
             &tpl.render()?,
@@ -150,6 +163,7 @@ fn write_group_file(
     db: &str,
     group: &str,
     model_names: &[&str],
+    camel_case: bool,
 ) -> Result<(), anyhow::Error> {
     let file_path = path.join(&format!("{}.rs", group));
     if !file_path.exists() {
@@ -187,6 +201,7 @@ fn write_group_file(
             group,
             add_models,
             mode: "Query",
+            camel_case,
         };
         let content = content.replace(
             "\n    // Do not modify this line. (GqiQuery)",
@@ -197,6 +212,7 @@ fn write_group_file(
             group,
             add_models,
             mode: "Mutation",
+            camel_case,
         };
         let content = content.replace(
             "\n    // Do not modify this line. (GqiMutation)",
@@ -303,6 +319,7 @@ fn write_model_file(
                 pascal_name,
                 class_mod,
                 def: &rel_model,
+                camel_case,
             }
             .render()?,
         );
@@ -335,6 +352,7 @@ fn write_model_file(
                 pascal_name,
                 class_mod,
                 def: &rel_model,
+                camel_case,
             }
             .render()?,
         );
@@ -365,6 +383,7 @@ fn write_model_file(
                 pascal_name,
                 class_mod,
                 def: &rel_model,
+                camel_case,
             }
             .render()?,
         );

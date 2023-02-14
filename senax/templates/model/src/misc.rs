@@ -362,7 +362,9 @@ pub trait ForUpdateTr {
     fn _is_updated(&self) -> bool;
     fn _eq(&self, update: &Self) -> bool;
     fn _set(&mut self, update: Self);
-    fn _update(&mut self, update: Self);
+    fn _update_except_skip(&mut self, update: Self);
+    fn _update_only_set(&mut self, update: Self);
+    fn _update(&mut self, update: Self, set_only: bool);
 }
 
 #[derive(Clone, Debug)]

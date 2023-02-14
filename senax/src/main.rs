@@ -68,6 +68,12 @@ enum Commands {
         /// Use camel case
         #[clap(long)]
         camel_case: bool,
+        /// With column title
+        #[clap(long)]
+        with_title: bool,
+        /// With column comment
+        #[clap(long)]
+        with_comment: bool,
         /// Force overwrite
         #[clap(short, long)]
         force: bool,
@@ -164,9 +170,15 @@ async fn exec(cli: Cli) -> Result<(), anyhow::Error> {
             model,
             camel_case,
             force,
+            with_title,
+            with_comment,
         } => {
             let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
             ensure!(re.is_match(db), "bad db name!");
+            model_generator::template::filters::SHOW_TITLE
+                .store(*with_title, std::sync::atomic::Ordering::SeqCst);
+            model_generator::template::filters::SHOW_COMMNET
+                .store(*with_comment, std::sync::atomic::Ordering::SeqCst);
             graphql_generator::generate(path, db, group, model, *camel_case, *force)?;
         }
         Commands::GenMigrate {

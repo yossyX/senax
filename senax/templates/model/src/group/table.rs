@@ -135,7 +135,7 @@ impl SessionStore for _@{ name|pascal }@Store {
         let id: _@{ name|pascal }@Id = s_key.into();
         let mut session = id.for_update(&conn);
         session.eol().set((data.eol() >> EOL_SHIFT) as u32);
-        session.updated_at().skip_update();
+        session.updated_at().skip_and_empty();
         _@{ name|pascal }@::update_delayed(&mut conn, session).await
     }
 

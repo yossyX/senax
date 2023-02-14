@@ -49,6 +49,9 @@ pub struct DbModTemplate<'a> {
 #[template(
     source = r###"
     @%- for name in add_groups %@
+    @%- if !camel_case %@
+    #[graphql(name = "@{ name }@")]
+    @%- endif %@
     async fn @{ name|to_var_name }@(&self) -> @{ name|to_var_name }@::GqiQuery@{ db|pascal }@@{ name|pascal }@ {
         @{ name|to_var_name }@::GqiQuery@{ db|pascal }@@{ name|pascal }@
     }
@@ -60,13 +63,18 @@ pub struct DbModTemplate<'a> {
 pub struct DbQueryTemplate<'a> {
     pub db: &'a str,
     pub add_groups: &'a BTreeSet<String>,
+    pub camel_case: bool,
 }
 
 #[derive(Template)]
 #[template(
     source = r###"
     @%- for name in add_groups %@
+    @%- if !camel_case %@
+    #[graphql(name = "@{ name }@", guard = "RoleGuard::new(Role::Admin).or(RoleGuard::new(Role::User))")]
+    @%- else %@
     #[graphql(guard = "RoleGuard::new(Role::Admin).or(RoleGuard::new(Role::User))")]
+    @%- endif %@
     async fn @{ name|to_var_name }@(&self) -> @{ name|to_var_name }@::GqiMutation@{ db|pascal }@@{ name|pascal }@ {
         @{ name|to_var_name }@::GqiMutation@{ db|pascal }@@{ name|pascal }@
     }
@@ -78,6 +86,7 @@ pub struct DbQueryTemplate<'a> {
 pub struct DbMutationTemplate<'a> {
     pub db: &'a str,
     pub add_groups: &'a BTreeSet<String>,
+    pub camel_case: bool,
 }
 
 #[derive(Template)]
@@ -125,6 +134,9 @@ pub struct GroupModTemplate<'a> {
 #[template(
     source = r###"
     @%- for name in add_models %@
+    @%- if !camel_case %@
+    #[graphql(name = "@{ name }@")]
+    @%- endif %@
     async fn @{ name|to_var_name }@(&self) -> @{ name|to_var_name }@::Gqi@{ mode }@@{ db|pascal }@@{ group|pascal }@@{ name|pascal }@ {
         @{ name|to_var_name }@::Gqi@{ mode }@@{ db|pascal }@@{ group|pascal }@@{ name|pascal }@
     }
@@ -138,6 +150,7 @@ pub struct GroupImplTemplate<'a> {
     pub db: &'a str,
     pub group: &'a str,
     pub add_models: &'a BTreeSet<String>,
+    pub camel_case: bool,
 }
 
 #[derive(Template)]
@@ -174,6 +187,7 @@ pub struct RelationTemplate<'a> {
     pub pascal_name: &'a str,
     pub class_mod: &'a str,
     pub def: &'a Arc<ModelDef>,
+    pub camel_case: bool,
 }
 
 #[derive(Template)]
@@ -186,4 +200,5 @@ pub struct ReferenceTemplate<'a> {
     pub pascal_name: &'a str,
     pub class_mod: &'a str,
     pub def: &'a Arc<ModelDef>,
+    pub camel_case: bool,
 }
