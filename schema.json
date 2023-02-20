@@ -676,27 +676,16 @@
     "ActAs": {
       "title": "ActAs Definition",
       "type": "object",
+      "required": [
+        "session"
+      ],
       "properties": {
         "session": {
           "description": "セッションDBとして使用",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/SessionType"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "boolean"
         }
       },
       "additionalProperties": false
-    },
-    "SessionType": {
-      "title": "Session Type",
-      "type": "string",
-      "enum": [
-        "actix"
-      ]
     },
     "ColumnTypeOrDef": {
       "title": "Column Type Or Def",
