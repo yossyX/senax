@@ -3,9 +3,7 @@ extern crate log;
 
 use actix_web::dev::Service as _;
 use actix_web::web::Data;
-use actix_web::{
-    error, guard, middleware, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer,
-};
+use actix_web::{guard, middleware, web, App, HttpMessage, HttpServer};
 use anyhow::Result;
 use async_graphql::{EmptySubscription, Schema};
 use clap::Parser;
@@ -23,7 +21,6 @@ use std::io::Write;
 use std::net::TcpListener;
 use std::path::Path;
 use std::sync::{Arc, Weak};
-use telemetry::*;
 use time::macros::offset;
 use tokio::sync::mpsc;
 use tokio::time::{sleep, Duration};

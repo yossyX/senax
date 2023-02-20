@@ -14,6 +14,7 @@ use crate::auth::Role;
 pub type QuerySchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
 #[derive(Debug, thiserror::Error)]
+#[allow(dead_code)]
 pub enum GqiError {
     #[error("Could not find resource")]
     NotFound,
@@ -46,6 +47,7 @@ struct RoleGuard {
 }
 
 impl RoleGuard {
+    #[allow(dead_code)]
     fn new(role: Role) -> Self {
         Self { role }
     }

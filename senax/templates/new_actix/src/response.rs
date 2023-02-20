@@ -1,10 +1,9 @@
 use actix_web::http::header::TryIntoHeaderValue;
 use actix_web::web::{Bytes, BytesMut};
-use actix_web::{HttpRequest, HttpResponse, Responder};
+use actix_web::{error, HttpRequest, HttpResponse, Responder};
 use chrono::{DateTime, Local};
 use derive_more::Display;
 use futures::{Stream, StreamExt};
-use log::{error, info, warn};
 use senax_common::err;
 use serde::Serialize;
 
@@ -26,6 +25,7 @@ pub struct NotFound {
     pub path: String,
 }
 impl NotFound {
+    #[allow(dead_code)]
     pub fn new(http_req: &HttpRequest) -> NotFound {
         NotFound {
             path: http_req.path().to_string(),
@@ -39,6 +39,7 @@ impl std::fmt::Display for NotFound {
 }
 impl std::error::Error for NotFound {}
 
+#[allow(dead_code)]
 pub fn json_response<T: Serialize>(r: Result<T, anyhow::Error>, ctx: &Ctx) -> impl Responder {
     match r {
         Ok(data) => {
