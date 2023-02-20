@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#definitions/ConfigDef
+# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.2.0/schema.json#definitions/ConfigDef
 
 db: mysql
 time_zone: local
@@ -17,6 +17,7 @@ groups:
         timestampable: real_time
         versioned: true
         use_update_delayed: true
+        exclude_from_api: true
         act_as:
           session: actix
         columns:

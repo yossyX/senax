@@ -17,7 +17,10 @@ pub(crate) mod ddl {
     pub mod parser;
     pub mod table;
 }
+mod actix_generator;
+mod db_generator;
 mod graphql_generator;
+mod init_generator;
 mod migration_generator;
 mod model_generator;
 pub(crate) mod schema;
@@ -42,6 +45,27 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Generate a workspace
+    Init {
+        /// Generated directory name
+        #[clap(value_parser)]
+        name: Option<String>,
+    },
+    /// Generate an actix server
+    NewActix {
+        /// package name
+        #[clap(value_parser)]
+        name: String,
+    },
+    /// Prepare to use DB
+    UseDb {
+        /// Specify the server path
+        #[clap(value_parser)]
+        path: PathBuf,
+        /// DB name
+        #[clap(value_parser)]
+        db: String,
+    },
     /// generate models
     Model {
         /// Specify the DB
@@ -53,7 +77,7 @@ enum Commands {
     },
     /// generate graphql api
     Graphql {
-        /// Specify the crate path
+        /// Specify the server path
         #[clap(value_parser)]
         path: PathBuf,
         /// Specify the DB
@@ -158,6 +182,17 @@ async fn main() -> Result<()> {
 
 async fn exec(cli: Cli) -> Result<(), anyhow::Error> {
     match &cli.command {
+        Commands::Init { name } => {
+            init_generator::generate(name)?;
+        }
+        Commands::NewActix { name } => {
+            actix_generator::generate(name)?;
+        }
+        Commands::UseDb { path, db } => {
+            let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
+            ensure!(re.is_match(db), "bad db name!");
+            db_generator::generate(path, db)?;
+        }
         Commands::Model { db, force } => {
             let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
             ensure!(re.is_match(db), "bad db name!");

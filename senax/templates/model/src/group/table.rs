@@ -12,6 +12,11 @@ pub use super::base::_@{ mod_name }@::{
 use crate::DbConn;
 use anyhow::Result;
 use senax_common::ShardId;
+@%- if def.as_actix_session() %@
+
+// Session Keys
+pub const SESSION_ROLE: &str = "role";
+@%- endif %@
 
 impl _@{ name|pascal }@ {
     pub(crate) async fn _before_delete(_conn: &mut DbConn, _list: &[Self]) -> Result<()> {

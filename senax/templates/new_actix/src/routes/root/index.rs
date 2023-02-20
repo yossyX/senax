@@ -18,3 +18,4 @@ pub async fn handler(http_req: HttpRequest) -> impl Responder {
         "#,
     )
 }
+@{-"\n"}@

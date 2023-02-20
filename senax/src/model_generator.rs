@@ -3,9 +3,9 @@ use askama::Template;
 use convert_case::{Case, Casing};
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::Path;
 
 use crate::{
+    common::fs_write,
     schema::{self, to_id_name, CONFIG, ENUM_GROUPS, GROUPS, MODEL, MODELS},
     MODELS_PATH,
 };
@@ -252,18 +252,4 @@ pub fn generate(db: &str, force: bool) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn fs_write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
-    fn inner(path: &Path, contents: &[u8]) -> Result<()> {
-        if let Ok(buf) = fs::read(path) {
-            if !buf.eq(contents) {
-                fs::write(path, contents)?;
-            }
-        } else {
-            fs::write(path, contents)?;
-        }
-        Ok(())
-    }
-    inner(path.as_ref(), contents.as_ref())
 }

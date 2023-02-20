@@ -1,10 +1,8 @@
-use actix::ArbiterHandle;
 use anyhow::Result;
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc;
 
 pub async fn start(
-    handle: &ArbiterHandle,
     is_hot_deploy: bool,
     exit_tx: mpsc::Sender<i32>,
     db_guard: &Arc<mpsc::Sender<u8>>,
@@ -12,19 +10,8 @@ pub async fn start(
     linker_port: &Option<String>,
     pw: &Option<String>,
 ) -> Result<()> {
-    db_sample::start(
-        handle,
-        is_hot_deploy,
-        exit_tx.clone(),
-        Arc::downgrade(db_guard),
-        db_dir,
-        linker_port,
-        pw,
-    )
-    .await?;
-
+    // Do not modify this line. (DbStart)
     db_session::start(
-        handle,
         is_hot_deploy,
         exit_tx.clone(),
         Arc::downgrade(db_guard),
@@ -37,6 +24,7 @@ pub async fn start(
 }
 
 pub fn stop() {
-    db_sample::stop();
+    // Do not modify this line. (DbStop)
     db_session::stop();
 }
+@{-"\n"}@

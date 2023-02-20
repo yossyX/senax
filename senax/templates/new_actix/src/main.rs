@@ -1,10 +1,13 @@
 #[macro_use]
 extern crate log;
 
-use actix::{Arbiter, System};
 use actix_web::dev::Service as _;
-use actix_web::{error, middleware, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer};
+use actix_web::web::Data;
+use actix_web::{
+    error, guard, middleware, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer,
+};
 use anyhow::Result;
+use async_graphql::{EmptySubscription, Schema};
 use clap::Parser;
 use db_session::session::session::{self, _SessionStore, senax_actix_session};
 use dotenvy::dotenv;
@@ -13,20 +16,24 @@ use mimalloc::MiMalloc;
 use once_cell::sync::OnceCell;
 use sha2::{Digest, Sha512};
 use std::collections::HashMap;
+use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::net::TcpListener;
 use std::path::Path;
 use std::sync::{Arc, Weak};
-use std::{env, thread};
+use telemetry::*;
 use time::macros::offset;
 use tokio::sync::mpsc;
 use tokio::time::{sleep, Duration};
 
 use crate::context::Ctx;
+use crate::graphql::{MutationRoot, QueryRoot, QuerySchema};
 
+pub mod auth;
 mod context;
 mod db;
+mod graphql;
 mod response;
 mod routes {
     pub mod api;
@@ -55,6 +62,8 @@ struct AppArg {
     #[clap(long = "pid")]
     /// output pid file
     pid: Option<String>,
+    #[clap(long, short)]
+    gql_schema: bool,
 }
 
 #[actix_web::main]
@@ -63,6 +72,12 @@ async fn main() -> Result<()> {
     let arg: AppArg = AppArg::parse();
 
     senax_logger::init(Some(offset!(+9)))?;
+
+    let schema: QuerySchema = Schema::build(QueryRoot, MutationRoot, EmptySubscription).finish();
+    if arg.gql_schema {
+        println!("{}", &schema.sdl());
+        return Ok(());
+    }
 
     let port = env::var(HOST_PORT).unwrap_or_else(|_| DEFAULT_HOST_PORT.to_owned());
     let dir = env::var(WORK_DIR).unwrap_or_else(|_| DEFAULT_WORK_DIR.to_owned());
@@ -78,30 +93,19 @@ async fn main() -> Result<()> {
     let (app_guard_tx, mut app_guard_rx) = mpsc::channel::<u8>(1);
     let app_guard_tx = Arc::new(app_guard_tx);
     SHUTDOWN_GUARD.set(Arc::downgrade(&app_guard_tx)).unwrap();
-    // The following will prevent the arbiter from being killed on shutdown.
-    let arbiter = thread::Builder::new()
-        .stack_size(8 * 1024 * 1024)
-        .spawn(move || {
-            let system = System::new();
-            system.block_on(async move {
-                let db_dir = Path::new(&dir);
-                let arbiter = Arbiter::new();
-                let handle = arbiter.handle();
-                db::start(
-                    &handle,
-                    is_hot_deploy,
-                    exit_tx.clone(),
-                    &db_guard,
-                    db_dir,
-                    &linker_port,
-                    &linker_pw,
-                )
-                .await?;
-                Ok::<Arbiter, anyhow::Error>(arbiter)
-            })
-        })?
-        .join()
-        .unwrap()?;
+    tokio::spawn(async move {
+        let db_dir = Path::new(&dir);
+        db::start(
+            is_hot_deploy,
+            exit_tx.clone(),
+            &db_guard,
+            db_dir,
+            &linker_port,
+            &linker_pw,
+        )
+        .await
+        .unwrap();
+    });
 
     let mut listeners = take_listener(&[&port])?;
 
@@ -110,13 +114,11 @@ async fn main() -> Result<()> {
     if use_linker {
         sleep(Duration::from_secs(2)).await;
     }
-    thread::spawn(|| {
-        System::new().block_on(async move {
-            loop {
-                senax_actix_session::SessionMiddleware::gc(_SessionStore, None).await;
-                tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
-            }
-        })
+    tokio::spawn(async move {
+        loop {
+            senax_actix_session::SessionMiddleware::gc(_SessionStore, None).await;
+            tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+        }
     });
     let session_secret_key = env::var(SESSION_SECRET_KEY)
         .map(|v| Sha512::digest(&v).to_vec())
@@ -137,8 +139,21 @@ async fn main() -> Result<()> {
             .configure(routes::root::init)
             .service(
                 web::scope("/api")
-                    .app_data(web::JsonConfig::default().error_handler(json_error_handler))
+                    .app_data(web::JsonConfig::default().error_handler(response::json_error_handler))
                     .configure(routes::api::init),
+            )
+            .service(
+                web::resource("/gql")
+                    .guard(guard::Post())
+                    .app_data(Data::new(schema.clone()))
+                    .to(graphql::index),
+            )
+            .service(
+                web::resource("/gql")
+                    .guard(guard::fn_guard(|_| cfg!(debug_assertions)))
+                    .guard(guard::Get())
+                    .app_data(Data::new(schema.clone()))
+                    .to(graphql::index_graphiql),
             )
     })
     .listen(listeners.remove(&port).unwrap())?;
@@ -169,8 +184,6 @@ async fn main() -> Result<()> {
     db::stop();
     drop(db_guard_tx);
     while let Some(_i) = db_guard_rx.recv().await {}
-    arbiter.stop();
-    let _ = arbiter.join();
 
     info!("server stopped");
     if exit_code != 0 {
@@ -285,17 +298,4 @@ fn output_pid_file(file: &Option<String>) -> Result<()> {
 fn output_pid_file(file: &Option<String>) -> Result<()> {
     Ok(())
 }
-
-fn json_error_handler(err: error::JsonPayloadError, _req: &HttpRequest) -> error::Error {
-    use actix_web::error::JsonPayloadError;
-
-    let detail = err.to_string();
-    let resp = match &err {
-        JsonPayloadError::ContentType => HttpResponse::UnsupportedMediaType().body(detail),
-        JsonPayloadError::Deserialize(json_err) if json_err.is_data() => {
-            HttpResponse::UnprocessableEntity().json(crate::response::BadRequest::new(detail))
-        }
-        _ => HttpResponse::BadRequest().body(detail),
-    };
-    error::InternalError::from_response(err, resp).into()
-}
+@{-"\n"}@

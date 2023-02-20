@@ -1,7 +1,8 @@
+use anyhow::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use sha2::{Digest, Sha256};
-use std::convert::TryInto;
+use std::{convert::TryInto, fs, path::Path};
 
 use crate::schema::BAD_KEYWORDS;
 
@@ -43,3 +44,17 @@ macro_rules! if_then_else {
     };
 }
 pub(crate) use if_then_else;
+
+pub fn fs_write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
+    fn inner(path: &Path, contents: &[u8]) -> Result<()> {
+        if let Ok(buf) = fs::read(path) {
+            if !buf.eq(contents) {
+                fs::write(path, contents)?;
+            }
+        } else {
+            fs::write(path, contents)?;
+        }
+        Ok(())
+    }
+    inner(path.as_ref(), contents.as_ref())
+}

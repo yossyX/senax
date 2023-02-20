@@ -7,12 +7,13 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::common::fs_write;
 use crate::schema::{self, to_id_name, ModelDef, RelDef, _to_var_name, GROUPS, MODEL};
 
 pub mod template;
 
 pub fn generate(
-    crate_path: &Path,
+    server_path: &Path,
     db: &str,
     group: &Option<String>,
     model: &Option<String>,
@@ -23,10 +24,10 @@ pub fn generate(
 
     let groups = unsafe { GROUPS.get().unwrap() }.clone();
     ensure!(
-        crate_path.exists() && crate_path.is_dir(),
+        server_path.exists() && server_path.is_dir(),
         "The crate path does not exist."
     );
-    let base_path = crate_path.join("src").join("graphql");
+    let base_path = server_path.join("src").join("graphql");
 
     let group_names = if let Some(group) = group {
         ensure!(
@@ -402,18 +403,4 @@ fn write_model_file(
     });
     fs_write(file_path, &*content)?;
     Ok(())
-}
-
-fn fs_write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<()> {
-    fn inner(path: &Path, contents: &[u8]) -> Result<()> {
-        if let Ok(buf) = fs::read(path) {
-            if !buf.eq(contents) {
-                fs::write(path, contents)?;
-            }
-        } else {
-            fs::write(path, contents)?;
-        }
-        Ok(())
-    }
-    inner(path.as_ref(), contents.as_ref())
 }

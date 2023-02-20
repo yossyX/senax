@@ -1,19 +1,17 @@
 [package]
-name = "server"
+name = "@{ name }@"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-actix = "0.13"
-actix-service = "2.0"
+db_session = { path = "../db/session" }
+
 actix-web = "4.1"
 ahash = "0.8"
 anyhow = "1.0"
 async-stream = "0.3"
 chrono = { version = "0.4.19", features = ["serde"] }
 clap = { version = "3.2.16", features = ["derive"] }
-db_sample = { path = "../db/sample" }
-db_session = { path = "../db/session" }
 derive_more = "0.99"
 dotenvy = "0.15.6"
 env_logger = "0.9"
@@ -34,9 +32,12 @@ thiserror = "1.0"
 time = "0.3.5"
 tokio = { version = "1.25", features = [ "full" ] }
 tracing = { version = "0.1", features = ["release_max_level_warn", "log-always"] }
-validator = { version = "0.14", features = ["derive"] }
+validator = { version = "0.14", features = ["derive", "unic"] }
+async-graphql = { version = "5.0", features = ["chrono", "decimal"] }
+async-graphql-actix-web = "5.0"
 
 [target.'cfg(unix)'.dependencies]
 nix = "0.24"
 signal-hook = "0.3.14"
 signal-hook-tokio = { version = "0.3.1", features = ["futures-v0_3"] }
+@{-"\n"}@

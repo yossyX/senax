@@ -148,6 +148,20 @@ where
     }
 }
 
+pub fn json_error_handler(err: error::JsonPayloadError, _req: &HttpRequest) -> error::Error {
+    use actix_web::error::JsonPayloadError;
+
+    let detail = err.to_string();
+    let resp = match &err {
+        JsonPayloadError::ContentType => HttpResponse::UnsupportedMediaType().body(detail),
+        JsonPayloadError::Deserialize(json_err) if json_err.is_data() => {
+            HttpResponse::UnprocessableEntity().json(crate::response::BadRequest::new(detail))
+        }
+        _ => HttpResponse::BadRequest().body(detail),
+    };
+    error::InternalError::from_response(err, resp).into()
+}
+
 fn error_response(err: anyhow::Error, ctx: &Ctx) -> HttpResponse {
     if let Some(e) = err.downcast_ref::<validator::ValidationErrors>() {
         info!(target: "server::validation_errors", req_no = ctx.req_no(); "{}", e);
@@ -166,3 +180,4 @@ fn error_response(err: anyhow::Error, ctx: &Ctx) -> HttpResponse {
         HttpResponse::InternalServerError().body("Internal Server Error")
     }
 }
+@{-"\n"}@
