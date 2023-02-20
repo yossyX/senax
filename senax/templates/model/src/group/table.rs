@@ -12,7 +12,7 @@ pub use super::base::_@{ mod_name }@::{
 use crate::DbConn;
 use anyhow::Result;
 use senax_common::ShardId;
-@%- if def.as_actix_session() %@
+@%- if def.act_as_session() %@
 
 // Session Keys
 pub const SESSION_ROLE: &str = "role";
@@ -47,10 +47,9 @@ impl std::fmt::Display for _@{ name|pascal }@Cache {
         todo!()
     }
 }
-@%- if def.as_actix_session() %@
+@%- if def.act_as_session() %@
 
-pub extern crate senax_actix_session;
-use senax_actix_session::{
+use senax_common::session::{
     interface::{SaveError, SessionData, SessionStore},
     SessionKey,
 };

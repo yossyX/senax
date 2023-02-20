@@ -19,7 +19,7 @@ groups:
         use_update_delayed: true
         exclude_from_api: true
         act_as:
-          session: actix
+          session: true
         columns:
           key:
             primary: true

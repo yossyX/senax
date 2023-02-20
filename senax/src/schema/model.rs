@@ -62,20 +62,13 @@ pub enum InheritanceType {
     ColumnAggregation,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-#[schemars(title = "Session Type")]
-pub enum SessionType {
-    Actix,
-}
-
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
 #[schemars(deny_unknown_fields)]
 #[schemars(title = "ActAs Definition")]
 pub struct ActAs {
     /// セッションDBとして使用
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub session: Option<SessionType>,
+    #[serde(skip_serializing_if = "super::is_false")]
+    pub session: bool,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema)]
@@ -220,12 +213,8 @@ impl ModelDef {
         self.mod_name.as_ref().unwrap_or(&self.name)
     }
 
-    pub fn as_session(&self) -> Option<SessionType> {
+    pub fn act_as_session(&self) -> bool {
         self.act_as.as_ref().map(|v| v.session).unwrap_or_default()
-    }
-
-    pub fn as_actix_session(&self) -> bool {
-        self.act_as.as_ref().map(|v| v.session).unwrap_or_default() == Some(SessionType::Actix)
     }
 
     pub fn session_secret_key(&self, _dummy: &usize) -> String {

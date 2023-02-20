@@ -1,10 +1,10 @@
-use actix_web::cookie::time::Duration;
 use anyhow::Result;
 use derive_more::Display;
 use std::time::{SystemTime, UNIX_EPOCH};
+use time::Duration;
 use zstd::{decode_all, stream::copy_encode};
 
-use crate::session_key::SessionKey;
+use crate::session::SessionKey;
 
 #[derive(Default)]
 pub struct SessionData {
@@ -52,6 +52,9 @@ impl SessionData {
     pub fn ttl_as_duration(&self) -> Duration {
         self.ttl
     }
+    pub fn set_ttl(&mut self, ttl: Duration) {
+        self.ttl = ttl;
+    }
     pub fn eol(&self) -> u64 {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -61,6 +64,16 @@ impl SessionData {
     }
     pub fn version(&self) -> u32 {
         self.version
+    }
+}
+
+impl From<(Vec<u8>, Duration, u32)> for SessionData {
+    fn from(v: (Vec<u8>, Duration, u32)) -> Self {
+        Self {
+            data: v.0,
+            ttl: v.1,
+            version: v.2,
+        }
     }
 }
 

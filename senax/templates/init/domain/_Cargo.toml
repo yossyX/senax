@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
-senax-common = "0.1.4"
+senax-common = "0.1.5"
 @{-"\n"}@

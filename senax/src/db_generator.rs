@@ -76,10 +76,10 @@ pub fn generate(server_path: &Path, db: &str) -> Result<()> {
 
 fn fix_env(content: &str, db: &str) -> Result<String> {
     let re = Regex::new(r"RUST_LOG(\s*)=(.+)").unwrap();
-    let mut content = if let Some(caps) = re.captures(&content) {
+    let mut content = if let Some(caps) = re.captures(content) {
         let sp = caps.get(1).unwrap().as_str();
         let conf = caps.get(2).unwrap().as_str();
-        re.replace(&content, format!("RUST_LOG{}={},db_{}=debug", sp, conf, db))
+        re.replace(content, format!("RUST_LOG{}={},db_{}=debug", sp, conf, db))
             .to_string()
     } else {
         content.to_owned()

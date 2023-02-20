@@ -4,7 +4,8 @@ use async_graphql::{async_trait, EmptySubscription, Error, ErrorExtensions, Obje
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
 use validator::ValidationErrors;
 
-pub use db_session::session::session::{_SessionStore, senax_actix_session::Session, SESSION_ROLE};
+pub use db_session::session::session::{_SessionStore, SESSION_ROLE};
+pub use senax_actix_session::Session;
 
 use crate::auth::Role;
 

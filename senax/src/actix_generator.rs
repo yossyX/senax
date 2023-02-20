@@ -103,10 +103,10 @@ pub fn generate(name: &str) -> Result<()> {
 
 fn fix_env(content: &str, name: &str) -> Result<String> {
     let re = Regex::new(r"RUST_LOG(\s*)=(.+)").unwrap();
-    let content = if let Some(caps) = re.captures(&content) {
+    let content = if let Some(caps) = re.captures(content) {
         let sp = caps.get(1).unwrap().as_str();
         let conf = caps.get(2).unwrap().as_str();
-        re.replace(&content, format!("RUST_LOG{}={},{}=debug", sp, conf, name))
+        re.replace(content, format!("RUST_LOG{}={},{}=debug", sp, conf, name))
             .to_string()
     } else {
         content.to_owned()

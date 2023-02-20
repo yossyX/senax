@@ -5,6 +5,7 @@ pub mod types {
 }
 pub mod cache;
 pub mod linker;
+pub mod session;
 
 pub type ShardId = u16;
 

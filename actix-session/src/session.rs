@@ -1,21 +1,18 @@
 use actix_utils::future::{ready, Ready};
 use actix_web::{
-    cookie::time::Duration,
     dev::{Extensions, Payload, ServiceRequest, ServiceResponse},
     error::Error,
     FromRequest, HttpMessage, HttpRequest,
 };
 use anyhow::{anyhow, bail, Context, Result};
+use senax_common::session::interface::{SaveError, SessionData, SessionStore};
+use senax_common::session::SessionKey;
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
 use std::{collections::HashMap, mem, sync::Arc, sync::Mutex};
+use time::Duration;
 
-use crate::{
-    config::Configuration,
-    interface::{SaveError, SessionData, SessionStore},
-    middleware::e500,
-    session_key::SessionKey,
-};
+use crate::{config::Configuration, middleware::e500};
 
 const MAX_RETRY_COUNT: usize = 5;
 
@@ -251,11 +248,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
                 inner.update = false;
                 let list = vec![&inner.debug_data, &inner.login_data, &inner.base_data];
                 let data = serde_cbor::to_vec(&list)?;
-                let session_data = SessionData {
-                    data,
-                    ttl: inner.state_ttl,
-                    version: inner.version,
-                };
+                let session_data = SessionData::from((data, inner.state_ttl, inner.version));
                 let key = inner.session_key.as_ref().cloned();
                 let storage = Arc::clone(&inner.storage);
                 (f_result, session_data, key, storage)
@@ -323,11 +316,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
                 inner.update = false;
                 let list = vec![&inner.debug_data, &inner.login_data, &inner.base_data];
                 let data = serde_cbor::to_vec(&list)?;
-                let session_data = SessionData {
-                    data,
-                    ttl: inner.state_ttl,
-                    version: inner.version,
-                };
+                let session_data = SessionData::from((data, inner.state_ttl, inner.version));
                 let storage = Arc::clone(&inner.storage);
                 (f_result, session_data, storage)
             };
@@ -361,7 +350,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
         let (session_key, mut data) = if let Some(session_key) = session_key {
             let data = storage.load(&session_key).await?;
             if let Some(data) = data {
-                if data.ttl.is_positive() {
+                if data.ttl_as_duration().is_positive() {
                     (Some(session_key), data)
                 } else {
                     (None, SessionData::default())
@@ -376,7 +365,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
         let ttl = configuration.session.state_ttl.whole_seconds();
         if let Some(session_key) = &session_key {
             if (ttl - data.ttl()) > (ttl >> 6) {
-                data.ttl = configuration.session.state_ttl;
+                data.set_ttl(configuration.session.state_ttl);
                 let _ = storage.update_ttl(session_key, &data).await.map_err(|e| {
                     tracing::warn!("{}", e);
                 });
@@ -398,7 +387,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
             update: false,
             status,
             state_ttl: configuration.session.state_ttl,
-            version: data.version,
+            version: data.version(),
             storage,
         };
         let inner = Arc::new(Mutex::new(inner));
@@ -441,7 +430,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
         inner.base_data = list.pop().unwrap_or_default();
         inner.login_data = list.pop().unwrap_or_default();
         inner.debug_data = list.pop().unwrap_or_default();
-        inner.version = data.version;
+        inner.version = data.version();
         Ok(())
     }
 
@@ -471,7 +460,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
         inner.base_data = list.pop().unwrap_or_default();
         inner.login_data = list.pop().unwrap_or_default();
         inner.debug_data = list.pop().unwrap_or_default();
-        inner.version = data.version;
+        inner.version = data.version();
         Ok(())
     }
 

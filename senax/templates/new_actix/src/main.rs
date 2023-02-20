@@ -9,11 +9,12 @@ use actix_web::{
 use anyhow::Result;
 use async_graphql::{EmptySubscription, Schema};
 use clap::Parser;
-use db_session::session::session::{self, _SessionStore, senax_actix_session};
+use db_session::session::session::{self, _SessionStore};
 use dotenvy::dotenv;
 use futures::stream::StreamExt;
 use mimalloc::MiMalloc;
 use once_cell::sync::OnceCell;
+use senax_actix_session;
 use sha2::{Digest, Sha512};
 use std::collections::HashMap;
 use std::env;

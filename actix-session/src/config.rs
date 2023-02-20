@@ -1,7 +1,9 @@
-use actix_web::cookie::{time::Duration, Key, SameSite};
+use actix_web::cookie::{Key, SameSite};
 use derive_more::From;
+use senax_common::session::interface::SessionStore;
+use time::Duration;
 
-use crate::{interface::SessionStore, SessionMiddleware};
+use crate::SessionMiddleware;
 
 #[derive(Debug, Clone, From)]
 pub enum SessionLifecycle {

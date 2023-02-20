@@ -6,14 +6,14 @@ use actix_web::{
     http::header::{HeaderValue, SET_COOKIE},
     HttpResponse,
 };
+use senax_common::session::interface::SessionStore;
+use senax_common::session::SessionKey;
 use std::{convert::TryInto, fmt, future::Future, pin::Pin, rc::Rc, sync::Arc};
 
 use crate::{
     config::{
         self, Configuration, CookieConfiguration, CookieContentSecurity, SessionMiddlewareBuilder,
     },
-    interface::SessionStore,
-    session_key::SessionKey,
     Session, SessionStatus,
 };
 
