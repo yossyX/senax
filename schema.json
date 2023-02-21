@@ -76,7 +76,7 @@
           ]
         },
         "ignore_foreign_key": {
-          "description": "falseの場合は外部キー制約をDDLに出力しない",
+          "description": "trueの場合は外部キー制約をDDLに出力しない",
           "default": false,
           "type": "boolean"
         },
@@ -390,7 +390,7 @@
           ]
         },
         "ignore_foreign_key": {
-          "description": "falseの場合は外部キー制約をDDLに出力しない",
+          "description": "trueの場合は外部キー制約をDDLに出力しない",
           "type": [
             "boolean",
             "null"
@@ -676,9 +676,6 @@
     "ActAs": {
       "title": "ActAs Definition",
       "type": "object",
-      "required": [
-        "session"
-      ],
       "properties": {
         "session": {
           "description": "セッションDBとして使用",

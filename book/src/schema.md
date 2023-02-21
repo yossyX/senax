@@ -1,3 +1,10 @@
+# スキーマ
+
+スキーマはSymfony 1 の doctrine/schema.yml に近いイメージです。  
+Doctrine の inheritance も一通り対応しています。  
+特徴的な構造として、モデルは必ずグループの下に分類されます。
+一つのデータベースに数百のテーブルがあるとディレクトリツリーが長くなったり管理が困ることになりますので、1階層分グループ分けできるようになっています。
+テーブル名がマルチバイト文字や複数形にも対応していますが、GraphQLがマルチバイトに対応していないため注意が必要です。
 
 # Schema Definition
 
@@ -19,7 +26,7 @@
 |**db**|[DbType](##/definitions/DbType)|使用するDB。現在のところmysqlのみ対応|Yes|
 |**title**|string|仕様書等のためのタイトル||
 |**author**|string|仕様書等のための著者||
-|**ignore_foreign_key**|boolean|falseの場合は外部キー制約をDDLに出力しない||
+|**ignore_foreign_key**|boolean|trueの場合は外部キー制約をDDLに出力しない||
 |**plural_table_name**|boolean|テーブル名を複数形にする||
 |**timestampable**|[Timestampable](##/definitions/Timestampable)|デフォルトのタイムスタンプ設定||
 |**time_zone**|[TimeZone](##/definitions/TimeZone)|日時型のデフォルトのタイムゾーン設定||
@@ -142,7 +149,7 @@
 |**title**|string|仕様書等のためのタイトル||
 |**comment**|string|コメント||
 |**table_name**|string|テーブル名||
-|**ignore_foreign_key**|boolean|falseの場合は外部キー制約をDDLに出力しない||
+|**ignore_foreign_key**|boolean|trueの場合は外部キー制約をDDLに出力しない||
 |**timestampable**|[Timestampable](##/definitions/Timestampable)|タイムスタンプ設定||
 |**disable_created_at**|boolean|created_atの無効化||
 |**disable_updated_at**|boolean|updated_atの無効化||
@@ -152,6 +159,7 @@
 |**use_cache**|boolean|キャッシュを使用するか||
 |**use_fast_cache**|boolean|高速キャッシュを使用するか(experimental)||
 |**use_cache_all**|boolean|全キャッシュを使用するか||
+|**use_cache_all_with_condition**|boolean|条件付き全キャッシュを使用するか||
 |**use_insert_delayed**|boolean|遅延INSERTを使用する||
 |**use_save_delayed**|boolean|遅延SAVEを使用する||
 |**use_update_delayed**|boolean|遅延UPDATEを使用する||
@@ -165,6 +173,7 @@
 |**collate**|string|文字セット照合順序||
 |**mod_name**|string|名前にマルチバイトを使用した場合のmod名||
 |**act_as**|[ActAs](##/definitions/ActAs)|機能追加||
+|**exclude_from_api**|boolean|API生成から除外する||
 |**columns**|Map<property, [ColumnTypeOrDef](##/definitions/ColumnTypeOrDef)>|カラム||
 |**relations**|Map<property, [RelDef](##/definitions/RelDef)>|リレーション||
 |**indexes**|Map<property, [IndexDef](##/definitions/IndexDef)>|インデックス||
@@ -235,7 +244,9 @@
 |**not_null**|boolean|指定がない場合はnullable||
 |**primary**|boolean|||
 |**auto_increment**|[AutoIncrement](##/definitions/AutoIncrement)|||
-|**length**|integer|||
+|**length**|integer|長さ(文字列の場合はバイト数ではなく、文字数)||
+|**max**|integer|最大値(decimalは非対応)||
+|**min**|integer|最小値(decimalは非対応)||
 |**collate**|string|||
 |**not_serializable**|boolean|serializeに出力しない（パスワード等保護用）||
 |**precision**|integer|||
@@ -251,6 +262,8 @@
 |**srid**|integer|Point型のSRID||
 |**default**|string|||
 |**sql_comment**|string|||
+|**api_visibility**|[ApiVisibility](##/definitions/ApiVisibility)|API可視性||
+|**api_required**|boolean|API入力時必須||
 ---------------------------------------
 <a id="#/definitions/ColumnType"></a>
 ## Column Type
@@ -321,6 +334,18 @@
 |**name**|string||Yes|
 |**title**|string|||
 |**comment**|string|||
+---------------------------------------
+<a id="#/definitions/ApiVisibility"></a>
+## API Visibility
+
+
+
+
+**Allowed values**
+
+* `readonly`
+* `hidden`
+
 ---------------------------------------
 <a id="#/definitions/ColumnSubsetType"></a>
 ## Column Subset Type

@@ -6,30 +6,42 @@
 # cargo install senax
 ```
 
-## 初期ファイル
+## 初期ファイル生成
+```
+$ senax init example
+$ cd example
+```
 
-初期ディレクトリ構成の参考のため、 https://github.com/yossyX/senax から examples/actix のコードを展開してください。
-とりあえずWebフレームワークとしては actix-web を使用しています。
-tonic や hyper 等でも対応できるようにしたいと思いますが、動作は未確認です。
-非同期ランタイムが tokio をそのまま利用しているとasyncブロックが Send である必要があり、その場合 SenaX は動作しません。
-actix-web は tokio 上で動作していますが、非同期については !Send で動作するスレッドごとの動作になっています。
-また、内部での消費メモリの計算はメモリアロケータとして mimalloc を使用することを想定しています。
+## Actix サーバ生成
+```
+$ senax new-actix server
+```
+serverの部分は任意のパッケージ名で、actix-web を使用したWebサーバを生成します。  
+生成されるコードはSIGUSR2シグナルによるホットデプロイに対応しています。
+
+## DBテンプレート生成
+```
+$ senax use-db server data
+```
+スキーマに data.yml を生成し、先程の server パッケージに data というDBを使用することを設定します。
 
 ## envファイル
 ```
 $ cp .env.sample .env
 ```
-.envのSAMPLE_DB_URLなどのDB設定を必要に応じて変更してください。
+.env の SESSION_DB_URL, DATA_DB_URL などのDB設定を必要に応じて変更してください。
 
 ## スキーマファイル
 スキーマファイルは基本的には設定ファイルとグループごとのモデル記述ファイルに分けて記述します。
 シンプルなケースでは設定ファイル内にまとめて記述することもできます。
 
-schema/sample.yml
-```yml
-# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#definitions/ConfigDef
+下記にチュートリアル用の内容を記述していますので、該当するファイルを修正してください。
 
-title: Sample DB
+schema/data.yml
+```yml
+# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.2.0/schema.json#definitions/ConfigDef
+
+title: Example DB
 author: author name
 db: mysql
 ignore_foreign_key: true
@@ -39,26 +51,19 @@ timestamp_time_zone: utc
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read
 use_cache: true
-use_fast_cache: true
 use_cache_all: true
-preserve_column_order: true
+preserve_column_order: false
 groups:
   note:
-    title: note
+    type: model
 ```
 複数のデータベース設定のための設定ファイルです。  
 yaml-language-serverの設定はVSCodeであればYAMLのプラグインを使用することにより、入力時にアシスタントが効きます。  
+db は現在のところ MySQL しか対応していません。  
 
-トップのsampleはDBのデータベース名です。  
-dbはまだMySQLしか対応していません。  
-tx_isolationとread_tx_isolationは更新用と参照用のデータベースの接続を分けて、それぞれread_committedとrepeatable_readにしています。  
-MySQLはデフォルトでrepeatable_readですが、負荷がかかると結構ギャップロックにやられます。PostgreSQLはread_committedですし、多くの場合read_committedのほうが適切です。ただし、SELECT FOR UPDATEでヒットしなかったときにINSERTの手順はrepeatable_readでないとロックが効きませんが、これこそがギャップロックで死ぬパターンです。この場合、上位テーブルでロックを掛けるか、INSERT IGNOREや、ON DUPLICATE KEY UPDATEなどのupsert構文で対応が必要です。  
-参照時のトランザクションはMySQLでは最初にテーブルにアクセスしたときにすべてのテーブルのスナップショットを取得するのでrepeatable_readが安全です。  
-groupsは一つのデータベースに数百のテーブルがあるとディレクトリツリーが長くなったり管理が困ることになりますので、1階層分グループ分けできるようになっています。
-
-schema/sample/note.yml
+schema/data/note.yml に下記のファイルを作成してください。
 ```yml
-# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#properties/model
+# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.2.0/schema.json#properties/model
 
 note:
   timestampable: fixed_time
@@ -128,35 +133,25 @@ counter:
     note:
 ```
 グループ内のテーブルの設定ファイルです。  
-Symfony 1.x の doctrine/schema.yml に近いイメージです。  
-テーブル名がマルチバイト文字や複数形にも対応しています。
 note モデルは tag と紐づいていますが、 relations の type が many では複数形の tags で自動的に紐づきます。  
 
-ちなみに、 Doctrine の inheritance も一通り対応しています。  
-
-
-セッション用の設定ファイルをダウンロードします。
-```
-$ wget -O schema/session.yml https://github.com/yossyX/senax/releases/latest/download/session.yml
-```
-
 ## モデル生成
-senaxのコマンドでdb/sample下にクレートを生成します。  
+senaxのコマンドで db/data, db/session 下にクレートを生成します。  
 ```
-$ senax model sample
+$ senax model data
 $ senax model session
 ```
-note.rs等はカスタマイズ用で、_note.rsが本体です。再度モデル生成を実行するとnote.rsは上書きされず、_note.rsは常に上書きされます。  
-モデル名が_Tagsのように_が付くのは他のライブラリと被らないようにそのような命名規則になっています。  
-Dockerでの開発環境でVS Code等を使用していてモデルの再生成後に変更が反映されていない場合は、ウィンドウの再読み込みや生成されたモデルのファイルをVS Code上で再度保存するなどしてモデルの更新をVS Codeに認識させる必要があります。
+生成されたファイルの note.rs 等はカスタマイズ用で、 _note.rs が本体です。再度モデル生成を実行すると note.rs は上書きされず、 _note.rs は常に上書きされます。  
+モデル名が _Tags のようにアンダースコアが付くのは他のライブラリと被らないようにそのような命名規則になっています。  
+Docker での開発環境で VS Code 等を使用していてモデルの再生成後に変更が反映されていない場合は、ウィンドウの再読み込みや生成されたモデルのファイルを VS Code 上で再度保存するなどしてモデルの更新を VS Code に認識させる必要があります。
 
 ## マイグレーション生成
-db/sample/migrations下にDDLファイルを生成します。  
+db/data/migrations下にDDLファイルを生成します。  
 ```
-$ senax gen-migrate sample init
+$ senax gen-migrate data init
 $ senax gen-migrate session init
 ```
-DDLは現状のDBを確認して差分を出力します。  
+スキーマファイルを修正して再実行すると現状のDBを確認して差分のDDLを出力します。  
 DB仕様書の更新履歴出力のためにコメント部分に更新内容が出力されています。コメントの追加や不要な更新内容を削除して仕様書に出力される更新内容を変更することができます。
 
 ※ テーブル名はデフォルトでグループ名とモデル名を結合した名前になります。変更する場合はスキーマで table_name を指定してください。
@@ -164,7 +159,7 @@ DB仕様書の更新履歴出力のためにコメント部分に更新内容が
 
 ## マイグレーション実行
 ```
-$ cargo run -p db_sample -- migrate -c
+$ cargo run -p db_data -- migrate -c
 $ cargo run -p db_session -- migrate -c
 ```
 
@@ -174,23 +169,23 @@ sqlxのマイグレーションを実行します。
 
 ## シードスキーマ生成
 ```
-$ cargo run -p db_sample -- gen-seed-schema > db/sample/seed-schema.json
+$ cargo run -p db_data -- gen-seed-schema > db/data/seed-schema.json
 ```
 もしくは、
 ```
-$ target/debug/db_sample gen-seed-schema > db/sample/seed-schema.json
+$ target/debug/db_data gen-seed-schema > db/data/seed-schema.json
 ```
 
 シードファイルの入力アシスタントのためのスキーマファイルを生成します。
 
 ## シードファイル生成
 ```
-$ senax gen-seed sample init
+$ senax gen-seed data init
 ```
 シードファイルもマイグレーションと同様にDBに登録済みかのバージョン管理を行いますので、コマンドでシードファイルを生成します。
 
 ## シードファイル記述
-db/sample/seeds/20221120120831_init.yml (数値部分は生成日時によって変化します。)
+db/data/seeds/20221120120831_init.yml (数値部分は生成日時によって変化します。)
 ```yml
 # yaml-language-server: $schema=../seed-schema.json
 
@@ -201,18 +196,18 @@ note:
   note:
     note_1:
       category_id: diary
-      key: sample
+      key: diary
       content: content
   tag:
     tag_1:
       note_id: note_1
       name: tag 1
 ```
-category_id の「diary」と note_id の「note_1」はそれぞれオートインクリメントで登録されたIDが渡されるようになっています。
+category_id の「diary」と note_id の「note_1」はそれぞれ category と note が生成されたときのオートインクリメントで登録された ID が渡されるようになっています。
 
 ## シードデータ投入
 ```
-$ cargo run -p db_sample -- seed
+$ cargo run -p db_data -- seed
 ```
 
 ## DBテーブル定義書生成
@@ -223,7 +218,7 @@ DB仕様書のER図出力のために graphviz が必要となります。
 ```
 
 ```
-$ senax gen-db-doc sample -e -H 10 > db-document.html
+$ senax gen-db-doc data -e -H 10 > db-document.html
 ```
 環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。
 "-e"はER図出力、"-H 10"は仕様書更新履歴を10件分出力します。
@@ -231,7 +226,7 @@ $ senax gen-db-doc sample -e -H 10 > db-document.html
 ## コード記述
 
 _Noteを取得して日毎のカウンターを加算しています。
-save_delayedではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。
+save_delayed ではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。
 
 server/src/routes/api/cache.rs
 ```rust
@@ -261,7 +256,7 @@ async fn handler(
             })
             .await?;
 
-        let mut conn = SampleConn::new();
+        let mut conn = DataConn::new();
         let mut note = _Note::find_by_key_from_cache(&conn, &*key) // ユニークキーからのキャシュ取得
             .await
             .with_context(|| NotFound::new(&http_req))?;
@@ -310,7 +305,7 @@ async fn handler(
 ) -> impl Responder {
     let ctx = get_ctx_and_log(&http_req);
     let result = async move {
-        let mut conn = SampleConn::new();
+        let mut conn = DataConn::new();
         let mut note = _Note::find_by_key(&mut conn, &*key)
             .await
             .with_context(|| NotFound::new(&http_req))?;
@@ -326,7 +321,7 @@ async fn handler(
         let count = counter.map(|v| v.counter()).unwrap_or_default() + 1;
 
         let note_id = note.id();
-        let cond = db_sample::cond_note_counter!((note_id=note_id) AND (date=date)); // WHERE句を生成するマクロ
+        let cond = db_data::cond_note_counter!((note_id=note_id) AND (date=date)); // WHERE句を生成するマクロ
         conn.begin().await?;
         let mut update = _Counter::for_update(&mut conn); // 更新内容を指定するための空のUpdate用オブジェクト生成
         let _ = update.counter().add(1);
@@ -356,12 +351,11 @@ upsert を使用すれば未登録の場合は登録、すでに登録されて�
 ```
 $ cargo run -p server
 ```
-http://localhost:8080/api/cache/sample にアクセスして結果を確認できます。
+http://localhost:8080/api/cache/diary にアクセスして結果を確認できます。
 
 本番環境ではリリースモードでビルドして起動します。
 ```
 $ cargo build -p server -r
 $ target/release/server
 ```
-
-チュートリアル用のサンプルですが、ホットデプロイにも対応しています。
+s

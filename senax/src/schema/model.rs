@@ -67,7 +67,7 @@ pub enum InheritanceType {
 #[schemars(title = "ActAs Definition")]
 pub struct ActAs {
     /// セッションDBとして使用
-    #[serde(skip_serializing_if = "super::is_false")]
+    #[serde(default, skip_serializing_if = "super::is_false")]
     pub session: bool,
 }
 
@@ -99,7 +99,7 @@ pub struct ModelDef {
     /// テーブル名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table_name: Option<String>,
-    /// falseの場合は外部キー制約をDDLに出力しない
+    /// trueの場合は外部キー制約をDDLに出力しない
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore_foreign_key: Option<bool>,
     /// タイムスタンプ設定

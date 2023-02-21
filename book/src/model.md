@@ -99,7 +99,7 @@ let obj = _{モデル名}::find(&mut conn, id).await?
 ```
 
 ## Update
-更新時はカラム名のメソッドでアクセッサを呼び出し、set,add,sub,max,min,bit_and,bit_orを実行して更新します。
+更新時はカラム名のメソッドでアクセッサを呼び出し、set, add, sub, max, min, bit_and, bit_orを実行して更新します。
 
 ```
 let mut obj = _{モデル名}::find_for_update(&mut conn, id).await?

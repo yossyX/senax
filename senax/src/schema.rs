@@ -66,7 +66,7 @@ pub struct ConfigDef {
     /// 仕様書等のための著者
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author: Option<String>,
-    /// falseの場合は外部キー制約をDDLに出力しない
+    /// trueの場合は外部キー制約をDDLに出力しない
     #[serde(default)]
     pub ignore_foreign_key: bool,
     /// テーブル名を複数形にする
