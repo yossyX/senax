@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>WHRER句マクロ - SenaX</title>
+        <title>GraphQL - SenaX</title>
 
 
         <!-- Custom HTML head -->
@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="data_type.html"><strong aria-hidden="true">7.</strong> データ型</a></li><li class="chapter-item expanded "><a href="query.html" class="active"><strong aria-hidden="true">8.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">9.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">10.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">11.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">12.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="graphql.html"><strong aria-hidden="true">13.</strong> GraphQL</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">14.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">15.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">15.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">15.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">15.3.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="data_type.html"><strong aria-hidden="true">7.</strong> データ型</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">8.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">9.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">10.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">11.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">12.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="graphql.html" class="active"><strong aria-hidden="true">13.</strong> GraphQL</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">14.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">15.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">15.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">15.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">15.3.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -149,46 +149,76 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="whrer句マクロ"><a class="header" href="#whrer句マクロ">WHRER句マクロ</a></h1>
-<p>QueryBuilderで使用するWHRER句はマクロで記述されます。<br />
-基本的に比較演算子の左側にカラム名、右側に値となります。<br />
-マクロはそのままテキスト化ではなく、プリペアードステートメントに変換されますので、SQLインジェクションは発生しません。
-他のテーブルとの結合はJOINではなく、EXISTSで判定します。膨大なブログから表示可能な新着数件を抽出などではJOINよりもEXISTSのほうが早く取得できます。</p>
+                        <h1 id="graphql"><a class="header" href="#graphql">GraphQL</a></h1>
+<h1 id="graphqlについて"><a class="header" href="#graphqlについて">GraphQLについて</a></h1>
+<p>GraphQLはまだあまり一般的とはいえないかもしれません。
+理由として、下記が挙げられます。</p>
+<ul>
+<li>自分で一からサーバを実装するのは困難で特定のフレームワークを必要とする</li>
+<li>リレーションをたどって秘密情報が漏れそう</li>
+<li>アクセス制限が不安</li>
+</ul>
+<p>メリットとしては複数のマスタの情報を一回で取得できますので、フォームの表示に必要な項目などが効率良くなります。
+Rust の async_graphql クレートでは先程あげた問題もなく比較的簡単に実装できそうです。</p>
+<h1 id="graphqlインタフェース生成"><a class="header" href="#graphqlインタフェース生成">GraphQLインタフェース生成</a></h1>
+<p>下記のコマンドで GraphQL のインタフェースを作成します。</p>
+<pre><code>$ senax graphql &lt;server&gt; &lt;db&gt; [group] [model]
+</code></pre>
+<p>server : 実装するサーバパッケージのPATH<br />
+db : DB名<br />
+group : グループ名（省略可）<br />
+model : モデル名（省略可）</p>
+<p>graphql.rs には下記の行がコメントアウトされているはずですので、コメントを解除して有効化します。</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>let cond = db_{DB名}::cond_{グループ名}_{モデル名}!(クエリー);
-let cond = db_sample::cond_note_note!(color = _Color::c);
-let cond = db_sample::cond_note_note!(content = &quot;ddd&quot;);
-let cond = db_sample::cond_note_note!(NOT(note_id = id));
-let cond = db_sample::cond_note_note!(note_id BETWEEN (3, 5));
-let cond = db_sample::cond_note_note!(note_id SEMI_OPEN (3, 5));
-let cond = db_sample::cond_note_note!((note_id &lt; c) AND (note_id &lt; 20) AND (note_id IN (3,3)));
-let cond = db_sample::cond_note_note!((NOT ((note_id &lt; c) AND (note_id &lt; 1) AND (note_id &lt; 2))) OR (note_id &lt; 3) OR (note_id &lt; 4));
-let cond = db_sample::cond_note_note!(note_id ANY_BITS c);
-let cond = db_sample::cond_note_note!(ONLY_TRASHED AND (category EXISTS (name = &quot;diary&quot;)));
-let cond = cond.and(db_sample::cond_note_note!(json CONTAINS [3,5]));
-let result = _Note::query().cond(cond).select(conn).await?;
+</span>pub mod &lt;db name&gt;;
 <span class="boring">}
 </span></code></pre></pre>
-<p>SEMI_OPENはBETWEENに似ていますが、半開区間 3 &lt;= note_id AND note_id &lt; 5 のように変換されます。</p>
-<p>order by については下記のようになります。
-IS NULL ASCの指定も可能ですが、インデックスの最適化は得られない可能性があります。</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>let order = db_sample::order_by_note_note!(note_id IS NULL ASC, note_id ASC);
-let result = _Note::query().order_by(order).select(conn).await?;
+</span>    async fn &lt;db name&gt;(&amp;self) -&gt; data::GqiQueryData {
+        data::GqiQueryData
+    }
 <span class="boring">}
 </span></code></pre></pre>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    async fn &lt;db name&gt;(&amp;self) -&gt; data::GqiMutationData {
+        data::GqiMutationData
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>サーバ起動後、 ブラウザで http://localhost:8080/gql を表示すると GraphiQL の画面で動作確認が出来ます。</p>
+<p>GraphQLの仕様としてはRelayには対応していません。Urqlを推奨します。
+また、クエリーの階層構造の一番上に取得、更新メソッドが来ることが一般的ですが、大量のメソッドが同列に並ぶのを防ぐため階層構造にしており、下記のようになります。</p>
+<pre><code>{
+  data {
+    note {
+      note {
+        find(id: 1) {
+          id,
+          content
+        }
+      }
+    }
+  }
+}
+</code></pre>
+<p>階層構造のメリットとして階層ごとに権限の設定が可能ですので、管理が容易です。
+権限設定の例のためダミーのログイン機能も実装されています。</p>
+<p>識別子はデフォルトでスネークケースとなります。これは数字付きカラム名などを変換したときの誤動作を防ぐためです。JavaScriptで一般的なキャメルケースにする場合は --camel-case を指定してください。<br />
+rust も JavaScript もマルチバイト識別子に対応しているのにも関わらず、残念ながら GraphiQL はわざわざエラーを返してくれます。これが GraphQL の共通仕様かどうかはわかりませんが。</p>
+<p>リレーション先の取得についてはスキーマで use_cache, in_cache が指定された1階層のみで、無限にリレーションをたどるような実装にはなっていません。</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="data_type.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="domain.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next" href="cache.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="test.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -198,11 +228,11 @@ let result = _Note::query().order_by(order).select(conn).await?;
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="data_type.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="domain.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next" href="cache.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="test.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

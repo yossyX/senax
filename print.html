@@ -82,7 +82,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">13.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.3.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="data_type.html"><strong aria-hidden="true">7.</strong> データ型</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">8.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">9.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">10.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html"><strong aria-hidden="true">11.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">12.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="graphql.html"><strong aria-hidden="true">13.</strong> GraphQL</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">14.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">15.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">15.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">15.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">15.3.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -184,24 +184,31 @@ SenaXではほぼ同時に行われたアクセスからのDBへのクエリー�
 <h2 id="インストール"><a class="header" href="#インストール">インストール</a></h2>
 <pre><code># cargo install senax
 </code></pre>
-<h2 id="初期ファイル"><a class="header" href="#初期ファイル">初期ファイル</a></h2>
-<p>初期ディレクトリ構成の参考のため、 https://github.com/yossyX/senax から examples/actix のコードを展開してください。
-とりあえずWebフレームワークとしては actix-web を使用しています。
-tonic や hyper 等でも対応できるようにしたいと思いますが、動作は未確認です。
-非同期ランタイムが tokio をそのまま利用しているとasyncブロックが Send である必要があり、その場合 SenaX は動作しません。
-actix-web は tokio 上で動作していますが、非同期については !Send で動作するスレッドごとの動作になっています。
-また、内部での消費メモリの計算はメモリアロケータとして mimalloc を使用することを想定しています。</p>
+<h2 id="初期ファイル生成"><a class="header" href="#初期ファイル生成">初期ファイル生成</a></h2>
+<pre><code>$ senax init example
+$ cd example
+</code></pre>
+<h2 id="actix-サーバ生成"><a class="header" href="#actix-サーバ生成">Actix サーバ生成</a></h2>
+<pre><code>$ senax new-actix server
+</code></pre>
+<p>serverの部分は任意のパッケージ名で、actix-web を使用したWebサーバを生成します。<br />
+生成されるコードはSIGUSR2シグナルによるホットデプロイに対応しています。</p>
+<h2 id="dbテンプレート生成"><a class="header" href="#dbテンプレート生成">DBテンプレート生成</a></h2>
+<pre><code>$ senax use-db server data
+</code></pre>
+<p>スキーマに data.yml を生成し、先程の server パッケージに data というDBを使用することを設定します。</p>
 <h2 id="envファイル"><a class="header" href="#envファイル">envファイル</a></h2>
 <pre><code>$ cp .env.sample .env
 </code></pre>
-<p>.envのSAMPLE_DB_URLなどのDB設定を必要に応じて変更してください。</p>
+<p>.env の SESSION_DB_URL, DATA_DB_URL などのDB設定を必要に応じて変更してください。</p>
 <h2 id="スキーマファイル"><a class="header" href="#スキーマファイル">スキーマファイル</a></h2>
 <p>スキーマファイルは基本的には設定ファイルとグループごとのモデル記述ファイルに分けて記述します。
 シンプルなケースでは設定ファイル内にまとめて記述することもできます。</p>
-<p>schema/sample.yml</p>
-<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#definitions/ConfigDef
+<p>下記にチュートリアル用の内容を記述していますので、該当するファイルを修正してください。</p>
+<p>schema/data.yml</p>
+<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.2.0/schema.json#definitions/ConfigDef
 
-title: Sample DB
+title: Example DB
 author: author name
 db: mysql
 ignore_foreign_key: true
@@ -211,23 +218,17 @@ timestamp_time_zone: utc
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read
 use_cache: true
-use_fast_cache: true
 use_cache_all: true
-preserve_column_order: true
+preserve_column_order: false
 groups:
   note:
-    title: note
+    type: model
 </code></pre>
 <p>複数のデータベース設定のための設定ファイルです。<br />
-yaml-language-serverの設定はVSCodeであればYAMLのプラグインを使用することにより、入力時にアシスタントが効きます。</p>
-<p>トップのsampleはDBのデータベース名です。<br />
-dbはまだMySQLしか対応していません。<br />
-tx_isolationとread_tx_isolationは更新用と参照用のデータベースの接続を分けて、それぞれread_committedとrepeatable_readにしています。<br />
-MySQLはデフォルトでrepeatable_readですが、負荷がかかると結構ギャップロックにやられます。PostgreSQLはread_committedですし、多くの場合read_committedのほうが適切です。ただし、SELECT FOR UPDATEでヒットしなかったときにINSERTの手順はrepeatable_readでないとロックが効きませんが、これこそがギャップロックで死ぬパターンです。この場合、上位テーブルでロックを掛けるか、INSERT IGNOREや、ON DUPLICATE KEY UPDATEなどのupsert構文で対応が必要です。<br />
-参照時のトランザクションはMySQLでは最初にテーブルにアクセスしたときにすべてのテーブルのスナップショットを取得するのでrepeatable_readが安全です。<br />
-groupsは一つのデータベースに数百のテーブルがあるとディレクトリツリーが長くなったり管理が困ることになりますので、1階層分グループ分けできるようになっています。</p>
-<p>schema/sample/note.yml</p>
-<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.1.3/schema.json#properties/model
+yaml-language-serverの設定はVSCodeであればYAMLのプラグインを使用することにより、入力時にアシスタントが効きます。<br />
+db は現在のところ MySQL しか対応していません。</p>
+<p>schema/data/note.yml に下記のファイルを作成してください。</p>
+<pre><code class="language-yml"># yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.2.0/schema.json#properties/model
 
 note:
   timestampable: fixed_time
@@ -297,50 +298,44 @@ counter:
     note:
 </code></pre>
 <p>グループ内のテーブルの設定ファイルです。<br />
-Symfony 1.x の doctrine/schema.yml に近いイメージです。<br />
-テーブル名がマルチバイト文字や複数形にも対応しています。
 note モデルは tag と紐づいていますが、 relations の type が many では複数形の tags で自動的に紐づきます。</p>
-<p>ちなみに、 Doctrine の inheritance も一通り対応しています。</p>
-<p>セッション用の設定ファイルをダウンロードします。</p>
-<pre><code>$ wget -O schema/session.yml https://github.com/yossyX/senax/releases/latest/download/session.yml
-</code></pre>
 <h2 id="モデル生成"><a class="header" href="#モデル生成">モデル生成</a></h2>
-<p>senaxのコマンドでdb/sample下にクレートを生成します。</p>
-<pre><code>$ senax model sample
+<p>senaxのコマンドで db/data, db/session 下にクレートを生成します。</p>
+<pre><code>$ senax model data
 $ senax model session
 </code></pre>
-<p>note.rs等はカスタマイズ用で、_note.rsが本体です。再度モデル生成を実行するとnote.rsは上書きされず、_note.rsは常に上書きされます。<br />
-モデル名が_Tagsのように_が付くのは他のライブラリと被らないようにそのような命名規則になっています。<br />
-Dockerでの開発環境でVS Code等を使用していてモデルの再生成後に変更が反映されていない場合は、ウィンドウの再読み込みや生成されたモデルのファイルをVS Code上で再度保存するなどしてモデルの更新をVS Codeに認識させる必要があります。</p>
+<p>生成されたファイルの note.rs 等はカスタマイズ用で、 _note.rs が本体です。再度モデル生成を実行すると note.rs は上書きされず、 _note.rs は常に上書きされます。<br />
+モデル名が _Tags のようにアンダースコアが付くのは他のライブラリと被らないようにそのような命名規則になっています。<br />
+Docker での開発環境で VS Code 等を使用していてモデルの再生成後に変更が反映されていない場合は、ウィンドウの再読み込みや生成されたモデルのファイルを VS Code 上で再度保存するなどしてモデルの更新を VS Code に認識させる必要があります。</p>
 <h2 id="マイグレーション生成"><a class="header" href="#マイグレーション生成">マイグレーション生成</a></h2>
-<p>db/sample/migrations下にDDLファイルを生成します。</p>
-<pre><code>$ senax gen-migrate sample init
+<p>db/data/migrations下にDDLファイルを生成します。</p>
+<pre><code>$ senax gen-migrate data init
 $ senax gen-migrate session init
 </code></pre>
-<p>DDLは現状のDBを確認して差分を出力します。<br />
+<p>スキーマファイルを修正して再実行すると現状のDBを確認して差分のDDLを出力します。<br />
 DB仕様書の更新履歴出力のためにコメント部分に更新内容が出力されています。コメントの追加や不要な更新内容を削除して仕様書に出力される更新内容を変更することができます。</p>
 <p>※ テーブル名はデフォルトでグループ名とモデル名を結合した名前になります。変更する場合はスキーマで table_name を指定してください。
 また、 plural_table_name の設定でテーブル名を複数形で生成することが出来ます。</p>
 <h2 id="マイグレーション実行"><a class="header" href="#マイグレーション実行">マイグレーション実行</a></h2>
-<pre><code>$ cargo run -p db_sample -- migrate -c
+<pre><code>$ cargo run -p db_data -- migrate -c
 $ cargo run -p db_session -- migrate -c
 </code></pre>
 <p>sqlxのマイグレーションを実行します。
 シャーディング設定がある場合すべてのシャードにクエリーを発行するようになっています。<br />
 -c はクリーンマイグレーションで、DBを作成してからマイグレーションを実行します。</p>
 <h2 id="シードスキーマ生成"><a class="header" href="#シードスキーマ生成">シードスキーマ生成</a></h2>
-<pre><code>$ cargo run -p db_sample -- gen-seed-schema &gt; db/sample/seed-schema.json
+<pre><code>$ cargo run -p db_data -- gen-seed-schema &gt; db/data/seed-schema.json
 </code></pre>
 <p>もしくは、</p>
-<pre><code>$ target/debug/db_sample gen-seed-schema &gt; db/sample/seed-schema.json
+<pre><code>$ target/debug/db_data gen-seed-schema &gt; db/data/seed-schema.json
 </code></pre>
 <p>シードファイルの入力アシスタントのためのスキーマファイルを生成します。</p>
 <h2 id="シードファイル生成"><a class="header" href="#シードファイル生成">シードファイル生成</a></h2>
-<pre><code>$ senax gen-seed sample init
+<pre><code>$ senax gen-seed data init
 </code></pre>
 <p>シードファイルもマイグレーションと同様にDBに登録済みかのバージョン管理を行いますので、コマンドでシードファイルを生成します。</p>
 <h2 id="シードファイル記述"><a class="header" href="#シードファイル記述">シードファイル記述</a></h2>
-<p>db/sample/seeds/20221120120831_init.yml (数値部分は生成日時によって変化します。)</p>
+<p>db/data/seeds/20221120120831_init.yml (数値部分は生成日時によって変化します。)</p>
 <pre><code class="language-yml"># yaml-language-server: $schema=../seed-schema.json
 
 note:
@@ -350,28 +345,28 @@ note:
   note:
     note_1:
       category_id: diary
-      key: sample
+      key: diary
       content: content
   tag:
     tag_1:
       note_id: note_1
       name: tag 1
 </code></pre>
-<p>category_id の「diary」と note_id の「note_1」はそれぞれオートインクリメントで登録されたIDが渡されるようになっています。</p>
+<p>category_id の「diary」と note_id の「note_1」はそれぞれ category と note が生成されたときのオートインクリメントで登録された ID が渡されるようになっています。</p>
 <h2 id="シードデータ投入"><a class="header" href="#シードデータ投入">シードデータ投入</a></h2>
-<pre><code>$ cargo run -p db_sample -- seed
+<pre><code>$ cargo run -p db_data -- seed
 </code></pre>
 <h2 id="dbテーブル定義書生成"><a class="header" href="#dbテーブル定義書生成">DBテーブル定義書生成</a></h2>
 <p>DB仕様書のER図出力のために graphviz が必要となります。</p>
 <pre><code># apt-get install graphviz
 </code></pre>
-<pre><code>$ senax gen-db-doc sample -e -H 10 &gt; db-document.html
+<pre><code>$ senax gen-db-doc data -e -H 10 &gt; db-document.html
 </code></pre>
 <p>環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。
 &quot;-e&quot;はER図出力、&quot;-H 10&quot;は仕様書更新履歴を10件分出力します。</p>
 <h2 id="コード記述"><a class="header" href="#コード記述">コード記述</a></h2>
 <p>_Noteを取得して日毎のカウンターを加算しています。
-save_delayedではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。</p>
+save_delayed ではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。</p>
 <p>server/src/routes/api/cache.rs</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -401,7 +396,7 @@ async fn handler(
             })
             .await?;
 
-        let mut conn = SampleConn::new();
+        let mut conn = DataConn::new();
         let mut note = _Note::find_by_key_from_cache(&amp;conn, &amp;*key) // ユニークキーからのキャシュ取得
             .await
             .with_context(|| NotFound::new(&amp;http_req))?;
@@ -450,7 +445,7 @@ async fn handler(
 ) -&gt; impl Responder {
     let ctx = get_ctx_and_log(&amp;http_req);
     let result = async move {
-        let mut conn = SampleConn::new();
+        let mut conn = DataConn::new();
         let mut note = _Note::find_by_key(&amp;mut conn, &amp;*key)
             .await
             .with_context(|| NotFound::new(&amp;http_req))?;
@@ -466,7 +461,7 @@ async fn handler(
         let count = counter.map(|v| v.counter()).unwrap_or_default() + 1;
 
         let note_id = note.id();
-        let cond = db_sample::cond_note_counter!((note_id=note_id) AND (date=date)); // WHERE句を生成するマクロ
+        let cond = db_data::cond_note_counter!((note_id=note_id) AND (date=date)); // WHERE句を生成するマクロ
         conn.begin().await?;
         let mut update = _Counter::for_update(&amp;mut conn); // 更新内容を指定するための空のUpdate用オブジェクト生成
         let _ = update.counter().add(1);
@@ -495,13 +490,19 @@ upsert を使用すれば未登録の場合は登録、すでに登録されて�
 <h2 id="サーバ起動"><a class="header" href="#サーバ起動">サーバ起動</a></h2>
 <pre><code>$ cargo run -p server
 </code></pre>
-<p>http://localhost:8080/api/cache/sample にアクセスして結果を確認できます。</p>
+<p>http://localhost:8080/api/cache/diary にアクセスして結果を確認できます。</p>
 <p>本番環境ではリリースモードでビルドして起動します。</p>
 <pre><code>$ cargo build -p server -r
 $ target/release/server
 </code></pre>
-<p>チュートリアル用のサンプルですが、ホットデプロイにも対応しています。</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="schema-definition"><a class="header" href="#schema-definition">Schema Definition</a></h1>
+<p>s</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="スキーマ"><a class="header" href="#スキーマ">スキーマ</a></h1>
+<p>スキーマはSymfony 1 の doctrine/schema.yml に近いイメージです。<br />
+Doctrine の inheritance も一通り対応しています。<br />
+特徴的な構造として、モデルは必ずグループの下に分類されます。
+一つのデータベースに数百のテーブルがあるとディレクトリツリーが長くなったり管理が困ることになりますので、1階層分グループ分けできるようになっています。
+テーブル名がマルチバイト文字や複数形にも対応していますが、GraphQLがマルチバイトに対応していないため注意が必要です。</p>
+<h1 id="schema-definition"><a class="header" href="#schema-definition">Schema Definition</a></h1>
 <ul>
 <li><a href="schema.html##/definitions/ConfigDef">properties/conf</a></li>
 <li><a href="schema.html##/definitions/EnumDef">properties/enum</a></li>
@@ -517,7 +518,7 @@ $ target/release/server
 <tr><td><strong>db</strong></td><td><a href="schema.html##/definitions/DbType">DbType</a></td><td>使用するDB。現在のところmysqlのみ対応</td><td>Yes</td></tr>
 <tr><td><strong>title</strong></td><td>string</td><td>仕様書等のためのタイトル</td><td></td></tr>
 <tr><td><strong>author</strong></td><td>string</td><td>仕様書等のための著者</td><td></td></tr>
-<tr><td><strong>ignore_foreign_key</strong></td><td>boolean</td><td>falseの場合は外部キー制約をDDLに出力しない</td><td></td></tr>
+<tr><td><strong>ignore_foreign_key</strong></td><td>boolean</td><td>trueの場合は外部キー制約をDDLに出力しない</td><td></td></tr>
 <tr><td><strong>plural_table_name</strong></td><td>boolean</td><td>テーブル名を複数形にする</td><td></td></tr>
 <tr><td><strong>timestampable</strong></td><td><a href="schema.html##/definitions/Timestampable">Timestampable</a></td><td>デフォルトのタイムスタンプ設定</td><td></td></tr>
 <tr><td><strong>time_zone</strong></td><td><a href="schema.html##/definitions/TimeZone">TimeZone</a></td><td>日時型のデフォルトのタイムゾーン設定</td><td></td></tr>
@@ -610,7 +611,7 @@ $ target/release/server
 <tr><td><strong>title</strong></td><td>string</td><td>仕様書等のためのタイトル</td><td></td></tr>
 <tr><td><strong>comment</strong></td><td>string</td><td>コメント</td><td></td></tr>
 <tr><td><strong>table_name</strong></td><td>string</td><td>テーブル名</td><td></td></tr>
-<tr><td><strong>ignore_foreign_key</strong></td><td>boolean</td><td>falseの場合は外部キー制約をDDLに出力しない</td><td></td></tr>
+<tr><td><strong>ignore_foreign_key</strong></td><td>boolean</td><td>trueの場合は外部キー制約をDDLに出力しない</td><td></td></tr>
 <tr><td><strong>timestampable</strong></td><td><a href="schema.html##/definitions/Timestampable">Timestampable</a></td><td>タイムスタンプ設定</td><td></td></tr>
 <tr><td><strong>disable_created_at</strong></td><td>boolean</td><td>created_atの無効化</td><td></td></tr>
 <tr><td><strong>disable_updated_at</strong></td><td>boolean</td><td>updated_atの無効化</td><td></td></tr>
@@ -620,6 +621,7 @@ $ target/release/server
 <tr><td><strong>use_cache</strong></td><td>boolean</td><td>キャッシュを使用するか</td><td></td></tr>
 <tr><td><strong>use_fast_cache</strong></td><td>boolean</td><td>高速キャッシュを使用するか(experimental)</td><td></td></tr>
 <tr><td><strong>use_cache_all</strong></td><td>boolean</td><td>全キャッシュを使用するか</td><td></td></tr>
+<tr><td><strong>use_cache_all_with_condition</strong></td><td>boolean</td><td>条件付き全キャッシュを使用するか</td><td></td></tr>
 <tr><td><strong>use_insert_delayed</strong></td><td>boolean</td><td>遅延INSERTを使用する</td><td></td></tr>
 <tr><td><strong>use_save_delayed</strong></td><td>boolean</td><td>遅延SAVEを使用する</td><td></td></tr>
 <tr><td><strong>use_update_delayed</strong></td><td>boolean</td><td>遅延UPDATEを使用する</td><td></td></tr>
@@ -633,6 +635,7 @@ $ target/release/server
 <tr><td><strong>collate</strong></td><td>string</td><td>文字セット照合順序</td><td></td></tr>
 <tr><td><strong>mod_name</strong></td><td>string</td><td>名前にマルチバイトを使用した場合のmod名</td><td></td></tr>
 <tr><td><strong>act_as</strong></td><td><a href="schema.html##/definitions/ActAs">ActAs</a></td><td>機能追加</td><td></td></tr>
+<tr><td><strong>exclude_from_api</strong></td><td>boolean</td><td>API生成から除外する</td><td></td></tr>
 <tr><td><strong>columns</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/ColumnTypeOrDef">ColumnTypeOrDef</a>&gt;</td><td>カラム</td><td></td></tr>
 <tr><td><strong>relations</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/RelDef">RelDef</a>&gt;</td><td>リレーション</td><td></td></tr>
 <tr><td><strong>indexes</strong></td><td>Map&lt;property, <a href="schema.html##/definitions/IndexDef">IndexDef</a>&gt;</td><td>インデックス</td><td></td></tr>
@@ -686,7 +689,9 @@ $ target/release/server
 <tr><td><strong>not_null</strong></td><td>boolean</td><td>指定がない場合はnullable</td><td></td></tr>
 <tr><td><strong>primary</strong></td><td>boolean</td><td></td><td></td></tr>
 <tr><td><strong>auto_increment</strong></td><td><a href="schema.html##/definitions/AutoIncrement">AutoIncrement</a></td><td></td><td></td></tr>
-<tr><td><strong>length</strong></td><td>integer</td><td></td><td></td></tr>
+<tr><td><strong>length</strong></td><td>integer</td><td>長さ(文字列の場合はバイト数ではなく、文字数)</td><td></td></tr>
+<tr><td><strong>max</strong></td><td>integer</td><td>最大値(decimalは非対応)</td><td></td></tr>
+<tr><td><strong>min</strong></td><td>integer</td><td>最小値(decimalは非対応)</td><td></td></tr>
 <tr><td><strong>collate</strong></td><td>string</td><td></td><td></td></tr>
 <tr><td><strong>not_serializable</strong></td><td>boolean</td><td>serializeに出力しない（パスワード等保護用）</td><td></td></tr>
 <tr><td><strong>precision</strong></td><td>integer</td><td></td><td></td></tr>
@@ -702,6 +707,8 @@ $ target/release/server
 <tr><td><strong>srid</strong></td><td>integer</td><td>Point型のSRID</td><td></td></tr>
 <tr><td><strong>default</strong></td><td>string</td><td></td><td></td></tr>
 <tr><td><strong>sql_comment</strong></td><td>string</td><td></td><td></td></tr>
+<tr><td><strong>api_visibility</strong></td><td><a href="schema.html##/definitions/ApiVisibility">ApiVisibility</a></td><td>API可視性</td><td></td></tr>
+<tr><td><strong>api_required</strong></td><td>boolean</td><td>API入力時必須</td><td></td></tr>
 </tbody></table>
 </div>
 <hr />
@@ -760,6 +767,14 @@ $ target/release/server
 <tr><td><strong>comment</strong></td><td>string</td><td></td><td></td></tr>
 </tbody></table>
 </div>
+<hr />
+<p><a id="#/definitions/ApiVisibility"></a></p>
+<h2 id="api-visibility"><a class="header" href="#api-visibility">API Visibility</a></h2>
+<p><strong>Allowed values</strong></p>
+<ul>
+<li><code>readonly</code></li>
+<li><code>hidden</code></li>
+</ul>
 <hr />
 <p><a id="#/definitions/ColumnSubsetType"></a></p>
 <h2 id="column-subset-type"><a class="header" href="#column-subset-type">Column Subset Type</a></h2>
@@ -952,9 +967,10 @@ conn.begin_read_tx().await?;
 <h2 id="セーブポイント"><a class="header" href="#セーブポイント">セーブポイント</a></h2>
 <p>更新用トランザクションがネストされているとセーブポイントになります。</p>
 <h2 id="トランザクションを使用しない場合"><a class="header" href="#トランザクションを使用しない場合">トランザクションを使用しない場合</a></h2>
-<p>トランザクションを使用しない自動コミットの場合は begin_without_transaction() の呼び出しが必要です。<br />
+<p>意図的にトランザクションを使用していないのか、あるいは実装漏れなのか分からないのはバグの元です。
+そのため、トランザクションを使用しない自動コミットの場合は begin_without_transaction() の呼び出しが必要です。<br />
 単純なinsert, updateが可能です。クエリーの実行ごとにコネクションが変わっている可能性がありますので、DB接続のセッションの連続性に依存する処理はできません。<br />
-また、force_delete では通常のトランザクションが必要です。</p>
+また、force_delete では更新用トランザクションが必要です。</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>let mut conn = DbConn::new();
@@ -1053,7 +1069,7 @@ _{モデル名}::save(conn, obj).await?;
 <pre><code>let obj = _{モデル名}::find(&amp;mut conn, id).await?
 </code></pre>
 <h2 id="update"><a class="header" href="#update">Update</a></h2>
-<p>更新時はカラム名のメソッドでアクセッサを呼び出し、set,add,sub,max,min,bit_and,bit_orを実行して更新します。</p>
+<p>更新時はカラム名のメソッドでアクセッサを呼び出し、set, add, sub, max, min, bit_and, bit_orを実行して更新します。</p>
 <pre><code>let mut obj = _{モデル名}::find_for_update(&amp;mut conn, id).await?
 obj.{カラム名}().set(1);
 _{モデル名}::save(conn, obj).await?;
@@ -1065,7 +1081,32 @@ _{モデル名}::delete(conn, obj).await?;
 <pre><code>let obj = _{モデル名}::find_for_update(&amp;mut conn, id).await?
 _{モデル名}::force_delete(conn, obj).await?;
 </code></pre>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="whrer句マクロ"><a class="header" href="#whrer句マクロ">WHRER句マクロ</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="データ型"><a class="header" href="#データ型">データ型</a></h1>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Rust Type</th><th>MySQL Type</th></tr></thead><tbody>
+<tr><td>tinyint</td><td>u8 or i8</td><td>TINYINT</td></tr>
+<tr><td>smallint</td><td>u16 or i16</td><td>SMALLINT</td></tr>
+<tr><td>int</td><td>u32 or i32</td><td>INT</td></tr>
+<tr><td>bigint</td><td>u64 or i64</td><td>BIGINT</td></tr>
+<tr><td>float</td><td>f32</td><td>FLOAT</td></tr>
+<tr><td>double</td><td>f64</td><td>DOUBLE</td></tr>
+<tr><td>varchar</td><td>String</td><td>VARCHAR</td></tr>
+<tr><td>boolean</td><td>bool</td><td>TINYINT</td></tr>
+<tr><td>text</td><td>String</td><td>TEXT</td></tr>
+<tr><td>blob</td><td>Vec&lt;u8&gt;</td><td>BLOB</td></tr>
+<tr><td>timestamp</td><td>chrono::DateTime</td><td>TIMESTAMP</td></tr>
+<tr><td>datetime</td><td>chrono::DateTime</td><td>DATETIME</td></tr>
+<tr><td>date</td><td>chrono::NaiveDate</td><td>DATE</td></tr>
+<tr><td>time</td><td>chrono::NaiveTime</td><td>TIME</td></tr>
+<tr><td>decimal</td><td>rust_decimal::Decimal</td><td>DECIMAL</td></tr>
+<tr><td>array_int</td><td>Vec&lt;u64&gt;</td><td>JSON</td></tr>
+<tr><td>array_string</td><td>Vec&lt;String&gt;</td><td>JSON</td></tr>
+<tr><td>json</td><td>User Defined or serde_json::Value</td><td>JSON</td></tr>
+<tr><td>enum</td><td>enum</td><td>UNSIGNED TINYINT</td></tr>
+<tr><td>db_enum</td><td>String</td><td>ENUM</td></tr>
+<tr><td>db_set</td><td>String</td><td>SET</td></tr>
+<tr><td>point</td><td>senax_common::types::point::Point</td><td>POINT</td></tr>
+</tbody></table>
+</div><div style="break-before: page; page-break-before: always;"></div><h1 id="whrer句マクロ"><a class="header" href="#whrer句マクロ">WHRER句マクロ</a></h1>
 <p>QueryBuilderで使用するWHRER句はマクロで記述されます。<br />
 基本的に比較演算子の左側にカラム名、右側に値となります。<br />
 マクロはそのままテキスト化ではなく、プリペアードステートメントに変換されますので、SQLインジェクションは発生しません。
@@ -1162,7 +1203,8 @@ list.fetch_{リレーション名}(&amp;mut conn).await?;
 </span></code></pre></pre>
 <h2 id="3世代目の取得"><a class="header" href="#3世代目の取得">3世代目の取得</a></h2>
 <p>リレーション先のリレーションのような3世代目の取得については Vec&lt;&amp;mut _{モデル名}&gt; にまとめれば fetch_{リレーション名} のメソッドが使用可能です。<br />
-その際、2世代目のリレーション先のトレイトが必要になります。</p>
+その際、2世代目のリレーション先のトレイトが必要になります。
+取得された3世代目リレーションのオブジェクトはそれぞれ1世代目オブジェクトが所持する2世代目オブジェクトの下に所持するようになります。</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use {2世代目のリレーションmod}::*;
@@ -1173,11 +1215,93 @@ let mut v: Vec&lt;_&gt; = list.iter_mut().map(|v| v.{2世代目リレーショ�
 v.fetch_{3世代目リレーション名}(&amp;mut conn).await?;
 <span class="boring">}
 </span></code></pre></pre>
+<h2 id="リレーションのタイプ"><a class="header" href="#リレーションのタイプ">リレーションのタイプ</a></h2>
+<p>スキーマに設定するリレーションのタイプとして、one, one_to_one, many に対応しています。</p>
+<ul>
+<li>one<br />
+自テーブルの主キーではないカラムに他のテーブルの主キーを保持している状態</li>
+<li>one_to_one<br />
+自テーブルが主であり、従属テーブル側も主キーに自テーブルと同じ値を保持して一対一で結合している状態</li>
+<li>many<br />
+自テーブルが主であり、従属テーブル側に自テーブルの主キーを保持して一対多で結合している状態</li>
+</ul>
+<p>リレーションが外部キー制約としてDDLに生成されないようにする場合は ignore_foreign_key: true を設定します。<br />
+なお、one_to_one と many の場合は従属テーブル側に on_delete: cascade を設定可能です。外部キー制約を生成していない場合でもフレームワークにより物理削除に連動して削除されます。</p>
+<h2 id="リレーションのキャッシュ"><a class="header" href="#リレーションのキャッシュ">リレーションのキャッシュ</a></h2>
+<p>オブジェクトのキャッシュを有効にする場合、 use_cache あるいは in_cache の設定を有効にします。</p>
+<ul>
+<li>use_cache<br />
+リレーションのタイプが one の場合に設定可能で、まとめてキャッシュはされませんが、キャッシュオブジェクトからリレーション先のオブジェクトのキャッシュを fetch することが出来ます。</li>
+<li>in_cache<br />
+リレーションのタイプが one_to_one, many の場合に設定可能で、キャッシュ時にまとめてキャッシュされます。</li>
+</ul>
+<p>なお、 use_cache の代わりに use_cache_with_trashed を設定することでリレーション先が論理削除されていてもキャッシュを取得できます。
+これは、例えば社員を論理削除しても過去にその社員が作成したドキュメントから作成者の名前が消えると困るようなケースで使用できます。</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ドメイン"><a class="header" href="#ドメイン">ドメイン</a></h1>
 <p>ORMのモデル層としてはカスタマイズ用の note.rs にロジックを実装したくなるところですが、自動生成されたクレートのビルドに非常に時間がかかるので、別途ドメイン用のクレートを用意してそちらにビジネスロジックを実装します。<br />
 単純な方法としてはビジネスロジックのトレイトを定義して _Note にトレイトの実装を行うことで、 _Note にメソッドが追加されたように扱うことができます。<br />
 クリーンアーキテクチャの場合はモデルとテーブルの乖離が大きいので、新しい構造体を定義してデータの詰替などを実装する必要があると考えられます。
 その際に _Note の代わりに Note などの名前で新しい構造体を定義すれば、名前が混乱することもなくクリーンに実装できると思われます。</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="graphql"><a class="header" href="#graphql">GraphQL</a></h1>
+<h1 id="graphqlについて"><a class="header" href="#graphqlについて">GraphQLについて</a></h1>
+<p>GraphQLはまだあまり一般的とはいえないかもしれません。
+理由として、下記が挙げられます。</p>
+<ul>
+<li>自分で一からサーバを実装するのは困難で特定のフレームワークを必要とする</li>
+<li>リレーションをたどって秘密情報が漏れそう</li>
+<li>アクセス制限が不安</li>
+</ul>
+<p>メリットとしては複数のマスタの情報を一回で取得できますので、フォームの表示に必要な項目などが効率良くなります。
+Rust の async_graphql クレートでは先程あげた問題もなく比較的簡単に実装できそうです。</p>
+<h1 id="graphqlインタフェース生成"><a class="header" href="#graphqlインタフェース生成">GraphQLインタフェース生成</a></h1>
+<p>下記のコマンドで GraphQL のインタフェースを作成します。</p>
+<pre><code>$ senax graphql &lt;server&gt; &lt;db&gt; [group] [model]
+</code></pre>
+<p>server : 実装するサーバパッケージのPATH<br />
+db : DB名<br />
+group : グループ名（省略可）<br />
+model : モデル名（省略可）</p>
+<p>graphql.rs には下記の行がコメントアウトされているはずですので、コメントを解除して有効化します。</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub mod &lt;db name&gt;;
+<span class="boring">}
+</span></code></pre></pre>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    async fn &lt;db name&gt;(&amp;self) -&gt; data::GqiQueryData {
+        data::GqiQueryData
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    async fn &lt;db name&gt;(&amp;self) -&gt; data::GqiMutationData {
+        data::GqiMutationData
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<p>サーバ起動後、 ブラウザで http://localhost:8080/gql を表示すると GraphiQL の画面で動作確認が出来ます。</p>
+<p>GraphQLの仕様としてはRelayには対応していません。Urqlを推奨します。
+また、クエリーの階層構造の一番上に取得、更新メソッドが来ることが一般的ですが、大量のメソッドが同列に並ぶのを防ぐため階層構造にしており、下記のようになります。</p>
+<pre><code>{
+  data {
+    note {
+      note {
+        find(id: 1) {
+          id,
+          content
+        }
+      }
+    }
+  }
+}
+</code></pre>
+<p>階層構造のメリットとして階層ごとに権限の設定が可能ですので、管理が容易です。
+権限設定の例のためダミーのログイン機能も実装されています。</p>
+<p>識別子はデフォルトでスネークケースとなります。これは数字付きカラム名などを変換したときの誤動作を防ぐためです。JavaScriptで一般的なキャメルケースにする場合は --camel-case を指定してください。<br />
+rust も JavaScript もマルチバイト識別子に対応しているのにも関わらず、残念ながら GraphiQL はわざわざエラーを返してくれます。これが GraphQL の共通仕様かどうかはわかりませんが。</p>
+<p>リレーション先の取得についてはスキーマで use_cache, in_cache が指定された1階層のみで、無限にリレーションをたどるような実装にはなっていません。</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="テスト"><a class="header" href="#テスト">テスト</a></h1>
 <p>テストはテストDB接続URLで指定されたDBで実行されます。<br />
 start_test()の呼び出しでデータベースは初期化されマイグレーションが実行されます。<br />

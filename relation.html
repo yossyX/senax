@@ -81,7 +81,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">7.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">8.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">9.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html" class="active"><strong aria-hidden="true">10.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">11.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">12.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">13.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">13.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">13.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">13.3.</strong> リンカー</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="index.html"><strong aria-hidden="true">1.</strong> SenaXについて</a></li><li class="chapter-item expanded "><a href="tutorial.html"><strong aria-hidden="true">2.</strong> チュートリアル</a></li><li class="chapter-item expanded "><a href="schema.html"><strong aria-hidden="true">3.</strong> スキーマ</a></li><li class="chapter-item expanded "><a href="env.html"><strong aria-hidden="true">4.</strong> 設定ファイル</a></li><li class="chapter-item expanded "><a href="transaction.html"><strong aria-hidden="true">5.</strong> トランザクション</a></li><li class="chapter-item expanded "><a href="model.html"><strong aria-hidden="true">6.</strong> モデル</a></li><li class="chapter-item expanded "><a href="data_type.html"><strong aria-hidden="true">7.</strong> データ型</a></li><li class="chapter-item expanded "><a href="query.html"><strong aria-hidden="true">8.</strong> WHRER句マクロ</a></li><li class="chapter-item expanded "><a href="cache.html"><strong aria-hidden="true">9.</strong> キャッシュ</a></li><li class="chapter-item expanded "><a href="delayed.html"><strong aria-hidden="true">10.</strong> 遅延一括更新</a></li><li class="chapter-item expanded "><a href="relation.html" class="active"><strong aria-hidden="true">11.</strong> リレーション</a></li><li class="chapter-item expanded "><a href="domain.html"><strong aria-hidden="true">12.</strong> ドメイン</a></li><li class="chapter-item expanded "><a href="graphql.html"><strong aria-hidden="true">13.</strong> GraphQL</a></li><li class="chapter-item expanded "><a href="test.html"><strong aria-hidden="true">14.</strong> テスト</a></li><li class="chapter-item expanded "><a href="others.html"><strong aria-hidden="true">15.</strong> その他</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="logger.html"><strong aria-hidden="true">15.1.</strong> ロガー</a></li><li class="chapter-item expanded "><a href="session.html"><strong aria-hidden="true">15.2.</strong> セッション</a></li><li class="chapter-item expanded "><a href="linker.html"><strong aria-hidden="true">15.3.</strong> リンカー</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -161,7 +161,8 @@ list.fetch_{リレーション名}(&amp;mut conn).await?;
 </span></code></pre></pre>
 <h2 id="3世代目の取得"><a class="header" href="#3世代目の取得">3世代目の取得</a></h2>
 <p>リレーション先のリレーションのような3世代目の取得については Vec&lt;&amp;mut _{モデル名}&gt; にまとめれば fetch_{リレーション名} のメソッドが使用可能です。<br />
-その際、2世代目のリレーション先のトレイトが必要になります。</p>
+その際、2世代目のリレーション先のトレイトが必要になります。
+取得された3世代目リレーションのオブジェクトはそれぞれ1世代目オブジェクトが所持する2世代目オブジェクトの下に所持するようになります。</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use {2世代目のリレーションmod}::*;
@@ -172,6 +173,28 @@ let mut v: Vec&lt;_&gt; = list.iter_mut().map(|v| v.{2世代目リレーショ�
 v.fetch_{3世代目リレーション名}(&amp;mut conn).await?;
 <span class="boring">}
 </span></code></pre></pre>
+<h2 id="リレーションのタイプ"><a class="header" href="#リレーションのタイプ">リレーションのタイプ</a></h2>
+<p>スキーマに設定するリレーションのタイプとして、one, one_to_one, many に対応しています。</p>
+<ul>
+<li>one<br />
+自テーブルの主キーではないカラムに他のテーブルの主キーを保持している状態</li>
+<li>one_to_one<br />
+自テーブルが主であり、従属テーブル側も主キーに自テーブルと同じ値を保持して一対一で結合している状態</li>
+<li>many<br />
+自テーブルが主であり、従属テーブル側に自テーブルの主キーを保持して一対多で結合している状態</li>
+</ul>
+<p>リレーションが外部キー制約としてDDLに生成されないようにする場合は ignore_foreign_key: true を設定します。<br />
+なお、one_to_one と many の場合は従属テーブル側に on_delete: cascade を設定可能です。外部キー制約を生成していない場合でもフレームワークにより物理削除に連動して削除されます。</p>
+<h2 id="リレーションのキャッシュ"><a class="header" href="#リレーションのキャッシュ">リレーションのキャッシュ</a></h2>
+<p>オブジェクトのキャッシュを有効にする場合、 use_cache あるいは in_cache の設定を有効にします。</p>
+<ul>
+<li>use_cache<br />
+リレーションのタイプが one の場合に設定可能で、まとめてキャッシュはされませんが、キャッシュオブジェクトからリレーション先のオブジェクトのキャッシュを fetch することが出来ます。</li>
+<li>in_cache<br />
+リレーションのタイプが one_to_one, many の場合に設定可能で、キャッシュ時にまとめてキャッシュされます。</li>
+</ul>
+<p>なお、 use_cache の代わりに use_cache_with_trashed を設定することでリレーション先が論理削除されていてもキャッシュを取得できます。
+これは、例えば社員を論理削除しても過去にその社員が作成したドキュメントから作成者の名前が消えると困るようなケースで使用できます。</p>
 
                     </main>
 
