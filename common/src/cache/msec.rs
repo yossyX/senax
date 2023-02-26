@@ -10,11 +10,16 @@ pub struct MSec(u64);
 
 impl MSec {
     pub fn now() -> MSec {
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .into()
+        MSec::from(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap(),
+        )
     }
+    pub fn inner(&self) -> u64 {
+        self.0
+    }
+    #[deprecated]
     pub fn get(&self) -> u64 {
         self.0
     }

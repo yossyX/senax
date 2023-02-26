@@ -49,10 +49,11 @@ impl LinkerClient {
 #[allow(clippy::type_complexity)]
 impl LinkerClient {
     pub fn start(
-        port: &str,
-        db: u64,
-        pw: String,
-        exit_tx: mpsc::Sender<i32>,
+        _port: &str,
+        _db: u64,
+        _pw: String,
+        _exit_tx: mpsc::Sender<i32>,
+        _disable_cache: bool,
     ) -> Result<(UnboundedSender<Vec<u8>>, UnboundedReceiver<Vec<u8>>)> {
         bail!("linker is not supported");
     }

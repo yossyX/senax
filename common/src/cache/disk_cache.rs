@@ -98,7 +98,7 @@ impl DiskCacheInner {
         let mut buf = BytesMut::with_capacity(HEADER_SIZE + data.len());
         buf.put_u128_le(hash);
         buf.put_u64_le(type_id);
-        buf.put_u64_le(time.get());
+        buf.put_u64_le(time.inner());
         buf.put_u32_le(data.len() as u32);
         buf.put_u32_le(checksum(data));
         buf.put(data);
