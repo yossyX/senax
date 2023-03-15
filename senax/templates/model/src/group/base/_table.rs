@@ -3779,7 +3779,7 @@ impl _@{ pascal_name }@ {
     }
 
     fn _clear_cache() {
-        CACHE_RESET_TIME.store(MSec::now().add(1).get(), Ordering::Relaxed);
+        CACHE_RESET_TIME.store(MSec::now().add(1).inner(), Ordering::Relaxed);
         clear_cache_all();
         if USE_CACHE {
             Cache::invalidate_all_of::<CacheWrapper>();
@@ -4828,7 +4828,7 @@ impl _@{ pascal_name }@ {
                 query.execute(conn.get_tx().await?).await?
             };
             @{- def.auto_increments()|fmt_join("
-            let mut id = result.last_insert_id() as u32;", "") }@
+            let mut id = result.last_insert_id() as {inner};", "") }@
             let mut data_list = Vec::new();
             @{- def.relations_one_owner()|fmt_rel_join("
             let mut _{alias} = Vec::new();", "") }@

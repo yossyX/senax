@@ -341,6 +341,7 @@ impl DbConn {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn push_callback(
         &mut self,
         cb: Box<dyn FnOnce() -> BoxFuture<'static, ()> + Send + Sync>,
