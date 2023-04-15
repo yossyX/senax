@@ -11,15 +11,30 @@ pub struct Point {
 }
 async_graphql::scalar!(Point);
 
+impl From<&(f64, f64)> for Point {
+    fn from(v: &(f64, f64)) -> Self {
+        Self { x: v.0, y: v.1 }
+    }
+}
+
+impl Point {
+    pub fn to_tuple(&self) -> (f64, f64) {
+        (self.x, self.y)
+    }
+}
 impl From<Vec<u8>> for Point {
-    fn from(buf: Vec<u8>) -> Self {
-        if buf.len() < 21 {
+    fn from(input: Vec<u8>) -> Self {
+        Self::from(&input)
+    }
+}
+impl From<&Vec<u8>> for Point {
+    fn from(input: &Vec<u8>) -> Self {
+        if input.len() < 21 {
             return Point {
                 x: f64::NAN,
                 y: f64::NAN,
             };
         }
-        let input = buf.as_slice();
         let (bytes, input) = input.split_at(1);
         let endian = u8::from_le_bytes(bytes.try_into().unwrap());
         let (bytes, input) = input.split_at(4);
@@ -88,6 +103,12 @@ pub trait ToPoint {
 
 impl ToPoint for Vec<u8> {
     fn to_point(&self) -> Point {
-        Point::from(self.clone())
+        Point::from(self)
+    }
+}
+
+impl ToPoint for (f64, f64) {
+    fn to_point(&self) -> Point {
+        Point::from(self)
     }
 }
