@@ -24,11 +24,16 @@ impl Point {
 }
 impl From<Vec<u8>> for Point {
     fn from(input: Vec<u8>) -> Self {
-        Self::from(&input)
+        Self::from(input.as_slice())
     }
 }
 impl From<&Vec<u8>> for Point {
     fn from(input: &Vec<u8>) -> Self {
+        Self::from(input.as_slice())
+    }
+}
+impl From<&[u8]> for Point {
+    fn from(input: &[u8]) -> Self {
         if input.len() < 21 {
             return Point {
                 x: f64::NAN,
