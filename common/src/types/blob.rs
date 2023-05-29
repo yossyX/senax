@@ -12,7 +12,7 @@ use std::sync::RwLock;
 
 pub static FILES: OnceCell<RwLock<HashMap<String, Cow<[u8]>>>> = OnceCell::new();
 
-#[derive(Serialize, Clone, Debug, Default, PartialEq, Eq, JsonSchema)]
+#[derive(Serialize, Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, JsonSchema)]
 pub struct Blob(#[schemars(schema_with = "crate::types::blob::schema")] pub Vec<u8>);
 
 pub(crate) fn schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {

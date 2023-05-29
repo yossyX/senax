@@ -384,8 +384,11 @@ impl DbCache {
             fast_cache.invalidate(id.hash_val(shard_id));
         }
         self.short_cache.invalidate(&id.hash_val(shard_id)).await;
-        self.version_cache.invalidate(&id.hash_val(shard_id)).await;
         self.long_cache.invalidate(&id.hash_val(shard_id)).await;
+    }
+
+    pub async fn invalidate_version(&self, id: &dyn HashVal, shard_id: ShardId) {
+        self.version_cache.invalidate(&id.hash_val(shard_id)).await;
     }
 
     pub fn invalidate_all_of<T>(&self)
