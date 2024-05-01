@@ -20,7 +20,7 @@ pub static CONN_NO: AtomicU64 = AtomicU64::new(1);
 pub struct Pack {
     pub data: Bytes, // including self length
     pub conn_no: u64,
-    pub db: u64,
+    pub stream_id: u64,
 }
 
 pub struct IoBytesMut(pub BytesMut, usize, usize);

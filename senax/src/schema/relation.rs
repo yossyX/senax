@@ -1,292 +1,706 @@
 use convert_case::{Case, Casing};
-use inflector::string::singularize::to_singular;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use super::{to_id_name, ModelDef, GROUPS, MODEL, MODELS};
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-#[schemars(title = "Relations Type")]
-pub enum RelationsType {
-    Many,
-    One,
-    OneToOne,
-}
+use crate::common::to_singular;
+use crate::schema::_to_var_name;
+
+use super::{domain_mode, to_id_name, FieldDef, ModelDef, GROUPS, MODELS};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-#[schemars(title = "Reference Option")]
+/// ### リレーションタイプ
+pub enum RelationsType {
+    HasMany,
+    BelongsTo,
+    HasOne,
+}
+
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema, derive_more::Display,
+)]
+#[serde(rename_all = "snake_case")]
+/// ### 参照オプション
 pub enum ReferenceOption {
+    #[display(fmt = "restrict")]
     Restrict,
+    #[display(fmt = "cascade")]
     Cascade,
+    #[display(fmt = "set_null")]
     SetNull,
     // NoAction,
+    #[display(fmt = "set_zero")]
     SetZero,
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, JsonSchema)]
+#[serde(untagged)]
+/// ### IDまたはIDの配列
+pub enum StringOrArray {
+    One(String),
+    Many(Vec<String>),
+}
+impl StringOrArray {
+    pub fn to_vec(&self) -> Vec<String> {
+        match self {
+            StringOrArray::One(v) => vec![v.to_string()],
+            StringOrArray::Many(v) => v.clone(),
+        }
+    }
+    fn from_vec(mut value: Vec<String>) -> Option<StringOrArray> {
+        if value.is_empty() {
+            None
+        } else if value.len() == 1 {
+            Some(StringOrArray::One(value.pop().unwrap()))
+        } else {
+            Some(StringOrArray::Many(value))
+        }
+    }
+    #[allow(dead_code)]
+    pub fn last(&self) -> &str {
+        match self {
+            StringOrArray::One(v) => v,
+            StringOrArray::Many(v) => v.last().unwrap(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
-#[schemars(deny_unknown_fields)]
-#[schemars(title = "Relation Def")]
-pub struct RelDef {
+#[serde(deny_unknown_fields)]
+/// ### has_oneリレーション定義
+pub struct HasOneDef {
+    /// ### 論理名
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
+    pub label: Option<String>,
+    /// ### コメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
-    /// 結合先のモデル　他のグループは::区切りで指定
+    /// ### 結合先のモデル
+    /// 他のグループは::区切りで指定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
-    // リレーションのタイプ　デフォルトはone
-    #[serde(rename = "type")]
+    /// ### 結合先のフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub type_def: Option<RelationsType>,
-    /// 結合するローカルのカラム名
+    pub foreign: Option<StringOrArray>,
+    /// ### 親モデルのキャッシュに含まれない
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_cache: bool,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
+/// ### has_oneリレーション定義
+pub struct HasOneJson {
+    /// ### リレーション名
+    /// 単数形
+    #[schemars(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$"))]
+    pub name: String,
+    /// ### 論理名
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub local: Option<String>,
-    /// 結合先のカラム名
+    pub label: Option<String>,
+    /// ### コメント
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// ### 結合先のモデル
+    /// 他のグループは::区切りで指定
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// ### 結合先のフィールド名
+    /// 複数の場合はカンマ区切り
     #[serde(skip_serializing_if = "Option::is_none")]
     pub foreign: Option<String>,
-    /// manyあるいはone_to_oneの場合にリレーション先も一緒にキャッシュするか
-    /// 結合深さは1代のみで子テーブルは親に含んだ状態で更新する必要がある
+    /// ### 親モデルのキャッシュに含まれない
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub in_cache: bool,
-    /// リレーションを取得する際の追加条件
-    /// 記述例：rel_group_model::Cond::Eq(rel_group_model::ColOne::value(1))
+    pub disable_cache: bool,
+}
+
+impl From<HasOneDef> for HasOneJson {
+    fn from(value: HasOneDef) -> Self {
+        Self {
+            name: Default::default(),
+            label: value.label,
+            comment: value.comment,
+            model: value.model,
+            foreign: value.foreign.map(|v| v.to_vec().join(", ")),
+            disable_cache: value.disable_cache,
+        }
+    }
+}
+
+impl From<HasOneJson> for HasOneDef {
+    fn from(value: HasOneJson) -> Self {
+        Self {
+            label: value.label,
+            comment: value.comment,
+            model: value.model,
+            foreign: value.foreign.and_then(|v| {
+                StringOrArray::from_vec(v.split(',').map(|v| v.trim().to_string()).collect())
+            }),
+            disable_cache: value.disable_cache,
+        }
+    }
+}
+
+impl From<&HasOneDef> for RelDef {
+    fn from(value: &HasOneDef) -> Self {
+        Self {
+            label: value.label.clone(),
+            comment: value.comment.clone(),
+            model: value.model.clone().unwrap_or_default(),
+            rel_type: Some(RelationsType::HasOne),
+            foreign: value.foreign.as_ref().map(|v| v.to_vec()),
+            in_cache: !value.disable_cache,
+            ..Default::default()
+        }
+    }
+}
+impl HasOneDef {
+    pub fn convert(rel: &Option<HasOneDef>, group: &str, name: &str) -> RelDef {
+        crate::common::check_name(name);
+        if let Some(mut d) = rel.as_ref().map(RelDef::from) {
+            if d.model.is_empty() {
+                d.model = format!("{}::{}", group, name);
+            } else if d.model.contains(MODEL_NAME_SPLITTER) {
+                let (group_name, stem_name) = d.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+                crate::common::check_name(group_name);
+                crate::common::check_name(stem_name);
+            } else {
+                crate::common::check_name(&d.model);
+                d.model = format!("{}::{}", group, d.model);
+            }
+            d
+        } else {
+            RelDef {
+                model: format!("{}::{}", group, name),
+                rel_type: Some(RelationsType::HasOne),
+                in_cache: true,
+                ..Default::default()
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
+/// ### has_manyリレーション定義
+pub struct HasManyDef {
+    /// ### 論理名
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub raw_cond: Option<String>,
+    pub label: Option<String>,
+    /// ### コメント
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// ### 結合先のモデル
+    /// 他のグループは::区切りで指定
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// ### 結合先のフィールド名
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foreign: Option<StringOrArray>,
+    /// ### 親モデルのキャッシュに含まれない
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_cache: bool,
+    /// ### 追加条件クエリー
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_filter: Option<String>,
+    /// ### ソートフィールド
     #[serde(skip_serializing_if = "Option::is_none")]
     pub order_by: Option<String>,
+    /// ### 降順ソート
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub desc: bool,
+    /// ### 取得数
+    /// 参照時のみ適用される
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
+/// ### has_manyリレーション定義
+pub struct HasManyJson {
+    /// ### リレーション名
+    /// 複数形
+    #[schemars(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$"))]
+    pub name: String,
+    /// ### 論理名
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// ### コメント
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// ### 結合先のモデル
+    /// 他のグループは::区切りで指定
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// ### 結合先のフィールド名
+    /// 複数の場合はカンマ区切り
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foreign: Option<String>,
+    /// ### 親モデルのキャッシュに含まれない
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_cache: bool,
-    /// リレーション先が論理削除されていてもキャッシュを取得する
+    pub disable_cache: bool,
+    /// ### 追加条件クエリー
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub additional_filter: Option<String>,
+    /// ### ソートフィールド
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_by: Option<String>,
+    /// ### 降順ソート
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_cache_with_trashed: bool,
+    pub desc: bool,
+    /// ### 取得数
+    /// 参照時のみ適用される
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+impl From<HasManyDef> for HasManyJson {
+    fn from(value: HasManyDef) -> Self {
+        Self {
+            name: Default::default(),
+            label: value.label,
+            comment: value.comment,
+            model: value.model,
+            foreign: value.foreign.map(|v| v.to_vec().join(", ")),
+            disable_cache: value.disable_cache,
+            additional_filter: value.additional_filter,
+            order_by: value.order_by,
+            desc: value.desc,
+            limit: value.limit,
+        }
+    }
+}
+
+impl From<HasManyJson> for HasManyDef {
+    fn from(value: HasManyJson) -> Self {
+        Self {
+            label: value.label,
+            comment: value.comment,
+            model: value.model,
+            foreign: value.foreign.and_then(|v| {
+                StringOrArray::from_vec(v.split(',').map(|v| v.trim().to_string()).collect())
+            }),
+            disable_cache: value.disable_cache,
+            additional_filter: value.additional_filter,
+            order_by: value.order_by,
+            desc: value.desc,
+            limit: value.limit,
+        }
+    }
+}
+
+impl From<&HasManyDef> for RelDef {
+    fn from(value: &HasManyDef) -> Self {
+        Self {
+            label: value.label.clone(),
+            comment: value.comment.clone(),
+            model: value.model.clone().unwrap_or_default(),
+            rel_type: Some(RelationsType::HasMany),
+            foreign: value.foreign.as_ref().map(|v| v.to_vec()),
+            in_cache: !value.disable_cache,
+            additional_filter: value.additional_filter.clone(),
+            order_by: value.order_by.clone(),
+            desc: value.desc,
+            limit: value.limit,
+            ..Default::default()
+        }
+    }
+}
+impl HasManyDef {
+    pub fn convert(rel: &Option<HasManyDef>, group: &str, name: &str) -> RelDef {
+        crate::common::check_name(name);
+        if let Some(mut d) = rel.as_ref().map(RelDef::from) {
+            if d.model.is_empty() {
+                d.model = format!("{}::{}", group, name);
+            } else if d.model.contains(MODEL_NAME_SPLITTER) {
+                let (group_name, stem_name) = d.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+                crate::common::check_name(group_name);
+                crate::common::check_name(stem_name);
+            } else {
+                crate::common::check_name(&d.model);
+                d.model = format!("{}::{}", group, d.model);
+            }
+            d
+        } else {
+            RelDef {
+                model: format!("{}::{}", group, name),
+                rel_type: Some(RelationsType::HasMany),
+                in_cache: true,
+                ..Default::default()
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
+/// ### belongs_toリレーション定義
+pub struct BelongsToDef {
+    /// ### 論理名
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// ### コメント
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// ### 結合先のモデル
+    /// 他のグループは::区切りで指定
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// ### 結合するローカルのフィールド名
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local: Option<StringOrArray>,
+    /// ### リレーション先が論理削除されていても取得する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub with_trashed: bool,
+    /// ### リレーションのインデックスを設定しない
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_index: bool,
+    /// ### カスケード削除
     /// DBの外部キー制約による削除およびソフトウェア側での削除制御
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_delete: Option<ReferenceOption>,
+    /// ### カスケード更新
     /// DBの外部キー制約による更新
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_update: Option<ReferenceOption>,
 }
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
+/// ### belongs_toリレーション定義
+pub struct BelongsToJson {
+    /// ### リレーション名
+    /// 単数形
+    #[schemars(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$"))]
+    pub name: String,
+    /// ### 論理名
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// ### コメント
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// ### 結合先のモデル
+    /// 他のグループは::区切りで指定
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// ### 結合するローカルのフィールド名
+    /// 複数の場合はカンマ区切り
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local: Option<String>,
+    /// ### リレーション先が論理削除されていても取得する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub with_trashed: bool,
+    /// ### リレーションのインデックスを設定しない
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_index: bool,
+    /// ### カスケード削除
+    /// DBの外部キー制約による削除およびソフトウェア側での削除制御
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_delete: Option<ReferenceOption>,
+    /// ### カスケード更新
+    /// DBの外部キー制約による更新
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_update: Option<ReferenceOption>,
+}
+
+impl From<BelongsToDef> for BelongsToJson {
+    fn from(value: BelongsToDef) -> Self {
+        Self {
+            name: Default::default(),
+            label: value.label,
+            comment: value.comment,
+            model: value.model,
+            local: value.local.map(|v| v.to_vec().join(", ")),
+            with_trashed: value.with_trashed,
+            disable_index: value.disable_index,
+            on_delete: value.on_delete,
+            on_update: value.on_update,
+        }
+    }
+}
+
+impl From<BelongsToJson> for BelongsToDef {
+    fn from(value: BelongsToJson) -> Self {
+        Self {
+            label: value.label,
+            comment: value.comment,
+            model: value.model,
+            local: value.local.and_then(|v| {
+                StringOrArray::from_vec(v.split(',').map(|v| v.trim().to_string()).collect())
+            }),
+            with_trashed: value.with_trashed,
+            disable_index: value.disable_index,
+            on_delete: value.on_delete,
+            on_update: value.on_update,
+        }
+    }
+}
+
+impl From<&BelongsToDef> for RelDef {
+    fn from(value: &BelongsToDef) -> Self {
+        Self {
+            label: value.label.clone(),
+            comment: value.comment.clone(),
+            model: value.model.clone().unwrap_or_default(),
+            rel_type: Some(RelationsType::BelongsTo),
+            local: value.local.as_ref().map(|v| v.to_vec()),
+            with_trashed: value.with_trashed,
+            disable_index: value.disable_index,
+            on_delete: value.on_delete,
+            on_update: value.on_update,
+            ..Default::default()
+        }
+    }
+}
+impl BelongsToDef {
+    pub fn convert(rel: &Option<BelongsToDef>, group: &str, name: &str) -> RelDef {
+        crate::common::check_name(name);
+        if let Some(mut d) = rel.as_ref().map(RelDef::from) {
+            if d.model.is_empty() {
+                d.model = format!("{}::{}", group, name);
+            } else if d.model.contains(MODEL_NAME_SPLITTER) {
+                let (group_name, stem_name) = d.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+                crate::common::check_name(group_name);
+                crate::common::check_name(stem_name);
+            } else {
+                crate::common::check_name(&d.model);
+                d.model = format!("{}::{}", group, d.model);
+            }
+            d
+        } else {
+            RelDef {
+                model: format!("{}::{}", group, name),
+                rel_type: Some(RelationsType::BelongsTo),
+                ..Default::default()
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
+pub struct RelDef {
+    pub in_abstract: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    pub model: String,
+    #[serde(rename = "type")]
+    pub rel_type: Option<RelationsType>,
+    pub local: Option<Vec<String>>,
+    pub foreign: Option<Vec<String>>,
+    pub in_cache: bool,
+    pub additional_filter: Option<String>,
+    pub order_by: Option<String>,
+    pub desc: bool,
+    pub limit: Option<u32>,
+    pub with_trashed: bool,
+    pub on_delete: Option<ReferenceOption>,
+    pub on_update: Option<ReferenceOption>,
+    pub disable_index: bool,
+}
 pub const MODEL_NAME_SPLITTER: &str = "::";
 impl RelDef {
-    pub fn get_stem_name(rel_def: &Option<RelDef>, name: &str) -> String {
-        if let Some(ref rel) = rel_def {
-            match rel.model {
-                None => name,
-                Some(ref name) => {
-                    if name.contains(MODEL_NAME_SPLITTER) {
-                        let (group_name, stem_name) = name.split_once(MODEL_NAME_SPLITTER).unwrap();
-                        crate::common::check_name(group_name);
-                        crate::common::check_name(stem_name);
-                        stem_name
-                    } else {
-                        crate::common::check_name(name);
-                        name
-                    }
-                }
-            }
-        } else {
-            name
-        }
-        .to_owned()
+    pub fn is_type_of_has_many(&self) -> bool {
+        self.rel_type.unwrap() == RelationsType::HasMany
     }
-    pub fn get_foreign_class_name(rel_def: &Option<RelDef>, name: &str) -> String {
+    pub fn is_type_of_has_one(&self) -> bool {
+        self.rel_type.unwrap() == RelationsType::HasOne
+    }
+    pub fn is_type_of_belongs_to(&self) -> bool {
+        self.rel_type.unwrap() == RelationsType::BelongsTo
+    }
+    pub fn get_foreign_class_name(&self) -> String {
+        if domain_mode() {
+            self.get_foreign_model_name().1.to_case(Case::Pascal)
+        } else {
+            format!("_{}", self.get_foreign_model_name().1.to_case(Case::Pascal))
+        }
+    }
+    pub fn get_id_name(&self) -> String {
+        let target_model = self.get_foreign_model();
+        if target_model.id().is_empty() {
+            error_exit!(
+                "The {} model needs a main_primary field.",
+                target_model.name
+            );
+        }
+        to_id_name(&self.get_foreign_model_name().1)
+    }
+    pub fn get_group_var(&self) -> String {
+        _to_var_name(&self.get_group_name())
+    }
+    pub fn get_mod_name(&self) -> String {
+        self.get_foreign_model_name().0
+    }
+    pub fn get_group_mod_name(&self) -> String {
+        format!("{}_{}", self.get_group_name(), self.get_mod_name())
+    }
+    pub fn get_group_mod_var(&self) -> String {
         format!(
-            "_{}",
-            Self::get_foreign_model_name(rel_def, name)
-                .1
-                .to_case(Case::Pascal)
+            "{}::{}",
+            _to_var_name(&self.get_group_name()),
+            _to_var_name(&self.get_mod_name())
         )
     }
-    pub fn get_id_name(rel_def: &Option<RelDef>, name: &str) -> String {
-        to_id_name(&Self::get_foreign_model_name(rel_def, name).1)
-    }
-    pub fn get_mod_name(rel_def: &Option<RelDef>, name: &str) -> String {
-        Self::get_foreign_model_name(rel_def, name).0
-    }
-    pub fn get_group_mod_name(rel_def: &Option<RelDef>, name: &str) -> String {
-        let model_def = unsafe { MODEL.get().unwrap() }.clone();
+    pub fn get_base_group_mod_var(&self) -> String {
         format!(
-            "{}_{}",
-            RelDef::get_group_name(rel_def, model_def.as_ref()),
-            RelDef::get_mod_name(rel_def, name)
+            "{}::_base::_{}",
+            _to_var_name(&self.get_group_name()),
+            &self.get_mod_name()
         )
     }
-    pub fn get_local_id(rel_def: &Option<RelDef>, name: &str, id_name: &str) -> String {
-        if let Some(ref rel) = rel_def {
-            match rel.local {
-                None => {
-                    if rel.type_def == Some(RelationsType::OneToOne) {
-                        id_name.to_string()
-                    } else {
-                        format!("{}_id", name)
-                    }
-                }
-                Some(ref name) => name.to_owned(),
-            }
-        } else {
-            format!("{}_id", name)
+    pub fn get_local_id(&self, name: &str) -> Vec<String> {
+        match self.local {
+            None => vec![format!("{}_id", name)],
+            Some(ref local) => local.to_owned(),
         }
     }
-    pub fn get_foreign_id(
-        rel_def: &Option<RelDef>,
-        self_model: &ModelDef,
-        target_model: &Arc<ModelDef>,
-    ) -> String {
-        if let Some(ref rel) = rel_def {
-            if let Some(ref name) = rel.foreign {
-                return name.to_owned();
+    pub fn get_local_cols<'a>(
+        &self,
+        name: &'a str,
+        model: &'a ModelDef,
+    ) -> Vec<(&'a String, &'a FieldDef)> {
+        let ids = self.get_local_id(name);
+        let mut result = Vec::new();
+        for id in &ids {
+            if let Some(v) = model.merged_fields.get_key_value(id) {
+                result.push(v);
             }
         }
-        let id = format!("{}_id", self_model.name);
-        if target_model.merged_columns.contains_key(&id) {
-            return id;
+        result
+    }
+    pub fn get_foreign_id(&self, model: &ModelDef) -> Vec<String> {
+        match self.foreign {
+            None => vec![format!("{}_id", model.name)],
+            Some(ref foreign) => foreign.to_owned(),
         }
-        "foreign id not found!".to_string()
     }
-    pub fn foreign_is_not_null(
-        rel_def: &Option<RelDef>,
-        name: &str,
-        self_model: &ModelDef,
-    ) -> bool {
-        let target_model = Self::get_foreign_model(rel_def, name);
-        let foreign = Self::get_foreign_id(rel_def, self_model, &target_model);
-        let column = target_model
-            .merged_columns
-            .get(&foreign)
-            .unwrap_or_else(|| panic!("{} is not found in {}.", foreign, target_model.name));
-        column.not_null
+    pub fn get_foreign_cols(&self, model: &ModelDef) -> Vec<(String, FieldDef)> {
+        let ids = self.get_foreign_id(model);
+        let target_model = self.get_foreign_model();
+        let mut result = Vec::new();
+        for id in &ids {
+            result.push(
+                target_model
+                    .merged_fields
+                    .get_key_value(id)
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .unwrap_or_else(|| {
+                        error_exit!("{} is not defined in {} model", id, target_model.name)
+                    }),
+            )
+        }
+        result
     }
-
-    pub fn get_foreign_table_name(rel_def: &Option<RelDef>, name: &str) -> String {
-        Self::get_foreign_model(rel_def, name).table_name()
-    }
-
-    pub fn get_foreign_model(rel_def: &Option<RelDef>, name: &str) -> Arc<ModelDef> {
-        let group_name = rel_def
-            .as_ref()
-            .and_then(|v| v.model.as_ref())
-            .and_then(|name| {
-                if name.contains(MODEL_NAME_SPLITTER) {
-                    let (group_name, _) = name.split_once(MODEL_NAME_SPLITTER).unwrap();
-                    crate::common::check_name(group_name);
-                    Some(group_name)
-                } else {
-                    None
-                }
-            });
-        let stem_name = Self::get_stem_name(rel_def, name);
-        get_model(group_name, &stem_name)
+    pub fn get_foreign_table_name(&self) -> String {
+        self.get_foreign_model().table_name()
     }
 
-    pub fn get_foreign_model_name(rel_def: &Option<RelDef>, name: &str) -> (String, String) {
-        let group_name = rel_def
-            .as_ref()
-            .and_then(|v| v.model.as_ref())
-            .and_then(|name| {
-                if name.contains(MODEL_NAME_SPLITTER) {
-                    let (group_name, _) = name.split_once(MODEL_NAME_SPLITTER).unwrap();
-                    crate::common::check_name(group_name);
-                    Some(group_name)
-                } else {
-                    None
-                }
-            });
-        let stem_name = Self::get_stem_name(rel_def, name);
-        get_model_name(group_name, &stem_name)
+    pub fn get_foreign_model(&self) -> Arc<ModelDef> {
+        let (group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+        get_model(Some(group_name), stem_name)
     }
 
-    pub fn get_model_by_name(name: &str) -> Arc<ModelDef> {
+    pub fn get_foreign_model_name(&self) -> (String, String) {
+        let (group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+        get_model_name(Some(group_name), stem_name)
+    }
+
+    pub fn get_model_by_name(name: &str, cur_group_name: Option<String>) -> Arc<ModelDef> {
         let (group_name, stem_name) = if name.contains(MODEL_NAME_SPLITTER) {
             let (group_name, stem_name) = name.split_once(MODEL_NAME_SPLITTER).unwrap();
             crate::common::check_name(group_name);
             crate::common::check_name(stem_name);
-            (Some(group_name), stem_name)
+            (Some(group_name.to_string()), stem_name)
         } else {
-            (None, name)
+            (cur_group_name, name)
         };
-        get_model(group_name, stem_name)
+        get_model(group_name.as_deref(), stem_name)
     }
 
-    pub fn get_group_name(rel_def: &Option<RelDef>, model_def: &ModelDef) -> String {
-        if let Some(ref rel) = rel_def {
-            match rel.model {
-                None => model_def.group_name.to_owned(),
-                Some(ref name) => {
-                    if name.contains(MODEL_NAME_SPLITTER) {
-                        let (group_name, stem_name) = name.split_once(MODEL_NAME_SPLITTER).unwrap();
-                        crate::common::check_name(group_name);
-                        crate::common::check_name(stem_name);
-                        group_name.to_string()
-                    } else {
-                        crate::common::check_name(&model_def.group_name);
-                        model_def.group_name.to_owned()
-                    }
-                }
-            }
-        } else {
-            model_def.group_name.to_owned()
-        }
+    pub fn get_group_name(&self) -> String {
+        let (group_name, _) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+        group_name.to_string()
     }
 }
 
 fn get_model(group_name: Option<&str>, stem_name: &str) -> Arc<ModelDef> {
     if let Some(group_name) = group_name {
-        if let Some(model) = unsafe { GROUPS.get().unwrap() }
+        if let Some(model) = GROUPS
+            .read()
+            .unwrap()
+            .as_ref()
+            .unwrap()
             .get(group_name)
-            .unwrap_or_else(|| panic!("{} group is not defined", group_name))
+            .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
             .get(stem_name)
         {
             return model.clone();
         }
         let singular_name = to_singular(stem_name);
-        unsafe { GROUPS.get().unwrap() }
+        GROUPS
+            .read()
+            .unwrap()
+            .as_ref()
+            .unwrap()
             .get(group_name)
-            .unwrap_or_else(|| panic!("{} group is not defined", group_name))
+            .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
             .get(&singular_name)
-            .unwrap_or_else(|| panic!("{} model is not defined", stem_name))
+            .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name))
             .clone()
     } else {
-        if let Some(model) = unsafe { MODELS.get().unwrap() }.get(stem_name) {
+        if let Some(model) = MODELS.read().unwrap().as_ref().unwrap().get(stem_name) {
             return model.clone();
         }
         let singular_name = to_singular(stem_name);
-        unsafe { MODELS.get().unwrap() }
+        MODELS
+            .read()
+            .unwrap()
+            .as_ref()
+            .unwrap()
             .get(&singular_name)
-            .unwrap_or_else(|| panic!("{} model is not defined", stem_name))
+            .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name))
             .clone()
     }
 }
 
 fn get_model_name(group_name: Option<&str>, stem_name: &str) -> (String, String) {
     if let Some(group_name) = group_name {
-        if let Some(model) = unsafe { GROUPS.get().unwrap() }
+        if let Some(model) = GROUPS
+            .read()
+            .unwrap()
+            .as_ref()
+            .unwrap()
             .get(group_name)
-            .unwrap_or_else(|| panic!("{} group is not defined", group_name))
+            .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
             .get(stem_name)
         {
             return (model.mod_name().to_string(), model.name.clone());
         }
         let singular_name = to_singular(stem_name);
-        let model = unsafe { GROUPS.get().unwrap() }
+        let group_lock = GROUPS.read().unwrap();
+        let model = group_lock
+            .as_ref()
+            .unwrap()
             .get(group_name)
-            .unwrap_or_else(|| panic!("{} group is not defined", group_name))
+            .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
             .get(&singular_name)
-            .unwrap_or_else(|| panic!("{} model is not defined", stem_name));
+            .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name));
         (model.mod_name().to_string(), model.name.clone())
     } else {
-        if let Some(model) = unsafe { MODELS.get().unwrap() }.get(stem_name) {
+        if let Some(model) = MODELS.read().unwrap().as_ref().unwrap().get(stem_name) {
             return (model.mod_name().to_string(), model.name.clone());
         }
         let singular_name = to_singular(stem_name);
-        let model = unsafe { MODELS.get().unwrap() }
+        let models_lock = MODELS.read().unwrap();
+        let model = models_lock
+            .as_ref()
+            .unwrap()
             .get(&singular_name)
-            .unwrap_or_else(|| panic!("{} model is not defined", stem_name));
+            .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name));
         (model.mod_name().to_string(), model.name.clone())
     }
 }

@@ -164,13 +164,15 @@
             <h2 class="title2">{{config | get(key="title", default="") }}</h2>
             {% if group_list | length == 1 -%}
             {% if config.groups | length > 1 -%}
-            <h3 class="group-name">{{group_list.0.group_def.title}}</h3>
+            <h3 class="group-name">{{group_list.0.group_def.label | default(value=group_list.0.group_name) }}</h3>
             {% endif -%}
             {% endif -%}
             <p class="created">{{date | date(format="%x", locale=locale)}}</p>
         </div>
         <div class="footer">
+            {% if config.author -%}
             <p class="author">{{config.author}}</p>
+            {% endif -%}
         </div>
     </section>
     {% if history | length > 0 -%}
@@ -186,38 +188,44 @@
                         <th class="description">Description</th>
                     </tr>
                 </thead>
+                {% set_global history_idx = 0 %}
                 {% for row in history -%}
                 {% set description = row.description | history_description(
-                    AddTable='Add a table: <a href="#table_{T}">{T}</a>',
-                    DropTable='Drop a table: {T}',
-                    AddColumn='Add a column: <a href="#table_{T}">{T}</a> ({C})',
-                    AddColumn_Plural='Add columns: <a href="#table_{T}">{T}</a> ({C})',
-                    ChangeColumn='Change a column: <a href="#table_{T}">{T}</a> ({C})',
-                    ChangeColumn_Plural='Change columns: <a href="#table_{T}">{T}</a> ({C})',
-                    DropColumn='Drop a column: <a href="#table_{T}">{T}</a> ({C})',
-                    DropColumn_Plural='Drop columns: <a href="#table_{T}">{T}</a> ({C})',
-                    ChangePrimary='Change the primary key: <a href="#table_{T}">{T}</a>',
-                    DropPrimary='Drop the primary key: <a href="#table_{T}">{T}</a>',
-                    AddIndex='Add an index: <a href="#table_{T}">{T}</a> ({C})',
-                    AddIndex_Plural='Add indexes: <a href="#table_{T}">{T}</a> ({C})',
-                    ChangeIndex='Change an index: <a href="#table_{T}">{T}</a> ({C})',
-                    ChangeIndex_Plural='Change indexes: <a href="#table_{T}">{T}</a> ({C})',
-                    DropIndex='Drop an index: <a href="#table_{T}">{T}</a> ({C})',
-                    DropIndex_Plural='Drop indexes: <a href="#table_{T}">{T}</a> ({C})',
-                    AddForeign='Add a foreign key: <a href="#table_{T}">{T}</a> ({C})',
-                    AddForeign_Plural='Add foreign keys: <a href="#table_{T}">{T}</a> ({C})',
-                    ChangeForeign='Change a foreign key: <a href="#table_{T}">{T}</a> ({C})',
-                    ChangeForeign_Plural='Change foreign keys: <a href="#table_{T}">{T}</a> ({C})',
-                    DropForeign='Drop a foreign key: <a href="#table_{T}">{T}</a> ({C})',
-                    DropForeign_Plural='Drop foreign keys: <a href="#table_{T}">{T}</a> ({C})',
+                    AddTable='Add a table: <a href="#table_{T}">{T}</a><br>',
+                    DropTable='Drop a table: {T}<br>',
+                    RenameTable='Rename a table: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    AddColumn='Add a column: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    AddColumn_Plural='Add columns: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    ChangeColumn='Change a column: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    ChangeColumn_Plural='Change columns: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    DropColumn='Drop a column: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    DropColumn_Plural='Drop columns: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    RenameColumn='Rename a column: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    RenameColumn_Plural='Rename columns: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    ChangePrimary='Change the primary key: <a href="#table_{T}">{T}</a><br>',
+                    DropPrimary='Drop the primary key: <a href="#table_{T}">{T}</a><br>',
+                    AddIndex='Add an index: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    AddIndex_Plural='Add indexes: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    ChangeIndex='Change an index: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    ChangeIndex_Plural='Change indexes: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    DropIndex='Drop an index: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    DropIndex_Plural='Drop indexes: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    AddForeign='Add a foreign key: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    AddForeign_Plural='Add foreign keys: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    ChangeForeign='Change a foreign key: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    ChangeForeign_Plural='Change foreign keys: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    DropForeign='Drop a foreign key: <a href="#table_{T}">{T}</a> ({C})<br>',
+                    DropForeign_Plural='Drop foreign keys: <a href="#table_{T}">{T}</a> ({C})<br>',
                 ) -%}
                 {% if description | length == 0 %}{% continue %}{% endif -%}
                 <tr>
                     <td class="updated">{{row.date | date(format="%x", locale=locale)}}</td>
                     <td class="description">
-                        <pre>{{description | safe}}</pre>
+                        {{- description | safe -}}
                     </td>
                 </tr>
+                {% set_global history_idx = history_idx + 1 %}
+                {% if history_idx == history_max %}{% break %}{% endif -%}
                 {% endfor -%}
             </table>
         </div>
@@ -239,7 +247,7 @@
                 {% for group in group_list -%}
                 <tr>
                     <td class="no center">{{loop.index}}</td>
-                    <td class="group-name"><a href="#sub_{{group.group_name}}">{{group.group_def.title}}</a></td>
+                    <td class="group-name"><a href="#sub_{{group.group_name}}">{{group.group_def.label | default(value=group.group_name)}}</a></td>
                 </tr>
                 {% endfor -%}
             </table>
@@ -252,7 +260,7 @@
         <a id="sub_{{group.group_name}}"></a>
         {% if group_list | length > 1 -%}
         <div class="title group-name">
-            <h2>{{group.group_def.title}}</h2>
+            <h2>{{group.group_def.label | default(value=group.group_name)}}</h2>
         </div>
         {% endif -%}
         {% if group.models -%}
@@ -271,7 +279,7 @@
                 <tr>
                     <td class="no center">{{loop.index}}</td>
                     <td class="model-name"><a href="#model_{{group.group_name}}::{{model_name}}">{{model_name}}
-                            {%- if model.title %} ({{model.title}}){% endif %}</a></td>
+                            {%- if model.label %} ({{model.label}}){% endif %}</a></td>
                 </tr>
                 {% endfor -%}
             </table>
@@ -283,28 +291,6 @@
             {% endif -%}
         </div>
         {% endif -%}
-        {% if group.enums -%}
-        <div class="frame enum-list">
-            <table>
-                <caption>
-                    <h3>Enum List</h3>
-                </caption>
-                <thead>
-                    <tr>
-                        <th class="no narrow">No.</th>
-                        <th class="enum-name">Name</th>
-                    </tr>
-                </thead>
-                {% for name, enum in group.enums -%}
-                <tr>
-                    <td class="no center">{{loop.index}}</td>
-                    <td class="enum-name"><a href="#enum_{{group.group_name}}::{{name}}">{{name}}
-                            {%- if enum.title %} ({{enum.title}}){% endif %}</a></td>
-                </tr>
-                {% endfor -%}
-            </table>
-        </div>
-        {% endif -%}
     </section>
     {% if group.models -%}
     {% for model_name, model in group.models -%}
@@ -312,7 +298,7 @@
         <a id="model_{{group.group_name}}::{{model_name}}"></a>
         <a id="table_{{model.table_name}}"></a>
         <div class="title">
-            <h3>{{loop.index}}. {{model_name}}{% if model.title %} ({{model.title}}){% endif %}</h3>
+            <h3>{{loop.index}}. {{model_name}}{% if model.label %} ({{model.label}}){% endif %}</h3>
         </div>
         <p class="no_frame table-name">
             <span>Real Table Name: </span>
@@ -328,7 +314,8 @@
                 <thead>
                     <tr>
                         <th class="no narrow">No.</th>
-                        <th class="name">Name</th>
+                        <th class="name">Logical Name</th>
+                        <th class="name">Physical Name</th>
                         <th class="type">Type</th>
                         <th class="null narrow">Null</th>
                         <th class="length">Length</th>
@@ -339,7 +326,8 @@
                 {% for name, column in model.columns -%}
                 <tr>
                     <td class="no center">{{loop.index}}</td>
-                    <td class="name">{{column | get(key="rename", default=name)}}</td>
+                    <td class="name">{{column | get(key="label", default="")}}</td>
+                    <td class="name">{{column | get(key="column_name", default=name)}}</td>
                     <td class="type">{% if column.signed %}signed {% endif %}{{column.type}}</td>
                     <td class="null center">{% if not column.not_null %}Y{% endif %}</td>
                     <td class="length center">
@@ -348,21 +336,16 @@
                         {%- if column.scale %},{{column.scale}}{% endif %}</td>
                     <td class="primary center">{% if column.primary %}P{% endif %}</td>
                     <td class="comment">
-                        {%- if column.title %}<p>{{column.title}}</p>{% endif %}
                         {%- if column.enum_values -%}
                         <p>{% for enum in column.enum_values -%}
-                            {{enum.value}}:{{enum | get(key="title", default=enum.name) }}
+                            {%- if enum.value is defined %}
+                            {{enum.value}}:{{enum | get(key="label", default=enum.name) }}
+                            {%- else %}
+                            {{enum.name}}{% if enum.label %}:{{enum.label}}{% endif %}
+                            {%- endif %}
                             {%- if enum.comment %} ({{enum.comment}}){% endif %}
                             {%- if not loop.last %}<br />{% endif %}
                             {%- endfor %}</p>
-                        {%- endif -%}
-                        {%- if column.db_enum_values %}<p>{% for enum in column.db_enum_values -%}{{enum.name}}
-                            {%- if enum.title %}:{{enum.title}}{% endif %}
-                            {%- if enum.comment %} ({{enum.comment}}){% endif %}
-                            {%- if not loop.last %}<br />{% endif %}
-                            {%- endfor %}</p>
-                        {%- endif -%}
-                        {%- if column.enum_class %}<a href="#enum_{{column.enum_class}}">{{column.enum_class}}</a>
                         {%- endif -%}
                         {%- if column.comment %}
                         <pre>{{column.comment}}</pre>{% endif -%}
@@ -390,11 +373,11 @@
                 <tr>
                     <td class="no center">{{loop.index}}</td>
                     <td class="type">
-                        {%- if index %}{{ index | get(key="type", default="INDEX") | upper}}
+                        {%- if index %}{{index | get(key="type", default="INDEX") | upper}}
                         {%- else %}INDEX{% endif %}
                     </td>
-                    <td class="fields">{%- if index and index.fields %}{% for name, field in index.fields -%}{{name}}
-                        {%- if field and field.length %}({{field.length}}){% endif %}
+                    <td class="fields">{%- if index and index.fields %}{% for name, field in index.fields -%}
+                        {%- if field and field.query %}({{field.query}}){% else %}{{name}}{%- if field and field.length %}({{field.length}}){% endif %}{% endif %}
                         {%- if not loop.last %}, {% endif %}
                         {%- endfor %}{% else %}{{name}}{% endif %}</td>
                 </tr>
@@ -412,26 +395,26 @@
                     <tr>
                         <th class="no narrow">No.</th>
                         <th class="name">Name</th>
-                        <th class="type">Data Type</th>
                         <th class="local">Local Column</th>
+                        <th class="type">Type</th>
                         <th class="model">Foreign Table</th>
                         <th class="foreign">Foreign Column</th>
                         <th class="on_delete">On Delete</th>
                     </tr>
                 </thead>
                 {% for name, relation in model.relations -%}
-                <tr>{% set type = relation | get(key="type", default="one") %}
+                <tr>{% set type = relation | get(key="type") %}
                     <td class="no center">{{loop.index}}</td>
-                    <td class="name">{{relation | get(key="title", default=name)}}</td>
-                    <td class="type">{% if type == "one_to_one" %}ONE{% else %}{{type | upper}}{% endif %}</td>
-                    <td class="local">{%- if relation.local %}{{relation.local}}{% else %}
-                        {%- if type == "many" or type == "one_to_one" %}-{% else %}{{name}}_id{% endif %}
+                    <td class="name">{{relation | get(key="label", default=name)}}</td>
+                    <td class="local">{%- if relation.local %}{{relation.local | join(sep=", ")}}{% else %}
+                        {%- if type == "has_many" or type == "has_one" %}<div style="text-align: center">-</div>{% else %}{{name}}_id{% endif %}
                         {%- endif %}</td>
+                    <td class="type">{{type | upper}}</td>
                     <td class="model"><a href="#model_{{relation.model}}">
-                            {{- relation.model | split(pat="::") | last}}</a></td>
-                    <td class="foreign">{%- if relation.foreign %}{{relation.foreign}}{% else %}
-                        {%- if type == "many" %}{{model_name}}_id{% else %}-{% endif %}
-                        {% endif %}</td>
+                        {{- relation.model | split(pat="::") | last}}</a></td>
+                    <td class="foreign">{%- if relation.foreign %}{{relation.foreign | join(sep=", ")}}{% else %}
+                        {%- if type == "has_many" %}{{model_name}}_id{% else %}<div style="text-align: center">-</div>{% endif %}
+                        {%- endif %}</td>
                     <td class="on_delete">{{relation | get(key="on_delete", default="")}}</td>
                 </tr>
                 {% endfor -%}
@@ -443,43 +426,6 @@
         {% endif -%}
     </section>
     {% endfor -%}
-    {% endif -%}
-    {% if group.enums -%}
-    <section class="sheet">
-        {% for name, enum in group.enums -%}
-        <div class="frame break-avoid">
-            <a id="enum_{{group.group_name}}::{{name}}"></a>
-            <div class="title">
-                <h3>{{loop.index}}. {{name}}{% if enum.title %} ({{enum.title}}){% endif %}</h3>
-            </div>
-            {% if enum.comment -%}
-            <div class="comment">
-                <pre>{{enum.comment}}</pre>
-            </div>
-            {% endif -%}
-            <table>
-                <thead>
-                    <tr>
-                        <th class="no narrow">Value</th>
-                        <th class="name">Name</th>
-                        <th class="comment">Comment</th>
-                    </tr>
-                </thead>
-                {% for value in enum.enum_values -%}
-                <tr>
-                    <td class="no center">{{value.value}}</td>
-                    <td class="name">{{value | get(key="title", default=value.name) }}</td>
-                    <td class="comment">
-                        {%- if value.comment %}
-                        <pre>{{value.comment}}</pre>
-                        {% endif -%}
-                    </td>
-                </tr>
-                {% endfor -%}
-            </table>
-        </div>
-        {% endfor -%}
-    </section>
     {% endif -%}
     {% endfor -%}
 </body>

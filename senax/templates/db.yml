@@ -1,7 +1,8 @@
-# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.2.0/schema.json#definitions/ConfigDef
+# yaml-language-server: $schema=../senax-schema.json#definitions/ConfigDef
 
 title: 
 author: 
+db_id: @{ db_id }@
 db: mysql
 ignore_foreign_key: true
 timestampable: real_time
@@ -10,9 +11,9 @@ timestamp_time_zone: utc
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read
 use_cache: true
-use_cache_all: true
+use_all_row_cache: true
 preserve_column_order: false
 groups:
-  {NAME}:
-    type: model
+  common:
+    exclude_group_from_table_name: true
 @{-"\n"}@

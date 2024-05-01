@@ -6,7 +6,7 @@ use zstd::{decode_all, stream::copy_encode};
 
 use crate::session::SessionKey;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SessionData {
     pub(crate) data: Vec<u8>,
     pub(crate) ttl: Duration,
@@ -65,6 +65,9 @@ impl SessionData {
     pub fn version(&self) -> u32 {
         self.version
     }
+    pub fn set_version(&mut self, version: u32) {
+        self.version = version;
+    }
 }
 
 impl From<(Vec<u8>, Duration, u32)> for SessionData {
@@ -81,32 +84,34 @@ impl From<(Vec<u8>, Duration, u32)> for SessionData {
 pub trait SessionStore {
     async fn load(&self, session_key: &SessionKey) -> Result<Option<SessionData>>;
     async fn reload(&self, session_key: &SessionKey) -> Result<Option<SessionData>>;
-
-    async fn save(&self, data: SessionData) -> Result<SessionKey, SaveError>;
-
-    async fn update(
+    async fn save(
         &self,
-        session_key: &SessionKey,
+        session_key: Option<SessionKey>,
         data: SessionData,
     ) -> Result<SessionKey, SaveError>;
-
     async fn update_ttl(&self, session_key: &SessionKey, data: &SessionData) -> Result<()>;
-
     async fn delete(&self, session_key: &SessionKey) -> Result<()>;
-
     async fn gc(&self, start_key: &SessionKey) -> Result<()>;
 }
 
-#[derive(Debug, Display)]
+#[derive(Display)]
+#[display(fmt = "")]
 pub enum SaveError {
     Retryable,
+    RetryableWithData(SessionData),
     Other(anyhow::Error),
+}
+impl std::fmt::Debug for SaveError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SaveError").finish()
+    }
 }
 
 impl std::error::Error for SaveError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Retryable => None,
+            Self::RetryableWithData(_) => None,
             Self::Other(err) => Some(err.as_ref()),
         }
     }

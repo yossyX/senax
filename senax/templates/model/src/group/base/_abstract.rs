@@ -3,83 +3,136 @@
 use schemars::JsonSchema;
 use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use sqlx::Row;
 use std::hash::Hash;
 use std::vec::Vec;
-use strum::{EnumMessage, EnumString, IntoStaticStr};
+use strum::{EnumMessage, EnumString, FromRepr, IntoStaticStr};
 
 use crate::misc::BindValue;
 
 @% for mod_name in def.relation_mods() -%@
-use crate::@{ mod_name[0] }@::@{ mod_name[1] }@::_@{ mod_name[1] }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use crate::models::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @% endfor %@
-@% for (name, column_def) in def.enums() -%@
-@% if column_def.enum_values.is_some() -%@
+@% for (name, column_def) in def.num_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(async_graphql::Enum, Serialize_repr, Deserialize_repr, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
-#[repr(u8)]
+#[derive(Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, FromRepr, IntoStaticStr, JsonSchema)]
+#[repr(@{ column_def.get_inner_type(true, true) }@)]
 #[allow(non_camel_case_types)]
-#[graphql(name="@{ group_name|to_pascal_name }@@{ mod_name|to_pascal_name }@@{ name|to_pascal_name }@")]
-pub enum _@{ name|to_pascal_name }@ {
-@% for row in values -%@@{ row.title|comment4 }@@{ row.comment|comment4 }@@{ row.title|strum_message4 }@@{ row.comment|strum_detailed4 }@    @{ row.name }@ = @{ row.value }@,
+#[allow(clippy::upper_case_acronyms)]
+pub@{ visibility }@ enum _@{ name|pascal }@ {
+@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@@{ row.value_str() }@,
 @% endfor -%@
 }
-impl _@{ name|to_pascal_name }@ {
-    pub fn get(&self) -> u8 {
-        *self as u8
+impl _@{ name|pascal }@ {
+    pub fn inner(&self) -> @{ column_def.get_inner_type(true, true) }@ {
+        *self as @{ column_def.get_inner_type(true, true) }@
     }
+@%- for row in values %@
+    pub fn is_@{ row.name }@(&self) -> bool {
+        self == &Self::@{ row.name|to_var_name }@
+    }
+@%- endfor %@
 }
-impl From<u8> for _@{ name|to_pascal_name }@ {
-    fn from(val: u8) -> Self {
-        match val {
-@% for row in values %@            @{ row.value }@ => _@{ name|to_pascal_name }@::@{ row.name }@,
-@% endfor %@            _ => panic!("{} is a value outside the range of _@{ name|to_pascal_name }@.", val),
+impl From<@{ column_def.get_inner_type(true, true) }@> for _@{ name|pascal }@ {
+    fn from(val: @{ column_def.get_inner_type(true, true) }@) -> Self {
+        if let Some(val) = Self::from_repr(val) {
+            val
+        } else {
+            panic!("{} is a value outside the range of _@{ name|pascal }@.", val)
         }
     }
 }
-impl From<_@{ name|to_pascal_name }@> for u8 {
-    fn from(val: _@{ name|to_pascal_name }@) -> Self {
-        val.get()
+impl From<_@{ name|pascal }@> for @{ column_def.get_inner_type(true, true) }@ {
+    fn from(val: _@{ name|pascal }@) -> Self {
+        val.inner()
     }
 }
-impl From<_@{ name|to_pascal_name }@> for BindValue {
-    fn from(val: _@{ name|to_pascal_name }@) -> Self {
-        Self::Enum(Some(val.get()))
+impl From<_@{ name|pascal }@> for BindValue {
+    fn from(val: _@{ name|pascal }@) -> Self {
+        Self::Enum(Some(val.inner() as i64))
     }
 }
-impl From<Option<_@{ name|to_pascal_name }@>> for BindValue {
-    fn from(val: Option<_@{ name|to_pascal_name }@>) -> Self {
-        Self::Enum(val.map(|t| t.get()))
+impl From<Option<_@{ name|pascal }@>> for BindValue {
+    fn from(val: Option<_@{ name|pascal }@>) -> Self {
+        Self::Enum(val.map(|t| t.inner() as i64))
     }
 }
+@%- if !config.excluded_from_domain %@
+@%- let a = crate::schema::set_domain_mode(true) %@
+impl From<@{ column_def.get_filter_type(true) }@> for _@{ name|pascal }@ {
+    fn from(v: @{ column_def.get_filter_type(true) }@) -> Self {
+        match v {
+@%- for row in values %@
+            @{ column_def.get_filter_type(true) }@::@{ row.name }@ => _@{ name|pascal }@::@{ row.name }@,
+@%- endfor %@
+        }
+    }
+}
+impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
+    fn from(v: _@{ name|pascal }@) -> Self {
+        match v {
+@%- for row in values %@
+            _@{ name|pascal }@::@{ row.name }@ => @{ column_def.get_filter_type(true) }@::@{ row.name }@,
+@%- endfor %@
+        }
+    }
+}
+@%- let a = crate::schema::set_domain_mode(false) %@
+@%- endif %@
 
-@% endif -%@
 @% endfor -%@
-@% for (name, column_def) in def.db_enums() -%@
-@% if column_def.db_enum_values.is_some() -%@
-@% let values = column_def.db_enum_values.as_ref().unwrap() -%@
-#[derive(async_graphql::Enum, Serialize, Deserialize, Hash, Eq, PartialEq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
+@% for (name, column_def) in def.str_enums(false) -%@
+@% let values = column_def.enum_values.as_ref().unwrap() -%@
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
 #[allow(non_camel_case_types)]
-#[graphql(name="@{ group_name|to_pascal_name }@@{ mod_name|to_pascal_name }@@{ name|to_pascal_name }@")]
-pub enum _@{ name|to_pascal_name }@ {
-@% for row in values -%@@{ row.title|comment4 }@@{ row.comment|comment4 }@@{ row.title|strum_message4 }@@{ row.comment|strum_detailed4 }@    @{ row.name }@,
+#[allow(clippy::upper_case_acronyms)]
+pub@{ visibility }@ enum _@{ name|pascal }@ {
+@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@,
 @% endfor -%@
 }
+impl _@{ name|pascal }@ {
+    pub fn as_static_str(&self) -> &'static str {
+        Into::<&'static str>::into(self)
+    }
+@%- for row in values %@
+    pub fn is_@{ row.name }@(&self) -> bool {
+        self == &Self::@{ row.name|to_var_name }@
+    }
+@%- endfor %@
+}
+@%- if !config.excluded_from_domain %@
+@%- let a = crate::schema::set_domain_mode(true) %@
+impl From<@{ column_def.get_filter_type(true) }@> for _@{ name|pascal }@ {
+    fn from(v: @{ column_def.get_filter_type(true) }@) -> Self {
+        match v {
+@%- for row in values %@
+            @{ column_def.get_filter_type(true) }@::@{ row.name }@ => _@{ name|pascal }@::@{ row.name }@,
+@%- endfor %@
+        }
+    }
+}
+impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
+    fn from(v: _@{ name|pascal }@) -> Self {
+        match v {
+@%- for row in values %@
+            _@{ name|pascal }@::@{ row.name }@ => @{ column_def.get_filter_type(true) }@::@{ row.name }@,
+@%- endfor %@
+        }
+    }
+}
+@%- let a = crate::schema::set_domain_mode(false) %@
+@%- endif %@
 
-@% endif -%@
 @% endfor -%@
-@{ def.title|comment0 -}@
+@{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
-pub trait _@{ pascal_name }@Tr {
-@{ def.primaries()|fmt_join("{title}{comment}    fn {var}(&self) -> &{inner};
-", "") -}@
-@{ def.non_primaries()|fmt_join("{title}{comment}    fn {var}(&self) -> {outer};
-", "") -}@
-@{ def.relations_one_except_cache()|fmt_rel_join("{title}{comment}    fn {alias}(&self) -> Option<&rel_{class_mod}::{class}>;
-", "") -}@
-@{ def.relations_one_only_cache()|fmt_rel_join("{title}{comment}    fn {alias}(&self) -> Option<&rel_{class_mod}::{class}Cache>;
-", "") -}@
-@{ def.relations_many()|fmt_rel_join("{title}{comment}    fn {alias}(&self) -> &Vec<rel_{class_mod}::{class}>;
-", "") -}@
+pub@{ visibility }@ trait _@{ pascal_name }@Getter: Send + Sync {
+@{- def.primaries()|fmt_join("
+{label}{comment}    fn _{raw_var}(&self) -> &{inner};", "") -}@
+@{- def.non_primaries()|fmt_join("
+{label}{comment}    fn _{raw_var}(&self) -> {outer};", "") -}@
+@{- def.relations_one_and_belonging(false)|fmt_rel_join("
+{label}{comment}    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}>;", "") -}@
+@{- def.relations_many(false)|fmt_rel_join("
+{label}{comment}    fn _{raw_rel_name}(&self) -> &Vec<rel_{class_mod}::{class}>;", "") -}@
 }
 @{-"\n"}@

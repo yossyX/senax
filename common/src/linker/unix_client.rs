@@ -14,14 +14,14 @@ use tokio_uring::net::UnixStream;
 use super::common::LINKER_VER;
 use super::common::{IoBytesMut, RECEIVER, SENDER};
 
-pub fn run(
+pub(crate) fn run(
     unix_port: &str,
-    db: u64,
+    stream_id: u64,
     from_local: UnboundedReceiver<Vec<u8>>,
     to_local: UnboundedSender<Vec<u8>>,
     pw: String,
     exit_tx: mpsc::Sender<i32>,
-    disable_cache: bool,
+    send_only: bool,
 ) -> Result<()> {
     let unix_port = unix_port.to_owned();
     let _unix_port = unix_port.clone();
@@ -41,7 +41,7 @@ pub fn run(
                         UnixStream::connect(&sock_file).await?
                     }
                 };
-                handle_sender_stream(stream, db, conn_no_sender, from_local, _pw).await?;
+                handle_sender_stream(stream, stream_id, conn_no_sender, from_local, _pw).await?;
                 Ok(())
             })
             .map_err(|e: Error| {
@@ -50,7 +50,7 @@ pub fn run(
                 e
             })
         })?;
-    if !disable_cache {
+    if !send_only {
         thread::Builder::new()
             .name("unix adapter".to_string())
             .spawn(move || {
@@ -65,7 +65,7 @@ pub fn run(
                             UnixStream::connect(&sock_file).await?
                         }
                     };
-                    handle_receiver_stream(stream, db, conn_no, to_local, pw).await?;
+                    handle_receiver_stream(stream, stream_id, conn_no, to_local, pw).await?;
                     Ok(())
                 })
                 .map_err(|e: Error| {
@@ -80,7 +80,7 @@ pub fn run(
 
 async fn handle_sender_stream(
     stream: UnixStream,
-    db: u64,
+    stream_id: u64,
     conn_no_sender: oneshot::Sender<u64>,
     mut from_local: UnboundedReceiver<Vec<u8>>,
     pw: String,
@@ -91,7 +91,7 @@ async fn handle_sender_stream(
     let mut hasher = Sha512::new();
     hasher.update(pw);
     buf.put(&*hasher.finalize());
-    buf.put_u64_le(db);
+    buf.put_u64_le(stream_id);
     write_all(buf.freeze(), &stream).await?;
     let buf = IoBytesMut::new(8);
     let conn_no = read_all(buf, &stream).await?.get_u64_le();
@@ -99,9 +99,9 @@ async fn handle_sender_stream(
     loop {
         tokio::select! {
             Some(data) = from_local.recv() => {
-                let mut list = vec![data];
+                let mut list = vec![serde_bytes::ByteBuf::from(data)];
                 while let Ok(data) = from_local.try_recv() {
-                    list.push(data);
+                    list.push(serde_bytes::ByteBuf::from(data));
                 }
                 let size = bincode::serialized_size(&list)?;
                 let mut buf = Vec::with_capacity((size + (size >> 3) + 100).try_into()?);
@@ -123,7 +123,7 @@ async fn handle_sender_stream(
 
 async fn handle_receiver_stream(
     stream: UnixStream,
-    db: u64,
+    stream_id: u64,
     conn_no: u64,
     to_local: UnboundedSender<Vec<u8>>,
     pw: String,
@@ -134,7 +134,7 @@ async fn handle_receiver_stream(
     let mut hasher = Sha512::new();
     hasher.update(pw);
     buf.put(&*hasher.finalize());
-    buf.put_u64_le(db);
+    buf.put_u64_le(stream_id);
     buf.put_u64_le(conn_no);
     write_all(buf.freeze(), &stream).await?;
     loop {
@@ -149,9 +149,9 @@ async fn handle_receiver_stream(
                     to_local.send(Vec::new())?;
                 } else {
                     let decompressed_input = lz4_flex::frame::FrameDecoder::new(buf.freeze().reader());
-                    let list: Vec<Vec<u8>> = bincode::deserialize_from(decompressed_input)?;
+                    let list: Vec<serde_bytes::ByteBuf> = bincode::deserialize_from(decompressed_input)?;
                     for data in list {
-                        to_local.send(data)?;
+                        to_local.send(data.into_vec())?;
                     }
                 }
             },

@@ -12,24 +12,14 @@ $ senax init example
 $ cd example
 ```
 
-## Actix サーバ生成
-```
-$ senax new-actix server
-```
-serverの部分は任意のパッケージ名で、actix-web を使用したWebサーバを生成します。  
-生成されるコードはSIGUSR2シグナルによるホットデプロイに対応しています。
-
 ## DBテンプレート生成
 ```
-$ senax use-db server data
+$ senax init-db data
 ```
-スキーマに data.yml を生成し、先程の server パッケージに data というDBを使用することを設定します。
+スキーマに data.yml を生成し、 data という名前のDBを使用することを設定します。
 
 ## envファイル
-```
-$ cp .env.sample .env
-```
-.env の SESSION_DB_URL, DATA_DB_URL などのDB設定を必要に応じて変更してください。
+生成された .env ファイルの SESSION_DB_URL, DATA_DB_URL などのDB設定を必要に応じて変更してください。
 
 ## スキーマファイル
 スキーマファイルは基本的には設定ファイルとグループごとのモデル記述ファイルに分けて記述します。
@@ -39,23 +29,22 @@ $ cp .env.sample .env
 
 schema/data.yml
 ```yml
-# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.2.0/schema.json#definitions/ConfigDef
+# yaml-language-server: $schema=../senax-schema.json#definitions/ConfigDef
 
 title: Example DB
 author: author name
 db: mysql
 ignore_foreign_key: true
-timestampable: real_time
+timestampable: fixed_time
 time_zone: local
 timestamp_time_zone: utc
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read
 use_cache: true
-use_cache_all: true
+use_all_row_cache: true
 preserve_column_order: false
 groups:
   note:
-    type: model
 ```
 複数のデータベース設定のための設定ファイルです。  
 yaml-language-serverの設定はVSCodeであればYAMLのプラグインを使用することにより、入力時にアシスタントが効きます。  
@@ -63,19 +52,16 @@ db は現在のところ MySQL しか対応していません。
 
 schema/data/note.yml に下記のファイルを作成してください。
 ```yml
-# yaml-language-server: $schema=https://github.com/yossyX/senax/releases/download/0.2.0/schema.json#properties/model
+# yaml-language-server: $schema=../../senax-schema.json#properties/model
 
 note:
-  timestampable: fixed_time
   soft_delete: time
   versioned: true
-  on_delete_fn: true
-  use_fast_cache: true
-  columns:
+  fields:
     id:
       type: int
       primary: true
-      auto_increment: auto
+      auto: increment
     key: varchar
     category_id: int
     content:
@@ -99,29 +85,29 @@ note:
       parser: ngram
 
 tag:
-  columns:
+  fields:
     id:
       type: int
       primary: true
-      auto_increment: auto
+      auto: increment
     note_id: int_not_null
     name: varchar_not_null
   relations:
     note:
 
 category:
-  columns:
+  fields:
     id:
       type: int
       primary: true
-      auto_increment: auto
+      auto: increment
     name: varchar_not_null
 
 counter:
   counting: counter
   timestampable: none
   use_save_delayed: true
-  columns:
+  fields:
     note_id:
       type: int
       primary: true
@@ -169,11 +155,11 @@ sqlxのマイグレーションを実行します。
 
 ## シードスキーマ生成
 ```
-$ cargo run -p db_data -- gen-seed-schema > db/data/seed-schema.json
+$ cargo run -p db_data -- gen-seed-schema
 ```
-もしくは、
+もしくは、デフォルト動作するサーバ生成後は次のコマンドでも動作します。
 ```
-$ target/debug/db_data gen-seed-schema > db/data/seed-schema.json
+$ cargo run -- gen-seed-schema data
 ```
 
 シードファイルの入力アシスタントのためのスキーマファイルを生成します。
@@ -223,13 +209,48 @@ $ senax gen-db-doc data -e -H 10 > db-document.html
 環境変数のLC_ALL, LC_TIME, LANGの設定により日本語の定義書を生成します。
 "-e"はER図出力、"-H 10"は仕様書更新履歴を10件分出力します。
 
+## Actix サーバ生成
+```
+$ senax new-actix server --db data
+```
+serverの部分は任意のパッケージ名で、actix-web を使用したWebサーバを生成します。  
+生成されるコードはSIGUSR2シグナルによるホットデプロイに対応しています。
+
 ## コード記述
+
+TODO 下記のコードは example の一部なのでコードが不足しています。
 
 _Noteを取得して日毎のカウンターを加算しています。
 save_delayed ではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。
 
 server/src/routes/api/cache.rs
 ```rust
+use crate::context::Ctx;
+use crate::response::*;
+use actix_web::{get, web, HttpRequest, Responder};
+#[allow(unused_imports)]
+use anyhow::{Context as _, Result};
+use chrono::Local;
+use db_sample::misc::Updater;
+use db_sample::models::note::counter::*;
+use db_sample::models::note::note::*;
+#[allow(unused_imports)]
+use db_sample::DbConn as SampleConn;
+use db_session::models::session::session::{_SessionStore, senax_actix_session::Session};
+use serde::Serialize;
+
+const SESSION_KEY: &str = "count";
+
+#[derive(Serialize)]
+pub struct Response {
+    pub id: _NoteId,
+    pub category: Option<String>,
+    pub article: String,
+    pub tags: Vec<String>,
+    pub count: u64,
+    pub session_count: u64,
+}
+
 #[get("/cache/{key}")]
 async fn handler(
     key: web::Path<String>,
@@ -270,15 +291,15 @@ async fn handler(
         let date = Local::now().date_naive();
         let counter = _Counter::find_optional_from_cache(&conn, (note.id(), date)).await?;
         let count = counter.map(|v| v.counter()).unwrap_or_default() + 1; // ここまではキャッシュから当日のカウント取得
-        let mut counter_for_update = _CounterFactory { // 当日のカウントが未登録の場合 INSERT
+        let mut counter_updater = _CounterFactory { // 当日のカウントが未登録の場合 INSERT
             note_id: note.id(),
             date,
             counter: 0,
         }
         .create(&conn);
-        let _ = counter_for_update.counter().add(1); // UPDATE加算
-        counter_for_update._upsert(); // INSERT ... ON DUPLICATE KEY UPDATE の指示
-        _Counter::update_delayed(&mut conn, counter_for_update).await?;
+        let _ = counter_updater.counter().add(1); // UPDATE加算
+        counter_updater._upsert(); // INSERT ... ON DUPLICATE KEY UPDATE の指示
+        _Counter::update_delayed(&mut conn, counter_updater).await?;
 
         Ok(Response {
             id: note.id(),
@@ -297,6 +318,29 @@ async fn handler(
 
 server/src/routes/api/no_cache.rs
 ```rust
+use crate::context::Ctx;
+use crate::response::*;
+use actix_web::{get, web, HttpRequest, Responder};
+#[allow(unused_imports)]
+use anyhow::{Context as _, Result};
+use chrono::Local;
+use db_sample::models::note::counter::*;
+use db_sample::models::note::note::*;
+use db_sample::models::note::tag::_TagTr;
+#[allow(unused_imports)]
+use db_sample::DbConn as SampleConn;
+use db_session::models::session::session::{_SessionStore, senax_actix_session::Session};
+use serde::Serialize;
+
+#[derive(Serialize)]
+pub struct Response {
+    pub id: _NoteId,
+    pub category: Option<String>,
+    pub article: String,
+    pub tags: Vec<String>,
+    pub count: u64,
+}
+
 #[get("/no_cache/{key}")]
 async fn handler(
     key: web::Path<String>,
@@ -321,13 +365,13 @@ async fn handler(
         let count = counter.map(|v| v.counter()).unwrap_or_default() + 1;
 
         let note_id = note.id();
-        let cond = db_data::cond_note_counter!((note_id=note_id) AND (date=date)); // WHERE句を生成するマクロ
+        let filter = db_data::filter_note_counter!((note_id=note_id) AND (date=date)); // WHERE句を生成するマクロ
         conn.begin().await?;
-        let mut update = _Counter::for_update(&mut conn); // 更新内容を指定するための空のUpdate用オブジェクト生成
-        let _ = update.counter().add(1);
+        let mut updater = _Counter::updater(&mut conn); // 更新内容を指定するための空のUpdate用オブジェクト生成
+        let _ = updater.counter().add(1);
         _Counter::query()
-            .cond(cond)
-            .update(&mut conn, update)
+            .filter(filter)
+            .update(&mut conn, updater)
             .await?;
         conn.commit().await?;
         
@@ -358,4 +402,3 @@ http://localhost:8080/api/cache/diary にアクセスして結果を確認でき
 $ cargo build -p server -r
 $ target/release/server
 ```
-s

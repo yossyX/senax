@@ -1,4 +1,5 @@
 // This code is auto-generated and will always be overwritten.
+// Senax v@{ ""|senax_version }@
 
 use anyhow::{bail, Result};
 use regex::Regex;
@@ -12,21 +13,21 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::RwLock;
 
-use crate::{connection, exec_ddl, DbConn};
+use crate::{connection, models::exec_ddl, DbConn};
 
 // SEEDS
 include!(concat!(env!("OUT_DIR"), "/seeds.rs"));
 
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
-#[schemars(deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct SeedSchema {
 @%- for (name, defs) in groups %@@% if !defs.is_empty() %@
-    @{ name|to_var_name }@: Option<crate::@{ name|to_var_name }@::@{ name|pascal }@>,
+    @{ name|to_var_name }@: Option<crate::models::@{ name|snake|to_var_name }@::@{ name|pascal }@>,
 @%- endif %@@% endfor %@
 }
 impl SeedSchema {
     #[allow(clippy::single_match)]
-    async fn seed(data: &str) -> Result<()> {
+    pub async fn seed(data: &str) -> Result<()> {
         let seeds: serde_yaml::Value = serde_yaml::from_str(data)?;
         let mut conns: Vec<_> = DbConn::shard_num_range().map(DbConn::_new).collect();
         for conn in conns.iter_mut() {
@@ -36,7 +37,7 @@ impl SeedSchema {
             for (name, value) in mapping {
                 match name.as_str() {
                 @%- for (name, defs) in groups %@@% if !defs.is_empty() %@
-                    Some("@{ name }@") => crate::@{ name|to_var_name }@::seed(value, &mut conns).await?,
+                    Some("@{ name }@") => crate::models::@{ name|snake|to_var_name }@::seed(value, &mut conns).await?,
                 @%- endif %@@% endfor %@
                     _ => {}
                 }
@@ -49,7 +50,7 @@ impl SeedSchema {
     }
 }
 
-pub fn gen_seed_schema() -> Result<String> {
+pub fn gen_seed_schema() -> Result<()> {
     let settings = SchemaSettings::draft07().with(|s| {
         s.option_nullable = false;
         s.option_add_null_type = true;
@@ -57,7 +58,14 @@ pub fn gen_seed_schema() -> Result<String> {
     let gen = settings.into_generator();
     let schema = gen.into_root_schema_for::<SeedSchema>();
     let schema = serde_json::to_string_pretty(&schema)?;
-    Ok(schema)
+    let path = std::path::Path::new(file!())
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("seed-schema.json");
+    fs::write(path, schema)?;
+    Ok(())
 }
 
 pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
@@ -127,12 +135,12 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
                     installed_on DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
             "#,
-            &mut source,
+            source.as_mut(),
         )
         .await?;
         let result = sqlx::query("SELECT version FROM _seeds WHERE version=?")
             .bind(version)
-            .fetch_optional(&mut source)
+            .fetch_optional(source.as_mut())
             .await?;
         if result.is_some() {
             continue;
@@ -141,7 +149,7 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
         sqlx::query("INSERT INTO _seeds (version, description) VALUES (?,?)")
             .bind(version)
             .bind(description)
-            .execute(&mut source)
+            .execute(source.as_mut())
             .await?;
     }
     FILES.get().unwrap().write().unwrap().clear();

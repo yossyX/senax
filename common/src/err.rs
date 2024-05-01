@@ -14,3 +14,19 @@ impl std::fmt::Display for RowNotFound {
     }
 }
 impl std::error::Error for RowNotFound {}
+
+#[derive(Debug)]
+pub struct LockFailed {
+    pub name: String,
+}
+impl LockFailed {
+    pub fn new(name: String) -> LockFailed {
+        LockFailed { name }
+    }
+}
+impl std::fmt::Display for LockFailed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Lock Failed: {}", self.name)
+    }
+}
+impl std::error::Error for LockFailed {}

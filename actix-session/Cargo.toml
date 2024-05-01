@@ -1,9 +1,9 @@
 [package]
 name = "senax-actix-session"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["yossyX"]
-description = "SenaX actix session library"
+description = "Senax actix session library"
 repository = "https://github.com/yossyX/senax"
 keywords = ["http", "web", "framework", "async", "session"]
 license = "MIT OR Apache-2.0"
@@ -12,10 +12,11 @@ license = "MIT OR Apache-2.0"
 actix-utils = "3"
 actix-web = { version = "4", default_features = false, features = ["cookies", "secure-cookies"] }
 anyhow = "1"
+ciborium = "0.2.1"
 derive_more = "0.99.5"
+log = { version = "0.4", features = [ "release_max_level_info", "kv_unstable_serde" ] }
 serde = "1"
-serde_cbor = "0.11"
-senax-common = "0.1.5"
+senax-common = "0.3.0"
 sha2 = "0.10.6"
 time = "0.3.19"
-tracing = { version = "0.1.30", default-features = false, features = ["log"] }
+tokio = { version = "1.28", features = [ "full" ] }

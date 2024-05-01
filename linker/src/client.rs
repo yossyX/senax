@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Result};
 use bytes::{BufMut, BytesMut};
-use quinn::Endpoint;
+use quinn::{Endpoint, TransportConfig};
 use sha2::{Digest, Sha512};
 use std::{fs, net::ToSocketAddrs, path::PathBuf, sync::Arc, time::Duration};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -12,7 +12,7 @@ use crate::common::{
 
 pub fn client_endpoint(ca_path: PathBuf) -> Result<Endpoint> {
     let mut roots = rustls::RootCertStore::empty();
-    roots.add(&rustls::Certificate(fs::read(&ca_path)?))?;
+    roots.add(&rustls::Certificate(fs::read(ca_path)?))?;
     let mut client_crypto = rustls::ClientConfig::builder()
         .with_safe_defaults()
         .with_root_certificates(roots)
@@ -20,11 +20,12 @@ pub fn client_endpoint(ca_path: PathBuf) -> Result<Endpoint> {
     client_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
     let mut endpoint = quinn::Endpoint::client("[::]:0".parse().unwrap())?;
     let mut config = quinn::ClientConfig::new(Arc::new(client_crypto));
-    Arc::get_mut(&mut config.transport)
-        .unwrap()
+    let mut transport = TransportConfig::default();
+    transport
         .keep_alive_interval(Some(Duration::from_secs(3)))
         .max_concurrent_bidi_streams(1_u8.into())
         .max_idle_timeout(Some(Duration::from_secs(30).try_into()?));
+    config.transport_config(Arc::new(transport));
     endpoint.set_default_client_config(config);
     Ok(endpoint)
 }
@@ -34,13 +35,14 @@ pub fn connect_client(
     host: &str,
     endpoint: Endpoint,
     pw: String,
-    db: u64,
+    stream_id: u64,
     command: u16,
 ) -> Result<UnboundedSender<Pack>> {
     let host = host.to_string();
     let (to_outer, from_local) = mpsc::unbounded_channel::<Pack>();
     tokio::spawn(async move {
-        if let Err(e) = handle_connection(remote, host, endpoint, from_local, pw, db, command).await
+        if let Err(e) =
+            handle_connection(remote, host, endpoint, from_local, pw, stream_id, command).await
         {
             error!("{}", e);
         }
@@ -54,21 +56,18 @@ async fn handle_connection(
     endpoint: Endpoint,
     mut from_local: UnboundedReceiver<Pack>,
     pw: String,
-    db: u64,
+    stream_id: u64,
     command: u16,
 ) -> Result<(), anyhow::Error> {
     let remote = remote
         .to_socket_addrs()?
         .next()
         .ok_or_else(|| anyhow!("couldn't resolve to an address"))?;
-    let new_conn = endpoint
+    let conn = endpoint
         .connect(remote, &host)?
         .await
         .map_err(|e| anyhow!("failed to connect: {}", e))?;
-    let quinn::NewConnection {
-        connection: conn, ..
-    } = new_conn;
-    send_password(&conn, pw, db, command).await?;
+    send_password(&conn, pw, stream_id, command).await?;
     while let Some(pack) = from_local.recv().await {
         let mut list1 = vec![pack];
         while let Ok(pack) = from_local.try_recv() {
@@ -76,7 +75,7 @@ async fn handle_connection(
         }
         let mut list2 = vec![];
         for pack in &list1 {
-            list2.push(&pack.data[..]);
+            list2.push(serde_bytes::Bytes::new(&pack.data[..]));
         }
         let size = bincode::serialized_size(&list2)?;
         let buf = BytesMut::with_capacity((size + (size >> 3) + 100).try_into()?).writer();
@@ -101,10 +100,10 @@ async fn handle_connection(
 async fn send_password(
     conn: &quinn::Connection,
     pw: String,
-    db: u64,
+    stream_id: u64,
     command: u16,
 ) -> Result<(), anyhow::Error> {
-    let (mut send, recv) = conn
+    let (mut send, mut recv) = conn
         .open_bi()
         .await
         .map_err(|e| anyhow!("failed to open stream: {}", e))?;
@@ -113,7 +112,7 @@ async fn send_password(
     let mut hasher = Sha512::new();
     hasher.update(pw);
     buf.put(&*hasher.finalize());
-    buf.put_u64_le(db);
+    buf.put_u64_le(stream_id);
     buf.put_u16_le(command);
     send.write_all(&buf.freeze())
         .await

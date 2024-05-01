@@ -5,7 +5,7 @@ pub const LINKER_VER: u16 = 1;
 pub const SENDER: u16 = 0;
 pub const RECEIVER: u16 = 1;
 
-pub struct IoBytesMut(BytesMut, usize, usize);
+pub(crate) struct IoBytesMut(BytesMut, usize, usize);
 impl IoBytesMut {
     pub fn new(capacity: usize) -> Self {
         Self(BytesMut::with_capacity(capacity), 0, capacity)

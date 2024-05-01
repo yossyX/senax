@@ -1,2 +1,3 @@
 [workspace]
-members = ["common", "macros", "linker", "logger", "actix-session", "senax"]
+resolver = "2"
+members = ["common", "macros", "linker", "logger", "inflector", "mysql-parser", "actix-session", "senax"]

@@ -44,7 +44,7 @@ impl<Store: SessionStore> SessionMiddleware<Store> {
         };
         let start_key = SessionKey::generate_past(ttl);
         if let Err(e) = store.gc(&start_key).await {
-            tracing::warn!("{}", e);
+            log::warn!("{}", e);
         }
     }
 
@@ -156,13 +156,13 @@ fn extract_session_key(req: &ServiceRequest, config: &CookieConfiguration) -> Op
     };
 
     if verification_result.is_none() {
-        tracing::warn!("The session cookie failed to decrypt.");
+        log::warn!("The session cookie failed to decrypt.");
     }
 
     match verification_result?.value().to_owned().try_into() {
         Ok(session_key) => Some(session_key),
         Err(err) => {
-            tracing::warn!("{}", err);
+            log::warn!("{}", err);
             None
         }
     }

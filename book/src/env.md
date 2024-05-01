@@ -10,9 +10,9 @@
 |{DB名}_REPLICA_DB_URL|参照用DB接続URL（改行区切りでシャーディング設定、カンマ区切りでレプリカ設定）|
 |{DB名}_CACHE_DB_URL|キャッシュ用DB接続URL（改行区切りでシャーディング設定、カンマ区切りでレプリカ設定）|
 |{DB名}_TEST_DB_URL|テストDB接続URL|
-|{DB名}_DB_MAX_CONNECTIONS|更新用コネクション数|
-|{DB名}_REPLICA_DB_MAX_CONNECTIONS|参照用コネクション数|
-|{DB名}_CACHE_DB_MAX_CONNECTIONS|キャッシュ用コネクション数|
+|{DB名}_DB_MAX_CONNECTIONS_FOR_WRITE|更新用コネクション数|
+|{DB名}_DB_MAX_CONNECTIONS_FOR_READ|参照用コネクション数|
+|{DB名}_DB_MAX_CONNECTIONS_FOR_CACHE|キャッシュ用コネクション数|
 
 ## キャッシュ設定
 

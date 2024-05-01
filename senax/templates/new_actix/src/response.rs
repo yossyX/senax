@@ -1,55 +1,42 @@
 use actix_web::http::header::TryIntoHeaderValue;
 use actix_web::web::{Bytes, BytesMut};
 use actix_web::{error, HttpRequest, HttpResponse, Responder};
-use chrono::{DateTime, Local};
-use derive_more::Display;
 use futures::{Stream, StreamExt};
-use senax_common::err;
 use serde::Serialize;
 
 use crate::context::Ctx;
 
-#[derive(Debug, Display, Serialize)]
-pub struct BadRequest {
-    msg: String,
-}
-impl std::error::Error for BadRequest {}
-impl BadRequest {
-    pub fn new(msg: String) -> BadRequest {
-        BadRequest { msg }
-    }
-}
+#[derive(Debug, thiserror::Error)]
+#[allow(dead_code)]
+pub enum ApiError {
+    #[error("Not Found")]
+    NotFound,
 
-#[derive(Debug)]
-pub struct NotFound {
-    pub path: String,
+    #[error("Unauthorized")]
+    Unauthorized,
+
+    #[error("Forbidden")]
+    Forbidden,
+
+    #[error("Bad Request: {0}")]
+    BadRequest(String),
+
+    #[error("Bad Request: {0}")]
+    BadRequestJson(serde_json::Value),
+
+    #[error("Internal Server Error")]
+    InternalServerError(String),
 }
-impl NotFound {
-    #[allow(dead_code)]
-    pub fn new(http_req: &HttpRequest) -> NotFound {
-        NotFound {
-            path: http_req.path().to_string(),
-        }
-    }
-}
-impl std::fmt::Display for NotFound {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Not Found: path={}", self.path)
-    }
-}
-impl std::error::Error for NotFound {}
 
 #[allow(dead_code)]
 pub fn json_response<T: Serialize>(r: Result<T, anyhow::Error>, ctx: &Ctx) -> impl Responder {
     match r {
         Ok(data) => {
-            let mut writer = Vec::with_capacity(4096);
+            let mut writer = Vec::with_capacity(65536);
             match serde_json::to_writer(&mut writer, &data) {
                 Ok(_) => {
                     let response = unsafe { String::from_utf8_unchecked(writer) };
-                    let time: DateTime<Local> = Local::now();
-                    let time = time.to_rfc3339_opts(chrono::SecondsFormat::Millis, false);
-                    info!(target:"response", "time:{}\treq_no:{}\tresponse:{}", time, ctx.req_no(), &response);
+                    info!(target:"response", ctx = ctx.ctx_no(), response = &response; "");
                     HttpResponse::Ok()
                         .content_type(mime::APPLICATION_JSON)
                         .body(response)
@@ -78,7 +65,7 @@ pub fn json_stream_response<T: Serialize>(
                         bytes.extend_from_slice(",".as_bytes());
                     }
                     first = false;
-                    let mut writer = Vec::with_capacity(4096);
+                    let mut writer = Vec::with_capacity(65536);
                     match serde_json::to_writer(&mut writer, &v) {
                         Ok(_) => {
                             bytes.extend_from_slice(&writer);
@@ -109,7 +96,7 @@ pub fn ndjson_stream_response<T: Serialize>(
                 futures::pin_mut!(stream);
                 let mut bytes = BytesMut::new();
                 while let Some(v) = stream.next().await {
-                    let mut writer = Vec::with_capacity(4096);
+                    let mut writer = Vec::with_capacity(65536);
                     match serde_json::to_writer(&mut writer, &v) {
                         Ok(_) => {
                             bytes.extend_from_slice(&writer);
@@ -138,9 +125,7 @@ where
 {
     match e {
         Ok(stream) => {
-            let time: DateTime<Local> = Local::now();
-            let time = time.to_rfc3339_opts(chrono::SecondsFormat::Millis, false);
-            info!(target:"response", "time:{}\treq_no:{}", time, ctx.req_no());
+            info!(target:"response", ctx = ctx.ctx_no(); "stream");
             HttpResponse::Ok()
                 .content_type(content_type)
                 .streaming(stream)
@@ -149,15 +134,14 @@ where
     }
 }
 
-pub fn json_error_handler(err: error::JsonPayloadError, _req: &HttpRequest) -> error::Error {
+#[allow(dead_code)]
+pub fn json_error_handler(err: error::JsonPayloadError, http_req: &HttpRequest) -> error::Error {
     use actix_web::error::JsonPayloadError;
-
     let detail = err.to_string();
+    let ctx = Ctx::get(http_req);
+    info!(target: "server::json_error", ctx = ctx.ctx_no(); "{}", &detail);
     let resp = match &err {
         JsonPayloadError::ContentType => HttpResponse::UnsupportedMediaType().body(detail),
-        JsonPayloadError::Deserialize(json_err) if json_err.is_data() => {
-            HttpResponse::UnprocessableEntity().json(crate::response::BadRequest::new(detail))
-        }
         _ => HttpResponse::BadRequest().body(detail),
     };
     error::InternalError::from_response(err, resp).into()
@@ -165,19 +149,61 @@ pub fn json_error_handler(err: error::JsonPayloadError, _req: &HttpRequest) -> e
 
 fn error_response(err: anyhow::Error, ctx: &Ctx) -> HttpResponse {
     if let Some(e) = err.downcast_ref::<validator::ValidationErrors>() {
-        info!(target: "server::validation_errors", req_no = ctx.req_no(); "{}", e);
+        info!(target: "server::validation_errors", ctx = ctx.ctx_no(); "{}", e);
         HttpResponse::BadRequest().json(e)
-    } else if let Some(e) = err.downcast_ref::<BadRequest>() {
-        info!(target: "server::bad_request", req_no = ctx.req_no(); "{}", e);
-        HttpResponse::BadRequest().json(e)
-    } else if let Some(e) = err.downcast_ref::<err::RowNotFound>() {
-        info!(target: "server::row_not_found", req_no = ctx.req_no(), table = e.table; "{}", e.id);
-        HttpResponse::NotFound().body("not found")
-    } else if let Some(e) = err.downcast_ref::<NotFound>() {
-        info!(target: "server::not_found", req_no = ctx.req_no(); "{}", e);
-        HttpResponse::NotFound().body("not found")
+    } else if let Some(e) = err.downcast_ref::<ApiError>() {
+        match e {
+            ApiError::NotFound => {
+                info!(target: "server::not_found", ctx = ctx.ctx_no(); "{}", e);
+                HttpResponse::NotFound().body("not found")
+            }
+            ApiError::Unauthorized => {
+                info!(target: "server::unauthorized", ctx = ctx.ctx_no(); "{}", e);
+                HttpResponse::Unauthorized().body("unauthorized")
+            }
+            ApiError::Forbidden => {
+                warn!(target: "server::forbidden", ctx = ctx.ctx_no(); "{}", e);
+                HttpResponse::Forbidden().body("forbidden")
+            }
+            ApiError::BadRequest(msg) => {
+                info!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", msg);
+                HttpResponse::BadRequest().body(msg.to_string())
+            }
+            ApiError::BadRequestJson(value) => {
+                info!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", value);
+                HttpResponse::BadRequest().json(value)
+            }
+            ApiError::InternalServerError(err) => {
+                error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", err);
+                HttpResponse::InternalServerError().body("Internal Server Error")
+            }
+        }
+    } else if let Some(e) = err.downcast_ref::<senax_common::err::RowNotFound>() {
+        warn!(target: "server::row_not_found", ctx = ctx.ctx_no(), table = e.table; "{}", e.id);
+        HttpResponse::BadRequest().body("Bad Request")
+    } else if let Some(e) = err.downcast_ref::<sqlx::Error>() {
+        match e {
+            sqlx::Error::Database(e) => {
+                warn!(ctx = ctx.ctx_no(); "{}", err);
+                use sqlx::error::ErrorKind;
+                match e.kind() {
+                    ErrorKind::UniqueViolation => {
+                        HttpResponse::Conflict().body("Conflict")
+                    }
+                    _ => HttpResponse::BadRequest().body("Bad Request"),
+                }
+            }
+            sqlx::Error::RowNotFound => {
+                warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", err);
+                HttpResponse::BadRequest().body("Bad Request")
+            }
+            _ => {
+                error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", err);
+                HttpResponse::InternalServerError().body("Internal Server Error")
+            }
+        }
     } else {
-        warn!(req_no = ctx.req_no(); "{}", err.root_cause());
+        error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", err.root_cause());
         HttpResponse::InternalServerError().body("Internal Server Error")
     }
 }

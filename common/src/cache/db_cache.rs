@@ -14,11 +14,11 @@ use std::{
 };
 
 use crate::ShardId;
-use crate::{cache::disk_cache::DiskCache, cache::fast_cache::FastCache};
+use crate::{cache::fast_cache::FastCache, cache::storage_cache::StorageCache};
 
 use super::msec::{get_cache_time, MSec, MSEC_SHR};
 
-const MOKA_BASE_MEMORY: u32 = 200;
+const MOKA_BASE_MEMORY: u32 = 400;
 const DEFAULT_FAST_CACHE_INDEX_SIZE: &str = "1MiB";
 const DEFAULT_SHORT_CACHE_CAPACITY: &str = "1MiB";
 const DEFAULT_SHORT_CACHE_TIME: &str = "60";
@@ -97,7 +97,7 @@ fn get_short_cache(
 fn get_long_cache(
     name: &str,
     long_cache_evicted: Arc<AtomicU64>,
-    disk_cache: Option<Arc<DiskCache>>,
+    storage_cache: Option<Arc<StorageCache>>,
 ) -> Cache<u128, Arc<dyn CacheVal>, FxBuildHasher> {
     let capacity = Byte::from_str(
         std::env::var(format!("{}_LONG_CACHE_CAPACITY", name))
@@ -129,9 +129,9 @@ fn get_long_cache(
                 long_cache_evicted.fetch_add(1, Ordering::Relaxed);
             }
             if cause.was_evicted() {
-                if let Some(ref disk_cache) = disk_cache {
+                if let Some(ref storage_cache) = storage_cache {
                     if let Ok(buf) = v._encode() {
-                        disk_cache.write(*k, v._type_id(), &buf, v._time());
+                        storage_cache.write(*k, v._type_id(), &buf, v._time());
                     }
                 }
             }
@@ -139,12 +139,12 @@ fn get_long_cache(
         .build_with_hasher(FxBuildHasher::default())
 }
 
-fn get_disk_cache(
+fn get_storage_cache(
     name: &str,
     is_hot_deploy: bool,
     path: &Path,
     time_to_live: u64,
-) -> Result<DiskCache> {
+) -> Result<StorageCache> {
     let index_size = Byte::from_str(
         std::env::var(format!("{}_DISK_CACHE_INDEX_SIZE", name))
             .unwrap_or_else(|_| DEFAULT_DISK_CACHE_INDEX_SIZE.to_owned()),
@@ -178,7 +178,7 @@ fn get_disk_cache(
             .format(DISK_CACHE_FILE_NAME)
             .to_string(),
     );
-    DiskCache::start(path, index_size, file_num, file_size, time_to_live)
+    StorageCache::start(path, index_size, file_num, file_size, time_to_live)
 }
 
 pub struct DbCache {
@@ -186,12 +186,12 @@ pub struct DbCache {
     short_cache: Cache<u128, Arc<dyn CacheVal>, FxBuildHasher>,
     version_cache: Cache<u128, Arc<dyn CacheVal>, FxBuildHasher>,
     long_cache: Cache<u128, Arc<dyn CacheVal>, FxBuildHasher>,
-    disk_cache: Option<Arc<DiskCache>>,
+    storage_cache: Option<Arc<StorageCache>>,
     fast_cache_hit: AtomicU64,
     long_cache_hit: AtomicU64,
     short_cache_hit: AtomicU64,
     version_cache_hit: AtomicU64,
-    disk_cache_hit: AtomicU64,
+    storage_cache_hit: AtomicU64,
     cache_request_count: AtomicU64,
     long_cache_evicted: Arc<AtomicU64>,
     short_cache_evicted: Arc<AtomicU64>,
@@ -205,7 +205,7 @@ impl DbCache {
         is_hot_deploy: bool,
         path: Option<&Path>,
         use_fast_cache: bool,
-        use_disk_cache: bool,
+        use_storage_cache: bool,
     ) -> Result<DbCache> {
         let ttl = std::env::var(format!("{}_CACHE_TTL", name))
             .unwrap_or_else(|_| DEFAULT_CACHE_TTL.to_owned())
@@ -218,8 +218,8 @@ impl DbCache {
         } else {
             None
         };
-        let disk_cache = if use_disk_cache && path.is_some() {
-            Some(Arc::new(get_disk_cache(
+        let storage_cache = if use_storage_cache && path.is_some() {
+            Some(Arc::new(get_storage_cache(
                 name,
                 is_hot_deploy,
                 path.unwrap(),
@@ -233,18 +233,19 @@ impl DbCache {
         let version_cache_evicted = Arc::new(AtomicU64::new(0));
         let version_cache = get_short_cache(name, Arc::clone(&version_cache_evicted));
         let long_cache_evicted = Arc::new(AtomicU64::new(0));
-        let long_cache = get_long_cache(name, Arc::clone(&long_cache_evicted), disk_cache.clone());
+        let long_cache =
+            get_long_cache(name, Arc::clone(&long_cache_evicted), storage_cache.clone());
         Ok(DbCache {
             fast_cache,
             short_cache,
             version_cache,
             long_cache,
-            disk_cache,
+            storage_cache,
             fast_cache_hit: AtomicU64::new(0),
             long_cache_hit: AtomicU64::new(0),
             short_cache_hit: AtomicU64::new(0),
             version_cache_hit: AtomicU64::new(0),
-            disk_cache_hit: AtomicU64::new(0),
+            storage_cache_hit: AtomicU64::new(0),
             cache_request_count: AtomicU64::new(0),
             long_cache_evicted,
             short_cache_evicted,
@@ -254,8 +255,8 @@ impl DbCache {
     }
 
     pub fn stop(&self) {
-        if let Some(ref disk_cache) = self.disk_cache {
-            disk_cache.stop();
+        if let Some(ref storage_cache) = self.storage_cache {
+            storage_cache.stop();
         }
     }
 
@@ -350,13 +351,16 @@ impl DbCache {
             return None;
         }
 
-        if let Some(ref disk_cache) = self.disk_cache {
-            if let Some(buf) = disk_cache.read(hash, T::__type_id(), T::_estimate()).await {
+        if let Some(ref storage_cache) = self.storage_cache {
+            if let Some(buf) = storage_cache
+                .read(hash, T::__type_id(), T::_estimate())
+                .await
+            {
                 match T::_decode(&buf) {
                     Ok(v) => {
                         if v._shard_id() == shard_id {
                             let val = Arc::new(v);
-                            self.disk_cache_hit.fetch_add(1, Ordering::Relaxed);
+                            self.storage_cache_hit.fetch_add(1, Ordering::Relaxed);
                             self.long_cache.insert(hash, val.clone()).await;
                             return Some(val);
                         }
@@ -401,8 +405,8 @@ impl DbCache {
         self.long_cache
             .invalidate_entries_if(|_k, v| v.clone().downcast_arc::<T>().is_ok())
             .unwrap();
-        if let Some(ref disk_cache) = self.disk_cache {
-            disk_cache.invalidate_all_of(T::__type_id());
+        if let Some(ref storage_cache) = self.storage_cache {
+            storage_cache.invalidate_all_of(T::__type_id());
         }
         if let Some(ref fast_cache) = self.fast_cache {
             fast_cache.invalidate_all_of(T::__type_id());
@@ -422,8 +426,8 @@ impl DbCache {
         self.short_cache.invalidate_all();
         self.version_cache.invalidate_all();
         self.long_cache.invalidate_all();
-        if let Some(ref disk_cache) = self.disk_cache {
-            disk_cache.invalidate_all();
+        if let Some(ref storage_cache) = self.storage_cache {
+            storage_cache.invalidate_all();
         }
         if let Some(ref fast_cache) = self.fast_cache {
             fast_cache.invalidate_all();
@@ -442,8 +446,8 @@ impl DbCache {
     pub fn version_cache_hit(&self) -> u64 {
         self.version_cache_hit.load(Ordering::Relaxed)
     }
-    pub fn disk_cache_hit(&self) -> u64 {
-        self.disk_cache_hit.load(Ordering::Relaxed)
+    pub fn storage_cache_hit(&self) -> u64 {
+        self.storage_cache_hit.load(Ordering::Relaxed)
     }
     pub fn cache_request_count(&self) -> u64 {
         self.cache_request_count.load(Ordering::Relaxed)

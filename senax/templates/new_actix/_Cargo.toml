@@ -1,41 +1,63 @@
 [package]
 name = "@{ name }@"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
+publish = false
+
+default-run = "@{ name }@"
+
+[features]
+default = []
+etcd = ["senax-common/etcd"]
+js_updater = ["rquickjs"]
+graphiql = []
 
 [dependencies]
-db_session = { path = "../db/session" }
+db_session = { path = "../2_db/session" }
 
 actix-web = "4.1"
-ahash = "0.8"
-anyhow = "1.0"
+ahash.workspace = true
+anyhow.workspace = true
+argon2 = "0.5.2"
+async-graphql.workspace = true
+async-graphql-actix-web.workspace = true
 async-stream = "0.3"
-chrono = { version = "0.4.19", features = ["serde"] }
-clap = { version = "3.2.16", features = ["derive"] }
-derive_more = "0.99"
-dotenvy = "0.15.6"
-env_logger = "0.9"
-futures = "0.3.13"
-log = { version = "0.4", features = [ "release_max_level_info", "kv_unstable" ] }
-mimalloc = "0.1.26"
+async-trait.workspace = true
+base64.workspace = true
+chrono.workspace = true
+clap.workspace = true
+derive_more.workspace = true
+domain = { path = "../1_domain" }
+dotenvy.workspace = true
+env_logger = "0.10"
+futures.workspace = true
+jsonwebtoken = "9.1.0"
+log.workspace = true
+mimalloc = "0.1"
 mime = "0.3"
-once_cell = "1.8.0"
-rand = "0.8.0"
-rust_decimal = "1.19"
-senax-actix-session = "0.2"
-senax-common = "0.1.5"
-senax-logger = "0.1"
-serde = { version = "1.0.106", features = ["rc"] }
-serde_json = "1.0.51"
+obfstr = "0.4.3"
+once_cell.workspace = true
+rand.workspace = true
+regex.workspace = true
+rquickjs = { version = "0.4.3", features = ["rust-alloc"], default-features = false, optional = true }
+rust_decimal.workspace = true
+rust_decimal_macros.workspace = true
+schemars.workspace = true
+senax-actix-session = "0.3.0"
+senax-common.workspace = true
+senax-logger = "0.2.4"
+serde.workspace = true
+serde_json.workspace = true
 serde_urlencoded = "0.7"
 sha2 = "0.10.6"
-thiserror = "1.0"
+sqlx.workspace = true
+thiserror.workspace = true
 time = "0.3.5"
-tokio = { version = "1.25", features = [ "full" ] }
-tracing = { version = "0.1", features = ["release_max_level_warn", "log-always"] }
-validator = { version = "0.14", features = ["derive", "unic"] }
-async-graphql = { version = "5.0", features = ["chrono", "decimal"] }
-async-graphql-actix-web = "5.0"
+tokio.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+v8 = { version = "0.79.2", optional = true }
+validator.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 nix = "0.24"

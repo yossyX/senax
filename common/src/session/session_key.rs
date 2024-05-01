@@ -48,7 +48,6 @@ impl SessionKey {
     pub fn new() -> SessionKey {
         Self::generate(SystemTime::now())
     }
-
     pub fn generate_past(ttl: std::time::Duration) -> SessionKey {
         Self::generate(SystemTime::now().checked_sub(ttl).unwrap())
     }
@@ -64,6 +63,9 @@ impl SessionKey {
             time,
             String::from_utf8(value).unwrap()
         ))
+    }
+    pub fn hash(&self) -> u32 {
+        crc32fast::hash(self.0.as_bytes())
     }
 }
 

@@ -22,7 +22,7 @@ Doctrine の inheritance も一通り対応しています。
 
 |   |Type|Description|Required|
 |---|---|---|---|
-|**db_no**|integer|リンカーで使用されるデータベースナンバー　自動生成では毎回現在時刻が使用されるので、強制上書き時に固定する場合に指定する||
+|**db_id**|integer|リンカーで使用されるデータベースID　自動生成では毎回現在時刻が使用されるので、強制上書き時に固定する場合に指定する||
 |**db**|[DbType](##/definitions/DbType)|使用するDB。現在のところmysqlのみ対応|Yes|
 |**title**|string|仕様書等のためのタイトル||
 |**author**|string|仕様書等のための著者||
@@ -34,7 +34,7 @@ Doctrine の inheritance も一通り対応しています。
 |**soft_delete**|[SoftDelete](##/definitions/SoftDelete)|論理削除のデフォルト設定||
 |**use_cache**|boolean|キャッシュ使用のデフォルト設定||
 |**use_fast_cache**|boolean|高速キャッシュ使用設定（experimental）||
-|**use_cache_all**|boolean|全キャッシュ使用のデフォルト設定||
+|**use_all_row_cache**|boolean|全キャッシュ使用のデフォルト設定||
 |**use_insert_delayed**|boolean|遅延INSERTを使用する||
 |**use_save_delayed**|boolean|遅延SAVEを使用する||
 |**use_update_delayed**|boolean|遅延UPDATEを使用する||
@@ -112,7 +112,7 @@ Doctrine の inheritance も一通り対応しています。
 
 ---------------------------------------
 <a id="#/definitions/GroupDef"></a>
-## Group Def
+## Group Definition
 
 
 
@@ -138,7 +138,7 @@ Doctrine の inheritance も一通り対応しています。
 
 ---------------------------------------
 <a id="#/definitions/ModelDef"></a>
-## Model Def
+## Model Definition
 
 
 
@@ -158,14 +158,14 @@ Doctrine の inheritance も一通り対応しています。
 |**counting**|string|save_delayedでカウンターを使用するカラム||
 |**use_cache**|boolean|キャッシュを使用するか||
 |**use_fast_cache**|boolean|高速キャッシュを使用するか(experimental)||
-|**use_cache_all**|boolean|全キャッシュを使用するか||
-|**use_cache_all_with_condition**|boolean|条件付き全キャッシュを使用するか||
+|**use_all_row_cache**|boolean|全キャッシュを使用するか||
+|**use_filtered_row_cache**|boolean|条件付き全キャッシュを使用するか||
 |**use_insert_delayed**|boolean|遅延INSERTを使用する||
 |**use_save_delayed**|boolean|遅延SAVEを使用する||
 |**use_update_delayed**|boolean|遅延UPDATEを使用する||
 |**use_upsert_delayed**|boolean|遅延UPSERTを使用する||
-|**ignore_propagated_insert_cache**|boolean|他サーバでinsertされたデータをキャッシュするか||
-|**on_delete_fn**|boolean|物理削除時の_before_deleteと_after_deleteの呼び出しを行うか||
+|**disable_insert_cache_propagation**|boolean|insertされたデータのキャッシュを他のサーバに通知しない||
+|**use_on_delete_fn**|boolean|物理削除時の_before_deleteと_after_deleteの呼び出しを行うか||
 |**abstract**|boolean|抽象化モード||
 |**inheritance**|[Inheritance](##/definitions/Inheritance)|継承モード||
 |**engine**|string|MySQLのストレージエンジン||
@@ -217,7 +217,7 @@ Doctrine の inheritance も一通り対応しています。
 |**session**|boolean|セッションDBとして使用||
 ---------------------------------------
 <a id="#/definitions/ColumnTypeOrDef"></a>
-## Column Type Or Def
+## Column Type Or Definition
 
 
 
@@ -229,7 +229,7 @@ Doctrine の inheritance も一通り対応しています。
 
 ---------------------------------------
 <a id="#/definitions/ColumnDef"></a>
-## Column Def
+## Column Definition
 
 
 
@@ -258,7 +258,7 @@ Doctrine の inheritance も一通り対応しています。
 |**json_class**|string|Json型で使用する型名||
 |**exclude_from_cache**|boolean|キャッシュからの除外設定||
 |**skip_factory**|boolean|factoryからの除外設定||
-|**rename**|string|カラム名の別名設定||
+|**column_name**|string|カラム名の別名設定||
 |**srid**|integer|Point型のSRID||
 |**default**|string|||
 |**sql_comment**|string|||
@@ -392,7 +392,7 @@ Doctrine の inheritance も一通り対応しています。
 
 ---------------------------------------
 <a id="#/definitions/RelDef"></a>
-## Relation Def
+## Relation Definition
 
 
 
@@ -407,12 +407,12 @@ Doctrine の inheritance も一通り対応しています。
 |**local**|string|結合するローカルのカラム名||
 |**foreign**|string|結合先のカラム名||
 |**in_cache**|boolean|manyあるいはone_to_oneの場合にリレーション先も一緒にキャッシュするか 結合深さは1代のみで子テーブルは親に含んだ状態で更新する必要がある||
-|**raw_cond**|string|リレーションを取得する際の追加条件 記述例：rel_group_model::Cond::Eq(rel_group_model::ColOne::value(1))||
-|**order_by**|string|||
+|**additional_filter**|string|リレーションを取得する際の追加条件||
+|**order**|string|||
 |**desc**|boolean|||
 |**limit**|integer|||
 |**use_cache**|boolean|||
-|**use_cache_with_trashed**|boolean|リレーション先が論理削除されていてもキャッシュを取得する||
+|**with_trashed**|boolean|リレーション先が論理削除されていてもキャッシュを取得する||
 |**on_delete**|[ReferenceOption](##/definitions/ReferenceOption)|DBの外部キー制約による削除およびソフトウェア側での削除制御||
 |**on_update**|[ReferenceOption](##/definitions/ReferenceOption)|DBの外部キー制約による更新||
 ---------------------------------------
@@ -444,7 +444,7 @@ Doctrine の inheritance も一通り対応しています。
 
 ---------------------------------------
 <a id="#/definitions/IndexDef"></a>
-## Index Def
+## Index Definition
 
 
 
@@ -457,7 +457,7 @@ Doctrine の inheritance も一通り対応しています。
 |**parser**|[Parser](##/definitions/Parser)|||
 ---------------------------------------
 <a id="#/definitions/IndexFieldDef"></a>
-## Index Field Def
+## Index Field Definition
 
 
 
@@ -507,7 +507,7 @@ Doctrine の inheritance も一通り対応しています。
 
 ---------------------------------------
 <a id="#/definitions/EnumDef"></a>
-## Enum Def
+## Enum Definition
 
 
 

@@ -1,26 +1,32 @@
 use anyhow::{bail, Result};
 use indexmap::IndexMap;
+use senax_mysql_parser::column::ColumnConstraint;
+use senax_mysql_parser::common::{Literal, SqlType, TableKey};
+use senax_mysql_parser::create::{creation, CreateTableStatement};
+use senax_mysql_parser::create_table_options::TableOption;
+use senax_mysql_parser::keywords::escape;
 use serde::{Deserialize, Serialize};
 use sqlx::migrate::MigrateDatabase;
 use sqlx::{MySql, MySqlPool, Row};
-use std::collections::HashMap;
 use std::fmt;
 
-use super::parser::column::ColumnConstraint;
-use super::parser::common::{SqlType, TableKey};
-use super::parser::create::{creation, CreateTableStatement};
-use super::parser::keywords::escape;
+use crate::common::yaml_value_to_str;
+use crate::schema::SoftDelete;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Table {
     pub name: String,
+    pub old_name: Option<String>,
+    pub old_soft_delete: Option<(String, SoftDelete)>,
     pub columns: IndexMap<String, Column>,
     pub primary: Option<TableKey>,
-    pub indexes: HashMap<String, TableKey>,
-    pub constraints: HashMap<String, TableKey>,
+    pub indexes: IndexMap<String, TableKey>,
+    pub constraints: IndexMap<String, TableKey>,
+    pub comment: Option<String>,
     pub engine: Option<String>,
-    pub character_set: Option<String>,
-    pub collate: Option<String>,
+    // pub character_set: Option<String>,
+    pub collation: Option<String>,
+    pub skip_ddl: bool,
 }
 
 impl fmt::Display for Table {
@@ -42,8 +48,8 @@ impl fmt::Display for Table {
             f,
             "{}",
             self.indexes
-                .iter()
-                .map(|(_name, index)| format!(",\n    {}", index))
+                .values()
+                .map(|index| format!(",\n    {}", index))
                 .collect::<Vec<_>>()
                 .join("")
         )?;
@@ -60,22 +66,44 @@ impl fmt::Display for Table {
         if let Some(ref engine) = self.engine {
             write!(f, " ENGINE={engine}")?;
         }
-        if let Some(ref character_set) = self.character_set {
-            write!(f, " CHARACTER SET='{character_set}'")?;
-        }
-        if let Some(ref collate) = self.collate {
-            write!(f, " COLLATE='{collate}'")?;
+        // if let Some(ref character_set) = self.character_set {
+        //     write!(f, " CHARACTER SET='{character_set}'")?;
+        // }
+        if let Some(ref collation) = self.collation {
+            write!(f, " COLLATE='{collation}'")?;
         }
         write!(f, ";")
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Column {
+    pub old_name: Option<String>,
     pub sql_type: SqlType,
+    pub alt_type: SqlType,
     pub constraint: Constraint,
-    pub default: Option<String>,
+    pub default: Option<Literal>,
     pub comment: Option<String>,
+}
+
+impl PartialEq for Column {
+    fn eq(&self, other: &Self) -> bool {
+        (self.sql_type == other.sql_type
+            || self.alt_type == other.sql_type
+            || self.sql_type == other.alt_type)
+            && self.constraint == other.constraint
+            && comp_literal(&self.default, &other.default)
+            && self.comment == other.comment
+    }
+}
+
+fn comp_literal(value: &Option<Literal>, other: &Option<Literal>) -> bool {
+    if let Some(value) = value {
+        if let Some(other) = other {
+            return value.to_raw_string() == other.to_raw_string();
+        }
+    }
+    value.is_some() == other.is_some()
 }
 
 fn mysql_escape(v: &str) -> String {
@@ -95,7 +123,7 @@ impl fmt::Display for Column {
         write!(f, "{}", self.sql_type)?;
         write!(f, "{}", self.constraint)?;
         if let Some(ref default) = self.default {
-            write!(f, " DEFAULT '{}'", mysql_escape(default))?;
+            write!(f, " DEFAULT {}", default.to_string())?;
         }
         if let Some(ref comment) = self.comment {
             write!(f, " COMMENT '{}'", mysql_escape(comment))?;
@@ -104,16 +132,31 @@ impl fmt::Display for Column {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Constraint {
     pub not_null: bool,
     // pub character_set: Option<String>,
+    pub default_collation: Option<String>,
     pub collation: Option<String>,
-    // pub default_value: Option<Literal>,
+    pub default_value: Option<Literal>,
     pub auto_increment: bool,
     pub primary_key: bool,
     pub unique: bool,
     pub srid: Option<u32>,
+}
+
+impl PartialEq for Constraint {
+    fn eq(&self, other: &Self) -> bool {
+        self.not_null == other.not_null
+            && (self.collation == other.collation
+                || self.default_collation == other.collation
+                || self.collation == other.default_collation)
+            && self.default_value == other.default_value
+            && self.auto_increment == other.auto_increment
+            && self.primary_key == other.primary_key
+            && self.unique == other.unique
+            && self.srid == other.srid
+    }
 }
 
 impl fmt::Display for Constraint {
@@ -127,9 +170,9 @@ impl fmt::Display for Constraint {
         if let Some(ref c) = self.collation {
             write!(f, " COLLATE {}", c)?;
         }
-        // if let Some(ref v) = self.default_value {
-        //     write!(f, " DEFAULT {}", v.to_string())?;
-        // }
+        if let Some(ref v) = self.default_value {
+            write!(f, " DEFAULT {}", v.to_string())?;
+        }
         if self.auto_increment {
             write!(f, " AUTO_INCREMENT")?;
         }
@@ -147,9 +190,9 @@ impl fmt::Display for Constraint {
 }
 
 impl From<Vec<ColumnConstraint>> for Constraint {
-    fn from(v: Vec<ColumnConstraint>) -> Self {
+    fn from(list: Vec<ColumnConstraint>) -> Self {
         let mut constraint = Constraint::default();
-        for row in v {
+        for row in list {
             match row {
                 ColumnConstraint::NotNull => {
                     constraint.not_null = true;
@@ -158,10 +201,11 @@ impl From<Vec<ColumnConstraint>> for Constraint {
                     // constraint.character_set = Some(v);
                 }
                 ColumnConstraint::Collation(v) => {
+                    constraint.default_collation = Some(v.clone());
                     constraint.collation = Some(v);
                 }
-                ColumnConstraint::DefaultValue(_v) => {
-                    // constraint.default_value = Some(v);
+                ColumnConstraint::DefaultValue(v) => {
+                    constraint.default_value = Some(v);
                 }
                 ColumnConstraint::AutoIncrement => {
                     constraint.auto_increment = true;
@@ -188,14 +232,29 @@ fn conv(def: CreateTableStatement) -> Table {
         .fields
         .into_iter()
         .fold(IndexMap::new(), |mut map, spec| {
-            let default = spec.default_value();
+            let default = spec
+                .constraints
+                .iter()
+                .map(|v| match v {
+                    ColumnConstraint::DefaultValue(x) => Some(x.clone()),
+                    _ => None,
+                })
+                .find(|v| v.is_some())
+                .flatten();
+            let constraints: Vec<_> = spec
+                .constraints
+                .into_iter()
+                .filter(|v| !matches!(v, ColumnConstraint::DefaultValue(_)))
+                .collect();
             map.insert(
                 spec.column.name,
                 Column {
-                    sql_type: spec.sql_type,
-                    constraint: spec.constraints.into(),
+                    old_name: None,
+                    sql_type: spec.sql_type.clone(),
+                    alt_type: spec.sql_type,
+                    constraint: constraints.into(),
                     default,
-                    comment: spec.comment,
+                    comment: spec.comment.map(|v| v.to_raw_string()),
                 },
             );
             map
@@ -227,10 +286,18 @@ fn conv(def: CreateTableStatement) -> Table {
             table.indexes.remove(name);
         }
     }
+    for option in def.options {
+        match option {
+            TableOption::Comment(comment) => table.comment = Some(comment.to_raw_string()),
+            TableOption::Collation(collation) => table.collation = Some(collation),
+            TableOption::Engine(engine) => table.engine = Some(engine),
+            TableOption::Another => {}
+        }
+    }
     table
 }
 
-pub async fn parse(database_url: &str) -> Result<HashMap<String, Table>> {
+pub async fn parse(database_url: &str) -> Result<IndexMap<String, Table>> {
     if !MySql::database_exists(database_url).await? {
         return Ok(Default::default());
     }
@@ -238,13 +305,13 @@ pub async fn parse(database_url: &str) -> Result<HashMap<String, Table>> {
     let mut conn = pool.acquire().await?;
 
     let rows = sqlx::query("show full tables where Table_Type != 'VIEW'")
-        .fetch_all(&mut conn)
+        .fetch_all(conn.as_mut())
         .await?;
     let tables: Vec<String> = rows.iter().map(|v| v.get(0)).collect();
-    let mut result = HashMap::new();
+    let mut result = IndexMap::new();
     for table in tables {
         let row = sqlx::query(&format!("show create table `{}`;", &table))
-            .fetch_one(&mut conn)
+            .fetch_one(conn.as_mut())
             .await?;
         let def: String = row.get(1);
         let def = match creation(def.as_bytes()) {
@@ -271,6 +338,65 @@ pub async fn parse(database_url: &str) -> Result<HashMap<String, Table>> {
         result.insert(table, def);
     }
     Ok(result)
+}
+
+pub fn parse_default_value(value: &serde_yaml::Value, sql_type: &SqlType) -> Result<Literal> {
+    let value: String = yaml_value_to_str(value)?;
+    match sql_type {
+        SqlType::Bool => {
+            let t: bool = value.parse()?;
+            if t {
+                Ok(Literal::Integer(1))
+            } else {
+                Ok(Literal::Integer(0))
+            }
+        }
+        SqlType::Char(_) => Ok(Literal::String(value)),
+        SqlType::Varchar(_) => Ok(Literal::String(value)),
+        SqlType::Int => Ok(Literal::Integer(value.parse()?)),
+        SqlType::UnsignedInt => Ok(Literal::UnsignedInteger(value.parse()?)),
+        SqlType::Smallint => Ok(Literal::Integer(value.parse()?)),
+        SqlType::UnsignedSmallint => Ok(Literal::UnsignedInteger(value.parse()?)),
+        SqlType::Bigint => Ok(Literal::Integer(value.parse()?)),
+        SqlType::UnsignedBigint => Ok(Literal::UnsignedInteger(value.parse()?)),
+        SqlType::Tinyint => Ok(Literal::Integer(value.parse()?)),
+        SqlType::UnsignedTinyint => Ok(Literal::UnsignedInteger(value.parse()?)),
+        SqlType::Blob => Ok(Literal::Null),
+        SqlType::Longblob => Ok(Literal::Null),
+        SqlType::Mediumblob => Ok(Literal::Null),
+        SqlType::Tinyblob => Ok(Literal::Null),
+        SqlType::Double => Ok(Literal::Integer(value.parse()?)),
+        SqlType::Float => Ok(Literal::Integer(value.parse()?)),
+        SqlType::Real => Ok(Literal::Integer(value.parse()?)),
+        SqlType::Tinytext => Ok(Literal::String(value)),
+        SqlType::Mediumtext => Ok(Literal::String(value)),
+        SqlType::Longtext => Ok(Literal::String(value)),
+        SqlType::Text => Ok(Literal::String(value)),
+        SqlType::Date => Ok(Literal::Null),
+        SqlType::Time => Ok(Literal::Null),
+        SqlType::DateTime(_) => {
+            if "CURRENT_TIMESTAMP".eq_ignore_ascii_case(&value) {
+                Ok(Literal::CurrentTimestamp)
+            } else {
+                Ok(Literal::Null)
+            }
+        }
+        SqlType::Timestamp(_) => {
+            if "CURRENT_TIMESTAMP".eq_ignore_ascii_case(&value) {
+                Ok(Literal::CurrentTimestamp)
+            } else {
+                Ok(Literal::Null)
+            }
+        }
+        SqlType::Binary(_) => Ok(Literal::Null),
+        SqlType::Varbinary(_) => Ok(Literal::Null),
+        SqlType::Enum(_) => Ok(Literal::String(value)),
+        SqlType::Set(_) => Ok(Literal::String(value)),
+        SqlType::Decimal(_, _) => Ok(Literal::Integer(value.parse()?)),
+        SqlType::Json => Ok(Literal::Null),
+        SqlType::Point => Ok(Literal::Null),
+        SqlType::Geometry => Ok(Literal::Null),
+    }
 }
 
 #[cfg(test)]

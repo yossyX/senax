@@ -29,13 +29,13 @@ pub fn run(
                     tokio::select! {
                         result = listener.accept() => {
                             let (stream, addr) = result?;
-                            let (db, conn_no, mode) = check_stream(&stream, &pw).await?;
+                            let (stream_id, conn_no, mode) = check_stream(&stream, &pw).await?;
                             let tx_end3 = tx_end2.clone();
                             if mode == SENDER {
                                 info!("sender connected from {}", addr);
                                 let to_all = to_all.clone();
                                 tokio_uring::spawn(async move {
-                                    if let Err(e) = handle_sender_stream(conn_no, stream, db, tx_end3, to_all).await {
+                                    if let Err(e) = handle_sender_stream(conn_no, stream, stream_id, tx_end3, to_all).await {
                                         error!("tcp sender {}", &e);
                                     }
                                     info!("sender disconnected: {}", addr);
@@ -43,7 +43,7 @@ pub fn run(
                             } else if mode == RECEIVER {
                                 info!("receiver connected from {}", addr);
                                 let (to_hub, from_hub) = mpsc::unbounded_channel::<Pack>();
-                                tx_incoming_local.send((db, to_hub)).await?;
+                                tx_incoming_local.send((stream_id, to_hub)).await?;
                                 tokio_uring::spawn(async move {
                                     if let Err(e) = handle_receiver_stream(conn_no, stream, tx_end3, from_hub).await {
                                         error!("tcp receiver {}", &e);
@@ -87,7 +87,7 @@ async fn check_stream(stream: &TcpStream, pw: &str) -> Result<(u64, u64, u16)> {
     }
 
     let buf = IoBytesMut::new(8);
-    let db = read_all(buf, stream).await?.get_u64_le();
+    let stream_id = read_all(buf, stream).await?.get_u64_le();
 
     let conn_no = if mode == SENDER {
         let conn_no = CONN_NO.fetch_add(1, Ordering::SeqCst);
@@ -99,14 +99,13 @@ async fn check_stream(stream: &TcpStream, pw: &str) -> Result<(u64, u64, u16)> {
         let buf = IoBytesMut::new(8);
         read_all(buf, stream).await?.get_u64_le()
     };
-
-    Ok((db, conn_no, mode))
+    Ok((stream_id, conn_no, mode))
 }
 
 async fn handle_sender_stream(
     conn_no: u64,
     stream: TcpStream,
-    db: u64,
+    stream_id: u64,
     tx_end: broadcast::Sender<i32>,
     to_all: Sender<Pack>,
 ) -> Result<()> {
@@ -119,7 +118,7 @@ async fn handle_sender_stream(
                 if n == 0 { break }
                 buf.advance(n);
                 let data =  read_msg(buf, &stream).await?.freeze();
-                let _ = to_all.send(Pack{data, conn_no, db}).await;
+                let _ = to_all.send(Pack{data, conn_no, stream_id}).await;
             },
             _stop = rx_end.recv() => break,
             else => break,

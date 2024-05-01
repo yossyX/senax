@@ -4,7 +4,7 @@ use actix_web::{
     error::Error,
     FromRequest, HttpMessage, HttpRequest,
 };
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use senax_common::session::interface::{SaveError, SessionData, SessionStore};
 use senax_common::session::SessionKey;
 use serde::{de::DeserializeOwned, Serialize};
@@ -14,7 +14,7 @@ use time::Duration;
 
 use crate::{config::Configuration, middleware::e500};
 
-const MAX_RETRY_COUNT: usize = 5;
+const MAX_RETRY_COUNT: usize = 10;
 
 #[derive(Clone)]
 pub struct Session<Store: SessionStore + 'static>(Arc<Mutex<SessionInner<Store>>>);
@@ -28,9 +28,9 @@ pub enum SessionStatus {
 
 pub struct SessionInner<Store: SessionStore + 'static> {
     session_key: Option<SessionKey>,
-    base_data: HashMap<String, Vec<u8>>,
-    login_data: HashMap<String, Vec<u8>>,
-    debug_data: HashMap<String, Vec<u8>>,
+    guest_zone: HashMap<String, Vec<u8>>,
+    user_zone: HashMap<String, Vec<u8>>,
+    debug_zone: HashMap<String, Vec<u8>>,
     update: bool,
     status: SessionStatus,
     state_ttl: Duration,
@@ -39,78 +39,90 @@ pub struct SessionInner<Store: SessionStore + 'static> {
 }
 
 impl<Store: SessionStore + 'static> SessionInner<Store> {
-    pub fn get_from_base<T: DeserializeOwned>(&mut self, key: &str) -> Result<Option<T>> {
-        if let Some(val) = self.base_data.get(key) {
-            Ok(Some(serde_cbor::from_slice(val)?))
+    pub fn get_from_guest_zone<T: DeserializeOwned>(&mut self, key: &str) -> Result<Option<T>> {
+        if let Some(val) = self.guest_zone.get(key) {
+            Ok(Some(ciborium::from_reader(val.as_slice())?))
         } else {
             Ok(None)
         }
     }
 
-    pub fn insert_to_base<T: Serialize>(&mut self, key: impl Into<String>, value: T) -> Result<()> {
-        self.update = true;
-        let val = serde_cbor::to_vec(&value)?;
-        self.base_data.insert(key.into(), val);
-        Ok(())
-    }
-
-    pub fn remove_from_base(&mut self, key: &str) {
-        self.update = true;
-        self.base_data.remove(key);
-    }
-
-    pub fn remove_from_base_as<T: DeserializeOwned>(&mut self, key: &str) -> Option<Result<T>> {
-        self.update = true;
-        self.base_data
-            .remove(key)
-            .map(|val| Ok(serde_cbor::from_slice(&val)?))
-    }
-
-    pub fn clear_base_data(&mut self) {
-        self.update = true;
-        self.base_data.clear();
-    }
-
-    pub fn get_from_login<T: DeserializeOwned>(&mut self, key: &str) -> Result<Option<T>> {
-        if let Some(val) = self.login_data.get(key) {
-            Ok(Some(serde_cbor::from_slice(val)?))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn insert_to_login<T: Serialize>(
+    pub fn insert_to_guest_zone<T: Serialize>(
         &mut self,
         key: impl Into<String>,
         value: T,
     ) -> Result<()> {
         self.update = true;
-        let val = serde_cbor::to_vec(&value)?;
-        self.login_data.insert(key.into(), val);
+        let mut buf = Vec::new();
+        ciborium::into_writer(&value, &mut buf)?;
+        self.guest_zone.insert(key.into(), buf);
         Ok(())
     }
 
-    pub fn remove_from_login(&mut self, key: &str) {
+    pub fn remove_from_guest_zone(&mut self, key: &str) {
         self.update = true;
-        self.login_data.remove(key);
+        self.guest_zone.remove(key);
     }
 
-    pub fn remove_from_login_as<T: DeserializeOwned>(&mut self, key: &str) -> Option<Result<T>> {
+    pub fn remove_from_guest_zone_as<T: DeserializeOwned>(
+        &mut self,
+        key: &str,
+    ) -> Option<Result<T>> {
         self.update = true;
-        self.login_data
+        self.guest_zone
             .remove(key)
-            .map(|val| Ok(serde_cbor::from_slice(&val)?))
+            .map(|val| Ok(ciborium::from_reader(val.as_slice())?))
     }
 
-    pub fn clear_login_data(&mut self) {
+    pub fn clear_guest_zone(&mut self) {
         self.update = true;
-        self.login_data.clear();
+        self.guest_zone.clear();
     }
 
-    pub fn get_from_debug<T: DeserializeOwned>(&mut self, key: &str) -> Result<Option<T>> {
+    pub fn get_from_user_zone<T: DeserializeOwned>(&mut self, key: &str) -> Result<Option<T>> {
+        if let Some(val) = self.user_zone.get(key) {
+            Ok(Some(ciborium::from_reader(val.as_slice())?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn insert_to_user_zone<T: Serialize>(
+        &mut self,
+        key: impl Into<String>,
+        value: T,
+    ) -> Result<()> {
+        self.update = true;
+        let mut buf = Vec::new();
+        ciborium::into_writer(&value, &mut buf)?;
+        self.user_zone.insert(key.into(), buf);
+        Ok(())
+    }
+
+    pub fn remove_from_user_zone(&mut self, key: &str) {
+        self.update = true;
+        self.user_zone.remove(key);
+    }
+
+    pub fn remove_from_user_zone_as<T: DeserializeOwned>(
+        &mut self,
+        key: &str,
+    ) -> Option<Result<T>> {
+        self.update = true;
+        self.user_zone
+            .remove(key)
+            .map(|val| Ok(ciborium::from_reader(val.as_slice())?))
+    }
+
+    pub fn clear_user_zone(&mut self) {
+        self.update = true;
+        self.user_zone.clear();
+    }
+
+    pub fn get_from_debug_zone<T: DeserializeOwned>(&mut self, key: &str) -> Result<Option<T>> {
         if cfg!(debug_assertions) {
-            if let Some(val) = self.debug_data.get(key) {
-                Ok(Some(serde_cbor::from_slice(val)?))
+            if let Some(val) = self.debug_zone.get(key) {
+                Ok(Some(ciborium::from_reader(val.as_slice())?))
             } else {
                 Ok(None)
             }
@@ -119,41 +131,45 @@ impl<Store: SessionStore + 'static> SessionInner<Store> {
         }
     }
 
-    pub fn insert_to_debug<T: Serialize>(
+    pub fn insert_to_debug_zone<T: Serialize>(
         &mut self,
         key: impl Into<String>,
         value: T,
     ) -> Result<()> {
         if cfg!(debug_assertions) {
             self.update = true;
-            let val = serde_cbor::to_vec(&value)?;
-            self.debug_data.insert(key.into(), val);
+            let mut buf = Vec::new();
+            ciborium::into_writer(&value, &mut buf)?;
+            self.debug_zone.insert(key.into(), buf);
         }
         Ok(())
     }
 
-    pub fn remove_from_debug(&mut self, key: &str) {
+    pub fn remove_from_debug_zone(&mut self, key: &str) {
         if cfg!(debug_assertions) {
             self.update = true;
-            self.debug_data.remove(key);
+            self.debug_zone.remove(key);
         }
     }
 
-    pub fn remove_from_debug_as<T: DeserializeOwned>(&mut self, key: &str) -> Option<Result<T>> {
+    pub fn remove_from_debug_zone_as<T: DeserializeOwned>(
+        &mut self,
+        key: &str,
+    ) -> Option<Result<T>> {
         if cfg!(debug_assertions) {
             self.update = true;
-            self.debug_data
+            self.debug_zone
                 .remove(key)
-                .map(|val| Ok(serde_cbor::from_slice(&val)?))
+                .map(|val| Ok(ciborium::from_reader(val.as_slice())?))
         } else {
             None
         }
     }
 
-    pub fn clear_debug_data(&mut self) {
+    pub fn clear_debug_zone(&mut self) {
         if cfg!(debug_assertions) {
             self.update = true;
-            self.debug_data.clear();
+            self.debug_zone.clear();
         }
     }
 }
@@ -164,51 +180,54 @@ impl<Store: SessionStore + 'static> Session<Store> {
     }
 
     pub fn csrf_token(&self) -> Option<String> {
+        use std::fmt::Write;
         self.0.lock().unwrap().session_key.as_ref().map(|v| {
-            Sha256::digest(&String::from(v))
+            Sha256::digest(String::from(v))
                 .iter()
                 .take(8)
-                .map(|x| format!("{:02X}", x))
-                .collect::<String>()
+                .fold(String::new(), |mut output, x| {
+                    write!(output, "{:02X}", x).unwrap();
+                    output
+                })
         })
     }
 
-    pub fn contains_in_base(&self, key: &str) -> bool {
-        self.0.lock().unwrap().base_data.contains_key(key)
+    pub fn contains_in_guest_zone(&self, key: &str) -> bool {
+        self.0.lock().unwrap().guest_zone.contains_key(key)
     }
 
-    pub fn contains_in_login(&self, key: &str) -> bool {
-        self.0.lock().unwrap().login_data.contains_key(key)
+    pub fn contains_in_user_zone(&self, key: &str) -> bool {
+        self.0.lock().unwrap().user_zone.contains_key(key)
     }
 
-    pub fn contains_in_debug(&self, key: &str) -> bool {
+    pub fn contains_in_debug_zone(&self, key: &str) -> bool {
         if cfg!(debug_assertions) {
-            self.0.lock().unwrap().debug_data.contains_key(key)
+            self.0.lock().unwrap().debug_zone.contains_key(key)
         } else {
             false
         }
     }
 
-    pub fn get_from_base<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
-        if let Some(val) = self.0.lock().unwrap().base_data.get(key) {
-            Ok(Some(serde_cbor::from_slice(val)?))
+    pub fn get_from_guest_zone<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
+        if let Some(val) = self.0.lock().unwrap().guest_zone.get(key) {
+            Ok(Some(ciborium::from_reader(val.as_slice())?))
         } else {
             Ok(None)
         }
     }
 
-    pub fn get_from_login<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
-        if let Some(val) = self.0.lock().unwrap().login_data.get(key) {
-            Ok(Some(serde_cbor::from_slice(val)?))
+    pub fn get_from_user_zone<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
+        if let Some(val) = self.0.lock().unwrap().user_zone.get(key) {
+            Ok(Some(ciborium::from_reader(val.as_slice())?))
         } else {
             Ok(None)
         }
     }
 
-    pub fn get_from_debug<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
+    pub fn get_from_debug_zone<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
         if cfg!(debug_assertions) {
-            if let Some(val) = self.0.lock().unwrap().debug_data.get(key) {
-                Ok(Some(serde_cbor::from_slice(val)?))
+            if let Some(val) = self.0.lock().unwrap().debug_zone.get(key) {
+                Ok(Some(ciborium::from_reader(val.as_slice())?))
             } else {
                 Ok(None)
             }
@@ -217,16 +236,16 @@ impl<Store: SessionStore + 'static> Session<Store> {
         }
     }
 
-    pub fn keys_of_base(&self) -> Vec<String> {
-        self.0.lock().unwrap().base_data.keys().cloned().collect()
+    pub fn keys_of_guest_zone(&self) -> Vec<String> {
+        self.0.lock().unwrap().guest_zone.keys().cloned().collect()
     }
 
-    pub fn keys_of_login(&self) -> Vec<String> {
-        self.0.lock().unwrap().login_data.keys().cloned().collect()
+    pub fn keys_of_user_zone(&self) -> Vec<String> {
+        self.0.lock().unwrap().user_zone.keys().cloned().collect()
     }
 
-    pub fn keys_of_debug(&self) -> Vec<String> {
-        self.0.lock().unwrap().debug_data.keys().cloned().collect()
+    pub fn keys_of_debug_zone(&self) -> Vec<String> {
+        self.0.lock().unwrap().debug_zone.keys().cloned().collect()
     }
 
     pub fn status(&self) -> SessionStatus {
@@ -246,19 +265,15 @@ impl<Store: SessionStore + 'static> Session<Store> {
                     return f_result;
                 }
                 inner.update = false;
-                let list = vec![&inner.debug_data, &inner.login_data, &inner.base_data];
-                let data = serde_cbor::to_vec(&list)?;
-                let session_data = SessionData::from((data, inner.state_ttl, inner.version));
+                let list = vec![&inner.debug_zone, &inner.user_zone, &inner.guest_zone];
+                let mut buf = Vec::new();
+                ciborium::into_writer(&list, &mut buf)?;
+                let session_data = SessionData::from((buf, inner.state_ttl, inner.version));
                 let key = inner.session_key.as_ref().cloned();
                 let storage = Arc::clone(&inner.storage);
                 (f_result, session_data, key, storage)
             };
-            let result = if key.is_some() {
-                storage.update(key.as_ref().unwrap(), session_data).await
-            } else {
-                storage.save(session_data).await
-            };
-            match result {
+            match storage.save(key, session_data).await {
                 Ok(key) => {
                     let mut inner = self.0.lock().unwrap();
                     if !matches!(&inner.session_key, Some(x) if x == &key) {
@@ -271,11 +286,16 @@ impl<Store: SessionStore + 'static> Session<Store> {
                     if retry_count > MAX_RETRY_COUNT {
                         bail!("too many session update retry");
                     }
+                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
                     self.reload().await?;
                     continue;
                 }
-                Err(e) => {
-                    return Err(anyhow!(e));
+                Err(SaveError::RetryableWithData(data)) => {
+                    self.reload_from_data(data).await?;
+                    continue;
+                }
+                Err(SaveError::Other(e)) => {
+                    return Err(e);
                 }
             }
             return f_result;
@@ -291,9 +311,9 @@ impl<Store: SessionStore + 'static> Session<Store> {
         let mut inner = self.0.lock().unwrap();
         inner.status = SessionStatus::Purged;
         inner.session_key = None;
-        inner.base_data.clear();
-        inner.login_data.clear();
-        inner.debug_data.clear();
+        inner.guest_zone.clear();
+        inner.user_zone.clear();
+        inner.debug_zone.clear();
         inner.version = 0;
         Ok(())
     }
@@ -314,13 +334,14 @@ impl<Store: SessionStore + 'static> Session<Store> {
                 let mut inner = self.0.lock().unwrap();
                 let f_result = f(&mut inner);
                 inner.update = false;
-                let list = vec![&inner.debug_data, &inner.login_data, &inner.base_data];
-                let data = serde_cbor::to_vec(&list)?;
-                let session_data = SessionData::from((data, inner.state_ttl, inner.version));
+                let list = vec![&inner.debug_zone, &inner.user_zone, &inner.guest_zone];
+                let mut buf = Vec::new();
+                ciborium::into_writer(&list, &mut buf)?;
+                let session_data = SessionData::from((buf, inner.state_ttl, inner.version));
                 let storage = Arc::clone(&inner.storage);
                 (f_result, session_data, storage)
             };
-            match storage.save(session_data).await {
+            match storage.save(None, session_data).await {
                 Ok(key) => {
                     let mut inner = self.0.lock().unwrap();
                     inner.status = SessionStatus::Changed;
@@ -333,8 +354,11 @@ impl<Store: SessionStore + 'static> Session<Store> {
                     }
                     continue;
                 }
-                Err(e) => {
-                    return Err(anyhow!(e));
+                Err(SaveError::RetryableWithData(_)) => {
+                    bail!("unreachable error");
+                }
+                Err(SaveError::Other(e)) => {
+                    return Err(e);
                 }
             }
             return f_result;
@@ -367,7 +391,7 @@ impl<Store: SessionStore + 'static> Session<Store> {
             if (ttl - data.ttl()) > (ttl >> 6) {
                 data.set_ttl(configuration.session.state_ttl);
                 let _ = storage.update_ttl(session_key, &data).await.map_err(|e| {
-                    tracing::warn!("{}", e);
+                    log::warn!("{}", e);
                 });
                 if configuration.cookie.max_age.is_some() {
                     status = SessionStatus::Changed;
@@ -377,13 +401,13 @@ impl<Store: SessionStore + 'static> Session<Store> {
         let mut list: Vec<HashMap<String, Vec<u8>>> = if data.is_empty_data() {
             Vec::new()
         } else {
-            serde_cbor::from_slice(data.data())?
+            ciborium::from_reader(data.data())?
         };
         let inner = SessionInner::<Store> {
             session_key,
-            base_data: list.pop().unwrap_or_default(),
-            login_data: list.pop().unwrap_or_default(),
-            debug_data: list.pop().unwrap_or_default(),
+            guest_zone: list.pop().unwrap_or_default(),
+            user_zone: list.pop().unwrap_or_default(),
+            debug_zone: list.pop().unwrap_or_default(),
             update: false,
             status,
             state_ttl: configuration.session.state_ttl,
@@ -399,9 +423,9 @@ impl<Store: SessionStore + 'static> Session<Store> {
         let mut inner = self.0.lock().unwrap();
         inner.status = SessionStatus::Unchanged;
         inner.session_key = None;
-        inner.base_data.clear();
-        inner.login_data.clear();
-        inner.debug_data.clear();
+        inner.guest_zone.clear();
+        inner.user_zone.clear();
+        inner.debug_zone.clear();
         inner.version = 0;
     }
 
@@ -421,15 +445,15 @@ impl<Store: SessionStore + 'static> Session<Store> {
             let list: Vec<HashMap<String, Vec<u8>>> = if data.is_empty_data() {
                 Vec::new()
             } else {
-                serde_cbor::from_slice(data.data())?
+                ciborium::from_reader(data.data())?
             };
             (data, list)
         };
         let mut inner = self.0.lock().unwrap();
         inner.session_key = session_key;
-        inner.base_data = list.pop().unwrap_or_default();
-        inner.login_data = list.pop().unwrap_or_default();
-        inner.debug_data = list.pop().unwrap_or_default();
+        inner.guest_zone = list.pop().unwrap_or_default();
+        inner.user_zone = list.pop().unwrap_or_default();
+        inner.debug_zone = list.pop().unwrap_or_default();
         inner.version = data.version();
         Ok(())
     }
@@ -452,14 +476,31 @@ impl<Store: SessionStore + 'static> Session<Store> {
             let list: Vec<HashMap<String, Vec<u8>>> = if data.is_empty_data() {
                 Vec::new()
             } else {
-                serde_cbor::from_slice(data.data())?
+                ciborium::from_reader(data.data())?
             };
             (data, list)
         };
         let mut inner = self.0.lock().unwrap();
-        inner.base_data = list.pop().unwrap_or_default();
-        inner.login_data = list.pop().unwrap_or_default();
-        inner.debug_data = list.pop().unwrap_or_default();
+        inner.guest_zone = list.pop().unwrap_or_default();
+        inner.user_zone = list.pop().unwrap_or_default();
+        inner.debug_zone = list.pop().unwrap_or_default();
+        inner.version = data.version();
+        Ok(())
+    }
+
+    pub(crate) async fn reload_from_data(&self, data: SessionData) -> Result<()> {
+        let (data, mut list) = {
+            let list: Vec<HashMap<String, Vec<u8>>> = if data.is_empty_data() {
+                Vec::new()
+            } else {
+                ciborium::from_reader(data.data())?
+            };
+            (data, list)
+        };
+        let mut inner = self.0.lock().unwrap();
+        inner.guest_zone = list.pop().unwrap_or_default();
+        inner.user_zone = list.pop().unwrap_or_default();
+        inner.debug_zone = list.pop().unwrap_or_default();
         inner.version = data.version();
         Ok(())
     }
@@ -490,21 +531,21 @@ impl<Store: SessionStore + 'static> Session<Store> {
 impl<Store: SessionStore + 'static> std::fmt::Debug for Session<Store> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let inner = self.0.lock().unwrap();
-        let list: Vec<HashMap<&String, serde_cbor::Value>> = vec![
+        let list: Vec<HashMap<&String, ciborium::Value>> = vec![
             inner
-                .base_data
+                .guest_zone
                 .iter()
-                .map(|(k, v)| (k, serde_cbor::from_slice(v).unwrap()))
+                .map(|(k, v)| (k, ciborium::from_reader(v.as_slice()).unwrap()))
                 .collect(),
             inner
-                .login_data
+                .user_zone
                 .iter()
-                .map(|(k, v)| (k, serde_cbor::from_slice(v).unwrap()))
+                .map(|(k, v)| (k, ciborium::from_reader(v.as_slice()).unwrap()))
                 .collect(),
             inner
-                .debug_data
+                .debug_zone
                 .iter()
-                .map(|(k, v)| (k, serde_cbor::from_slice(v).unwrap()))
+                .map(|(k, v)| (k, ciborium::from_reader(v.as_slice()).unwrap()))
                 .collect(),
         ];
         f.debug_tuple("Session")

@@ -31,7 +31,7 @@
 |find_optional_from_cache_with_trashed||
 |find_optional_with_trashed||
 |find_with_trashed||
-|for_update||
+|updater||
 |force_delete||
 |force_delete_all||
 |force_delete_by_ids||
@@ -44,6 +44,7 @@
 |save||
 |save_delayed||
 |set||
+|update_many|指定された複数のIDに対して同一の更新を適用する|
 |upsert_delayed||
 |_receive_update_notice||
 
@@ -52,7 +53,7 @@
 |メソッド|説明|
 |---|---|
 |bind||
-|cond||
+|filter||
 |count||
 |delete||
 |fetch_category||
@@ -61,23 +62,20 @@
 |limit||
 |offset||
 |only_trashed||
-|order_by||
+|order||
 |raw_query||
 |select||
 |select_for|カラム数を削減したサブセット型で取得を行う|
 |select_for_update||
 |select_from_cache||
-|select_from_cache_with_count||
 |select_one||
 |select_one_for||
 |select_stream||
 |select_stream_for||
-|select_with_count|limit制限付きの場合に、全件検索結果数とlimit分の取得結果を返す|
-|select_with_count_for||
 |update||
 |with_trashed||
 
-## _{モデル名}Rel
+## _{モデル名}Joiner
 
 |メソッド|説明|
 |---|---|
@@ -88,7 +86,7 @@
 ```
 let obj = _{モデル名}Factory {
     ...
-}.create(conn);
+}.create();
 _{モデル名}::save(conn, obj).await?;
 ```
 
@@ -103,7 +101,7 @@ let obj = _{モデル名}::find(&mut conn, id).await?
 
 ```
 let mut obj = _{モデル名}::find_for_update(&mut conn, id).await?
-obj.{カラム名}().set(1);
+obj.mut_{カラム名}().set(1);
 _{モデル名}::save(conn, obj).await?;
 ```
 

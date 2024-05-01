@@ -1,0 +1,13 @@
+[package]
+name = "senax-inflector"
+version = "0.1.1"
+edition = "2021"
+authors = ["yossyX"]
+license="BSD-2-Clause"
+description = "Pluralizes and singularizes English nouns. This crate is forked from https://github.com/whatisinternet/Inflector."
+repository = "https://github.com/yossyX/senax"
+keywords = ["senax"]
+
+[dependencies]
+lazy_static = "1.4.0"
+regex = "1"

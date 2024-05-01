@@ -2,11 +2,11 @@ pub mod db_cache;
 pub mod fast_cache;
 pub mod msec;
 
-#[cfg(target_os = "linux")]
-pub mod disk_cache;
-#[cfg(not(target_os = "linux"))]
-#[path = "cache/disk_cache_dummy.rs"]
-pub mod disk_cache;
+#[cfg(all(feature = "uring", target_os = "linux"))]
+pub mod storage_cache;
+#[cfg(not(all(feature = "uring", target_os = "linux")))]
+#[path = "cache/storage_cache_dummy.rs"]
+pub mod storage_cache;
 
 pub trait CycleCounter {
     #[must_use]

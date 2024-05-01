@@ -1,4 +1,5 @@
 // This code is auto-generated and will always be overwritten.
+// Senax v@{ ""|senax_version }@
 
 use anyhow::Result;
 use futures::future::join_all;
@@ -19,7 +20,7 @@ impl Cache {
         is_hot_deploy: bool,
         path: Option<&Path>,
         use_fast_cache: bool,
-        use_disk_cache: bool,
+        use_storage_cache: bool,
     ) -> Result<()> {
         if CACHE.get().is_none() {
             let _ = CACHE.set(DbCache::start(
@@ -27,7 +28,7 @@ impl Cache {
                 is_hot_deploy,
                 path,
                 use_fast_cache,
-                use_disk_cache,
+                use_storage_cache,
             )?);
         }
         Ok(())
@@ -54,6 +55,21 @@ impl Cache {
     pub async fn insert_long(id: &dyn HashVal, value: Arc<dyn CacheVal>, use_fast_cache: bool) {
         if let Some(cache) = CACHE.get() {
             cache.insert_long(id, value, use_fast_cache).await;
+        }
+    }
+
+    pub async fn insert(
+        id: &dyn HashVal,
+        value: Arc<dyn CacheVal>,
+        use_fast_cache: bool,
+        long: bool,
+    ) {
+        if let Some(cache) = CACHE.get() {
+            if long {
+                cache.insert_long(id, value, use_fast_cache).await;
+            } else {
+                cache.insert_short(id, value).await;
+            }
         }
     }
 
@@ -132,6 +148,12 @@ impl Cache {
         }
     }
 
+    pub async fn invalidate_version(id: &dyn HashVal, shard_id: ShardId) {
+        if let Some(cache) = CACHE.get() {
+            cache.invalidate_version(id, shard_id).await;
+        }
+    }
+
     pub fn invalidate_all_of<T>()
     where
         T: CacheVal,
@@ -162,8 +184,8 @@ impl Cache {
     pub fn short_cache_hit() -> Option<u64> {
         CACHE.get().map(|c| c.short_cache_hit())
     }
-    pub fn disk_cache_hit() -> Option<u64> {
-        CACHE.get().map(|c| c.disk_cache_hit())
+    pub fn storage_cache_hit() -> Option<u64> {
+        CACHE.get().map(|c| c.storage_cache_hit())
     }
     pub fn cache_request_count() -> Option<u64> {
         CACHE.get().map(|c| c.cache_request_count())

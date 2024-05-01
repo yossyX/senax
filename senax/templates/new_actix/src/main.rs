@@ -1,42 +1,45 @@
+@% if non_snake_case -%@
+#![allow(non_snake_case)]
+@% endif -%@
 #[macro_use]
 extern crate log;
 
 use actix_web::dev::Service as _;
 use actix_web::web::Data;
 use actix_web::{guard, middleware, web, App, HttpMessage, HttpServer};
-use anyhow::Result;
+use anyhow::{ensure, Context, Result};
 use async_graphql::{EmptySubscription, Schema};
-use clap::Parser;
-use db_session::session::session::{self, _SessionStore};
+use clap::{Parser, Subcommand};
+use db_session::models::session::session::_SessionStore;
 use dotenvy::dotenv;
-use futures::stream::StreamExt;
 use mimalloc::MiMalloc;
 use once_cell::sync::OnceCell;
-use senax_actix_session;
 use sha2::{Digest, Sha512};
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
-use std::io::Write;
 use std::net::TcpListener;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
-use time::macros::offset;
 use tokio::sync::mpsc;
 use tokio::time::{sleep, Duration};
 
+use crate::auto_api::{MutationRoot, QueryRoot};
 use crate::context::Ctx;
-use crate::graphql::{MutationRoot, QueryRoot, QuerySchema};
 
-pub mod auth;
+mod auto_api;
+mod auth;
+mod common;
 mod context;
 mod db;
-mod graphql;
+mod gql_log;
 mod response;
 mod routes {
-    pub mod api;
     pub mod root;
 }
+mod tasks;
+#[cfg(test)]
+mod tests;
+mod validator;
 
 const HOST_PORT: &str = "HOST_PORT";
 const WORK_DIR: &str = "WORK_DIR";
@@ -44,9 +47,11 @@ const DEFAULT_HOST_PORT: &str = "0.0.0.0:8080";
 const DEFAULT_WORK_DIR: &str = "temp";
 const LINKER_PORT: &str = "LINKER_PORT";
 const LINKER_PASSWORD: &str = "LINKER_PASSWORD";
+const SECRET_KEY: &str = "SECRET_KEY";
 const SESSION_SECRET_KEY: &str = "SESSION_SECRET_KEY";
 // for Hot Deploy
 const SERVER_STARTER_PORT: &str = "SERVER_STARTER_PORT";
+#[cfg(unix)]
 const KILL_PARENT: &str = "KILL_PARENT";
 
 #[global_allocator]
@@ -57,32 +62,148 @@ static SHUTDOWN_GUARD: OnceCell<Weak<mpsc::Sender<u8>>> = OnceCell::new();
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct AppArg {
+    #[clap(long)]
+    auto_migrate: bool,
     #[clap(long = "pid")]
     /// output pid file
     pid: Option<String>,
-    #[clap(long, short)]
-    gql_schema: bool,
+    #[clap(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand, PartialEq, Clone, Debug)]
+enum Command {
+    GqlSchema,
+    Migrate {
+        /// Drop DB before migrating
+        #[clap(short, long)]
+        clean: bool,
+        /// Drop DB before migrating in release environment
+        #[clap(long)]
+        force_delete_all_db: bool,
+        /// Use test environment
+        #[clap(short, long)]
+        test: bool,
+    },
+    GenSeedSchema,
+    Seed {
+        /// Use clean migration
+        #[clap(short, long)]
+        clean: bool,
+        /// Drop DB before migrating in release environment
+        #[clap(long)]
+        force_delete_all_db: bool,
+        /// Use test environment
+        #[clap(short, long)]
+        test: bool,
+    },
+    Check {
+        /// Use test environment
+        #[clap(short, long)]
+        test: bool,
+    },
+    /// generate graphql json schema
+    GenGqlSchema {
+        #[clap(long)]
+        ts_dir: PathBuf,
+    },
 }
 
 #[actix_web::main]
 async fn main() -> Result<()> {
     dotenv().ok();
+    #[cfg(feature = "etcd")]
+    senax_common::etcd::init().await?;
+
     let arg: AppArg = AppArg::parse();
-
-    senax_logger::init(Some(offset!(+9)))?;
-
-    let schema: QuerySchema = Schema::build(QueryRoot, MutationRoot, EmptySubscription).finish();
-    if arg.gql_schema {
-        println!("{}", &schema.sdl());
-        return Ok(());
+    let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
+        .extension(gql_log::GqlLogger)
+        .extension(
+            async_graphql::extensions::apollo_persisted_queries::ApolloPersistedQueries::new(
+                async_graphql::extensions::apollo_persisted_queries::LruCacheStorage::new(1000),
+            ),
+        )
+        .limit_complexity(auto_api::LIMIT_COMPLEXITY);
+    let schema = if cfg!(debug_assertions) || cfg!(feature = "graphiql") {
+        schema.finish()
+    } else {
+        schema
+            .disable_introspection()
+            .disable_suggestions()
+            .finish()
+    };
+    if let Some(command) = arg.command {
+        match command {
+            Command::GqlSchema => {
+                println!("{}", &schema.sdl());
+                return Ok(());
+            }
+            Command::Migrate {
+                clean,
+                test,
+                force_delete_all_db,
+            } => {
+                if clean {
+                    ensure!(
+                        force_delete_all_db || cfg!(debug_assertions),
+                        "clean migrate is debug environment only"
+                    );
+                }
+                db::migrate(test, clean || force_delete_all_db, false).await?;
+                return Ok(());
+            }
+            Command::GenSeedSchema => {
+                db::gen_seed_schema()?;
+                return Ok(());
+            }
+            Command::Seed {
+                clean,
+                test,
+                force_delete_all_db,
+            } => {
+                if clean {
+                    ensure!(
+                        force_delete_all_db || cfg!(debug_assertions),
+                        "clean migrate is debug environment only"
+                    );
+                    db::migrate(test, clean || force_delete_all_db, false).await?;
+                }
+                db::seed(test).await?;
+                return Ok(());
+            }
+            Command::Check { test } => {
+                db::check(test).await?;
+                return Ok(());
+            }
+            Command::GenGqlSchema { ts_dir } => {
+                auto_api::gen_json_schema(&ts_dir.join("src").join("gql_query"))?;
+                return Ok(());
+            }
+        }
     }
 
+    let offset_in_sec = chrono::Local::now().offset().local_minus_utc();
+    senax_logger::init(
+        senax_logger::Rotation::DAILY,
+        Some(time::UtcOffset::from_whole_seconds(offset_in_sec)?),
+        !cfg!(debug_assertions),
+    )?;
+    if arg.auto_migrate {
+        info!("Starting migration");
+        db::migrate(false, false, true).await?;
+    }
     let port = env::var(HOST_PORT).unwrap_or_else(|_| DEFAULT_HOST_PORT.to_owned());
+    info!("HOST_PORT: {:?}", port);
     let dir = env::var(WORK_DIR).unwrap_or_else(|_| DEFAULT_WORK_DIR.to_owned());
+    info!("WORK_DIR: {:?}", dir);
     let is_hot_deploy = env::var(SERVER_STARTER_PORT).is_ok();
     let linker_port = env::var(LINKER_PORT).ok();
+    info!("LINKER_PORT: {:?}", linker_port);
     let linker_pw = env::var(LINKER_PASSWORD).ok();
-    let use_linker = linker_port.is_some();
+    let secret_key = env::var(SECRET_KEY).with_context(|| format!("{} required", SECRET_KEY))?;
+    auth::SECRET
+        .set(format!("{}{}", auth::INNER_KEY.as_str(), secret_key))
+        .unwrap();
 
     let (exit_tx, mut exit_rx) = mpsc::channel::<i32>(1);
     let (db_guard_tx, mut db_guard_rx) = mpsc::channel::<u8>(1);
@@ -103,15 +224,25 @@ async fn main() -> Result<()> {
         )
         .await
         .unwrap();
+    })
+    .await?;
+    tokio::spawn(async {
+        // For rolling update
+        tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+        db::clear_local_cache().await;
     });
+
+    #[cfg(feature = "v8")]
+    {
+        let platform = v8::Platform::new(0, false).make_shared();
+        v8::V8::initialize_platform(platform);
+        v8::V8::initialize();
+    }
 
     let mut listeners = take_listener(&[&port])?;
 
     tokio::spawn(handle_signals());
 
-    if use_linker {
-        sleep(Duration::from_secs(2)).await;
-    }
     tokio::spawn(async move {
         loop {
             senax_actix_session::SessionMiddleware::gc(_SessionStore, None).await;
@@ -119,14 +250,34 @@ async fn main() -> Result<()> {
         }
     });
     let session_secret_key = env::var(SESSION_SECRET_KEY)
-        .map(|v| Sha512::digest(&v).to_vec())
-        .unwrap_or_else(|_| session::SESSION_SECRET_KEY.to_vec());
+        .map(|v| Sha512::digest(v).to_vec())
+        .with_context(|| format!("{} required", SESSION_SECRET_KEY))?;
 
     let server = HttpServer::new(move || {
         App::new()
-            .wrap(middleware::Logger::default())
+            .wrap(
+                middleware::Logger::new(
+                    r#"%a "%r" %s %b "%{Referer}i" "%{User-Agent}i" %{ctx}xi %{username}xi %T"#,
+                )
+                .log_target("access_log")
+                .custom_request_replace("ctx", |req| {
+                    let ctx = Ctx::get(req.request());
+                    format!("ctx={}", ctx.ctx_no())
+                })
+                .custom_request_replace("username", |req| {
+                    if let Some(auth) = req.request().extensions().get::<auth::AuthInfo>() {
+                        format!("username={}", auth.username())
+                    } else {
+                        String::new()
+                    }
+                }),
+            )
+            .wrap(middleware::Compress::default())
             .wrap_fn(|req, srv| {
                 req.extensions_mut().insert(Ctx::new());
+                if let Some(auth) = auth::retrieve_auth(req.request()) {
+                    req.extensions_mut().insert(auth);
+                }
                 srv.call(req)
             })
             .wrap(
@@ -135,23 +286,27 @@ async fn main() -> Result<()> {
                     .build(),
             )
             .configure(routes::root::init)
-            .service(
-                web::scope("/api")
-                    .app_data(web::JsonConfig::default().error_handler(response::json_error_handler))
-                    .configure(routes::api::init),
-            )
+            // .service(
+            //     web::scope("/api")
+            //         .app_data(
+            //             web::JsonConfig::default().error_handler(response::json_error_handler),
+            //         )
+            //         .configure(api::init),
+            // )
             .service(
                 web::resource("/gql")
                     .guard(guard::Post())
                     .app_data(Data::new(schema.clone()))
-                    .to(graphql::index),
+                    .to(auto_api::graphql),
             )
             .service(
                 web::resource("/gql")
-                    .guard(guard::fn_guard(|_| cfg!(debug_assertions)))
+                    .guard(guard::fn_guard(|_| {
+                        cfg!(debug_assertions) || cfg!(feature = "graphiql")
+                    }))
                     .guard(guard::Get())
                     .app_data(Data::new(schema.clone()))
-                    .to(graphql::index_graphiql),
+                    .to(auto_api::graphiql),
             )
     })
     .listen(listeners.remove(&port).unwrap())?;
@@ -182,6 +337,14 @@ async fn main() -> Result<()> {
     db::stop();
     drop(db_guard_tx);
     while let Some(_i) = db_guard_rx.recv().await {}
+
+    #[cfg(feature = "v8")]
+    {
+        unsafe {
+            v8::V8::dispose();
+        }
+        v8::V8::dispose_platform();
+    }
 
     info!("server stopped");
     if exit_code != 0 {
@@ -240,14 +403,16 @@ fn take_listener(ports: &[&str]) -> Result<HashMap<String, TcpListener>> {
 
 #[cfg(unix)]
 async fn handle_signals() {
+    use futures::stream::StreamExt;
     use nix::unistd;
     use signal_hook::consts::signal::*;
     use signal_hook_tokio::Signals;
     use std::ffi::CString;
 
-    let mut signals = Signals::new(&[SIGUSR2]).unwrap();
+    let mut signals = Signals::new([SIGUSR1, SIGUSR2]).unwrap();
     while let Some(signal) = signals.next().await {
         match signal {
+            SIGUSR1 => db::clear_whole_cache().await,
             SIGUSR2 => match unsafe { unistd::fork() }.expect("fork failed") {
                 unistd::ForkResult::Parent { .. } => {}
                 unistd::ForkResult::Child => {
@@ -284,6 +449,8 @@ fn kill_parent() {}
 #[cfg(unix)]
 fn output_pid_file(file: &Option<String>) -> Result<()> {
     use nix::unistd;
+    use std::fs::File;
+    use std::io::Write;
 
     if let Some(ref file) = file {
         let mut file = File::create(file)?;
@@ -293,7 +460,7 @@ fn output_pid_file(file: &Option<String>) -> Result<()> {
     Ok(())
 }
 #[cfg(not(unix))]
-fn output_pid_file(file: &Option<String>) -> Result<()> {
+fn output_pid_file(_file: &Option<String>) -> Result<()> {
     Ok(())
 }
 @{-"\n"}@

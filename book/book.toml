@@ -2,7 +2,8 @@
 authors = ["yossyX"]
 language = "ja"
 src = "src"
-title = "SenaX"
+title = "Senax"
+description = "This is a book of Senax descriptions. Senax is a full-stack web development framework for Rust"
 
 [[output.i18n.translations]]
 language = "en"

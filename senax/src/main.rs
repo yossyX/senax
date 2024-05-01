@@ -1,44 +1,67 @@
 use anyhow::{ensure, Context as _, Result};
 use chrono::Utc;
 use clap::{Parser, Subcommand};
-use dotenv::dotenv;
-use once_cell::sync::OnceCell;
+use dotenvy::dotenv;
 use regex::Regex;
-use schemars::{gen::SchemaSettings, schema::RootSchema};
+use schemars::gen::SchemaSettings;
 use serde_json::Value;
 use std::fs;
+use std::path::Path;
 use std::{env, path::PathBuf};
 
 use crate::{schema::SchemaDef, schema_md::gen_schema_md};
 
+#[macro_export]
+macro_rules! error_exit {
+    ($($arg:tt)*) => {{
+        if cfg!(debug_assertions) {
+            panic!($($arg)*);
+        } else {
+            use std::io::Write;
+            use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+            let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+            let _ = stderr.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
+            let _ = writeln!(&mut stderr, $($arg)*);
+            let _ = stderr.reset();
+            std::process::exit(1);
+        }
+    }};
+}
+
+mod api_document;
 pub(crate) mod common;
 mod db_document;
 pub(crate) mod ddl {
-    pub mod parser;
     pub mod table;
 }
 mod actix_generator;
+mod api_generator;
+mod config_server;
 mod db_generator;
-mod graphql_generator;
 mod init_generator;
 mod migration_generator;
 mod model_generator;
 pub(crate) mod schema;
-mod schema_generator;
 mod schema_md;
 
-pub static MODELS_PATH: OnceCell<PathBuf> = OnceCell::new();
+pub const SCHEMA_PATH: &str = "0_schema";
+pub const DOMAIN_PATH: &str = "1_domain";
+pub const DB_PATH: &str = "2_db";
+pub const SIMPLE_VALUE_OBJECTS_FILE: &str = "_simple_value_objects.yml";
+pub const DEFAULT_CONFIG_PORT: u16 = 9100;
+pub const API_SCHEMA_PATH: &str = "api_schema";
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
+#[cfg(feature = "config")]
+include!(concat!(env!("OUT_DIR"), "/config_app.rs"));
 
 #[derive(Parser)]
 #[clap(name = "senax code generator", author, version, about, long_about = None)]
 #[clap(propagate_version = true)]
 struct Cli {
-    #[clap(long, value_parser)]
-    dir: Option<PathBuf>,
-    #[clap(long, value_parser)]
-    base_dir: Option<PathBuf>,
+    #[clap(long)]
+    cwd: Option<PathBuf>,
     #[clap(subcommand)]
     command: Commands,
 }
@@ -48,88 +71,97 @@ enum Commands {
     /// Generate a workspace
     Init {
         /// Generated directory name
-        #[clap(value_parser)]
         name: Option<String>,
+        #[clap(long)]
+        non_snake_case: bool,
+    },
+    #[cfg(feature = "config")]
+    Config {
+        /// open port
+        #[clap(short, long)]
+        port: Option<u16>,
+        /// open browser
+        #[clap(short, long)]
+        open: bool,
+        #[clap(long)]
+        backup: Option<PathBuf>,
+        #[clap(long)]
+        read_only: bool,
     },
     /// Generate an actix server
     NewActix {
         /// package name
-        #[clap(value_parser)]
         name: String,
+        /// DB names
+        #[clap(long)]
+        db: String,
+        /// Force overwrite
+        #[clap(short, long)]
+        force: bool,
     },
     /// Prepare to use DB
-    UseDb {
-        /// Specify the server path
-        #[clap(value_parser)]
-        path: PathBuf,
+    InitDb {
         /// DB name
-        #[clap(value_parser)]
         db: String,
     },
     /// generate models
     Model {
         /// Specify the DB
-        #[clap(value_parser)]
         db: String,
         /// Force overwrite
         #[clap(short, long)]
         force: bool,
+        /// Delete files under the directory before generating
+        #[clap(short, long)]
+        clean: bool,
     },
-    /// generate graphql api
-    Graphql {
+    /// generate api
+    GenApi {
         /// Specify the server path
-        #[clap(value_parser)]
         path: PathBuf,
         /// Specify the DB
-        #[clap(value_parser)]
         db: String,
         /// Specify the group
-        #[clap(value_parser)]
         group: Option<String>,
         /// Specify the model
-        #[clap(value_parser)]
         model: Option<String>,
-        /// Use camel case
         #[clap(long)]
-        camel_case: bool,
-        /// With column title
-        #[clap(long)]
-        with_title: bool,
-        /// With column comment
-        #[clap(long)]
-        with_comment: bool,
+        ts_dir: Option<PathBuf>,
+        /// Inquire about adding a model
+        #[clap(short, long)]
+        inquiry: bool,
         /// Force overwrite
         #[clap(short, long)]
         force: bool,
+        /// Delete files under the directory before generating
+        #[clap(short, long)]
+        clean: bool,
     },
     /// generate migration ddl
     GenMigrate {
         /// Specify the DB
-        #[clap(value_parser)]
         db: String,
         /// Specify description and generate a file
-        #[clap(value_parser)]
         description: Option<String>,
-        /// If true, creates a pair of up and down migration files
-        #[clap(short, long)]
-        revert: bool,
+        #[clap(long)]
+        skip_empty: bool,
+        #[clap(long)]
+        use_test_db: bool,
     },
+    /// Finalize and save the names in the schema
+    FixSchema,
     /// generate a import data file
     GenSeed {
         /// Specify the db
-        #[clap(value_parser)]
         db: String,
         /// Specify description and output to file
-        #[clap(value_parser)]
         description: String,
     },
     /// generate a DB document file
-    GenDbDoc {
+    DbDoc {
         /// Specify the db
-        #[clap(value_parser)]
         db: String,
         /// Specify the group
-        #[clap(value_parser)]
         group: Option<String>,
         /// Include ER diagram
         #[clap(short, long)]
@@ -144,93 +176,158 @@ enum Commands {
         #[clap(short, long)]
         template: Option<PathBuf>,
     },
-    /// generate a schema yml file from DB
-    GenSchema {
-        /// Specify the DB uri
-        #[clap(long, value_parser, value_name = "DB_URI")]
-        uri: String,
+    /// generate a API document file
+    ApiDoc {
+        /// Specify the server path
+        path: PathBuf,
+        /// Specify the db
+        db: String,
+        /// Specify the group
+        group: Option<String>,
+        /// Output file
+        #[clap(short, long)]
+        output: Option<PathBuf>,
+        /// Template file
+        #[clap(short, long)]
+        template: Option<PathBuf>,
     },
-    GenConfSchema {
+    SenaxSchema {
         #[clap(short, long)]
         doc: bool,
     },
+    StreamId,
 }
 
-#[tokio::main]
+#[actix_web::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    if let Some(ref base_dir) = cli.base_dir {
-        env::set_current_dir(base_dir)
-            .with_context(|| format!("directory error!: {}", base_dir.to_string_lossy()))?;
+    if let Some(ref cwd) = cli.cwd {
+        env::set_current_dir(cwd)
+            .with_context(|| format!("directory error!: {}", cwd.to_string_lossy()))?;
     }
-    MODELS_PATH
-        .set(cli.dir.as_ref().cloned().unwrap_or("./db".parse()?))
-        .unwrap();
     dotenv().ok();
 
     let result = exec(cli).await;
     if let Err(err) = result {
+        use std::io::Write;
+        use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+        let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+        let _ = stderr.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
         if cfg!(debug_assertions) {
-            eprintln!("{:?}", err);
+            let _ = write!(&mut stderr, "{:?}", err);
         } else {
-            eprintln!("{}", err);
+            let _ = write!(&mut stderr, "{}", err);
         }
+        let _ = stderr.reset();
+        let _ = writeln!(&mut stderr);
         std::process::exit(1);
     }
     Ok(())
 }
 
-async fn exec(cli: Cli) -> Result<(), anyhow::Error> {
+async fn exec(cli: Cli) -> Result<()> {
+    let db_re = Regex::new(r"^[a-zA-Z][_a-zA-Z0-9]*$").unwrap();
     match &cli.command {
-        Commands::Init { name } => {
-            init_generator::generate(name)?;
+        Commands::Init {
+            name,
+            non_snake_case,
+        } => {
+            init_generator::generate(name, *non_snake_case)?;
         }
-        Commands::NewActix { name } => {
-            actix_generator::generate(name)?;
+        #[cfg(feature = "config")]
+        Commands::Config {
+            port,
+            open,
+            backup,
+            read_only,
+        } => {
+            use actix_web::{web, App, HttpServer};
+            use lambda_web::{is_running_on_lambda, run_actix_on_lambda};
+            if let Some(backup) = backup.clone() {
+                ensure!(backup.is_dir(), "Specify a directory for backup");
+                config_server::BACKUP.set(backup).unwrap();
+            }
+            config_server::READ_ONLY.store(*read_only, std::sync::atomic::Ordering::SeqCst);
+            let port = port.unwrap_or(DEFAULT_CONFIG_PORT);
+            let url = format!("http://localhost:{port}");
+            use std::io::Write;
+            use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+            let mut stdout = StandardStream::stdout(ColorChoice::Auto);
+            stdout.set_color(ColorSpec::new().set_fg(Some(Color::Blue)))?;
+            write!(&mut stdout, "{url}")?;
+            stdout.reset()?;
+            writeln!(&mut stdout)?;
+            if *open {
+                let _ = webbrowser::open(&url);
+            }
+
+            let factory = move || {
+                App::new()
+                    .service(
+                        web::scope("/api")
+                            .app_data(
+                                web::JsonConfig::default()
+                                    .error_handler(config_server::json_error_handler),
+                            )
+                            .configure(config_server::api),
+                    )
+                    .configure(config_server::init)
+            };
+            if is_running_on_lambda() {
+                run_actix_on_lambda(factory)
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            } else {
+                HttpServer::new(factory)
+                    .bind(("0.0.0.0", port))?
+                    .run()
+                    .await?;
+            }
         }
-        Commands::UseDb { path, db } => {
-            let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
-            ensure!(re.is_match(db), "bad db name!");
-            db_generator::generate(path, db)?;
+        Commands::NewActix { name, db, force } => {
+            let db_list = db.split(',').map(|v| v.trim()).collect();
+            actix_generator::generate(name, db_list, *force)?;
         }
-        Commands::Model { db, force } => {
-            let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
-            ensure!(re.is_match(db), "bad db name!");
-            model_generator::generate(db, *force)?;
+        Commands::InitDb { db } => {
+            ensure!(db_re.is_match(db), "bad db name!");
+            db_generator::generate(db)?;
         }
-        Commands::Graphql {
+        Commands::Model { db, force, clean } => {
+            ensure!(db_re.is_match(db), "bad db name!");
+            model_generator::generate(db, *force, *clean)?;
+        }
+        Commands::GenApi {
             path,
             db,
             group,
             model,
-            camel_case,
+            ts_dir,
+            inquiry,
             force,
-            with_title,
-            with_comment,
+            clean,
         } => {
-            let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
-            ensure!(re.is_match(db), "bad db name!");
-            model_generator::template::filters::SHOW_TITLE
-                .store(*with_title, std::sync::atomic::Ordering::SeqCst);
-            model_generator::template::filters::SHOW_COMMNET
-                .store(*with_comment, std::sync::atomic::Ordering::SeqCst);
-            graphql_generator::generate(path, db, group, model, *camel_case, *force)?;
+            ensure!(db_re.is_match(db), "bad db name!");
+            api_generator::generate(path, db, group, model, ts_dir, *inquiry, *force, *clean)?;
         }
         Commands::GenMigrate {
             db,
             description,
-            revert,
+            skip_empty,
+            use_test_db,
         } => {
-            let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
-            ensure!(re.is_match(db), "bad db name!");
-            migration_generator::generate(db, description, *revert).await?;
+            ensure!(db_re.is_match(db), "bad db name!");
+            migration_generator::generate(db, description, *skip_empty, *use_test_db).await?;
+        }
+        Commands::FixSchema => {
+            for db in crate::db_generator::list()? {
+                config_server::fix_schema(&db)?;
+            }
         }
         Commands::GenSeed { db, description } => {
-            let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
-            ensure!(re.is_match(db), "bad db name!");
+            ensure!(db_re.is_match(db), "bad db name!");
             generate_seed_file(db, description)?;
         }
-        Commands::GenDbDoc {
+        Commands::DbDoc {
             db,
             group,
             er,
@@ -238,14 +335,21 @@ async fn exec(cli: Cli) -> Result<(), anyhow::Error> {
             output,
             template,
         } => {
-            let re = Regex::new(r"^[_a-zA-Z0-9]+$").unwrap();
-            ensure!(re.is_match(db), "bad db name!");
+            ensure!(db_re.is_match(db), "bad db name!");
             db_document::generate(db, group, *er, history, output, template)?;
         }
-        Commands::GenSchema { uri } => {
-            schema_generator::generate(uri).await?;
+        Commands::ApiDoc {
+            path,
+            db,
+            group,
+            output,
+            template,
+        } => {
+            ensure!(db_re.is_match(db), "bad db name!");
+            let def = api_generator::serialize::generate(path, db, group)?;
+            api_document::generate(def, output, template)?;
         }
-        Commands::GenConfSchema { doc } => {
+        Commands::SenaxSchema { doc } => {
             if *doc {
                 let settings = SchemaSettings::draft07().with(|s| {
                     s.option_nullable = true;
@@ -258,23 +362,15 @@ async fn exec(cli: Cli) -> Result<(), anyhow::Error> {
                 let md = gen_schema_md(schema)?;
                 println!("{}", md);
             } else {
-                let settings = SchemaSettings::draft07().with(|s| {
-                    s.option_nullable = false;
-                    s.option_add_null_type = true;
-                });
-                let gen = settings.into_generator();
-                let schema = gen.into_root_schema_for::<SchemaDef>();
-                let schema = serde_json::to_string(&schema)?;
-                let schema = schema.replace(r#""additionalProperties":{"#,
-                    r#""propertyNames":{"pattern":"^\\p{XID_Start}\\p{XID_Continue}*$"},"additionalProperties":{"#);
-                let schema = schema.replace(r#""conf":{"default":{},"type":"object","propertyNames":{"pattern":"^\\p{XID_Start}\\p{XID_Continue}*$"}"#,
-                    r#""conf":{"default":{},"type":"object","propertyNames":{"pattern":"^[A-Za-z][0-9A-Z_a-z]*$"}"#);
-                let schema = schema.replace(r#""groups":{"type":"object","propertyNames":{"pattern":"^\\p{XID_Start}\\p{XID_Continue}*$"}"#,
-                    r#""groups":{"type":"object","propertyNames":{"pattern":"^[A-Za-z][0-9A-Z_a-z]*$"}"#);
-                let schema: RootSchema = serde_json::from_str(&schema)?;
-                let schema = serde_json::to_string_pretty(&schema)?;
-                println!("{}", schema);
+                schema::json_schema::write_schema(std::path::Path::new("."))?;
             }
+        }
+        Commands::StreamId => {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_micros() as u64;
+            println!("{}", now);
         }
     }
     Ok(())
@@ -291,13 +387,12 @@ fn generate_seed_file(db: &str, description: &str) -> Result<()> {
             }
         })
         .collect();
-    let path = MODELS_PATH.get().unwrap().join(db).join("seeds");
+    let path = Path::new(DB_PATH).join(db).join("seeds");
     fs::create_dir_all(&path)?;
     let dt = Utc::now();
     let file_prefix = dt.format("%Y%m%d%H%M%S").to_string();
     let file_path = path.join(format!("{}_{}.yml", file_prefix, description));
-    println!("{}", file_path.display());
-    fs::write(
+    common::fs_write(
         file_path,
         "# yaml-language-server: $schema=../seed-schema.json\n\n",
     )?;

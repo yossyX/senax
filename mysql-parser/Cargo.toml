@@ -1,0 +1,14 @@
+[package]
+name = "senax-mysql-parser"
+version = "0.1.4"
+edition = "2021"
+authors = ["yossyX"]
+license = "MIT"
+description = "MySQL parser for Senax. This library is forked from https://github.com/ms705/nom-sql ."
+repository = "https://github.com/yossyX/senax"
+keywords = ["senax"]
+
+[dependencies]
+derive_more = "0.99.17"
+nom = "7"
+serde = { version = "1.0", features = ["derive", "rc"] }

@@ -11,6 +11,7 @@ use time::UtcOffset;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use crate::log_writer::LogWriter;
+use crate::Rotation;
 
 const FILTER_ENV: &str = "RUST_LOG";
 
@@ -20,29 +21,33 @@ static ERROR_TX: OnceCell<UnboundedSender<String>> = OnceCell::new();
 static WARN_TX: OnceCell<UnboundedSender<String>> = OnceCell::new();
 
 pub fn init(
+    rotation: Rotation,
     offset: Option<UtcOffset>,
+    compress: bool,
 ) -> Result<(UnboundedReceiver<String>, UnboundedReceiver<String>)> {
     let use_local = offset.is_some();
     let offset = offset.unwrap_or(UtcOffset::UTC);
-    let compress = !cfg!(debug_assertions);
-    let log_dir = env::var("LOG_DIR").unwrap_or_else(|_| "log".to_owned());
-    std::fs::create_dir_all(&log_dir)?;
     let (error_tx, error_rx) = mpsc::unbounded_channel::<String>();
     let (warn_tx, warn_rx) = mpsc::unbounded_channel::<String>();
     ERROR_TX.set(error_tx).unwrap();
     WARN_TX.set(warn_tx).unwrap();
 
-    let log_writer = LogWriter::daily(&log_dir, "log", offset, compress);
-    WRITER.set(log_writer).unwrap();
-
-    let log_file = env::var("LOG_FILE").unwrap_or_else(|_| "".to_owned());
-    let files: Vec<&str> = log_file.split(',').collect();
-    let mut named_writer = AHashMap::<String, LogWriter>::new();
-    for file in files {
-        let log_writer = LogWriter::daily(&log_dir, file, offset, compress);
-        named_writer.insert(file.to_owned(), log_writer);
+    let log_dir = env::var("LOG_DIR").ok();
+    if let Some(log_dir) = log_dir {
+        std::fs::create_dir_all(&log_dir)?;
+        let log_writer = LogWriter::new(rotation.clone(), &log_dir, "log", offset, compress);
+        WRITER.set(log_writer).unwrap();
+        let log_file = env::var("LOG_FILE").unwrap_or_else(|_| "".to_owned());
+        let files: Vec<&str> = log_file.split(',').collect();
+        let mut named_writer = AHashMap::<String, LogWriter>::new();
+        for file in files {
+            let log_writer = LogWriter::new(rotation.clone(), &log_dir, file, offset, compress);
+            named_writer.insert(file.to_owned(), log_writer);
+        }
+        if !named_writer.is_empty() {
+            NAMED_WRITER.set(named_writer).unwrap();
+        }
     }
-    NAMED_WRITER.set(named_writer).unwrap();
 
     let logger = Logger::new(use_local);
     log::set_max_level(logger.inner.filter());
@@ -66,34 +71,31 @@ impl Logger {
     }
 }
 
-fn remove_ctrl(str: &mut String, end: char) {
-    let len = str.len();
-    let buf = unsafe { str.as_mut_vec() };
-    for c in buf.iter_mut() {
-        if *c <= 0x1F || *c == 0x7F {
-            *c = b' ';
-        }
-    }
-    buf[len - 1] = end as u8;
-}
-
-fn remove_ctrl_except_tab(str: &mut String, end: char) {
-    let len = str.len();
-    let buf = unsafe { str.as_mut_vec() };
-    for c in buf.iter_mut() {
-        if *c != b'\t' && (*c <= 0x1F || *c == 0x7F) {
-            *c = b' ';
-        }
-    }
-    buf[len - 1] = end as u8;
-}
+#[derive(Default)]
 struct KvBuf(String);
+
 impl Visitor<'_> for KvBuf {
     fn visit_pair(&mut self, key: Key, value: Value) -> Result<(), log::kv::value::Error> {
-        let value = format!("{}", value);
-        if !value.is_empty() {
-            let mut str = format!("{}:{}\t", key, value);
-            remove_ctrl(&mut str, '\t');
+        #[cfg(not(feature = "jsonl"))]
+        {
+            let str = format!(
+                "\t{}:{}",
+                key,
+                serde_json::to_string(&value)
+                    .map_err(|v| log::warn!("{}", v))
+                    .unwrap_or_default()
+            );
+            self.0.push_str(&str);
+        }
+        #[cfg(feature = "jsonl")]
+        {
+            let str = format!(
+                ", {:?}:{}",
+                key.as_str(),
+                serde_json::to_string(&value)
+                    .map_err(|v| log::warn!("{}", v))
+                    .unwrap_or_default()
+            );
             self.0.push_str(&str);
         }
         Ok(())
@@ -107,36 +109,53 @@ impl log::Log for Logger {
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            if let Some(writer) = NAMED_WRITER.wait().get(record.target()) {
-                let mut log = format!("{}\n", record.args());
-                remove_ctrl_except_tab(&mut log, '\n');
+            let time = if self.use_local {
+                Local::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, false)
+            } else {
+                Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+            };
+            let mut visitor = KvBuf::default();
+            let _ = record.key_values().visit(&mut visitor);
+            #[cfg(not(feature = "jsonl"))]
+            let log = match record.args().as_str() {
+                Some("") => format!(
+                    "time:{}\tlevel:{}\ttarget:{}{}\n",
+                    time,
+                    record.level(),
+                    record.target(),
+                    visitor.0,
+                ),
+                _ => format!(
+                    "time:{}\tlevel:{}\ttarget:{}{}\tmsg:{}\n",
+                    time,
+                    record.level(),
+                    record.target(),
+                    visitor.0,
+                    record.args(),
+                ),
+            };
+            #[cfg(feature = "jsonl")]
+            let log = match record.args().as_str() {
+                Some("") => format!(
+                    "{{\"time\":{:?}, \"level\":{:?}, \"target\":{:?}{}}}\n",
+                    time,
+                    record.level().as_str(),
+                    record.target(),
+                    visitor.0,
+                ),
+                _ => format!(
+                    "{{\"time\":{:?}, \"level\":{:?}, \"target\":{:?}{}, \"msg\":{:?}}}\n",
+                    time,
+                    record.level().as_str(),
+                    record.target(),
+                    visitor.0,
+                    record.args().to_string(),
+                ),
+            };
+            if let Some(writer) = NAMED_WRITER.get().and_then(|w| w.get(record.target())) {
                 writer.write(log);
             } else {
-                let time = if self.use_local {
-                    Local::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, false)
-                } else {
-                    Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, false)
-                };
-                let mut visitor = KvBuf(String::new());
-                let _ = record.key_values().visit(&mut visitor);
-                let mut log = match record.args().as_str() {
-                    Some("") => format!(
-                        "time:{}\tlevel:{}\ttarget:{}\t{}\n",
-                        time,
-                        record.level(),
-                        record.target(),
-                        visitor.0,
-                    ),
-                    _ => format!(
-                        "time:{}\tlevel:{}\ttarget:{}\t{}msg:{}\n",
-                        time,
-                        record.level(),
-                        record.target(),
-                        visitor.0,
-                        record.args(),
-                    ),
-                };
-                if cfg!(debug_assertions) {
+                if WRITER.get().is_none() || cfg!(debug_assertions) {
                     if record.metadata().level() == Level::Error {
                         print!("{}", log.red());
                     } else if record.metadata().level() == Level::Warn {
@@ -145,14 +164,15 @@ impl log::Log for Logger {
                         print!("{}", log);
                     }
                 }
-                remove_ctrl_except_tab(&mut log, '\n');
                 if record.level() == Level::Error {
                     ERROR_TX.get().map(|v| v.send(log.clone()));
                 }
                 if record.level() == Level::Warn {
                     WARN_TX.get().map(|v| v.send(log.clone()));
                 }
-                WRITER.wait().write(log);
+                if let Some(w) = WRITER.get() {
+                    w.write(log)
+                }
             }
         }
     }

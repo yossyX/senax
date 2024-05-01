@@ -5,8 +5,12 @@ pub fn gen_schema_md(schema: Value) -> Result<String, anyhow::Error> {
     let tpl = r##"
 # {{ title }}
 {% for key, value in properties %}
-{%- if key == "history" %}
-* [properties/{{key}}](##/definitions/History)
+{%- if key == "api_model" %}
+* [properties/{{key}}](##/definitions/ApiModelDef)
+{%- elif key == "api_config" %}
+* [properties/{{key}}](##/definitions/ApiConfigDef)
+{%- elif key == "api_db" %}
+* [properties/{{key}}](##/definitions/ApiDbDef)
 {%- else %}
 * [properties/{{key}}](#{{value.additionalProperties["$ref"]}})
 {%- endif %}
@@ -45,7 +49,11 @@ pub fn gen_schema_md(schema: Value) -> Result<String, anyhow::Error> {
 **any of the following**
 
 {% for anyOf in value.anyOf -%}
+{% if anyOf["$ref"] -%}
 * [{{anyOf["$ref"] | split(pat="/") | last}}](#{{anyOf["$ref"]}})
+{% elif anyOf.type -%}
+* {{anyOf.type}}
+{%- endif %}
 {% endfor %}
 {%- endif %}
 {%- if value.oneOf %}

@@ -27,15 +27,15 @@ pub fn run(
             tokio_uring::start(async move {
                 let sock_file = Path::new(&unix_port);
                 if sock_file.exists() {
-                    fs::remove_file(&sock_file)?;
+                    fs::remove_file(sock_file)?;
                 }
-                let listener = UnixListener::bind(&sock_file)?;
+                let listener = UnixListener::bind(sock_file)?;
                 loop {
                     tokio::select! {
                         result = listener.accept() => {
                             let stream = result?;
-                            let (db, conn_no, mode) = match check_stream(&stream, &pw).await {
-                                Ok((db, conn_no, mode)) => (db, conn_no, mode),
+                            let (stream_id, conn_no, mode) = match check_stream(&stream, &pw).await {
+                                Ok((stream_id, conn_no, mode)) => (stream_id, conn_no, mode),
                                 Err(e) => {
                                     warn!("unix incoming connection: {}", e);
                                     continue;
@@ -46,7 +46,7 @@ pub fn run(
                                 info!("sender connected");
                                 let to_all = to_all.clone();
                                 tokio_uring::spawn(async move {
-                                    if let Err(e) = handle_sender_stream(conn_no, stream, db, tx_end3, to_all).await {
+                                    if let Err(e) = handle_sender_stream(conn_no, stream, stream_id, tx_end3, to_all).await {
                                         error!("unix sender {}", &e);
                                     }
                                     info!("sender disconnected");
@@ -54,7 +54,7 @@ pub fn run(
                             } else if mode == RECEIVER {
                                 info!("receiver connected");
                                 let (to_hub, from_hub) = mpsc::unbounded_channel::<Pack>();
-                                tx_incoming_local.send((db, to_hub)).await?;
+                                tx_incoming_local.send((stream_id, to_hub)).await?;
                                 tokio_uring::spawn(async move {
                                     if let Err(e) = handle_receiver_stream(conn_no, stream, tx_end3, from_hub).await {
                                         error!("unix receiver {}", &e);
@@ -69,7 +69,7 @@ pub fn run(
                         else => break,
                     }
                 }
-                let _ = std::fs::remove_file(&sock_file);
+                let _ = std::fs::remove_file(sock_file);
                 Ok(())
             })
             .map_err(|e| {
@@ -99,7 +99,7 @@ async fn check_stream(stream: &UnixStream, pw: &str) -> Result<(u64, u64, u16)> 
     }
 
     let buf = IoBytesMut::new(8);
-    let db = read_all(buf, stream).await?.get_u64_le();
+    let stream_id = read_all(buf, stream).await?.get_u64_le();
 
     let conn_no = if mode == SENDER {
         let conn_no = CONN_NO.fetch_add(1, Ordering::SeqCst);
@@ -111,14 +111,13 @@ async fn check_stream(stream: &UnixStream, pw: &str) -> Result<(u64, u64, u16)> 
         let buf = IoBytesMut::new(8);
         read_all(buf, stream).await?.get_u64_le()
     };
-
-    Ok((db, conn_no, mode))
+    Ok((stream_id, conn_no, mode))
 }
 
 async fn handle_sender_stream(
     conn_no: u64,
     stream: UnixStream,
-    db: u64,
+    stream_id: u64,
     tx_end: broadcast::Sender<i32>,
     to_all: Sender<Pack>,
 ) -> Result<()> {
@@ -131,7 +130,7 @@ async fn handle_sender_stream(
                 if n == 0 { break }
                 buf.advance(n);
                 let data =  read_msg(buf, &stream).await?.freeze();
-                let _ = to_all.send(Pack{data, conn_no, db}).await;
+                let _ = to_all.send(Pack{data, conn_no, stream_id}).await;
             },
             _stop = rx_end.recv() => break,
             else => break,

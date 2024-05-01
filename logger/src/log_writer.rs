@@ -1,13 +1,14 @@
 use anyhow::{bail, Result};
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{BufMut, BytesMut};
 use log::error;
 use std::convert::TryInto;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::thread;
 use time::{format_description, Duration, OffsetDateTime, Time, UtcOffset};
 use tokio::sync::mpsc::{self, UnboundedSender};
-use tokio_uring::fs::{File, OpenOptions};
+use tokio::task::LocalSet;
 use zstd::Encoder;
 
 // Based on tracing-appender
@@ -38,10 +39,15 @@ impl LogWriter {
         let log_directory = directory.as_ref().to_owned();
         let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap().to_string();
         let (writer, mut writer_rx) = mpsc::unbounded_channel::<String>();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
         thread::Builder::new()
             .name("log writer".to_string())
             .spawn(move || {
-                tokio_uring::start(async move {
+                let local = LocalSet::new();
+                local.spawn_local(async move {
                     let now = rotation.round_date(&OffsetDateTime::now_utc().to_offset(offset));
                     let (mut next_date, mut file) = Self::rotate(
                         &rotation,
@@ -80,14 +86,15 @@ impl LogWriter {
                                 enc.write_all(log.as_bytes()).unwrap();
                             }
                             enc.finish().unwrap();
-                            let _ = write(&file, writer.into_inner()).await;
+                            let _ = write(&mut file, writer.into_inner()).await;
                         } else {
                             let mut writer = BytesMut::with_capacity(log.len());
                             writer.put(log.as_bytes());
-                            let _ = write(&file, writer).await;
+                            let _ = write(&mut file, writer).await;
                         }
                     }
-                })
+                });
+                rt.block_on(local);
             })
             .unwrap();
         Self { writer }
@@ -107,12 +114,7 @@ impl LogWriter {
         );
         let path = log_directory.join(filename);
         let next_date = rotation.next_date(now);
-        let file = match OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&path)
-            .await
-        {
+        let file = match OpenOptions::new().append(true).create(true).open(path) {
             Ok(file) => file,
             Err(err) => {
                 error!("{}", err);
@@ -183,10 +185,10 @@ impl LogWriter {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Rotation(RotationKind);
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 enum RotationKind {
     Minutely,
     Hourly,
@@ -256,19 +258,7 @@ impl Rotation {
     }
 }
 
-async fn write(file: &File, mut buf: BytesMut) -> Result<()> {
-    loop {
-        let (res, _buf) = file.write_at(buf, 0).await;
-        buf = _buf;
-        let len = res?;
-        if len == 0 {
-            bail!("write zero byte error");
-        }
-        if buf.len() > len {
-            buf.advance(len);
-            continue;
-        }
-        break;
-    }
+async fn write(file: &mut File, buf: BytesMut) -> Result<()> {
+    file.write_all(&buf)?;
     Ok(())
 }

@@ -1,5 +1,7 @@
 use anyhow::Result;
-use base64::{decode, encode};
+use base64::alphabet;
+use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
+use base64::{engine::general_purpose, Engine as _};
 use once_cell::sync::OnceCell;
 use schemars::schema::{InstanceType, Schema, SchemaObject};
 use schemars::JsonSchema;
@@ -51,7 +53,7 @@ impl<'de> serde::Deserialize<'de> for Blob {
                 {
                     return Ok(Blob(file));
                 }
-                if let Ok(decode) = decode(v) {
+                if let Ok(decode) = DECODE.decode(v) {
                     return Ok(Blob(decode));
                 }
                 Err(serde::de::Error::custom(format_args!(
@@ -86,11 +88,49 @@ impl FromStr for Blob {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Blob(decode(s)?))
+        Ok(Blob(DECODE.decode(s)?))
     }
 }
 impl Display for Blob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&encode(&self.0))
+        f.write_str(&general_purpose::STANDARD.encode(&self.0))
+    }
+}
+
+pub trait BlobToApi {
+    fn to_str(&self) -> String;
+}
+impl BlobToApi for std::sync::Arc<Vec<u8>> {
+    fn to_str(&self) -> String {
+        general_purpose::STANDARD_NO_PAD.encode(self.as_ref())
+    }
+}
+pub trait ApiToBlob {
+    fn to_vec(&self) -> Vec<u8>;
+}
+impl ApiToBlob for String {
+    fn to_vec(&self) -> Vec<u8> {
+        DECODE.decode(self).unwrap_or_default()
+    }
+}
+pub const DECODE: GeneralPurpose = GeneralPurpose::new(
+    &alphabet::STANDARD,
+    GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
+);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test() {
+        assert_eq!(
+            "SGVsbG8sIOOCu+OCq+OCpA==".to_string().to_vec(),
+            "Hello, セカイ".as_bytes()
+        );
+        assert_eq!(
+            "SGVsbG8sIOOCu+OCq+OCpA".to_string().to_vec(),
+            "Hello, セカイ".as_bytes()
+        );
     }
 }

@@ -3,7 +3,9 @@ use askama::Template;
 use chrono::DateTime;
 use chrono::Local;
 use chrono::NaiveDateTime;
+use chrono::TimeZone;
 use chrono::Utc;
+use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -13,46 +15,44 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::env;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tera::Filter;
 use tera::{Context, Tera};
 
-use crate::schema::ColumnDef;
+use crate::schema::FieldDef;
 use crate::schema::IndexDef;
 use crate::schema::RelDef;
-use crate::schema::RelationsType;
-use crate::schema::MODEL;
 use crate::schema::MODELS;
-use crate::schema::{self, EnumDef, GroupDef, ModelDef, CONFIG, ENUM_GROUPS, GROUPS};
-use crate::MODELS_PATH;
+use crate::schema::{self, GroupDef, ModelDef, CONFIG, GROUPS};
+use crate::DB_PATH;
 
 #[derive(Debug, Serialize, Clone)]
 struct Group<'a> {
     group_name: &'a String,
-    group_def: &'a GroupDef,
+    group_def: GroupDef,
     models: Option<IndexMap<&'a String, DocModel>>,
-    enums: Option<&'a IndexMap<String, EnumDef>>,
     er: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
 struct DocModel {
-    title: Option<String>,
+    label: Option<String>,
     comment: Option<String>,
     table_name: String,
-    columns: IndexMap<String, ColumnDef>,
-    relations: IndexMap<String, Option<RelDef>>,
+    columns: IndexMap<String, FieldDef>,
+    relations: IndexMap<String, RelDef>,
     indexes: IndexMap<String, IndexDef>,
 }
 impl From<&Arc<ModelDef>> for DocModel {
     fn from(m: &Arc<ModelDef>) -> Self {
         DocModel {
-            title: m.title.clone(),
+            label: m.label.clone(),
             comment: m.comment.clone(),
             table_name: m.table_name(),
-            columns: m.merged_columns.clone(),
+            columns: m.merged_fields.clone(),
             relations: m.merged_relations.clone(),
             indexes: m.merged_indexes.clone(),
         }
@@ -73,21 +73,20 @@ pub fn generate(
     output: &Option<PathBuf>,
     template: &Option<PathBuf>,
 ) -> Result<()> {
-    schema::parse(db, false)?;
+    schema::parse(db, false, false)?;
 
-    let config = unsafe { CONFIG.get().unwrap() }.clone();
-    let groups = unsafe { GROUPS.get().unwrap() }.clone();
-    let enum_groups = unsafe { ENUM_GROUPS.get().unwrap() }.clone();
+    let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
+    let groups = GROUPS.read().unwrap().as_ref().unwrap().clone();
     let locale = env::var("LC_ALL").unwrap_or_else(|_| {
         env::var("LC_TIME").unwrap_or_else(|_| env::var("LANG").unwrap_or_default())
     });
     let locale = locale.split('.').collect::<Vec<_>>()[0];
 
-    let base_path = MODELS_PATH.get().unwrap().join(&db);
+    let base_path = Path::new(DB_PATH).join(db);
     let ddl_path = base_path.join("migrations");
     fn file_read(path: &PathBuf) -> Result<String> {
         let content = std::fs::read_to_string(path)
-            .with_context(|| format!("file cannot read: {:?}", path))?;
+            .with_context(|| format!("Cannot read file: {:?}", path))?;
         let mut result = String::new();
         for line in content.split('\n') {
             match line.strip_prefix("-- ") {
@@ -122,10 +121,10 @@ pub fn generate(
         }
     }
     let mut history = Vec::new();
-    if let Some(max) = history_max {
+    if history_max.is_some() {
         for (date, file) in files.into_iter() {
             let utc = NaiveDateTime::parse_from_str(&date, "%Y%m%d%H%M%S")
-                .map(|ndt| DateTime::<Utc>::from_utc(ndt, Utc))?;
+                .map(|ndt| Utc.from_utc_datetime(&ndt))?;
             let date: DateTime<Local> = DateTime::from(utc);
             let description = file_read(&file)?;
             if description.is_empty() {
@@ -134,7 +133,6 @@ pub fn generate(
             history.push(History { date, description });
         }
         history.reverse();
-        history.truncate(*max);
     }
 
     let mut context = Context::new();
@@ -142,21 +140,22 @@ pub fn generate(
     context.insert("locale", locale);
     context.insert("date", &Local::now().to_rfc3339());
     context.insert("history", &history);
+    context.insert("history_max", &history_max.unwrap_or_default());
     let mut group_list = Vec::new();
     if let Some(group_name) = group_name {
         let models = groups.get(group_name);
+        MODELS.write().unwrap().take();
         if let Some(models) = models {
-            unsafe {
-                MODELS.take();
-                MODELS.set(models.clone()).unwrap();
-            }
+            MODELS.write().unwrap().replace(models.clone());
         }
         group_list.push(Group {
             group_name,
             group_def: config
                 .groups
                 .get(group_name)
-                .context("The specified group was not found.")?,
+                .context("The specified group was not found.")?
+                .clone()
+                .unwrap_or_default(),
             models: models.map(|i| {
                 i.iter().fold(IndexMap::new(), |mut acc, (k, v)| {
                     if v.has_table() {
@@ -165,22 +164,19 @@ pub fn generate(
                     acc
                 })
             }),
-            enums: enum_groups.get(group_name),
             er: gen_er(group_name, &models, er)?,
         });
         context.insert("group_list", &group_list);
     } else {
         for (group_name, group_def) in &config.groups {
             let models = groups.get(group_name);
+            MODELS.write().unwrap().take();
             if let Some(models) = models {
-                unsafe {
-                    MODELS.take();
-                    MODELS.set(models.clone()).unwrap();
-                }
+                MODELS.write().unwrap().replace(models.clone());
             }
             group_list.push(Group {
                 group_name,
-                group_def,
+                group_def: group_def.clone().unwrap_or_default(),
                 models: models.map(|i| {
                     i.iter().fold(IndexMap::new(), |mut acc, (k, v)| {
                         if v.has_table() {
@@ -189,7 +185,6 @@ pub fn generate(
                         acc
                     })
                 }),
-                enums: enum_groups.get(group_name),
                 er: gen_er(group_name, &models, er)?,
             });
         }
@@ -208,10 +203,16 @@ pub fn generate(
         std::str::from_utf8(tpl.as_ref())?.to_string()
     };
     let mut tera = Tera::default();
-    tera.add_raw_template("db-document.html", &tpl)?;
+    tera.add_raw_template("template", &tpl)?;
     tera.register_filter("history_description", ConvHistory(true));
     tera.register_filter("history_description_wo_esc", ConvHistory(false));
-    let result = tera.render("db-document.html", &context)?;
+    tera.register_filter("title", Title);
+    tera.register_filter("pascal", Pascal);
+    tera.register_filter("camel", Camel);
+    tera.register_filter("snake", Snake);
+    tera.register_filter("upper_snake", UpperSnake);
+    tera.add_raw_template("template", &tpl)?;
+    let result = tera.render("template", &context)?;
     if let Some(output) = output {
         std::fs::write(output, result)?;
     } else {
@@ -288,6 +289,42 @@ impl Filter for ConvHistory {
     }
 }
 
+struct Title;
+impl Filter for Title {
+    fn filter(&self, value: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
+        let v = value.as_str().unwrap_or_default();
+        Ok(v.to_case(Case::Title).into())
+    }
+}
+struct Pascal;
+impl Filter for Pascal {
+    fn filter(&self, value: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
+        let v = value.as_str().unwrap_or_default();
+        Ok(v.to_case(Case::Pascal).into())
+    }
+}
+struct Camel;
+impl Filter for Camel {
+    fn filter(&self, value: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
+        let v = value.as_str().unwrap_or_default();
+        Ok(v.to_case(Case::Camel).into())
+    }
+}
+struct Snake;
+impl Filter for Snake {
+    fn filter(&self, value: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
+        let v = value.as_str().unwrap_or_default();
+        Ok(v.to_case(Case::Snake).into())
+    }
+}
+struct UpperSnake;
+impl Filter for UpperSnake {
+    fn filter(&self, value: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
+        let v = value.as_str().unwrap_or_default();
+        Ok(v.to_case(Case::UpperSnake).into())
+    }
+}
+
 fn gen_er(
     group_name: &str,
     models: &Option<&IndexMap<String, Arc<ModelDef>>>,
@@ -299,73 +336,103 @@ fn gen_er(
             return Ok(None);
         }
     };
-    let mut _models: IndexMap<String, Model> = IndexMap::new();
+    let mut target_models: IndexMap<String, Model> = IndexMap::new();
     let mut another_models: IndexMap<String, AnotherModel> = IndexMap::new();
     let mut relations: IndexMap<String, Relation> = IndexMap::new();
     for (model_name, model) in models.iter() {
-        unsafe {
-            MODEL.take();
-            MODEL.set(model.clone()).unwrap();
-        }
-
         if !model.has_table() {
             continue;
         }
-        let title = if let Some(ref title) = model.title {
-            title.clone()
+        let label = if let Some(ref label) = model.label {
+            label.clone()
         } else {
             model_name.clone()
         };
         let mut columns: IndexMap<String, Column> = IndexMap::new();
-        for (col_name, relation) in model.merged_relations.iter() {
-            let foreign = RelDef::get_foreign_model(relation, col_name);
+        for (rel_name, relation) in model.merged_relations.iter() {
+            let foreign = relation.get_foreign_model();
+            if model.hide_er_relations || foreign.hide_er_relations {
+                continue;
+            }
             let foreign_name = if foreign.group_name == group_name {
                 foreign.name.clone()
             } else {
                 let foreign_name = format!("{}__{}", foreign.group_name, foreign.name);
-                let title = if let Some(ref title) = foreign.title {
-                    title.clone()
+                let label = if let Some(ref label) = foreign.label {
+                    label.clone()
                 } else {
                     foreign.name.clone()
                 };
                 let link = format!("{}::{}", foreign.group_name, foreign.name);
-                another_models.insert(foreign_name.clone(), AnotherModel { link, title });
+                let tooltip: Vec<_> = foreign
+                    .merged_fields
+                    .iter()
+                    .map(|(k, _)| k.to_string())
+                    .collect();
+                another_models.insert(
+                    foreign_name.clone(),
+                    AnotherModel {
+                        link,
+                        label,
+                        tooltip: tooltip.join("\n"),
+                    },
+                );
                 foreign_name
             };
-            match relation {
-                Some(rel) => {
-                    if rel.type_def.is_none() || rel.type_def == Some(RelationsType::One) {
-                        let local = if let Some(ref local) = rel.local {
-                            local.clone()
-                        } else {
-                            format!("{}_id", col_name)
-                        };
-                        if let Some(col) = model.merged_columns.get(&local) {
-                            relations.insert(
-                                format!("{model_name}:{local}"),
-                                to_rel(&foreign_name, col, model),
-                            );
-                            columns.insert(local.clone(), to_column(&local, col));
-                        }
-                    }
-                }
-                None => {
-                    if let Some(col) = model.merged_columns.get(col_name) {
+            if relation.is_type_of_belongs_to() {
+                let local = if let Some(ref local) = relation.local {
+                    local.clone()
+                } else {
+                    vec![format!("{}_id", rel_name)]
+                };
+                if let Some(local_id) = local.get(foreign.main_primary_nth()) {
+                    if let Some(col) = model.merged_fields.get(local_id) {
                         relations.insert(
-                            format!("{model_name}:{col_name}"),
+                            format!("{model_name}:{local_id}"),
                             to_rel(&foreign_name, col, model),
                         );
-                        columns.insert(col_name.clone(), to_column(col_name, col));
+                        columns.insert(local_id.clone(), to_column(local_id, col));
                     }
                 }
+                // for local_id in &local {
+                //     if let Some(col) = model.merged_columns.get(local_id) {
+                //         relations.insert(
+                //             format!("{model_name}:{local_id}"),
+                //             to_rel(&foreign_name, col, model),
+                //         );
+                //         columns.insert(local_id.clone(), to_column(local_id, col));
+                //     }
+                // }
+                // if local.len() == 1 {
+                //     let local_id = &local[0];
+                //     if let Some(col) = model.merged_columns.get(local_id) {
+                //         relations.insert(
+                //             format!("{model_name}:{local_id}"),
+                //             to_rel(&foreign_name, col, model),
+                //         );
+                //         columns.insert(local_id.clone(), to_column(local_id, col));
+                //     }
+                // }
             }
         }
-        _models.insert(model_name.clone(), Model { title, columns });
+        let tooltip: Vec<_> = model
+            .merged_fields
+            .iter()
+            .map(|(k, _)| k.to_string())
+            .collect();
+        target_models.insert(
+            model_name.clone(),
+            Model {
+                label,
+                columns,
+                tooltip: tooltip.join("\n"),
+            },
+        );
     }
 
     let tpl = ErDotTemplate {
         group_name,
-        models: _models,
+        models: target_models,
         another_models,
         relations,
     };
@@ -389,30 +456,29 @@ digraph "" {
     node [shape="box" fontname="times" fontsize="10" margin="0" penwidth="0.5"];
     edge [dir="both" arrowsize=0.5 arrowhead="none" arrowtail="dot" penwidth="0.5"];
     @%- for (name, model) in models %@
-    @{ name }@[shape="plain" href="#model_@{ group_name }@::@{ name }@" label = <
+    @{ name }@[shape="plain" href="#model_@{ group_name }@::@{ name }@" tooltip="@{ model.tooltip|e }@" label = <
     <table cellspacing="0" cellpadding="2" cellborder="0" border="1" color="black">
-    <tr><td port="_">@{ model.title|e }@</td></tr>
+    <tr><td port="_">@{ model.label|e }@</td></tr>
     @%- if !model.columns.is_empty() %@
     <hr />
     @%- for (name, column) in model.columns %@
-    <tr><td align="left" port="@{ name|e }@">@{ column.title|e }@</td></tr>
+    <tr><td align="left" port="@{ name|e }@">@{ column.label|e }@</td></tr>
     @%- endfor %@
     @%- endif %@
     </table>>]
     @%- endfor %@
 
     @%- for (name, model) in another_models %@
-    @{ name }@[shape="plain" href="#model_@{ model.link }@" label = <
+    @{ name }@[shape="plain" href="#model_@{ model.link }@" tooltip="@{ model.tooltip|e }@" label = <
     <table cellspacing="0" cellpadding="2" cellborder="0" border="1" color="black">
-    <tr><td port="_">@{ model.title|e }@</td></tr>
+    <tr><td port="_">@{ model.label|e }@</td></tr>
     </table>>]
     @%- endfor %@
 
     @%- for (from, rel) in relations %@
     @{ from }@ -> @{ rel.to }@[@% if rel.null %@arrowhead="odiamond" style="dashed"@% endif %@@% if rel.one %@ arrowtail="none"@% endif %@]
     @%- endfor %@
-}
-"###,
+}"###,
     ext = "txt"
 )]
 struct ErDotTemplate<'a> {
@@ -423,30 +489,32 @@ struct ErDotTemplate<'a> {
 }
 
 struct Model {
-    title: String,
+    label: String,
     columns: IndexMap<String, Column>,
+    tooltip: String,
 }
 struct Column {
-    title: String,
+    label: String,
 }
-fn to_column(name: &str, col: &ColumnDef) -> Column {
+fn to_column(name: &str, col: &FieldDef) -> Column {
     Column {
-        title: col
-            .title
+        label: col
+            .label
             .clone()
             .unwrap_or_else(|| col.get_col_name(name).to_string()),
     }
 }
 struct AnotherModel {
     link: String,
-    title: String,
+    label: String,
+    tooltip: String,
 }
 struct Relation {
     to: String,
     null: bool,
     one: bool,
 }
-fn to_rel(foreign_name: &String, col: &ColumnDef, model: &ModelDef) -> Relation {
+fn to_rel(foreign_name: &String, col: &FieldDef, model: &ModelDef) -> Relation {
     Relation {
         to: format!("{foreign_name}:_"),
         null: !col.not_null,

@@ -1,10 +1,10 @@
 [package]
 name = "senax-macros"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["yossyX"]
 license = "MIT OR Apache-2.0"
-description = "SenaX macros"
+description = "Senax macros"
 repository = "https://github.com/yossyX/senax"
 keywords = ["senax"]
 

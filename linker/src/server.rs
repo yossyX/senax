@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
 use bytes::BufMut;
-use futures_util::{StreamExt, TryFutureExt};
+use futures_util::TryFutureExt;
 use log::{error, info};
 use quinn::ServerConfig;
 use sha2::{Digest, Sha512};
@@ -21,9 +21,9 @@ pub async fn run(
     pw: String,
 ) -> Result<()> {
     let server_config = make_server(&key_path, &cert_path)?;
-    let (endpoint, mut incoming) = quinn::Endpoint::server(server_config, addr)?;
+    let endpoint = quinn::Endpoint::server(server_config, addr)?;
     info!("listening on {}", endpoint.local_addr()?);
-    while let Some(conn) = incoming.next().await {
+    while let Some(conn) = endpoint.accept().await {
         tokio::spawn(
             handle_connection(conn, to_local.clone(), pw.clone()).unwrap_or_else(|e| {
                 error!("connection failed: {}", e);
@@ -84,20 +84,9 @@ async fn handle_connection(
     to_local: UnboundedSender<Pack>,
     pw: String,
 ) -> Result<()> {
-    let quinn::NewConnection {
-        connection,
-        mut uni_streams,
-        mut bi_streams,
-        ..
-    } = conn.await?;
+    let connection = conn.await?;
     info!("connected from {}", connection.remote_address());
-    let (db, cmd) = if let Some(stream) = bi_streams.next().await {
-        let (send, mut recv) = match stream {
-            Err(e) => {
-                return Err(anyhow!(e));
-            }
-            Ok(s) => s,
-        };
+    let (stream_id, cmd) = if let Ok((send, mut recv)) = connection.accept_bi().await {
         let mut v = [0; 2];
         recv.read_exact(&mut v)
             .await
@@ -120,7 +109,7 @@ async fn handle_connection(
         recv.read_exact(&mut v)
             .await
             .map_err(|e| anyhow!("failed reading request: {}", e))?;
-        let db = u64::from_le_bytes(v);
+        let stream_id = u64::from_le_bytes(v);
         let mut cmd = [0; 2];
         recv.read_exact(&mut cmd)
             .await
@@ -128,7 +117,7 @@ async fn handle_connection(
 
         send_response(send, CONNECTION_SUCCESS).await?;
 
-        (db, u16::from_le_bytes(cmd))
+        (stream_id, u16::from_le_bytes(cmd))
     } else {
         bail!("bi_streams was not sent.");
     };
@@ -137,13 +126,13 @@ async fn handle_connection(
         let _ = to_local.send(Pack {
             data: data.into(),
             conn_no: 0,
-            db,
+            stream_id,
         });
         warn!("reset command received");
     }
 
-    while let Some(stream) = uni_streams.next().await {
-        let stream = match stream {
+    loop {
+        let stream = match connection.accept_uni().await {
             Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
                 info!("connection closed");
                 return Ok(());
@@ -154,11 +143,10 @@ async fn handle_connection(
             Ok(s) => s,
         };
         tokio::spawn(
-            handle_request(stream, to_local.clone(), db)
+            handle_request(stream, to_local.clone(), stream_id)
                 .unwrap_or_else(move |e| error!("failed: {}", e)),
         );
     }
-    Ok(())
 }
 
 async fn send_response(mut send: quinn::SendStream, code: u8) -> Result<()> {
@@ -174,21 +162,21 @@ async fn send_response(mut send: quinn::SendStream, code: u8) -> Result<()> {
 }
 
 async fn handle_request(
-    recv: quinn::RecvStream,
+    mut recv: quinn::RecvStream,
     to_local: UnboundedSender<Pack>,
-    db: u64,
+    stream_id: u64,
 ) -> Result<()> {
     let buf = recv
         .read_to_end(usize::MAX)
         .await
         .map_err(|e| anyhow!("failed reading request: {}", e))?;
     let decoder = Decoder::new(&*buf)?;
-    let list: Vec<Vec<u8>> = bincode::deserialize_from(decoder)?;
+    let list: Vec<serde_bytes::ByteBuf> = bincode::deserialize_from(decoder)?;
     for buf in list {
         let _ = to_local.send(Pack {
-            data: buf.into(),
+            data: buf.into_vec().into(),
             conn_no: 0,
-            db,
+            stream_id,
         });
     }
     Ok(())

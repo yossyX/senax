@@ -29,7 +29,7 @@ $ senax-linker --cert
 |HOST_NAME||認証局用ホスト名|
 |TCP_PORT|||
 |UNIX_PORT|||
-|LINK_PORT|||
+|OUTER_PORT|||
 |PASSWORD|Yes|サーバとの接続時に使用されるパスワード|
 |ETCD_PORT|||
 |ETCD_USER|||

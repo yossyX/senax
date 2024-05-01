@@ -5,7 +5,7 @@ use anyhow::{bail, Context, Result};
 use clap::Parser;
 use client::client_endpoint;
 use common::Pack;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use etcd_client::{
     Client, ConnectOptions, EventType, GetOptions, PutOptions, TlsOptions, WatchOptions,
 };
@@ -37,7 +37,7 @@ mod unix_listener;
 
 const WATCHDOG_TTL: i64 = 10;
 const WATCHDOG_KEEP_ALIVE: u64 = 1;
-const HOST_NAME: &str = "setsuna_linker";
+const HOST_NAME: &str = "senax_linker";
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -71,12 +71,9 @@ async fn main() -> Result<()> {
         let pem_serialized = cert.serialize_pem()?;
         let der_serialized = pem::parse(&pem_serialized).unwrap().contents;
         std::fs::create_dir_all("certs/")?;
-        fs::write("certs/cert.pem", &pem_serialized.as_bytes())?;
-        fs::write("certs/cert.der", &der_serialized)?;
-        fs::write(
-            "certs/key.pem",
-            &cert.serialize_private_key_pem().as_bytes(),
-        )?;
+        fs::write("certs/cert.pem", pem_serialized.as_bytes())?;
+        fs::write("certs/cert.der", der_serialized)?;
+        fs::write("certs/key.pem", cert.serialize_private_key_pem().as_bytes())?;
         // fs::write("certs/key.der", &cert.serialize_private_key_der())?;
         return Ok(());
     }
@@ -154,10 +151,10 @@ async fn main() -> Result<()> {
     let watchdog_key = set_watchdog(&mut etcd_client, link_port, lease).await?;
 
     let opt = WatchOptions::new().with_prefix();
-    let key = "/setsuna_linker/";
+    let key = "/senax_linker/";
     let (_watcher, mut etcd_stream) = etcd_client.watch(key, Some(opt)).await?;
 
-    let etcd_db_re = Regex::new(r"^/setsuna_linker/db/(\d+)/(.+)$").unwrap();
+    let etcd_stream_re = Regex::new(r"^/senax_linker/(\d+)/(.+)$").unwrap();
 
     let mut exit_code = 0;
     let mut to_locals: HashMap<u64, Vec<UnboundedSender<Pack>>> = HashMap::new();
@@ -166,59 +163,43 @@ async fn main() -> Result<()> {
     interval.tick().await;
     loop {
         tokio::select! {
-            Some((db, sender)) = rx_incoming_local.recv() => {
-                if let Some(vec) = to_locals.get_mut(&db) {
+            Some((stream_id, sender)) = rx_incoming_local.recv() => {
+                if let Some(vec) = to_locals.get_mut(&stream_id) {
                     vec.push(sender);
                 } else {
-                    to_locals.insert(db, vec![sender]);
+                    to_locals.insert(stream_id, vec![sender]);
 
-                    let map = to_outers.entry(db).or_default();
-                    for remote in fetch_node_list(&mut etcd_client, db).await? {
+                    let map = to_outers.entry(stream_id).or_default();
+                    for remote in fetch_node_list(&mut etcd_client, stream_id).await? {
                         if let Vacant(e) = map.entry(remote.clone()) {
-                            let to_outer = connect_client(remote, &host, endpoint.clone(), pw.clone(), db, 0)?;
+                            let to_outer = connect_client(remote, &host, endpoint.clone(), pw.clone(), stream_id, 0)?;
                             e.insert(to_outer);
                         }
                     }
-                    register_node(&mut etcd_client, db, link_port, lease).await?;
+                    register_node(&mut etcd_client, stream_id, link_port, lease).await?;
                 }
             },
             Some(pack) = from_local.recv() => {
                 // from local to outer linker servers
-                let db = pack.db;
-                if let Some(vec) = to_locals.get_mut(&db) {
-                    let mut keep = Vec::new();
-                    for sender in vec.iter() {
-                        keep.push(sender.send(pack.clone()).is_ok());
-                    }
-                    let mut iter = keep.iter();
-                    vec.retain(|_| *iter.next().unwrap());
+                let stream_id = pack.stream_id;
+                if let Some(vec) = to_locals.get_mut(&stream_id) {
+                    vec.retain(|sender| sender.send(pack.clone()).is_ok());
                 }
-                if let Some(map) = to_outers.get_mut(&db) {
-                    let mut remove = Vec::new();
-                    for (remote, sender) in map.iter() {
-                        if sender.send(pack.clone()).is_err() {
-                            remove.push(remote.to_string());
-                        }
-                    }
-                    map.retain(|k, _| !remove.contains(k));
+                if let Some(map) = to_outers.get_mut(&stream_id) {
+                    map.retain(|_, sender| sender.send(pack.clone()).is_ok());
                 }
             },
             Some(pack) = from_outer.recv() => {
                 // from outer linker server to local
-                let db = pack.db;
-                if let Some(vec) = to_locals.get_mut(&db) {
-                    let mut keep = Vec::new();
-                    for sender in vec.iter() {
-                        keep.push(sender.send(pack.clone()).is_ok());
-                    }
-                    let mut iter = keep.iter();
-                    vec.retain(|_| *iter.next().unwrap());
+                let stream_id = pack.stream_id;
+                if let Some(vec) = to_locals.get_mut(&stream_id) {
+                    vec.retain(|sender| sender.send(pack.clone()).is_ok());
                     if vec.is_empty() {
                         // when all local connections are disconnected
-                        log::warn!("db removed {db}");
-                        to_locals.remove(&db);
-                        to_outers.remove(&db);
-                        unregister_node(&mut etcd_client, db, link_port).await?;
+                        log::warn!("stream removed {stream_id}");
+                        to_locals.remove(&stream_id);
+                        to_outers.remove(&stream_id);
+                        unregister_node(&mut etcd_client, stream_id, link_port).await?;
                     }
                 }
             },
@@ -243,14 +224,14 @@ async fn main() -> Result<()> {
                         let key = kv.key_str()?;
                         if EventType::Delete == event.event_type() && key == watchdog_key {
                             let _ = tx_end.send(1);
-                        } else if let Some(caps) = etcd_db_re.captures(key) {
-                            let db: u64 = caps.get(1).unwrap().as_str().parse()?;
+                        } else if let Some(caps) = etcd_stream_re.captures(key) {
+                            let stream_id: u64 = caps.get(1).unwrap().as_str().parse()?;
                             let remote = caps.get(2).unwrap().as_str().to_string();
-                            if let Some(map) = to_outers.get_mut(&db) {
+                            if let Some(map) = to_outers.get_mut(&stream_id) {
                                 if EventType::Put == event.event_type() {
                                     if remote != link_port.to_string() && !map.contains_key(&remote) {
                                         // connect with new linker server
-                                        let to_outer = connect_client(remote.clone(), &host, endpoint.clone(), pw.clone(), db, 0)?;
+                                        let to_outer = connect_client(remote.clone(), &host, endpoint.clone(), pw.clone(), stream_id, 0)?;
                                         map.insert(remote, to_outer);
                                     }
                                 } else if EventType::Delete == event.event_type() {
@@ -271,11 +252,11 @@ async fn main() -> Result<()> {
             }
             _ = interval.tick() => {
                 // check connections
-                for (&db, map) in to_outers.iter_mut() {
-                    for remote in fetch_node_list(&mut etcd_client, db).await? {
+                for (&stream_id, map) in to_outers.iter_mut() {
+                    for remote in fetch_node_list(&mut etcd_client, stream_id).await? {
                         if remote != link_port.to_string() && !map.contains_key(&remote) {
                             log::warn!("send reset {remote}");
-                            let to_outer = connect_client(remote.clone(), &host, endpoint.clone(), pw.clone(), db, CMD_RESET)?;
+                            let to_outer = connect_client(remote.clone(), &host, endpoint.clone(), pw.clone(), stream_id, CMD_RESET)?;
                             map.insert(remote, to_outer);
                         }
                     }
@@ -294,12 +275,12 @@ async fn main() -> Result<()> {
 }
 
 fn link_port() -> Result<SocketAddr> {
-    let port: u16 = env::var("LINK_PORT")
+    let port: u16 = env::var("OUTER_PORT")
         .unwrap_or_else(|_| "25552".to_string())
         .parse()
         .unwrap_or_default();
     if port == 0 {
-        return Ok(env::var("LINK_PORT").unwrap().parse()?);
+        return Ok(env::var("OUTER_PORT").unwrap().parse()?);
     }
     let hostname = hostname::get()?;
     if let Ok(mut port) = format!("{}:{port}", hostname.to_str().unwrap()).to_socket_addrs() {
@@ -312,7 +293,7 @@ fn link_port() -> Result<SocketAddr> {
             return Ok(format!("{}:{port}", iface.ip()).parse()?);
         }
     }
-    bail!("LINK_PORT not found");
+    bail!("OUTER_PORT not found");
 }
 
 async fn set_watchdog(
@@ -328,32 +309,36 @@ async fn set_watchdog(
         }
     });
     let opt = PutOptions::new().with_lease(lease);
-    let key = format!("/setsuna_linker/watchdog/{link_port}");
+    let key = format!("/senax_linker/watchdog/{link_port}");
     etcd_client.put(&*key, "1", Some(opt)).await?;
     Ok(key)
 }
 
 async fn register_node(
     etcd_client: &mut Client,
-    db: u64,
+    stream_id: u64,
     link_port: SocketAddr,
     lease: i64,
 ) -> Result<()> {
     let opt = PutOptions::new().with_lease(lease);
-    let key = format!("/setsuna_linker/db/{db}/{link_port}");
+    let key = format!("/senax_linker/{stream_id}/{link_port}");
     etcd_client.put(&*key, "1", Some(opt)).await?;
     Ok(())
 }
 
-async fn unregister_node(etcd_client: &mut Client, db: u64, link_port: SocketAddr) -> Result<()> {
-    let key = format!("/setsuna_linker/db/{db}/{link_port}");
+async fn unregister_node(
+    etcd_client: &mut Client,
+    stream_id: u64,
+    link_port: SocketAddr,
+) -> Result<()> {
+    let key = format!("/senax_linker/{stream_id}/{link_port}");
     etcd_client.delete(&*key, None).await?;
     Ok(())
 }
 
-async fn fetch_node_list(etcd_client: &mut Client, db: u64) -> Result<Vec<String>> {
+async fn fetch_node_list(etcd_client: &mut Client, stream_id: u64) -> Result<Vec<String>> {
     let opt = GetOptions::new().with_prefix();
-    let key = format!("/setsuna_linker/db/{db}/");
+    let key = format!("/senax_linker/{stream_id}/");
     let resp = etcd_client.get(&*key, Some(opt)).await?;
     let mut ports = Vec::new();
     for kv in resp.kvs() {

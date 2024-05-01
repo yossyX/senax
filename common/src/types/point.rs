@@ -4,12 +4,23 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, fmt::Display, str::FromStr};
 
-#[derive(Deserialize, Serialize, Copy, Clone, Debug, Default, PartialEq, JsonSchema)]
+#[derive(
+    Deserialize,
+    Serialize,
+    Copy,
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    JsonSchema,
+    async_graphql::SimpleObject,
+    async_graphql::InputObject,
+)]
+#[graphql(input_name = "PointInput")]
 pub struct Point {
     pub x: f64,
     pub y: f64,
 }
-async_graphql::scalar!(Point);
 
 impl From<&(f64, f64)> for Point {
     fn from(v: &(f64, f64)) -> Self {
@@ -77,6 +88,17 @@ impl From<Point> for Vec<u8> {
         buf.put_u32_le(1);
         buf.put_f64_le(point.x);
         buf.put_f64_le(point.y);
+        buf.to_vec()
+    }
+}
+
+impl Point {
+    pub fn to_wkb(&self) -> Vec<u8> {
+        let mut buf = BytesMut::with_capacity(21);
+        buf.put_u8(1);
+        buf.put_u32_le(1);
+        buf.put_f64_le(self.x);
+        buf.put_f64_le(self.y);
         buf.to_vec()
     }
 }

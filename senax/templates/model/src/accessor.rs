@@ -1,8 +1,8 @@
 // This code is auto-generated and will always be overwritten.
+// Senax v@{ ""|senax_version }@
 
 #![allow(dead_code)]
 
-use crate::misc::IntoJson;
 use anyhow::{ensure, Result};
 use derive_more::Display;
 use log::kv::ToValue;
@@ -11,10 +11,11 @@ use rust_decimal::Decimal;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::fmt::Debug;
 use std::ops::{BitAnd, BitOr};
+use std::sync::Arc;
 use std::{fmt, fmt::Display, marker::PhantomData};
 
 #[derive(
-    Serialize_repr, Deserialize_repr, Eq, PartialEq, Clone, Copy, Debug, Display, Default, Hash,
+    Serialize_repr, Deserialize_repr, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash,
 )]
 #[repr(u8)]
 pub(crate) enum Op {
@@ -31,23 +32,119 @@ pub(crate) enum Op {
 }
 
 impl Op {
-    pub fn get_sql(&self, col: &str, nullable: bool, ps: &str) -> String {
+    pub fn get_sql(&self, col: &str, nullable: bool, ph: &str) -> String {
+        let mut buf = String::with_capacity(100);
         match self {
-            Op::None => "".to_string(),
-            Op::Skip => "".to_string(),
-            Op::Set => format!("{}={}", col, ps),
-            Op::Add if nullable => format!("{}=IFNULL({}, 0)+?", col, col),
-            Op::Add => format!("{}={}+?", col, col),
-            Op::Sub if nullable => format!("{}=IFNULL({}, 0)-?", col, col),
-            Op::Sub => format!("{}={}-?", col, col),
-            Op::Max if nullable => format!("{}=IF(IFNULL({}, ?)<?,?,{})", col, col, col),
-            Op::Max => format!("{}=IF({}<?,?,{})", col, col, col),
-            Op::Min if nullable => format!("{}=IF(IFNULL({}, ?)>?,?,{})", col, col, col),
-            Op::Min => format!("{}=IF({}>?,?,{})", col, col, col),
-            Op::BitAnd => format!("{}={}&?", col, col),
-            Op::BitOr if nullable => format!("{}=IFNULL({}, 0)|?", col, col),
-            Op::BitOr => format!("{}={}|?", col, col),
-        }
+            Op::None => {}
+            Op::Skip => {}
+            Op::Set => {
+                buf.push_str(col);
+                buf.push('=');
+                buf.push_str(ph);
+            }
+            Op::Add if nullable => {
+                buf.push_str(col);
+                buf.push_str("=IFNULL(");
+                buf.push_str(col);
+                buf.push_str(", 0)+");
+                buf.push_str(ph);
+            }
+            Op::Add => {
+                buf.push_str(col);
+                buf.push('=');
+                buf.push_str(col);
+                buf.push('+');
+                buf.push_str(ph);
+            }
+            Op::Sub if nullable => {
+                buf.push_str(col);
+                buf.push_str("=IFNULL(");
+                buf.push_str(col);
+                buf.push_str(", 0)-");
+                buf.push_str(ph);
+            }
+            Op::Sub => {
+                buf.push_str(col);
+                buf.push('=');
+                buf.push_str(col);
+                buf.push('-');
+                buf.push_str(ph);
+            }
+            Op::Max if nullable => {
+                buf.push_str(col);
+                buf.push_str("=IF(IFNULL(");
+                buf.push_str(col);
+                buf.push_str(", ");
+                buf.push_str(ph);
+                buf.push_str(")<");
+                buf.push_str(ph);
+                buf.push(',');
+                buf.push_str(ph);
+                buf.push(',');
+                buf.push_str(col);
+                buf.push(')');
+            }
+            Op::Max => {
+                buf.push_str(col);
+                buf.push_str("=IF(");
+                buf.push_str(col);
+                buf.push('<');
+                buf.push_str(ph);
+                buf.push(',');
+                buf.push_str(ph);
+                buf.push(',');
+                buf.push_str(col);
+                buf.push(')');
+            }
+            Op::Min if nullable => {
+                buf.push_str(col);
+                buf.push_str("=IF(IFNULL(");
+                buf.push_str(col);
+                buf.push_str(", ");
+                buf.push_str(ph);
+                buf.push_str(")>");
+                buf.push_str(ph);
+                buf.push(',');
+                buf.push_str(ph);
+                buf.push(',');
+                buf.push_str(col);
+                buf.push(')');
+            }
+            Op::Min => {
+                buf.push_str(col);
+                buf.push_str("=IF(");
+                buf.push_str(col);
+                buf.push('>');
+                buf.push_str(ph);
+                buf.push(',');
+                buf.push_str(ph);
+                buf.push(',');
+                buf.push_str(col);
+                buf.push(')');
+            }
+            Op::BitAnd => {
+                buf.push_str(col);
+                buf.push('=');
+                buf.push_str(col);
+                buf.push('&');
+                buf.push_str(ph);
+            }
+            Op::BitOr if nullable => {
+                buf.push_str(col);
+                buf.push_str("=IFNULL(");
+                buf.push_str(col);
+                buf.push_str(", 0)|");
+                buf.push_str(ph);
+            }
+            Op::BitOr => {
+                buf.push_str(col);
+                buf.push('=');
+                buf.push_str(col);
+                buf.push('|');
+                buf.push_str(ph);
+            }
+        };
+        buf
     }
 
     pub fn get_bind_num(&self, nullable: bool) -> u32 {
@@ -71,16 +168,19 @@ impl Op {
     }
 }
 
-macro_rules! assignment_sql_no_cache_update {
+#[allow(unused_macros)]
+macro_rules! assign_sql_no_cache_update {
     ( $obj:ident, $vec:ident, $col:ident, $name:expr, $nullable:expr, $ph:expr ) => {
         if $obj._op.$col != Op::None && $obj._op.$col != Op::Skip {
             $vec.push($obj._op.$col.get_sql($name, $nullable, $ph));
         }
     };
 }
-pub(crate) use assignment_sql_no_cache_update;
+#[allow(unused_imports)]
+pub(crate) use assign_sql_no_cache_update;
 
-macro_rules! assignment_sql {
+#[allow(unused_macros)]
+macro_rules! assign_sql {
     ( $obj:ident, $vec:ident, $col:ident, $name:expr, $nullable:expr, $update_cache: ident, $ph:expr ) => {
         if $obj._op.$col != Op::None && $obj._op.$col != Op::Skip {
             $vec.push($obj._op.$col.get_sql($name, $nullable, $ph));
@@ -88,16 +188,8 @@ macro_rules! assignment_sql {
         }
     };
 }
-pub(crate) use assignment_sql;
-
-macro_rules! bind_sql {
-    ( $obj:ident, $query:ident, $col:ident, $nullable:expr ) => {
-        for _n in 0..$obj._op.$col.get_bind_num($nullable) {
-            $query = $query.bind(&$obj._update.$col);
-        }
-    };
-}
-pub(crate) use bind_sql;
+#[allow(unused_imports)]
+pub(crate) use assign_sql;
 
 pub(crate) struct Empty;
 impl Empty {
@@ -134,14 +226,14 @@ impl Empty {
     pub fn is_zero_decimal(val: &Decimal) -> bool {
         val.is_zero()
     }
-    pub fn is_zero_len<T>(val: &Vec<T>) -> bool {
+    pub fn is_zero_len<T>(val: &std::sync::Arc<Vec<T>>) -> bool {
         val.is_empty()
     }
-    pub fn is_zero_json_len<T>(val: &sqlx::types::Json<Vec<T>>) -> bool {
+    pub fn is_zero_json_len<T>(val: &Vec<T>) -> bool {
         val.is_empty()
     }
-    pub fn is_default_json<T: Default + PartialEq>(val: &sqlx::types::Json<T>) -> bool {
-        **val == T::default()
+    pub fn is_default<T: Default + PartialEq>(val: &T) -> bool {
+        *val == T::default()
     }
     pub fn is_default_utc_date_time(val: &chrono::DateTime<chrono::offset::Utc>) -> bool {
         *val == chrono::DateTime::<chrono::offset::Utc>::default()
@@ -157,27 +249,43 @@ impl Empty {
     }
 }
 
-pub struct AccessorPrimary<'a, I: Clone + Debug, O> {
+pub struct AccessorPrimary<'a, I: Clone + Debug, O>
+where
+    O: From<I>,
+{
     pub(crate) val: &'a I,
     pub(crate) _phantom: PhantomData<O>,
 }
 impl<'a, I: Clone + Debug, O> AccessorPrimary<'a, I, O>
 where
-    I: From<O>,
     O: From<I>,
 {
     pub fn get(&self) -> O {
         self.val.clone().into()
     }
-    pub fn mark_skip(&self) {}
-    pub fn mark_set(&mut self) {}
+    pub fn mark_for_skip(&self) {}
+    pub fn mark_for_set(&mut self) {}
 
-    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, col: &str, value: &I) -> fmt::Result {
-        write!(f, "{}={:?}, ", col, value)
+    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result {
+        write!(f, "{comma}{col}: {:?}", value)
+    }
+
+    pub(crate) fn _write_update(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        _op: Op,
+        value: &I,
+    ) -> fmt::Result {
+        write!(f, "{comma}{col}: {:?}", value)
     }
 }
 
-pub struct AccessorNotNull<'a, I: Clone + Debug, O> {
+pub struct AccessorNotNull<'a, I: Clone + Debug, O>
+where
+    I: From<O>,
+    O: From<I>,
+{
     pub(crate) op: &'a mut Op,
     pub(crate) val: &'a mut I,
     pub(crate) update: &'a mut I,
@@ -191,10 +299,10 @@ where
     pub fn get(&self) -> O {
         self.val.clone().into()
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
     pub fn set(&mut self, val: O) {
@@ -209,23 +317,28 @@ where
         }
     }
 
-    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, col: &str, value: &I) -> fmt::Result {
-        write!(f, "{}={:?}, ", col, value)
+    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result {
+        write!(f, "{comma}{col}: {:?}", value)
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
         value: &I,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            write!(f, "{}={}({:?}), ", col, op, value)?;
+            write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
         }
         Ok(())
     }
 }
-pub struct AccessorNull<'a, I: Clone + Debug, O> {
+pub struct AccessorNull<'a, I: Clone + Debug, O>
+where
+    I: From<O>,
+    O: From<I>,
+{
     pub(crate) op: &'a mut Op,
     pub(crate) val: &'a mut Option<I>,
     pub(crate) update: &'a mut Option<I>,
@@ -239,10 +352,10 @@ where
     pub fn get(&self) -> Option<O> {
         self.val.as_ref().map(|v| v.clone().into())
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<O>) {
@@ -259,27 +372,29 @@ where
 
     pub(crate) fn _write_insert(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         value: &Option<I>,
     ) -> fmt::Result {
-        if value.is_none() {
-            write!(f, "{}=null, ", col)
+        if let Some(value) = value {
+            write!(f, "{comma}{col}: {:?}", value)
         } else {
-            write!(f, "{}={:?}, ", col, value.as_ref().unwrap())
+            write!(f, "{comma}{col}: null")
         }
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
         value: &Option<I>,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            if value.is_none() {
-                write!(f, "{}={}(null), ", col, op)?;
+            if let Some(value) = value {
+                write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
             } else {
-                write!(f, "{}={}({:?}), ", col, op, value.as_ref().unwrap())?;
+                write!(f, "{comma}{col}: {{{op}: null}}")?;
             }
         }
         Ok(())
@@ -296,10 +411,10 @@ impl<'a> AccessorNotNullBool<'a> {
     pub fn get(&self) -> bool {
         (*self.val) == 1
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
     pub fn set(&mut self, val: bool) {
@@ -313,18 +428,19 @@ impl<'a> AccessorNotNullBool<'a> {
         }
     }
 
-    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, col: &str, value: &i8) -> fmt::Result {
-        write!(f, "{}={:?}, ", col, value)
+    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &i8) -> fmt::Result {
+        write!(f, "{comma}{col}: {:?}", value)
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
         value: &i8,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            write!(f, "{}={}({:?}), ", col, op, value)?;
+            write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
         }
         Ok(())
     }
@@ -339,10 +455,10 @@ impl<'a> AccessorNullBool<'a> {
     pub fn get(&self) -> Option<bool> {
         self.val.map(|v| v == 1)
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<bool>) {
@@ -359,201 +475,213 @@ impl<'a> AccessorNullBool<'a> {
 
     pub(crate) fn _write_insert(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         value: &Option<i8>,
     ) -> fmt::Result {
-        if value.is_none() {
-            write!(f, "{}=null, ", col)
+        if let Some(value) = value {
+            write!(f, "{comma}{col}: {:?}", value)
         } else {
-            write!(f, "{}={:?}, ", col, value.as_ref().unwrap())
+            write!(f, "{comma}{col}: null")
         }
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
         value: &Option<i8>,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            if value.is_none() {
-                write!(f, "{}={}(null), ", col, op)?;
+            if let Some(value) = value {
+                write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
             } else {
-                write!(f, "{}={}({:?}), ", col, op, value.as_ref().unwrap())?;
+                write!(f, "{comma}{col}: {{{op}: null}}")?;
             }
         }
         Ok(())
     }
 }
 
-pub struct AccessorNotNullString<'a> {
+pub struct AccessorNotNullArc<'a, I: Debug> {
     pub(crate) op: &'a mut Op,
-    pub(crate) val: &'a mut String,
-    pub(crate) update: &'a mut String,
-    pub(crate) _phantom: PhantomData<String>,
-}
-impl<'a> AccessorNotNullString<'a> {
-    pub fn get(&self) -> &str {
-        &*self.val
-    }
-    pub fn mark_skip(&mut self) {
-        *self.op = Op::Skip;
-    }
-    pub fn mark_set(&mut self) {
-        *self.op = Op::Set;
-    }
-    pub fn set(&mut self, val: &str) {
-        *self.op = Op::Set;
-        *self.val = val.to_string();
-        *self.update = val.to_string();
-    }
-    pub(crate) fn _set(op: Op, prop: &mut String, update: &str) {
-        if op == Op::Set {
-            *prop = update.to_owned();
-        }
-    }
-
-    pub(crate) fn _write_insert(
-        f: &mut fmt::Formatter<'_>,
-        col: &str,
-        value: &String,
-    ) -> fmt::Result {
-        write!(f, "{}={:?}, ", col, value)
-    }
-
-    pub(crate) fn _write_update(
-        f: &mut fmt::Formatter<'_>,
-        col: &str,
-        op: Op,
-        value: &String,
-    ) -> fmt::Result {
-        if op != Op::None && op != Op::Skip {
-            write!(f, "{}={}({:?}), ", col, op, value)?;
-        }
-        Ok(())
-    }
-}
-pub struct AccessorNullString<'a> {
-    pub(crate) op: &'a mut Op,
-    pub(crate) val: &'a mut Option<String>,
-    pub(crate) update: &'a mut Option<String>,
-    pub(crate) _phantom: PhantomData<String>,
-}
-impl<'a> AccessorNullString<'a> {
-    pub fn get(&self) -> Option<&str> {
-        self.val.as_deref()
-    }
-    pub fn mark_skip(&mut self) {
-        *self.op = Op::Skip;
-    }
-    pub fn mark_set(&mut self) {
-        *self.op = Op::Set;
-    }
-    pub fn set(&mut self, val: Option<&str>) {
-        *self.op = Op::Set;
-        *self.val = val.map(|v| v.to_string());
-        *self.update = val.map(|v| v.to_string());
-    }
-    pub(crate) fn _set(op: Op, prop: &mut Option<String>, update: &Option<String>) {
-        if op == Op::Set {
-            *prop = update.clone();
-        }
-    }
-
-    pub(crate) fn _write_insert(
-        f: &mut fmt::Formatter<'_>,
-        col: &str,
-        value: &Option<String>,
-    ) -> fmt::Result {
-        if value.is_none() {
-            write!(f, "{}=null, ", col)
-        } else {
-            write!(f, "{}={:?}, ", col, value.as_ref().unwrap())
-        }
-    }
-
-    pub(crate) fn _write_update(
-        f: &mut fmt::Formatter<'_>,
-        col: &str,
-        op: Op,
-        value: &Option<String>,
-    ) -> fmt::Result {
-        if op != Op::None && op != Op::Skip {
-            if value.is_none() {
-                write!(f, "{}={}(null), ", col, op)?;
-            } else {
-                write!(f, "{}={}({:?}), ", col, op, value.as_ref().unwrap())?;
-            }
-        }
-        Ok(())
-    }
-}
-
-pub struct AccessorNotNullRef<'a, I: Clone + Debug> {
-    pub(crate) op: &'a mut Op,
-    pub(crate) val: &'a mut I,
-    pub(crate) update: &'a mut I,
+    pub(crate) val: &'a mut Arc<I>,
+    pub(crate) update: &'a mut Arc<I>,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Clone + Debug> AccessorNotNullRef<'a, I> {
-    pub fn get(&self) -> &I {
-        self.val
+impl<'a, I: Debug> AccessorNotNullArc<'a, I> {
+    pub fn get(&self) -> Arc<I> {
+        self.val.clone()
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
-    pub fn set(&mut self, val: I) {
+    pub fn set(&mut self, val: Arc<I>) {
         *self.op = Op::Set;
         *self.val = val.clone();
         *self.update = val;
     }
-    pub(crate) fn _set(op: Op, prop: &mut I, update: &I) {
+    pub(crate) fn _set(op: Op, prop: &mut Arc<I>, update: &Arc<I>) {
         if op == Op::Set {
             *prop = update.clone();
         }
     }
 
-    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, col: &str, value: &I) -> fmt::Result {
-        write!(f, "{}={:?}, ", col, value)
+    pub(crate) fn _write_insert(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        value: &Arc<I>,
+    ) -> fmt::Result {
+        write!(f, "{comma}{col}: {:?}", value.as_ref())
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
-        value: &I,
+        value: &Arc<I>,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            write!(f, "{}={}({:?}), ", col, op, value)?;
+            write!(f, "{comma}{col}: {{{op}: {:?}}}", value.as_ref())?;
         }
         Ok(())
     }
 }
-pub struct AccessorNullRef<'a, I: Clone + Debug> {
+pub struct AccessorNullArc<'a, I: Debug> {
     pub(crate) op: &'a mut Op,
-    pub(crate) val: &'a mut Option<I>,
-    pub(crate) update: &'a mut Option<I>,
+    pub(crate) val: &'a mut Option<Arc<I>>,
+    pub(crate) update: &'a mut Option<Arc<I>>,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Clone + Debug> AccessorNullRef<'a, I> {
-    pub fn get(&self) -> Option<&I> {
+impl<'a, I: Debug> AccessorNullArc<'a, I> {
+    pub fn get(&self) -> Option<Arc<I>> {
+        self.val.clone()
+    }
+    pub fn mark_for_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_for_set(&mut self) {
+        *self.op = Op::Set;
+    }
+    pub fn set(&mut self, val: Option<Arc<I>>) {
+        *self.op = Op::Set;
+        *self.val = val.clone();
+        *self.update = val;
+    }
+    pub(crate) fn _set(op: Op, prop: &mut Option<Arc<I>>, update: &Option<Arc<I>>) {
+        if op == Op::Set {
+            *prop = update.clone();
+        }
+    }
+
+    pub(crate) fn _write_insert(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        value: &Option<Arc<I>>,
+    ) -> fmt::Result {
+        if let Some(value) = value {
+            write!(f, "{comma}{col}: {:?}", value.as_ref())
+        } else {
+            write!(f, "{comma}{col}: null")
+        }
+    }
+
+    pub(crate) fn _write_update(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        op: Op,
+        value: &Option<Arc<I>>,
+    ) -> fmt::Result {
+        if op != Op::None && op != Op::Skip {
+            if let Some(value) = value {
+                write!(f, "{comma}{col}: {{{op}: {:?}}}", value.as_ref())?;
+            } else {
+                write!(f, "{comma}{col}: {{{op}: null}}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+pub struct AccessorNotNullBlob<'a> {
+    pub(crate) op: &'a mut Op,
+    pub(crate) val: &'a mut Arc<Vec<u8>>,
+    pub(crate) update: &'a mut Arc<Vec<u8>>,
+    pub(crate) _phantom: PhantomData<Vec<u8>>,
+}
+impl<'a> AccessorNotNullBlob<'a> {
+    pub fn get(&self) -> Arc<Vec<u8>> {
+        self.val.clone()
+    }
+    pub fn mark_for_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_for_set(&mut self) {
+        *self.op = Op::Set;
+    }
+    pub fn set(&mut self, val: Arc<Vec<u8>>) {
+        *self.op = Op::Set;
+        *self.val = val.clone();
+        *self.update = val;
+    }
+    pub(crate) fn _set(op: Op, prop: &mut Arc<Vec<u8>>, update: &Arc<Vec<u8>>) {
+        if op == Op::Set {
+            *prop = update.clone();
+        }
+    }
+
+    pub(crate) fn _write_insert(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        _value: &Arc<Vec<u8>>,
+    ) -> fmt::Result {
+        write!(f, "{comma}{col}: BLOB")
+    }
+
+    pub(crate) fn _write_update(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        op: Op,
+        _value: &Arc<Vec<u8>>,
+    ) -> fmt::Result {
+        if op != Op::None && op != Op::Skip {
+            write!(f, "{comma}{col}: {{{op}: BLOB}}")?;
+        }
+        Ok(())
+    }
+}
+pub struct AccessorNullBlob<'a> {
+    pub(crate) op: &'a mut Op,
+    pub(crate) val: &'a mut Option<Arc<Vec<u8>>>,
+    pub(crate) update: &'a mut Option<Arc<Vec<u8>>>,
+    pub(crate) _phantom: PhantomData<Vec<u8>>,
+}
+impl<'a> AccessorNullBlob<'a> {
+    pub fn get(&self) -> Option<&Arc<Vec<u8>>> {
         self.val.as_ref()
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
-    pub fn set(&mut self, val: Option<I>) {
+    pub fn set(&mut self, val: Option<Arc<Vec<u8>>>) {
         *self.op = Op::Set;
         *self.val = val.clone();
         *self.update = val;
     }
-    pub(crate) fn _set(op: Op, prop: &mut Option<I>, update: &Option<I>) {
+    pub(crate) fn _set(op: Op, prop: &mut Option<Arc<Vec<u8>>>, update: &Option<Arc<Vec<u8>>>) {
         if op == Op::Set {
             *prop = update.clone();
         }
@@ -561,136 +689,29 @@ impl<'a, I: Clone + Debug> AccessorNullRef<'a, I> {
 
     pub(crate) fn _write_insert(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
-        value: &Option<I>,
+        value: &Option<Arc<Vec<u8>>>,
     ) -> fmt::Result {
-        if value.is_none() {
-            write!(f, "{}=null, ", col)
+        if value.is_some() {
+            write!(f, "{comma}{col}: BLOB")
         } else {
-            write!(f, "{}={:?}, ", col, value.as_ref().unwrap())
+            write!(f, "{comma}{col}: null")
         }
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
-        value: &Option<I>,
+        value: &Option<Arc<Vec<u8>>>,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            if value.is_none() {
-                write!(f, "{}={}(null), ", col, op)?;
+            if value.is_some() {
+                write!(f, "{comma}{col}: {{{op}: BLOB}}")?;
             } else {
-                write!(f, "{}={}({:?}), ", col, op, value.as_ref().unwrap())?;
-            }
-        }
-        Ok(())
-    }
-}
-
-pub struct AccessorNotNullJson<'a, I: Clone + Debug> {
-    pub(crate) op: &'a mut Op,
-    pub(crate) val: &'a mut sqlx::types::Json<I>,
-    pub(crate) update: &'a mut sqlx::types::Json<I>,
-    pub(crate) _phantom: PhantomData<I>,
-}
-impl<'a, I: Clone + Debug> AccessorNotNullJson<'a, I> {
-    pub fn get(&self) -> &I {
-        self.val.as_ref()
-    }
-    pub fn mark_skip(&mut self) {
-        *self.op = Op::Skip;
-    }
-    pub fn mark_set(&mut self) {
-        *self.op = Op::Set;
-    }
-    pub fn set(&mut self, val: I) {
-        *self.op = Op::Set;
-        let val = val._into_json();
-        *self.val = val.clone();
-        *self.update = val;
-    }
-    pub(crate) fn _set(op: Op, prop: &mut sqlx::types::Json<I>, update: &sqlx::types::Json<I>) {
-        if op == Op::Set {
-            *prop = update.clone();
-        }
-    }
-
-    pub(crate) fn _write_insert(
-        f: &mut fmt::Formatter<'_>,
-        col: &str,
-        value: &sqlx::types::Json<I>,
-    ) -> fmt::Result {
-        write!(f, "{}={:?}, ", col, value)
-    }
-
-    pub(crate) fn _write_update(
-        f: &mut fmt::Formatter<'_>,
-        col: &str,
-        op: Op,
-        value: &sqlx::types::Json<I>,
-    ) -> fmt::Result {
-        if op != Op::None && op != Op::Skip {
-            write!(f, "{}={}({:?}), ", col, op, value)?;
-        }
-        Ok(())
-    }
-}
-pub struct AccessorNullJson<'a, I: Clone + Debug> {
-    pub(crate) op: &'a mut Op,
-    pub(crate) val: &'a mut Option<sqlx::types::Json<I>>,
-    pub(crate) update: &'a mut Option<sqlx::types::Json<I>>,
-    pub(crate) _phantom: PhantomData<I>,
-}
-impl<'a, I: Clone + Debug> AccessorNullJson<'a, I> {
-    pub fn get(&self) -> Option<&I> {
-        self.val.as_deref()
-    }
-    pub fn mark_skip(&mut self) {
-        *self.op = Op::Skip;
-    }
-    pub fn mark_set(&mut self) {
-        *self.op = Op::Set;
-    }
-    pub fn set(&mut self, val: Option<I>) {
-        *self.op = Op::Set;
-        let val = val.map(|v| v._into_json());
-        *self.val = val.clone();
-        *self.update = val;
-    }
-    pub(crate) fn _set(
-        op: Op,
-        prop: &mut Option<sqlx::types::Json<I>>,
-        update: &Option<sqlx::types::Json<I>>,
-    ) {
-        if op == Op::Set {
-            *prop = update.clone();
-        }
-    }
-
-    pub(crate) fn _write_insert(
-        f: &mut fmt::Formatter<'_>,
-        col: &str,
-        value: &Option<sqlx::types::Json<I>>,
-    ) -> fmt::Result {
-        if value.is_none() {
-            write!(f, "{}=null, ", col)
-        } else {
-            write!(f, "{}={:?}, ", col, value.as_ref().unwrap())
-        }
-    }
-
-    pub(crate) fn _write_update(
-        f: &mut fmt::Formatter<'_>,
-        col: &str,
-        op: Op,
-        value: &Option<sqlx::types::Json<I>>,
-    ) -> fmt::Result {
-        if op != Op::None && op != Op::Skip {
-            if value.is_none() {
-                write!(f, "{}={}(null), ", col, op)?;
-            } else {
-                write!(f, "{}={}({:?}), ", col, op, value.as_ref().unwrap())?;
+                write!(f, "{comma}{col}: {{{op}: null}}")?;
             }
         }
         Ok(())
@@ -707,10 +728,10 @@ impl<'a, I: Clone + Ord + Debug + Default> AccessorNotNullOrd<'a, I> {
     pub fn get(&self) -> I {
         self.val.clone()
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
     pub(crate) fn skip_and_empty(&mut self) {
@@ -767,18 +788,19 @@ impl<'a, I: Clone + Ord + Debug + Default> AccessorNotNullOrd<'a, I> {
         }
     }
 
-    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, col: &str, value: &I) -> fmt::Result {
-        write!(f, "{}={:?}, ", col, value)
+    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result {
+        write!(f, "{comma}{col}: {:?}", value)
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
         value: &I,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            write!(f, "{}={}({:?}), ", col, op, value)?;
+            write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
         }
         Ok(())
     }
@@ -793,10 +815,10 @@ impl<'a, I: Clone + Ord + Debug> AccessorNullOrd<'a, I> {
     pub fn get(&self) -> Option<I> {
         self.val.clone()
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<I>) {
@@ -851,27 +873,29 @@ impl<'a, I: Clone + Ord + Debug> AccessorNullOrd<'a, I> {
 
     pub(crate) fn _write_insert(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         value: &Option<I>,
     ) -> fmt::Result {
-        if value.is_none() {
-            write!(f, "{}=null, ", col)
+        if let Some(value) = value {
+            write!(f, "{comma}{col}: {:?}", value)
         } else {
-            write!(f, "{}={:?}, ", col, value.as_ref().unwrap())
+            write!(f, "{comma}{col}: null")
         }
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
         value: &Option<I>,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            if value.is_none() {
-                write!(f, "{}={}(null), ", col, op)?;
+            if let Some(value) = value {
+                write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
             } else {
-                write!(f, "{}={}({:?}), ", col, op, value.as_ref().unwrap())?;
+                write!(f, "{comma}{col}: {{{op}: null}}")?;
             }
         }
         Ok(())
@@ -915,10 +939,10 @@ impl<
     pub fn get(&self) -> I {
         *self.val
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
     pub fn set(&mut self, val: I) {
@@ -941,7 +965,7 @@ impl<
         } else {
             panic!("operation error!");
         }
-        ensure!(!overflow, format!("overflow (base {}, add {})", base, val));
+        ensure!(!overflow, "overflow (base {}, add {})", base, val);
         Ok(())
     }
     pub fn sub(&mut self, val: I) -> Result<()> {
@@ -959,7 +983,7 @@ impl<
         } else {
             panic!("operation error!");
         }
-        ensure!(!overflow, format!("overflow (base {}, sub {})", base, val));
+        ensure!(!overflow, "overflow (base {}, sub {})", base, val);
         Ok(())
     }
     pub fn max(&mut self, val: I) {
@@ -1037,18 +1061,19 @@ impl<
         }
     }
 
-    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, col: &str, value: &I) -> fmt::Result {
-        write!(f, "{}={:?}, ", col, value)
+    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result {
+        write!(f, "{comma}{col}: {:?}", value)
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
         value: &I,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            write!(f, "{}={}({:?}), ", col, op, value)?;
+            write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
         }
         Ok(())
     }
@@ -1092,10 +1117,10 @@ impl<
     pub fn get(&self) -> Option<I> {
         *self.val
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<I>) {
@@ -1118,10 +1143,7 @@ impl<
         } else {
             panic!("operation error!");
         }
-        ensure!(
-            !overflow,
-            format!("overflow (base {}, add {})", self_val, val)
-        );
+        ensure!(!overflow, "overflow (base {}, add {})", self_val, val);
         Ok(())
     }
     pub fn sub(&mut self, val: I) -> Result<()> {
@@ -1139,10 +1161,7 @@ impl<
         } else {
             panic!("operation error!");
         }
-        ensure!(
-            !overflow,
-            format!("overflow (base {}, sub {})", self_val, val)
-        );
+        ensure!(!overflow, "overflow (base {}, sub {})", self_val, val);
         Ok(())
     }
     pub fn max(&mut self, val: I) {
@@ -1228,27 +1247,29 @@ impl<
 
     pub(crate) fn _write_insert(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         value: &Option<I>,
     ) -> fmt::Result {
-        if value.is_none() {
-            write!(f, "{}=null, ", col)
+        if let Some(value) = value {
+            write!(f, "{comma}{col}: {:?}", value)
         } else {
-            write!(f, "{}={:?}, ", col, value.as_ref().unwrap())
+            write!(f, "{comma}{col}: null")
         }
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
         value: &Option<I>,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            if value.is_none() {
-                write!(f, "{}={}(null), ", col, op)?;
+            if let Some(value) = value {
+                write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
             } else {
-                write!(f, "{}={}({:?}), ", col, op, value.as_ref().unwrap())?;
+                write!(f, "{comma}{col}: {{{op}: null}}")?;
             }
         }
         Ok(())
@@ -1265,10 +1286,10 @@ impl<'a, I: Copy + PartialOrd + Float + Debug + Display + ToValue> AccessorNotNu
     pub fn get(&self) -> I {
         *self.val
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
     pub fn set(&mut self, val: I) {
@@ -1345,18 +1366,19 @@ impl<'a, I: Copy + PartialOrd + Float + Debug + Display + ToValue> AccessorNotNu
         }
     }
 
-    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, col: &str, value: &I) -> fmt::Result {
-        write!(f, "{}={:?}, ", col, value)
+    pub(crate) fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result {
+        write!(f, "{comma}{col}: {:?}", value)
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
         value: &I,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            write!(f, "{}={}({:?}), ", col, op, value)?;
+            write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
         }
         Ok(())
     }
@@ -1374,10 +1396,10 @@ impl<'a, I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
     pub fn get(&self) -> Option<I> {
         *self.val
     }
-    pub fn mark_skip(&mut self) {
+    pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
     }
-    pub fn mark_set(&mut self) {
+    pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
     pub fn set(&mut self, val: Option<I>) {
@@ -1458,67 +1480,85 @@ impl<'a, I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
 
     pub(crate) fn _write_insert(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         value: &Option<I>,
     ) -> fmt::Result {
-        if value.is_none() {
-            write!(f, "{}=null, ", col)
+        if let Some(value) = value {
+            write!(f, "{comma}{col}: {:?}", value)
         } else {
-            write!(f, "{}={:?}, ", col, value.as_ref().unwrap())
+            write!(f, "{comma}{col}: null")
         }
     }
 
     pub(crate) fn _write_update(
         f: &mut fmt::Formatter<'_>,
+        comma: &str,
         col: &str,
         op: Op,
         value: &Option<I>,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
-            if value.is_none() {
-                write!(f, "{}={}(null), ", col, op)?;
+            if let Some(value) = value {
+                write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
             } else {
-                write!(f, "{}={}({:?}), ", col, op, value.as_ref().unwrap())?;
+                write!(f, "{comma}{col}: {{{op}: null}}")?;
             }
         }
         Ok(())
     }
 }
 
-pub struct AccessorOneToOne<'a, I> {
+pub struct AccessorHasOne<'a, I>
+where
+    I: crate::misc::Updater,
+{
     pub(crate) name: &'static str,
-    pub(crate) val: &'a mut Option<Option<Box<I>>>,
+    pub(crate) val: &'a mut Option<Vec<I>>,
 }
-impl<'a, I> AccessorOneToOne<'a, I> {
-    pub fn get(&mut self) -> Option<&mut Box<I>> {
+impl<'a, I> AccessorHasOne<'a, I>
+where
+    I: crate::misc::Updater,
+{
+    pub fn get(&mut self) -> Option<&mut I> {
         let name = self.name;
         self.val
             .as_mut()
             .unwrap_or_else(|| panic!("{} is not fetched.", name))
-            .as_mut()
+            .last_mut()
     }
     pub fn set(&mut self, val: I) {
-        *self.val = Some(Some(Box::new(val)));
+        if self.val.is_none() {
+            *self.val = Some(Vec::new());
+        }
+        let list = self.val.as_mut().unwrap();
+        if let Some(old) = list.last_mut() {
+            old.mark_for_delete();
+        }
+        list.push(val);
     }
 }
 
-pub struct AccessorMany<'a, I> {
+pub struct AccessorHasMany<'a, I>
+where
+    I: crate::misc::Updater,
+{
     pub(crate) name: &'static str,
     pub(crate) val: &'a mut Option<Vec<I>>,
 }
-impl<'a, I> AccessorMany<'a, I>
+impl<'a, I> AccessorHasMany<'a, I>
 where
-    I: crate::misc::ForUpdateTr,
+    I: crate::misc::Updater,
 {
-    pub fn iter(&mut self) -> impl Iterator<Item = &mut I> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut I> {
         let name = self.name;
         self.val
             .as_mut()
             .unwrap_or_else(|| panic!("{} is not fetched.", name))
             .iter_mut()
-            .filter(|v| !v._will_be_deleted())
+            .filter(|v| !v.will_be_deleted())
     }
-    pub fn insert(&mut self, val: I) {
+    pub fn push(&mut self, val: I) {
         if self.val.is_none() {
             *self.val = Some(Vec::new());
         }

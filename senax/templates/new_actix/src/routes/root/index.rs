@@ -14,7 +14,7 @@ pub async fn handler(http_req: HttpRequest) -> impl Responder {
     let _ = span.enter();
     HttpResponse::Ok().body(
         r#"
-        Welcome to SenaX example.
+        Welcome to Senax example.
         "#,
     )
 }

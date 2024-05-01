@@ -1,23 +1,29 @@
 // This code is auto-generated and will always be overwritten.
+// Senax v@{ ""|senax_version }@
 
-use anyhow::Result;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use rust_decimal::Decimal;
 use senax_common::cache::calc_mem_size;
 use serde_json::Value;
+use sqlx::query::{Query, QueryAs};
 use std::convert::TryFrom;
-use validator::ValidationError;
+
+use crate::connection::{DbArguments, DbType};
 
 macro_rules! fetch {
     ( $conn:ident, $query:ident, $method:ident ) => {
         if $conn.has_read_tx() {
-            $query.$method($conn.get_read_tx().await?).await?
+            $query.$method($conn.get_read_tx().await?.as_mut()).await?
+@%- if !config.force_disable_cache %@
         } else if $conn.has_cache_tx() {
-            $query.$method($conn.get_cache_tx().await?).await?
+            $query.$method($conn.get_cache_tx().await?.as_mut()).await?
+@%- endif %@
         } else if $conn.has_tx() {
-            $query.$method($conn.get_tx().await?).await?
+            $query.$method($conn.get_tx().await?.as_mut()).await?
         } else {
-            $query.$method($conn.get_replica_conn().await?).await?
+            $query
+                .$method($conn.get_replica_conn().await?.as_mut())
+                .await?
         }
     };
 }
@@ -31,74 +37,177 @@ pub(crate) enum TrashMode {
     Only,
 }
 
-macro_rules! condition {
+pub(crate) trait ColTr {
+    fn name(&self) -> &'static str;
+}
+pub(crate) trait BindTr {
+    fn name(&self) -> &'static str;
+    fn placeholder(&self) -> &'static str {
+        ""
+    }
+    fn len(&self) -> usize {
+        1
+    }
+    fn query_as_bind<T>(
+        self,
+        query: QueryAs<'_, DbType, T, DbArguments>,
+    ) -> QueryAs<'_, DbType, T, DbArguments>;
+    fn query_bind(self, query: Query<'_, DbType, DbArguments>) -> Query<'_, DbType, DbArguments>;
+}
+pub(crate) trait BindArrayTr {
+    fn query_as_each_bind<T>(
+        self,
+        query: QueryAs<'_, DbType, T, DbArguments>,
+    ) -> QueryAs<'_, DbType, T, DbArguments>;
+    fn query_each_bind(
+        self,
+        query: Query<'_, DbType, DbArguments>,
+    ) -> Query<'_, DbType, DbArguments>;
+}
+pub(crate) trait ColRelTr {
+    fn write_rel(&self, buf: &mut String, idx: usize, without_key: bool);
+    fn write_key(&self, buf: &mut String);
+    fn query_as_bind<T>(
+        self,
+        query: QueryAs<'_, DbType, T, DbArguments>,
+    ) -> QueryAs<'_, DbType, T, DbArguments>;
+    fn query_bind(
+        self,
+        query: Query<'_, DbType, DbArguments>,
+    ) -> Query<'_, DbType, DbArguments>;
+}
+pub(crate) trait FilterTr
+where
+    Self: Sized,
+{
+    fn write(&self, buf: &mut String, idx: usize, trash_mode: &mut TrashMode);
+    fn query_as_bind<T>(
+        self,
+        query: sqlx::query::QueryAs<'_, DbType, T, DbArguments>,
+    ) -> sqlx::query::QueryAs<'_, DbType, T, DbArguments>;
+    fn query_bind(
+        self,
+        query: sqlx::query::Query<'_, DbType, DbArguments>,
+    ) -> sqlx::query::Query<'_, DbType, DbArguments>;
+    fn write_where(
+        filter: &Option<Self>,
+        trash_mode: TrashMode,
+        trashed_sql: &str,
+        not_trashed_sql: &str,
+        only_trashed_sql: &str,
+    ) -> String;
+}
+pub(crate) trait OrderTr
+where
+    Self: Sized,
+{
+    fn write(&self, buf: &mut String);
+    fn write_order(order: &Option<Vec<Self>>) -> String;
+}
+
+#[rustfmt::skip]
+macro_rules! filter {
     ( $t:ty ) => {
-        pub(crate) fn write(&self, buf: &mut String, idx: i32, trash_mode: &mut TrashMode) {
+        fn write(&self, buf: &mut String, idx: usize, trash_mode: &mut TrashMode) {
             match self {
-                Cond::WithTrashed => {
+                Filter_::WithTrashed => {
                     *trash_mode = TrashMode::With;
                 }
-                Cond::OnlyTrashed => {
+                Filter_::OnlyTrashed => {
                     *trash_mode = TrashMode::Only;
                 }
-                Cond::IsNull(c) => {
+                Filter_::Match(cols, _v) => {
+                    buf.push_str(" MATCH (");
+                    for c in cols {
+                        buf.push_str(c.name());
+                        buf.push_str(",");
+                    }
+                    buf.truncate(buf.len() - 1);
+                    buf.push_str(") AGAINST (?) AND ");
+                }
+                Filter_::MatchBoolean(cols, _v) => {
+                    buf.push_str(" MATCH (");
+                    for c in cols {
+                        buf.push_str(c.name());
+                        buf.push_str(",");
+                    }
+                    buf.truncate(buf.len() - 1);
+                    buf.push_str(") AGAINST (?  IN BOOLEAN MODE) AND ");
+                }
+                Filter_::MatchExpansion(cols, _v) => {
+                    buf.push_str(" MATCH (");
+                    for c in cols {
+                        buf.push_str(c.name());
+                        buf.push_str(",");
+                    }
+                    buf.truncate(buf.len() - 1);
+                    buf.push_str(") AGAINST (?  WITH QUERY EXPANSION) AND ");
+                }
+                Filter_::IsNull(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" IS NULL AND ");
                 }
-                Cond::IsNotNull(c) => {
+                Filter_::IsNotNull(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" IS NOT NULL AND ");
                 }
-                Cond::Eq(c) => {
+                Filter_::Eq(c) => {
+                    buf.push_str(c.name());
+                    buf.push_str(" = ");
+                    buf.push_str(c.placeholder());
+                    buf.push_str(" AND ");
+                }
+                Filter_::EqKey(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" = ? AND ");
                 }
-                Cond::EqKey(c) => {
-                    buf.push_str(c.name());
-                    buf.push_str(" = ? AND ");
-                }
-                Cond::NotEq(c) => {
+                Filter_::NotEq(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" != ? AND ");
                 }
-                Cond::NullSafeEq(c) => {
+                Filter_::Gt(c) => {
                     buf.push_str(c.name());
-                    buf.push_str(" <=> ? AND ");
+                    buf.push_str(" > ");
+                    buf.push_str(c.placeholder());
+                    buf.push_str(" AND ");
                 }
-                Cond::Gt(c) => {
+                Filter_::Gte(c) => {
                     buf.push_str(c.name());
-                    buf.push_str(" > ? AND ");
+                    buf.push_str(" >= ");
+                    buf.push_str(c.placeholder());
+                    buf.push_str(" AND ");
                 }
-                Cond::Gte(c) => {
+                Filter_::Lt(c) => {
                     buf.push_str(c.name());
-                    buf.push_str(" >= ? AND ");
+                    buf.push_str(" < ");
+                    buf.push_str(c.placeholder());
+                    buf.push_str(" AND ");
                 }
-                Cond::Lt(c) => {
+                Filter_::Lte(c) => {
                     buf.push_str(c.name());
-                    buf.push_str(" < ? AND ");
+                    buf.push_str(" <= ");
+                    buf.push_str(c.placeholder());
+                    buf.push_str(" AND ");
                 }
-                Cond::Lte(c) => {
-                    buf.push_str(c.name());
-                    buf.push_str(" <= ? AND ");
-                }
-                Cond::Like(c) => {
+                Filter_::Like(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" LIKE ? AND ");
                 }
-                Cond::AllBits(c) => {
+                Filter_::AllBits(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" & ? = ? AND ");
                 }
-                Cond::AnyBits(c) => {
+                Filter_::AnyBits(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" & ? != 0 AND ");
                 }
-                Cond::In(c) => {
+                Filter_::In(c) => {
                     if c.len() > 0 {
                         buf.push_str(c.name());
                         buf.push_str(" IN (");
                         for _i in 0..c.len() {
-                            buf.push_str("?,");
+                            buf.push_str(c.placeholder());
+                            buf.push_str(",");
                         }
                         buf.truncate(buf.len() - 1);
                         buf.push_str(") AND ");
@@ -106,39 +215,117 @@ macro_rules! condition {
                         buf.push_str("false AND ");
                     }
                 }
-                Cond::NotIn(c) => {
+                Filter_::NotIn(c) => {
                     if c.len() > 0 {
                         buf.push_str(c.name());
                         buf.push_str(" NOT IN (");
                         for _i in 0..c.len() {
-                            buf.push_str("?,");
+                            buf.push_str(c.placeholder());
+                            buf.push_str(",");
                         }
                         buf.truncate(buf.len() - 1);
                         buf.push_str(") AND ");
                     }
                 }
-                Cond::MemberOf(c) => {
-                    buf.push_str("? MEMBER OF (");
-                    buf.push_str(c.name());
+                Filter_::MemberOf(c, p) => {
+                    buf.push_str("CAST(? AS JSON) MEMBER OF (");
+                    if p.is_some() {
+                        buf.push_str("JSON_EXTRACT(");
+                        buf.push_str(c.name());
+                        buf.push_str(", ?)");
+                    } else {
+                        buf.push_str(c.name());
+                    }
                     buf.push_str(") AND ");
                 }
-                Cond::Contains(c) => {
-                    buf.push_str("JSON_CONTAINS (");
-                    buf.push_str(c.name());
-                    buf.push_str(",?) AND ");
+                Filter_::Contains(c, p) => {
+                    buf.push_str("JSON_CONTAINS(");
+                    if p.is_some() {
+                        buf.push_str("JSON_EXTRACT(");
+                        buf.push_str(c.name());
+                        buf.push_str(", ?)");
+                    } else {
+                        buf.push_str(c.name());
+                    }
+                    buf.push_str(", CAST(? AS JSON)) AND ");
                 }
-                Cond::Overlaps(c) => {
-                    buf.push_str("JSON_OVERLAPS (");
-                    buf.push_str(c.name());
-                    buf.push_str(",?) AND ");
+                Filter_::Overlaps(c, p) => {
+                    buf.push_str("JSON_OVERLAPS(");
+                    if p.is_some() {
+                        buf.push_str("JSON_EXTRACT(");
+                        buf.push_str(c.name());
+                        buf.push_str(", ?)");
+                    } else {
+                        buf.push_str(c.name());
+                    }
+                    buf.push_str(", CAST(? AS JSON)) AND ");
                 }
-                Cond::Not(c) => {
+                Filter_::JsonIn(c, p) => {
+                    buf.push_str("JSON_OVERLAPS(JSON_EXTRACT(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ?)");
+                    buf.push_str(", CAST(? AS JSON)) AND ");
+                }
+                Filter_::JsonContainsPath(c, _p) => {
+                    buf.push_str("JSON_CONTAINS_PATH(");
+                    buf.push_str(c.name());
+                    buf.push_str(", 'one', ?) AND ");
+                }
+                Filter_::JsonEq(c, _p) => {
+                    buf.push_str("JSON_EXTRACT(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ?) = CAST(? AS JSON) AND ");
+                }
+                Filter_::JsonLt(c, _p) => {
+                    buf.push_str("JSON_EXTRACT(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ?) < CAST(? AS JSON) AND ");
+                }
+                Filter_::JsonLte(c, _p) => {
+                    buf.push_str("JSON_EXTRACT(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ?) <= CAST(? AS JSON) AND ");
+                }
+                Filter_::JsonGt(c, _p) => {
+                    buf.push_str("JSON_EXTRACT(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ?) > CAST(? AS JSON) AND ");
+                }
+                Filter_::JsonGte(c, _p) => {
+                    buf.push_str("JSON_EXTRACT(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ?) >= CAST(? AS JSON) AND ");
+                }
+                Filter_::Within(c) => {
+                    buf.push_str("ST_Within(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_GeomFromGeoJSON(?, 2, ?)) AND ");
+                }
+                Filter_::Intersects(c) => {
+                    buf.push_str("ST_Intersects(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_GeomFromGeoJSON(?, 2, ?)) AND ");
+                }
+                Filter_::Crosses(c) => {
+                    buf.push_str("ST_Crosses(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_GeomFromGeoJSON(?, 2, ?)) AND ");
+                }
+                Filter_::DWithin(c) => {
+                    buf.push_str("ST_Distance(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_GeomFromGeoJSON(?, 2, ?)) <= ? AND ");
+                    buf.push_str("ST_Intersects(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_Buffer(ST_GeomFromGeoJSON(?, 2, ?), ? * 1.1)) AND ");
+                }
+                Filter_::Not(c) => {
                     buf.push_str("NOT (");
                     c.write(buf, idx, trash_mode);
                     buf.truncate(buf.len() - 5);
                     buf.push_str(") AND ");
                 }
-                Cond::And(v) => {
+                Filter_::And(v) => {
                     if !v.is_empty() {
                         buf.push_str("(");
                         for c in v.iter() {
@@ -150,7 +337,7 @@ macro_rules! condition {
                         buf.push_str("true AND ");
                     }
                 }
-                Cond::Or(v) => {
+                Filter_::Or(v) => {
                     if !v.is_empty() {
                         buf.push_str("(");
                         for c in v.iter() {
@@ -164,52 +351,145 @@ macro_rules! condition {
                         buf.push_str("false AND ");
                     }
                 }
-                Cond::Exists(c) => {
+                Filter_::Exists(c) => {
                     buf.push_str("EXISTS (");
-                    c.write(buf, idx);
+                    c.write_rel(buf, idx, false);
                     buf.push_str(") AND ");
                 }
-                Cond::NotExists(c) => {
+                Filter_::NotExists(c) => {
                     buf.push_str("NOT EXISTS (");
-                    c.write(buf, idx);
+                    c.write_rel(buf, idx, false);
                     buf.push_str(") AND ");
+                }
+                Filter_::EqAny(c) => {
+                    c.write_key(buf);
+                    buf.push_str(" = ANY (");
+                    c.write_rel(buf, idx, true);
+                    buf.push_str(") AND ");
+                }
+                Filter_::NotAll(c) => {
+                    c.write_key(buf);
+                    buf.push_str(" <> ALL (");
+                    c.write_rel(buf, idx, true);
+                    buf.push_str(") AND ");
+                }
+                Filter_::Raw(raw) => {
+                    buf.push_str("(");
+                    buf.push_str(raw);
+                    buf.push_str(") AND ");
+                }
+                Filter_::RawWithParam(raw, _param) => {
+                    buf.push_str("(");
+                    buf.push_str(raw);
+                    buf.push_str(") AND ");
+                }
+                Filter_::Boolean(_) => {
+                    buf.push_str("? AND ");
                 }
             };
         }
-        pub(crate) fn bind<T>(
+        fn query_as_bind<T>(
             self,
-            query: sqlx::query::QueryAs<'_, DbType, T, DbArguments>,
+            mut query: sqlx::query::QueryAs<'_, DbType, T, DbArguments>,
         ) -> sqlx::query::QueryAs<'_, DbType, T, DbArguments> {
             match self {
-                Cond::WithTrashed => query,
-                Cond::OnlyTrashed => query,
-                Cond::IsNull(_c) => query,
-                Cond::IsNotNull(_c) => query,
-                Cond::Eq(c) => c.bind(query),
-                Cond::EqKey(c) => c.bind(query),
-                Cond::NotEq(c) => c.bind(query),
-                Cond::NullSafeEq(c) => c.bind(query),
-                Cond::Gt(c) => c.bind(query),
-                Cond::Gte(c) => c.bind(query),
-                Cond::Lt(c) => c.bind(query),
-                Cond::Lte(c) => c.bind(query),
-                Cond::Like(c) => c.bind(query),
-                Cond::AllBits(c) => c.bind(query),
-                Cond::AnyBits(c) => c.bind(query),
-                Cond::In(c) => c.bind(query),
-                Cond::NotIn(c) => c.bind(query),
-                Cond::MemberOf(c) => c.bind(query),
-                Cond::Contains(c) => c.bind(query),
-                Cond::Overlaps(c) => c.bind(query),
-                Cond::Not(c) => c.bind(query),
-                Cond::And(v) => v.into_iter().fold(query, |query, c| c.bind(query)),
-                Cond::Or(v) => v.into_iter().fold(query, |query, c| c.bind(query)),
-                Cond::Exists(c) => c.bind(query),
-                Cond::NotExists(c) => c.bind(query),
+                Filter_::WithTrashed => query,
+                Filter_::OnlyTrashed => query,
+                Filter_::Match(_c, v) => query.bind(v),
+                Filter_::MatchBoolean(_c, v) => query.bind(v),
+                Filter_::MatchExpansion(_c, v) => query.bind(v),
+                Filter_::IsNull(_c) => query,
+                Filter_::IsNotNull(_c) => query,
+                Filter_::Eq(c) => c.query_as_bind(query),
+                Filter_::EqKey(c) => c.query_as_bind(query),
+                Filter_::NotEq(c) => c.query_as_bind(query),
+                Filter_::Gt(c) => c.query_as_bind(query),
+                Filter_::Gte(c) => c.query_as_bind(query),
+                Filter_::Lt(c) => c.query_as_bind(query),
+                Filter_::Lte(c) => c.query_as_bind(query),
+                Filter_::Like(c) => c.query_as_bind(query),
+                Filter_::AllBits(c) => c.query_as_bind(query),
+                Filter_::AnyBits(c) => c.query_as_bind(query),
+                Filter_::In(c) => c.query_as_bind(query),
+                Filter_::NotIn(c) => c.query_as_bind(query),
+                Filter_::MemberOf(c, p) => if let Some(p) = p { c.query_as_bind(query).bind(p) } else { c.query_as_bind(query) },
+                Filter_::Contains(c, p) => if let Some(p) = p { c.query_as_bind(query.bind(p)) } else { c.query_as_bind(query) },
+                Filter_::Overlaps(c, p) => if let Some(p) = p { c.query_as_bind(query.bind(p)) } else { c.query_as_bind(query) },
+                Filter_::JsonIn(c, p) => c.query_as_bind(query.bind(p)),
+                Filter_::JsonContainsPath(c, p) => query.bind(p),
+                Filter_::JsonEq(c, p) => c.query_as_bind(query.bind(p)),
+                Filter_::JsonLt(c, p) => c.query_as_bind(query.bind(p)),
+                Filter_::JsonLte(c, p) => c.query_as_bind(query.bind(p)),
+                Filter_::JsonGt(c, p) => c.query_as_bind(query.bind(p)),
+                Filter_::JsonGte(c, p) => c.query_as_bind(query.bind(p)),
+                Filter_::Within(c) => c.query_as_bind(query),
+                Filter_::Intersects(c) => c.query_as_bind(query),
+                Filter_::Crosses(c) => c.query_as_bind(query),
+                Filter_::DWithin(c) => c.query_as_bind(query),
+                Filter_::Not(c) => c.query_as_bind(query),
+                Filter_::And(v) => {for c in v { query = c.query_as_bind(query); } query},
+                Filter_::Or(v) => {for c in v { query = c.query_as_bind(query); } query},
+                Filter_::Exists(c) => c.query_as_bind(query),
+                Filter_::NotExists(c) => c.query_as_bind(query),
+                Filter_::EqAny(c) => c.query_as_bind(query),
+                Filter_::NotAll(c) => c.query_as_bind(query),
+                Filter_::Raw(_c) => query,
+                Filter_::RawWithParam(_c, param) => {for v in param { query = query.bind(v); } query},
+                Filter_::Boolean(v) => query.bind(v),
+            }
+        }
+        fn query_bind(
+            self,
+            mut query: sqlx::query::Query<'_, DbType, DbArguments>,
+        ) -> sqlx::query::Query<'_, DbType, DbArguments> {
+            match self {
+                Filter_::WithTrashed => query,
+                Filter_::OnlyTrashed => query,
+                Filter_::Match(_c, v) => query.bind(v),
+                Filter_::MatchBoolean(_c, v) => query.bind(v),
+                Filter_::MatchExpansion(_c, v) => query.bind(v),
+                Filter_::IsNull(_c) => query,
+                Filter_::IsNotNull(_c) => query,
+                Filter_::Eq(c) => c.query_bind(query),
+                Filter_::EqKey(c) => c.query_bind(query),
+                Filter_::NotEq(c) => c.query_bind(query),
+                Filter_::Gt(c) => c.query_bind(query),
+                Filter_::Gte(c) => c.query_bind(query),
+                Filter_::Lt(c) => c.query_bind(query),
+                Filter_::Lte(c) => c.query_bind(query),
+                Filter_::Like(c) => c.query_bind(query),
+                Filter_::AllBits(c) => c.query_bind(query),
+                Filter_::AnyBits(c) => c.query_bind(query),
+                Filter_::In(c) => c.query_bind(query),
+                Filter_::NotIn(c) => c.query_bind(query),
+                Filter_::MemberOf(c, p) => if let Some(p) = p { c.query_bind(query).bind(p) } else { c.query_bind(query) },
+                Filter_::Contains(c, p) => if let Some(p) = p { c.query_bind(query.bind(p)) } else { c.query_bind(query) },
+                Filter_::Overlaps(c, p) => if let Some(p) = p { c.query_bind(query.bind(p)) } else { c.query_bind(query) },
+                Filter_::JsonIn(c, p) => c.query_bind(query.bind(p)),
+                Filter_::JsonContainsPath(c, p) => query.bind(p),
+                Filter_::JsonEq(c, p) => c.query_bind(query.bind(p)),
+                Filter_::JsonLt(c, p) => c.query_bind(query.bind(p)),
+                Filter_::JsonLte(c, p) => c.query_bind(query.bind(p)),
+                Filter_::JsonGt(c, p) => c.query_bind(query.bind(p)),
+                Filter_::JsonGte(c, p) => c.query_bind(query.bind(p)),
+                Filter_::Within(c) => c.query_bind(query),
+                Filter_::Intersects(c) => c.query_bind(query),
+                Filter_::Crosses(c) => c.query_bind(query),
+                Filter_::DWithin(c) => c.query_bind(query),
+                Filter_::Not(c) => c.query_bind(query),
+                Filter_::And(v) => {for c in v { query = c.query_bind(query); } query},
+                Filter_::Or(v) => {for c in v { query = c.query_bind(query); } query},
+                Filter_::Exists(c) => c.query_bind(query),
+                Filter_::NotExists(c) => c.query_bind(query),
+                Filter_::EqAny(c) => c.query_bind(query),
+                Filter_::NotAll(c) => c.query_bind(query),
+                Filter_::Raw(_c) => query,
+                Filter_::RawWithParam(_c, param) => {for v in param { query = query.bind(v); } query},
+                Filter_::Boolean(v) => query.bind(v),
             }
         }
         fn write_where(
-            condition: &Option<Cond>,
+            filter: &Option<Filter_>,
             mut trash_mode: TrashMode,
             trashed_sql: &str,
             not_trashed_sql: &str,
@@ -217,11 +497,8 @@ macro_rules! condition {
         ) -> String {
             let mut s = String::with_capacity(100);
             s.push_str("WHERE ");
-            match condition {
-                Some(ref c) => {
-                    c.write(&mut s, 1, &mut trash_mode);
-                }
-                _ => {}
+            if let Some(ref c) = filter {
+                c.write(&mut s, 1, &mut trash_mode);
             }
             if trash_mode == TrashMode::Not {
                 s.push_str(not_trashed_sql)
@@ -231,7 +508,7 @@ macro_rules! condition {
                 s.push_str(trashed_sql)
             }
             if s.len() > "WHERE ".len() {
-                s.truncate(s.len() - 5);
+                s.truncate(s.len() - " AND ".len());
             } else {
                 s.truncate(0);
             }
@@ -239,32 +516,32 @@ macro_rules! condition {
         }
     };
 }
-pub(crate) use condition;
+pub(crate) use filter;
 
-macro_rules! order_by {
+macro_rules! order {
     () => {
         fn write(&self, buf: &mut String) {
             match self {
-                OrderBy::Asc(c) => {
+                Order_::Asc(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" ASC, ");
                 }
-                OrderBy::Desc(c) => {
+                Order_::Desc(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" DESC, ");
                 }
-                OrderBy::IsNullAsc(c) => {
+                Order_::IsNullAsc(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" IS NULL ASC, ");
                 }
-                OrderBy::IsNullDesc(c) => {
+                Order_::IsNullDesc(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" IS NULL DESC, ");
                 }
             };
         }
-        pub(crate) fn write_order_by(order_by: &Option<Vec<OrderBy>>) -> String {
-            match order_by {
+        fn write_order(order: &Option<Vec<Order_>>) -> String {
+            match order {
                 Some(ref v) if !v.is_empty() => {
                     let mut s = String::with_capacity(100);
                     s.push_str("ORDER BY ");
@@ -279,15 +556,18 @@ macro_rules! order_by {
         }
     };
 }
-pub(crate) use order_by;
+pub(crate) use order;
 
 pub(crate) trait IntoJson<T> {
-    fn _into_json(self) -> sqlx::types::Json<T>;
+    fn _into_json(&self) -> String;
 }
 
-impl<T> IntoJson<T> for T {
-    fn _into_json(self) -> sqlx::types::Json<T> {
-        sqlx::types::Json(self)
+impl<T> IntoJson<T> for T
+where
+    T: serde::Serialize,
+{
+    fn _into_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
     }
 }
 
@@ -351,26 +631,26 @@ impl Size for Value {
     }
 }
 
-pub trait ForUpdateTr {
-    fn _is_new(&self) -> bool;
-    fn _has_been_deleted(&self) -> bool;
-    fn _set_delete(&mut self);
-    fn _set_delete_and_return_self(self) -> Self;
-    fn _cancel_delete(&mut self);
-    fn _will_be_deleted(&self) -> bool;
-    fn _set_upsert(&mut self);
-    fn _is_updated(&self) -> bool;
-    fn _eq(&self, update: &Self) -> bool;
-    fn _set(&mut self, update: Self);
-    fn _update_except_skip(&mut self, update: Self);
-    fn _update_only_set(&mut self, update: Self);
-    fn _update(&mut self, update: Self, set_only: bool);
+pub trait Updater {
+    fn is_new(&self) -> bool;
+    fn has_been_deleted(&self) -> bool;
+    fn mark_for_delete(&mut self);
+    fn mark_for_delete_and_return_self(self) -> Self;
+    fn unmark_for_delete(&mut self);
+    fn will_be_deleted(&self) -> bool;
+    fn mark_for_upsert(&mut self);
+    fn is_updated(&self) -> bool;
+    // fn __eq(&self, updater: &Self) -> bool;
+    // fn __set(&mut self, updater: Self);
+    fn overwrite_except_skip(&mut self, updater: Self);
+    fn overwrite_only_set(&mut self, updater: Self);
+    fn overwrite_with(&mut self, updater: Self, set_only: bool);
 }
 
 #[derive(Clone, Debug)]
 pub enum BindValue {
     Bool(Option<bool>),
-    Enum(Option<u8>),
+    Enum(Option<i64>),
     Number(Option<Decimal>),
     String(Option<String>),
     DateTime(Option<NaiveDateTime>),
@@ -378,18 +658,20 @@ pub enum BindValue {
     Time(Option<NaiveTime>),
     Blob(Option<Vec<u8>>),
     Json(Option<Value>),
+    Uuid(Option<uuid::fmt::Hyphenated>),
+    BinaryUuid(Option<uuid::Uuid>),
 }
 
 macro_rules! impl_bind_value {
     ($T:ty, $U:ident) => {
         impl core::convert::From<$T> for BindValue {
             fn from(t: $T) -> Self {
-                Self::$U(Some(t))
+                Self::$U(Some(t.into()))
             }
         }
         impl core::convert::From<Option<$T>> for BindValue {
             fn from(t: Option<$T>) -> Self {
-                Self::$U(t)
+                Self::$U(t.map(|v| v.into()))
             }
         }
     };
@@ -401,6 +683,7 @@ impl_bind_value!(NaiveDate, Date);
 impl_bind_value!(NaiveTime, Time);
 impl_bind_value!(Vec<u8>, Blob);
 impl_bind_value!(Value, Json);
+impl_bind_value!(uuid::Uuid, Uuid);
 
 macro_rules! impl_decimal {
     ($T:ty) => {
@@ -448,31 +731,49 @@ impl_decimal!(Decimal);
 impl_try_decimal!(f32);
 impl_try_decimal!(f64);
 
-#[allow(dead_code)]
-pub(crate) fn validate_tinytext_length(value: &str) -> Result<(), ValidationError> {
-    if value.len() > 255 {
-        return Err(ValidationError::new("length"));
-    }
-    Ok(())
-}
+pub mod arc_bytes {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use serde_bytes::ByteBuf;
+    use std::sync::Arc;
 
-#[allow(dead_code)]
-pub(crate) fn validate_text_length(value: &str) -> Result<(), ValidationError> {
-    if value.len() > 65535 {
-        return Err(ValidationError::new("length"));
+    pub fn serialize<S>(data: &Arc<Vec<u8>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_bytes(data.as_slice())
     }
-    Ok(())
-}
 
-#[allow(dead_code)]
-pub(crate) fn validate_unsigned_decimal(
-    value: &rust_decimal::Decimal,
-) -> Result<(), ValidationError> {
-    if value.is_sign_negative() {
-        let mut err = ValidationError::new("range");
-        err.add_param(::std::borrow::Cow::from("min"), &0.0);
-        return Err(err);
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Arc<Vec<u8>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let buf = ByteBuf::deserialize(deserializer)?;
+        Ok(Arc::new(buf.into_vec()))
     }
-    Ok(())
+}
+pub mod option_arc_bytes {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use serde_bytes::ByteBuf;
+    use std::sync::Arc;
+
+    pub fn serialize<S>(data: &Option<Arc<Vec<u8>>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match data {
+            Some(value) => serializer.serialize_bytes(value.as_slice()),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Arc<Vec<u8>>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match Option::<ByteBuf>::deserialize(deserializer)? {
+            Some(buf) => Ok(Some(Arc::new(buf.into_vec()))),
+            None => Ok(None),
+        }
+    }
 }
 @{-"\n"}@

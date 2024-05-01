@@ -1,16 +1,13 @@
 use crate::{common::if_then_else, model_generator::schema::*};
 use convert_case::{Case, Casing};
-use std::{
-    fmt::Write,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use std::sync::atomic::{AtomicBool, Ordering};
 
-pub static SHOW_TITLE: AtomicBool = AtomicBool::new(true);
+pub static SHOW_LABEL: AtomicBool = AtomicBool::new(true);
 pub static SHOW_COMMNET: AtomicBool = AtomicBool::new(true);
 
-fn _to_db_col(s: &str, esc: bool) -> String {
+pub fn _to_db_col(s: &str, esc: bool) -> String {
     if esc {
-        format!("`{}`", s)
+        format!("\"{}\"", s)
     } else {
         s.to_owned()
     }
@@ -20,8 +17,8 @@ fn _raw_var_name(s: &str) -> String {
     s.to_owned()
 }
 
-pub fn to_var_name(s: &str) -> ::askama::Result<String> {
-    Ok(_to_var_name(s))
+pub fn to_var_name<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
+    Ok(_to_var_name(s.as_ref()))
 }
 
 pub fn to_pascal_name(s: &str) -> ::askama::Result<String> {
@@ -34,15 +31,26 @@ pub fn pascal(s: &str) -> ::askama::Result<String> {
 pub fn camel(s: &str) -> ::askama::Result<String> {
     Ok(s.to_case(Case::Camel))
 }
-// pub fn upper(s: &str) -> ::askama::Result<String> {
-//     Ok(s.to_case(Case::UpperSnake))
-// }
+pub fn gql_pascal(s: &str) -> ::askama::Result<String> {
+    use inflector::Inflector;
+    Ok(s.to_pascal_case())
+}
+pub fn gql_camel(s: &str) -> ::askama::Result<String> {
+    use inflector::Inflector;
+    Ok(s.to_camel_case())
+}
+pub fn snake<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
+    Ok(s.as_ref().to_case(Case::Snake))
+}
+pub fn upper_snake(s: &str) -> ::askama::Result<String> {
+    Ok(s.to_case(Case::UpperSnake))
+}
 pub fn db_esc(s: &str) -> ::askama::Result<String> {
     Ok(_to_db_col(s, true))
 }
 
 pub fn fmt_join_with_paren(
-    v: &Vec<(&String, &ColumnDef)>,
+    v: Vec<(&String, &FieldDef)>,
     f: &str,
     sep: &str,
 ) -> ::askama::Result<String> {
@@ -53,22 +61,35 @@ pub fn fmt_join_with_paren(
     }
 }
 
-pub fn fmt_join(v: &[(&String, &ColumnDef)], f: &str, sep: &str) -> ::askama::Result<String> {
+pub fn fmt_join_with_paren2(
+    v: Vec<(&String, &FieldDef)>,
+    f1: &str,
+    f2: &str,
+    sep: &str,
+) -> ::askama::Result<String> {
+    if v.len() > 1 {
+        Ok(format!("({})", fmt_join(v, f2, sep)?))
+    } else {
+        fmt_join(v, f1, sep)
+    }
+}
+
+pub fn fmt_join(v: Vec<(&String, &FieldDef)>, f: &str, sep: &str) -> ::askama::Result<String> {
     let mut index = -1;
     Ok(v.iter()
         .map(|(name, col)| {
             index += 1;
-            _fmt_join(f, name, col, index, "")
+            _fmt_join(f, name, col, index, &Vec::new())
         })
         .collect::<Vec<_>>()
         .join(sep))
 }
 
 pub fn fmt_join_with_foreign_default(
-    v: &[(&String, &ColumnDef)],
+    v: Vec<(&String, &FieldDef)>,
     f: &str,
     sep: &str,
-    foreign: &str,
+    foreign: &[String],
 ) -> ::askama::Result<String> {
     let mut index = -1;
     Ok(v.iter()
@@ -81,7 +102,7 @@ pub fn fmt_join_with_foreign_default(
 }
 
 pub fn fmt_join_cache_or_not(
-    v: &[(&String, &ColumnDef)],
+    v: Vec<(&String, &FieldDef)>,
     th: &str,
     el: &str,
     sep: &str,
@@ -90,64 +111,180 @@ pub fn fmt_join_cache_or_not(
     Ok(v.iter()
         .map(|(name, col)| {
             index += 1;
-            if !col.exclude_from_cache {
-                _fmt_join(th, name, col, index, "")
+            if !col.exclude_from_cache() {
+                _fmt_join(th, name, col, index, &Vec::new())
             } else {
-                _fmt_join(el, name, col, index, "")
+                _fmt_join(el, name, col, index, &Vec::new())
             }
         })
         .collect::<Vec<_>>()
         .join(sep))
 }
 
-fn _fmt_join(f: &str, name: &&String, col: &&ColumnDef, index: i32, foreign: &str) -> String {
+pub fn fmt_join_foreign_with_paren(
+    v: Vec<(String, FieldDef)>,
+    f: &str,
+    sep: &str,
+) -> ::askama::Result<String> {
+    if v.len() > 1 {
+        Ok(format!("({})", fmt_join_foreign(v, f, sep)?))
+    } else {
+        fmt_join_foreign(v, f, sep)
+    }
+}
+
+pub fn fmt_join_foreign(
+    v: Vec<(String, FieldDef)>,
+    f: &str,
+    sep: &str,
+) -> ::askama::Result<String> {
+    let mut index = -1;
+    Ok(v.iter()
+        .map(|(name, col)| {
+            index += 1;
+            _fmt_join(f, &name, &col, index, &Vec::new())
+        })
+        .collect::<Vec<_>>()
+        .join(sep))
+}
+
+pub fn fmt_join_foreign_not_null_or_null(
+    v: Vec<(String, FieldDef)>,
+    not_null_case: &str,
+    null_case: &str,
+    sep: &str,
+) -> ::askama::Result<String> {
+    let mut index = -1;
+    Ok(v.iter()
+        .map(|(name, col)| {
+            let f = if col.not_null {
+                not_null_case
+            } else {
+                null_case
+            };
+            index += 1;
+            _fmt_join(f, &name, &col, index, &Vec::new())
+        })
+        .collect::<Vec<_>>()
+        .join(sep))
+}
+
+fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[String]) -> String {
     f.replace("{col}", &_to_db_col(name, false))
         .replace("{col_esc}", &_to_db_col(&col.get_col_name(name), true))
+        .replace("{col_query}", &col.get_col_query(&col.get_col_name(name)))
         .replace("{var}", &_to_var_name(name))
         .replace("{raw_var}", &_raw_var_name(name))
         .replace("{var_pascal}", &name.to_case(Case::Pascal))
         .replace("{upper}", &name.to_case(Case::UpperSnake))
-        .replace("{inner}", &col.get_inner_type(&false))
-        .replace("{inner_without_option}", &col.get_inner_type(&true))
+        .replace("{raw_inner}", &col.get_inner_type(true, false))
+        .replace(
+            "{raw_inner_without_option}",
+            &col.get_inner_type(true, true),
+        )
+        .replace("{inner}", &col.get_inner_type(false, false))
+        .replace("{inner_without_option}", &col.get_inner_type(false, true))
+        .replace("{inner_to_raw}", col.get_inner_to_raw())
+        .replace("{raw_to_inner}", col.get_raw_to_inner())
         .replace("{may_null}", col.get_may_null())
-        .replace("{default}", &col.get_serde_default())
-        .replace("{rename}", &col.get_rename(name))
-        .replace("{validate}", &col.get_validate())
-        .replace("{api_validate}", &col.get_api_validate())
-        .replace("{outer}", &col.get_outer_type())
+        .replace("{null_question}", col.get_null_question())
+        .replace("{serde}", &col.get_serde_default())
+        .replace("{default}", &col.get_default())
+        .replace("{column_query}", &col.get_column_query(name))
+        .replace("{validate}", &col.get_validate(name))
+        .replace("{api_validate_const}", &col.get_api_validate_const(name))
+        .replace("{api_validate}", &col.get_api_validate(name))
+        .replace("{api_default}", &col.get_api_default(name))
+        .replace("{api_serde_default}", &col.get_api_serde_default(name))
+        .replace("{graphql_secret}", col.graphql_secret())
+        .replace("{outer}", &col.get_outer_type(false))
+        .replace("{domain_outer}", &col.get_outer_type(true))
         .replace("{outer_ref}", &col.get_outer_ref_type())
-        .replace("{outer_owned}", &col.get_outer_owned_type())
-        .replace("{outer_for_update}", &col.get_outer_for_update_type())
+        .replace("{outer_owned}", &col.get_outer_owned_type(false))
+        .replace("{domain_outer_owned}", &col.get_outer_owned_type(true))
         .replace("{accessor}", &col.accessor(false, ""))
         .replace("{accessor_with_type}", &col.accessor(true, ""))
         .replace("{accessor_with_sep_type}", &col.accessor(true, "::"))
         .replace("{convert_inner}", &col.convert_inner_type())
+        .replace("{convert_outer_prefix}", col.convert_outer_prefix())
         .replace("{convert_outer}", col.convert_outer_type())
+        .replace(
+            "{convert_domain_outer_prefix}",
+            col.convert_domain_outer_prefix(),
+        )
+        .replace(
+            "{convert_domain_outer}",
+            col.convert_domain_outer_type(false, false),
+        )
+        .replace(
+            "{convert_impl_domain_outer}",
+            col.convert_domain_outer_type(true, false),
+        )
+        .replace(
+            "{convert_impl_domain_inner}",
+            col.convert_domain_outer_type(true, true),
+        )
+        .replace(
+            "{convert_domain_inner_type}",
+            col.convert_domain_inner_type(),
+        )
+        .replace(
+            "{convert_impl_domain_outer_for_updater}",
+            &col.convert_impl_domain_outer_for_updater(name),
+        )
         .replace("{convert_serialize}", col.convert_serialize())
         .replace("{factory}", &col.get_factory_type())
         .replace("{factory_default}", col.get_factory_default())
         .replace("{convert_factory}", &col.convert_factory_type())
-        .replace("{api_option_type}", &col.get_api_type(true))
-        .replace("{api_type}", &col.get_api_type(false))
-        .replace("{to_api_type}", col.get_to_api_type())
+        .replace("{convert_from_entity}", &col.convert_from_entity())
+        .replace("{res_api_type}", &col.get_api_type(false, false))
+        .replace("{req_api_option_type}", &col.get_api_type(true, true))
+        .replace("{req_api_type}", &col.get_api_type(false, true))
+        .replace("{gql_type}", &col.get_gql_type())
+        .replace("{ts_type}", col.get_ts_type())
+        .replace("{to_res_api_type}", col.get_to_api_type(false))
+        .replace("{to_req_api_type}", col.get_to_api_type(true))
         .replace(
             "{from_api_type}",
-            &col.get_from_api_type(name, false, foreign),
+            &col.get_from_api_type(name, false, foreign, false),
+        )
+        .replace(
+            "{from_api_type_for_update}",
+            &col.get_from_api_type(name, false, foreign, true),
         )
         .replace(
             "{from_api_rel_type}",
-            &col.get_from_api_type(name, true, foreign),
+            &col.get_from_api_type(name, true, foreign, false),
         )
-        .replace("{cond_type}", &col.get_cond_type())
+        .replace("{filter_type}", &col.get_filter_type(super::domain_mode()))
+        .replace(
+            "{filter_check_null}",
+            &col.get_filter_null(&_to_var_name(name)),
+        )
+        .replace("{filter_check_eq}", &col.get_filter_eq(None))
+        .replace("{filter_check_cmp}", &col.get_filter_cmp(None))
+        .replace("{filter_like}", col.get_filter_like())
+        .replace("{bind_as_for_filter}", col.get_bind_as_for_filter())
         .replace("{bind_as}", col.get_bind_as())
+        .replace("{from_row}", &col.get_from_row(name, index))
         .replace("{index}", &index.to_string())
         .replace("{clone}", col.clone_str())
+        .replace("{clone_for_outer}", col.clone_for_outer_str())
         .replace("{placeholder}", &col.placeholder())
         .replace(
-            "{title}",
-            &comment4(if_then_else!(
-                SHOW_TITLE.load(Ordering::Relaxed),
-                &col.title,
+            "{label}",
+            &label4(if_then_else!(
+                SHOW_LABEL.load(Ordering::Relaxed),
+                &col.label,
+                &None
+            ))
+            .unwrap(),
+        )
+        .replace(
+            "{label_wo_hash}",
+            &label4_wo_hash(if_then_else!(
+                SHOW_LABEL.load(Ordering::Relaxed),
+                &col.label,
                 &None
             ))
             .unwrap(),
@@ -161,31 +298,12 @@ fn _fmt_join(f: &str, name: &&String, col: &&ColumnDef, index: i32, foreign: &st
             ))
             .unwrap(),
         )
-}
-
-pub fn fmt_rel_join_foreign_is_not_null_or_null(
-    v: &[(&ModelDef, &String, &Option<RelDef>)],
-    not_null_case: &str,
-    null_case: &str,
-    sep: &str,
-) -> ::askama::Result<String> {
-    let mut index = -1;
-    Ok(v.iter()
-        .map(|(model, name, rel)| {
-            let f = if RelDef::foreign_is_not_null(rel, name, model) {
-                not_null_case
-            } else {
-                null_case
-            };
-            index += 1;
-            _fmt_rel(f, rel, name, model, index)
-        })
-        .collect::<Vec<_>>()
-        .join(sep))
+        .replace("{comma}", if { index } > 0 { ", " } else { "" })
+        .replace("{disp}", if col.is_displayable() { "{}" } else { "{:?}" })
 }
 
 pub fn fmt_rel_join(
-    v: &[(&ModelDef, &String, &Option<RelDef>)],
+    v: Vec<(&ModelDef, &String, &RelDef)>,
     f: &str,
     sep: &str,
 ) -> ::askama::Result<String> {
@@ -199,129 +317,117 @@ pub fn fmt_rel_join(
         .join(sep))
 }
 
-fn _fmt_rel(
-    f: &str,
-    rel: &&Option<RelDef>,
-    name: &&String,
-    model: &&ModelDef,
-    index: i32,
-) -> String {
-    let local = RelDef::get_local_id(rel, name, &model.id_name());
-    let local_col_name = if let Some(local_col) = model.merged_columns.get(&local) {
-        local_col.get_col_name(&local).to_string()
-    } else {
-        local.clone()
-    };
-    let local_id = model
-        .id()
-        .iter()
-        .map(|(name, _a)| name.as_str())
-        .last()
-        .unwrap_or("id");
-    let foreign_model = RelDef::get_foreign_model(rel, name);
-    let foreign_pk = foreign_model
-        .id()
-        .iter()
-        .map(|(name, _a)| name.as_str())
-        .last()
-        .unwrap_or("id");
-    let foreign = RelDef::get_foreign_id(rel, model, &foreign_model);
-    let primaries = fmt_join(&foreign_model.primaries(), "{col_esc}", ",").unwrap();
-    let asc = if_then_else!(rel.as_ref().map(|v| v.desc).unwrap_or(false), "Desc", "Asc");
-    let list_order = if_then_else!(
-        rel.as_ref().map(|v| v.desc).unwrap_or(false),
-        ".reverse()",
-        ""
-    );
-    let class_mod = RelDef::get_group_mod_name(rel, name);
-    let alias = _to_var_name(name);
-    let and_cond = if let Some(raw_cond) = rel.as_ref().and_then(|v| v.raw_cond.as_ref()) {
-        format!(".and({})", raw_cond)
+fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i32) -> String {
+    let foreign_model = rel.get_foreign_model();
+    let asc = if_then_else!(rel.desc, "Desc", "Asc");
+    let list_order = if_then_else!(rel.desc, ".reverse()", "");
+    let class_mod = rel.get_group_mod_name();
+    let rel_name = _to_var_name(name);
+    let additional_filter = if let Some(additional_filter) = &rel.additional_filter {
+        format!(".and(rel_{}::filter!({}))", class_mod, additional_filter)
     } else {
         "".to_string()
     };
-    let (order_by, list_sort) = if let Some(col) = rel.as_ref().and_then(|v| v.order_by.as_ref()) {
-        let col = if let Some(local_col) = model.merged_columns.get(col) {
+    let mut local_keys: Vec<_> = rel
+        .get_local_cols(name, model)
+        .iter()
+        .map(|(k, v)| {
+            let name = _to_var_name(k);
+            if v.not_null {
+                format!("self.{name}()")
+            } else {
+                format!("self.{name}()?")
+            }
+        })
+        .collect();
+    let local_keys = if local_keys.len() == 1 {
+        local_keys.pop().unwrap()
+    } else {
+        format!("({})", local_keys.join(", "))
+    };
+    let (order, list_sort, list_sort_for_update, cache_list_sort) = if let Some(col) = &rel.order_by
+    {
+        let col = if let Some(local_col) = model.merged_fields.get(col) {
             local_col.get_col_name(col)
         } else {
             col.into()
         };
         let col = _to_var_name(&col);
         (
-                format!("rel_{class_mod}::OrderBy::{asc}(rel_{class_mod}::Col::{col})"),
-                format!("cache.{alias}.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
-            )
+            format!("rel_{class_mod}::Order_::{asc}(rel_{class_mod}::Col_::{col})"),
+            format!("l.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
+            format!("l.sort_by(|v1, v2| v1._data.{col}.cmp(&v2._data.{col}){list_order});"),
+            format!("cache.{rel_name}.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
+        )
     } else {
-        let tmpl = format!("rel_{class_mod}::OrderBy::{asc}(rel_{class_mod}::Col::{{var}})");
+        let tmpl1 = format!("rel_{class_mod}::Order_::{asc}(rel_{class_mod}::Col_::{{var}})");
+        let tmpl2 = "(v1._inner.{{var}}.cmp(&v2._inner.{{var}}))".to_string();
+        let tmpl3 = "(v1._data.{{var}}.cmp(&v2._data.{{var}}))".to_string();
         (
-            fmt_join(&foreign_model.primaries(), &tmpl, ",").unwrap(),
-            "".to_string(),
+            fmt_join(foreign_model.primaries(), &tmpl1, ",").unwrap(),
+            format!(
+                "l.sort_by(|v1, v2| {}{list_order});",
+                fmt_join(foreign_model.primaries(), &tmpl2, ".then").unwrap()
+            ),
+            format!(
+                "l.sort_by(|v1, v2| {}{list_order});",
+                fmt_join(foreign_model.primaries(), &tmpl3, ".then").unwrap()
+            ),
+            format!(
+                "cache.{rel_name}.sort_by(|v1, v2| {}{list_order});",
+                fmt_join(foreign_model.primaries(), &tmpl2, ".then").unwrap()
+            ),
         )
     };
-    let (limit, list_limit) = if let Some(limit) = rel.as_ref().and_then(|v| v.limit) {
+    let (limit, cache_list_limit, order_and_limit) = if let Some(limit) = rel.limit {
         (
             format!(".limit({limit})"),
-            format!("cache.{alias}.truncate({limit});"),
+            format!("cache.{rel_name}.truncate({limit});"),
+            format!(".order_by(vec![{order}]).limit({limit})"),
         )
     } else {
-        ("".to_string(), "".to_string())
+        ("".to_string(), "".to_string(), "".to_string())
     };
-    let (title, comment) = if let Some(ref v) = rel {
-        (&v.title, &v.comment)
+    let with_trashed = if rel.with_trashed {
+        "_with_trashed"
     } else {
-        (&None, &None)
+        ""
     };
-    let mut constraint = String::new();
-    let mut with_trashed = "";
-    if let Some(ref v) = rel {
-        constraint.push_str(match v.on_delete {
-            Some(ReferenceOption::Restrict) => " ON DELETE RESTRICT",
-            Some(ReferenceOption::Cascade) => " ON DELETE CASCADE",
-            Some(ReferenceOption::SetNull) => " ON DELETE SET NULL",
-            //                Some(ReferenceOption::NoAction) => " ON DELETE NO ACTION",
-            Some(ReferenceOption::SetZero) => "",
-            None => "",
-        });
-        constraint.push_str(match v.on_update {
-            Some(ReferenceOption::Restrict) => " ON UPDATE RESTRICT",
-            Some(ReferenceOption::Cascade) => " ON UPDATE CASCADE",
-            Some(ReferenceOption::SetNull) => " ON UPDATE SET NULL",
-            //                Some(ReferenceOption::NoAction) => " ON UPDATE NO ACTION",
-            Some(ReferenceOption::SetZero) => "",
-            None => "",
-        });
-        if v.use_cache_with_trashed {
-            with_trashed = "_with_trashed";
-        }
-    }
-    f.replace("{col}", &_to_db_col(&local, false))
-        .replace("{col_esc}", &_to_db_col(&local_col_name, true))
-        .replace("{var}", &_to_var_name(&local))
-        .replace("{alias}", &_to_var_name(name))
-        .replace("{raw_alias}", name)
-        .replace("{alias_pascal}", &name.to_case(Case::Pascal))
-        .replace("{alias_camel}", &name.to_case(Case::Camel))
-        .replace("{class}", &RelDef::get_foreign_class_name(rel, name))
-        .replace("{class_mod}", &RelDef::get_group_mod_name(rel, name))
-        .replace("{mod_name}", &RelDef::get_mod_name(rel, name))
-        .replace("{local_id}", &_to_var_name(local_id))
-        .replace("{foreign}", &foreign)
-        .replace("{foreign_pk}", &_to_var_name(foreign_pk))
-        .replace("{foreign_esc}", &_to_db_col(&foreign, true))
-        .replace("{foreign_var}", &_to_var_name(&foreign))
-        .replace("{foreign_pascal}", &foreign.to_case(Case::Pascal))
+    let soft_delete_filter = foreign_model.soft_delete_tpl(
+        "",
+        ".filter(|data| data.--1--.deleted_at.is_none())",
+        ".filter(|data| data.--1--.deleted == 0)",
+    );
+    let ignore_soft_delete = foreign_model.soft_delete_tpl("", "_with_trashed", "_with_trashed");
+    f.replace("{rel_name}", &_to_var_name(name))
+        .replace("{raw_rel_name}", name)
+        .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
+        .replace("{rel_name_camel}", &name.to_case(Case::Camel))
+        .replace("{class}", &rel.get_foreign_class_name())
+        .replace("{class_mod}", &rel.get_group_mod_name())
+        .replace("{group_var}", &rel.get_group_var())
+        .replace("{class_mod_var}", &rel.get_group_mod_var())
+        .replace("{base_class_mod_var}", &rel.get_base_group_mod_var())
+        .replace("{mod_name}", &rel.get_mod_name())
+        .replace("{mod_var}", &_to_var_name(&rel.get_mod_name()))
         .replace("{local_table}", &model.table_name())
-        .replace(
-            "{table}",
-            &_to_db_col(&RelDef::get_foreign_table_name(rel, name), true),
-        )
-        .replace("{raw_table}", &RelDef::get_foreign_table_name(rel, name))
+        .replace("{table}", &_to_db_col(&rel.get_foreign_table_name(), true))
+        .replace("{raw_table}", &rel.get_foreign_table_name())
         .replace("{index}", &index.to_string())
         .replace(
-            "{title}",
-            &comment4(if_then_else!(
-                SHOW_TITLE.load(Ordering::Relaxed),
-                title,
+            "{label}",
+            &label4(if_then_else!(
+                SHOW_LABEL.load(Ordering::Relaxed),
+                &rel.label,
+                &None
+            ))
+            .unwrap(),
+        )
+        .replace(
+            "{label_wo_hash}",
+            &label4_wo_hash(if_then_else!(
+                SHOW_LABEL.load(Ordering::Relaxed),
+                &rel.label,
                 &None
             ))
             .unwrap(),
@@ -330,179 +436,28 @@ fn _fmt_rel(
             "{comment}",
             &comment4(if_then_else!(
                 SHOW_COMMNET.load(Ordering::Relaxed),
-                comment,
+                &rel.comment,
                 &None
             ))
             .unwrap(),
         )
-        .replace("{constraint}", &constraint)
-        .replace("{primaries}", &primaries)
-        .replace("{and_cond}", &and_cond)
-        .replace("{order_by}", &order_by)
+        .replace("{additional_filter}", &additional_filter)
+        .replace("{order}", &order)
         .replace("{limit}", &limit)
+        .replace("{order_and_limit}", &order_and_limit)
         .replace("{list_sort}", &list_sort)
-        .replace("{list_limit}", &list_limit)
+        .replace("{list_sort_for_update}", &list_sort_for_update)
+        .replace("{cache_list_sort}", &cache_list_sort)
+        .replace("{cache_list_limit}", &cache_list_limit)
         .replace("{pascal_name}", &model.name.to_case(Case::Pascal))
         .replace("{id_name}", &to_id_name(&model.name))
         .replace("{with_trashed}", with_trashed)
+        .replace("{soft_delete_filter}", &soft_delete_filter)
+        .replace("{ignore_soft_delete}", &ignore_soft_delete)
+        .replace("{local_keys}", &local_keys)
 }
 
-pub fn fmt_rel_join_not_null_or_null(
-    v: &[(&ModelDef, &String, &Option<RelDef>)],
-    not_null_case: &str,
-    null_case: &str,
-    sep: &str,
-) -> ::askama::Result<String> {
-    let mut index = -1;
-    Ok(v.iter()
-        .map(|(model, name, rel)| {
-            let local = RelDef::get_local_id(rel, name, &model.id_name());
-            let col = model
-                .merged_columns
-                .get(&local)
-                .unwrap_or_else(|| panic!("{} column is not defined in {}", local, model.name));
-            let f = if col.not_null {
-                not_null_case
-            } else {
-                null_case
-            };
-            index += 1;
-            _fmt_rel(f, rel, name, model, index)
-        })
-        .collect::<Vec<_>>()
-        .join(sep))
-}
-
-#[allow(dead_code)]
-pub fn fmt_index(v: &[(&ModelDef, &String, &IndexDef)], f: &str) -> ::askama::Result<String> {
-    Ok(v.iter()
-        .map(|(model, name, index)| _fmt_index(name, index, model, f))
-        .collect::<Vec<_>>()
-        .join(""))
-}
-
-#[allow(dead_code)]
-pub fn fmt_index_not_null_or_null(
-    v: &[(&ModelDef, &String, &IndexDef)],
-    not_null_case: &str,
-    null_case: &str,
-) -> ::askama::Result<String> {
-    Ok(v.iter()
-        .map(|(model, name, index)| {
-            let mut col_name = name.to_string();
-            if !index.fields.is_empty() {
-                for row in &index.fields {
-                    col_name = row.0.clone();
-                }
-            }
-            let col = model
-                .merged_columns
-                .get(&col_name)
-                .unwrap_or_else(|| panic!("{} column is not defined in {}", col_name, model.name));
-            if col.exclude_from_cache {
-                panic!(
-                    "Unique column cannot be excluded from cache: {} in {}",
-                    col_name, model.name
-                );
-            }
-            let f = if col.not_null {
-                not_null_case
-            } else {
-                null_case
-            };
-            _fmt_index(name, index, model, f)
-        })
-        .collect::<Vec<_>>()
-        .join(""))
-}
-
-fn _fmt_index(name: &&String, index: &&IndexDef, model: &&ModelDef, f: &str) -> String {
-    let mut name = name.to_string();
-    let mut prop_name = name.clone();
-    let mut col_name = String::new();
-    let mut v = Vec::new();
-    let mut length = 0;
-    let mut first = true;
-    if !index.fields.is_empty() {
-        for row in &index.fields {
-            let col = model
-                .merged_columns
-                .get(row.0)
-                .unwrap_or_else(|| panic!("{} index is not in columns", row.0));
-            let col = col.get_col_name(row.0).to_string();
-            let mut s = format!("`{}`", &col);
-            if first {
-                col_name = col;
-                prop_name = row.0.clone();
-                first = false;
-            }
-            if let Some(def) = row.1 {
-                if let Some(len) = def.length {
-                    length = len;
-                    let _ = write!(s, "({})", len);
-                }
-                if let Some(sorting) = def.sorting {
-                    match sorting {
-                        SortType::Asc => s.push_str(" ASC"),
-                        SortType::Desc => s.push_str(" DESC"),
-                    }
-                }
-            }
-            v.push(s);
-        }
-    } else {
-        let col = model
-            .merged_columns
-            .get(&name)
-            .unwrap_or_else(|| panic!("{} index is not in columns", name));
-        col_name = col.get_col_name(&name).to_string();
-        v.push(format!("`{}`", &col_name));
-    }
-    name = match index.type_def {
-        Some(IndexType::Index) => format!("IDX_{}", name),
-        Some(IndexType::Unique) => format!("UQ_{}", name),
-        Some(IndexType::Fulltext) => format!("FT_{}", name),
-        Some(IndexType::Spatial) => format!("SP_{}", name),
-        None => format!("IDX_{}", name),
-    };
-    let index_type = match index.type_def {
-        Some(IndexType::Index) => "INDEX",
-        Some(IndexType::Unique) => "UNIQUE",
-        Some(IndexType::Fulltext) => "FULLTEXT",
-        Some(IndexType::Spatial) => "SPATIAL",
-        None => "INDEX",
-    };
-    let mut cols = v.join(", ");
-    let col = model.merged_columns.get(&prop_name);
-    if col.unwrap().type_def == ColumnType::ArrayInt {
-        cols = format!("(CAST(`{}` AS UNSIGNED ARRAY))", col_name);
-    }
-    if col.unwrap().type_def == ColumnType::ArrayString {
-        cols = format!("(CAST(`{}` AS CHAR({}) ARRAY))", col_name, length);
-    }
-    let parser = if let Some(parser) = index.parser {
-        format!(" WITH PARSER {}", parser)
-    } else {
-        "".to_string()
-    };
-    f.replace("{name}", &name)
-        .replace("{index_type}", index_type)
-        .replace("{cols}", &cols)
-        .replace("{col_esc}", &_to_db_col(&col_name, true))
-        .replace("{table_name}", &model.table_name())
-        .replace("{pascal_name}", &model.name.to_case(Case::Pascal))
-        .replace("{col_name}", &prop_name)
-        .replace("{col_pascal}", &prop_name.to_case(Case::Pascal))
-        .replace("{var}", &_to_var_name(&prop_name))
-        .replace("{bind_as}", col.unwrap().get_bind_as())
-        .replace(
-            "{cond_type}",
-            &col.map(|col| col.get_cond_type()).unwrap_or_default(),
-        )
-        .replace("{parser}", &parser)
-}
-
-pub fn fmt_index_col(v: &[(&String, &ColumnDef)], f: &str, sep: &str) -> ::askama::Result<String> {
+pub fn fmt_index_col(v: Vec<(&String, &FieldDef)>, f: &str, sep: &str) -> ::askama::Result<String> {
     let mut index = 0;
     Ok(v.iter()
         .map(|(name, col)| {
@@ -514,7 +469,7 @@ pub fn fmt_index_col(v: &[(&String, &ColumnDef)], f: &str, sep: &str) -> ::askam
 }
 
 pub fn fmt_index_col_not_null_or_null(
-    v: &[(&String, &ColumnDef)],
+    v: Vec<(&String, &FieldDef)>,
     not_null_case: &str,
     null_case: &str,
     sep: &str,
@@ -533,20 +488,47 @@ pub fn fmt_index_col_not_null_or_null(
         .collect::<Vec<_>>()
         .join(sep))
 }
-fn _fmt_index_col(name: &&String, col: &&ColumnDef, f: &str, index: i32) -> String {
+fn _fmt_index_col(name: &&String, col: &&FieldDef, f: &str, index: i32) -> String {
     f.replace("{name}", name)
         .replace("{col_name}", &col.get_col_name(name))
         .replace("{col_esc}", &_to_db_col(&col.get_col_name(name), true))
         .replace("{col_pascal}", &name.to_case(Case::Pascal))
         .replace("{var}", &_to_var_name(name))
-        .replace("{bind_as}", col.get_bind_as())
-        .replace("{cond_type}", &col.get_cond_type())
+        .replace("{raw_var}", name)
+        .replace("{bind_as_for_filter}", col.get_bind_as_for_filter())
+        .replace("{filter_type}", &col.get_filter_type(super::domain_mode()))
         .replace("{index}", &index.to_string())
+        .replace("{inner_to_raw}", col.get_inner_to_raw())
+}
+
+pub fn fmt_cache_owners(v: &[(String, String, String)], f: &str) -> ::askama::Result<String> {
+    Ok(v.iter()
+        .map(|(mod_name, model_name, name)| {
+            f.replace("{mod}", mod_name)
+                .replace("{model_name}", &model_name.to_case(Case::Pascal))
+                .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
+        })
+        .collect::<Vec<_>>()
+        .join(""))
 }
 
 #[allow(dead_code)]
 pub fn check_lifetime(s: &str) -> ::askama::Result<String> {
     Ok(if s.contains("&'a") { "<'a>" } else { "" }.to_string())
+}
+pub fn label0(s: &Option<String>) -> ::askama::Result<String> {
+    match s {
+        None => Ok("".to_owned()),
+        Some(s) => {
+            let s = s
+                .trim()
+                .to_string()
+                .replace("\r\n", "\n")
+                .replace('\r', "\n")
+                .replace('\n', "\n/// ");
+            Ok(format!("/// ### {}\n", s))
+        }
+    }
 }
 pub fn comment0(s: &Option<String>) -> ::askama::Result<String> {
     match s {
@@ -559,6 +541,34 @@ pub fn comment0(s: &Option<String>) -> ::askama::Result<String> {
                 .replace('\r', "\n")
                 .replace('\n', "\n/// ");
             Ok(format!("/// {}\n", s))
+        }
+    }
+}
+pub fn label4(s: &Option<String>) -> ::askama::Result<String> {
+    match s {
+        None => Ok("".to_owned()),
+        Some(s) => {
+            let s = s
+                .trim()
+                .to_string()
+                .replace("\r\n", "\n")
+                .replace('\r', "\n")
+                .replace('\n', "\n    /// ");
+            Ok(format!("    /// ### {}\n", s))
+        }
+    }
+}
+pub fn label4_wo_hash(s: &Option<String>) -> ::askama::Result<String> {
+    match s {
+        None => Ok("".to_owned()),
+        Some(s) => {
+            let s = s
+                .trim()
+                .to_string()
+                .replace("\r\n", "\n")
+                .replace('\r', "\n")
+                .replace('\n', "\n    /// ");
+            Ok(format!("    /// {}\n", s))
         }
     }
 }
@@ -588,10 +598,12 @@ pub fn strum_detailed4(s: &Option<String>) -> ::askama::Result<String> {
         Some(s) => Ok(format!("    #[strum(detailed_message = {:?})]\n", s.trim())),
     }
 }
-pub fn strum_props4(def: &ColumnDef) -> ::askama::Result<String> {
+pub fn strum_props4(def: &FieldDef) -> ::askama::Result<String> {
+    let mut def = def.clone();
+    def._name = None;
     Ok(format!(
         "    #[strum(props(def = {:?}))]\n",
-        serde_json::to_string(def).unwrap()
+        serde_json::to_string(&def).unwrap()
     ))
 }
 #[allow(dead_code)]
@@ -607,16 +619,26 @@ pub fn disp_opt<T: std::fmt::Debug>(s: &Option<T>) -> ::askama::Result<String> {
         Some(ref s) => Ok(format!("Some({:?})", s)),
     }
 }
-pub fn if_then_else<T: std::fmt::Display>(wh: &bool, th: T, el: T) -> ::askama::Result<T> {
+// pub fn if_then_else<T: std::fmt::Display>(wh: bool, th: T, el: T) -> ::askama::Result<T> {
+//     Ok(if_then_else!(wh, th, el))
+// }
+pub fn if_then_else_ref<T: std::fmt::Display>(wh: &bool, th: T, el: T) -> ::askama::Result<T> {
     Ok(if_then_else!(*wh, th, el))
 }
 #[allow(dead_code)]
 pub fn is_true(b: &Option<bool>) -> ::askama::Result<bool> {
     Ok(*b == Some(true))
 }
-pub fn replace3(content: &str, r1: &str, r2: &str, r3: &str) -> ::askama::Result<String> {
-    Ok(content
-        .replace("--1--", r1)
-        .replace("--2--", r2)
-        .replace("--3--", r3))
+pub fn replace1<S: AsRef<str>>(content: &str, r1: S) -> ::askama::Result<String> {
+    Ok(content.replace("--1--", r1.as_ref()))
+}
+// pub fn replace3(content: &str, r1: &str, r2: &str, r3: &str) -> ::askama::Result<String> {
+//     Ok(content
+//         .replace("--1--", r1)
+//         .replace("--2--", r2)
+//         .replace("--3--", r3))
+// }
+
+pub fn senax_version(_s: &str) -> ::askama::Result<String> {
+    Ok(crate::VERSION.to_string())
 }
