@@ -361,8 +361,8 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         )
     } else {
         let tmpl1 = format!("rel_{class_mod}::Order_::{asc}(rel_{class_mod}::Col_::{{var}})");
-        let tmpl2 = "(v1._inner.{{var}}.cmp(&v2._inner.{{var}}))".to_string();
-        let tmpl3 = "(v1._data.{{var}}.cmp(&v2._data.{{var}}))".to_string();
+        let tmpl2 = "(v1._inner.{var}.cmp(&v2._inner.{var}))".to_string();
+        let tmpl3 = "(v1._data.{var}.cmp(&v2._data.{var}))".to_string();
         (
             fmt_join(foreign_model.primaries(), &tmpl1, ",").unwrap(),
             format!(

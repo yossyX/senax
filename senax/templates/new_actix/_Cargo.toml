@@ -43,7 +43,7 @@ rquickjs = { version = "0.4.3", features = ["rust-alloc"], default-features = fa
 rust_decimal.workspace = true
 rust_decimal_macros.workspace = true
 schemars.workspace = true
-senax-actix-session = "0.3.0"
+senax-actix-session = "0.4.0"
 senax-common.workspace = true
 senax-logger = "0.2.4"
 serde.workspace = true
