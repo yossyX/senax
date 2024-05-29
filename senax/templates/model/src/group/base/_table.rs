@@ -3934,7 +3934,7 @@ impl QueryBuilder {
     @%- if def.use_cache() %@
 
     #[cfg(not(feature="cache_update_only"))]
-    async fn _select_from_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
+    async fn _select_from_cache(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         let mut sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL),
@@ -3949,12 +3949,13 @@ impl QueryBuilder {
         }
         let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
         let _span = debug_span!("query", sql = &query.sql());
+        let joiner = self.joiner.take();
         query = self._bind(query);
         let result = crate::misc::fetch!(conn, query, fetch_all);
         let ids: Vec<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> = result.iter().map(|id| id.into()).collect();
         conn.release_cache_tx();
         let mut list = _@{ pascal_name }@::find_many_from_cache(conn, ids).await?;
-        list.join(conn, self.joiner).await?;
+        list.join(conn, joiner).await?;
         let mut map = _@{ pascal_name }@::cache_list_to_map(list);
         let list: Vec<_@{ pascal_name }@Cache> = result
             .iter()
@@ -6095,20 +6096,20 @@ impl _@{ pascal_name }@ {
         T{index}: Into<{filter_type}>,", "") }@
     {
         @{- index.fields(index_name, def)|fmt_index_col("
-        let val{index}: {filter_type} = _{name}.into();", "") }@
-        let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col("ColKey_::{var}(val{index}.clone().into())", ", ") }@]);
+        let c{index}: {filter_type} = _{name}.into();", "") }@
+        let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col("ColKey_::{var}(c{index}.clone().into())", ", ") }@]);
         if let Some(id) = Cache::get::<PrimaryWrapper>(&key, conn.shard_id(), true).await {
             if let Some(obj) = Self::find_optional_from_cache(conn, &id.0).await? {
-                if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("obj._{raw_var}() == val{index}", "matches!(obj._{raw_var}(), Some(v) if v == val{index})", " && ") }@ {
+                if @{ index.fields(index_name, def)|fmt_index_col("obj._{raw_var}(){filter_check_eq}", " && ") }@ {
                     return Ok(obj);
                 }
             }
         }
-        let filter = Filter_::And(vec![@{- index.fields(index_name, def)|fmt_index_col("Filter_::EqKey(ColKey_::{var}(val{index}.clone().into()))", ", ") }@]);
+        let filter = Filter_::And(vec![@{- index.fields(index_name, def)|fmt_index_col("Filter_::EqKey(ColKey_::{var}(c{index}.clone().into()))", ", ") }@]);
         let mut conn = DbConn::_new(conn.shard_id());
         conn.begin_cache_tx().await?;
         let obj = Self::query().filter(filter).select_from_cache(&mut conn).await?.pop()
-            .with_context(|| err::RowNotFound::new("@{ table_name }@", format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("val{index}", ", ") }@)))?;
+            .with_context(|| err::RowNotFound::new("@{ table_name }@", format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("c{index}", ", ") }@)))?;
         let id = PrimaryWrapper(InnerPrimary::from(&obj), conn.shard_id(), MSec::now());
         Cache::insert_long(&key, Arc::new(id), true).await;
         Ok(obj)

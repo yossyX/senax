@@ -220,7 +220,7 @@ impl IndexDef {
                     .replace("{index}", &index.to_string())
                     .replace("{bind_as_for_filter}", col.get_bind_as_for_filter())
                     .replace("{placeholder}", &col.placeholder())
-                    .replace("{filter_check_eq}", &col.get_filter_eq(Some(index)))
+                    .replace("{filter_check_eq}", &col.get_filter_eq(Some(index), false))
                     .replace("{filter_check_cmp}", &col.get_filter_cmp(Some(index))),
             );
         }

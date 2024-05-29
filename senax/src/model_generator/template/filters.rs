@@ -261,7 +261,7 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
             "{filter_check_null}",
             &col.get_filter_null(&_to_var_name(name)),
         )
-        .replace("{filter_check_eq}", &col.get_filter_eq(None))
+        .replace("{filter_check_eq}", &col.get_filter_eq(None, false))
         .replace("{filter_check_cmp}", &col.get_filter_cmp(None))
         .replace("{filter_like}", col.get_filter_like())
         .replace("{bind_as_for_filter}", col.get_bind_as_for_filter())
@@ -488,7 +488,8 @@ pub fn fmt_index_col_not_null_or_null(
         .collect::<Vec<_>>()
         .join(sep))
 }
-fn _fmt_index_col(name: &&String, col: &&FieldDef, f: &str, index: i32) -> String {
+
+fn _fmt_index_col(name: &&String, col: &&FieldDef, f: &str, index: usize) -> String {
     f.replace("{name}", name)
         .replace("{col_name}", &col.get_col_name(name))
         .replace("{col_esc}", &_to_db_col(&col.get_col_name(name), true))
@@ -499,6 +500,7 @@ fn _fmt_index_col(name: &&String, col: &&FieldDef, f: &str, index: i32) -> Strin
         .replace("{filter_type}", &col.get_filter_type(super::domain_mode()))
         .replace("{index}", &index.to_string())
         .replace("{inner_to_raw}", col.get_inner_to_raw())
+        .replace("{filter_check_eq}", &col.get_filter_eq(Some(index), true))
 }
 
 pub fn fmt_cache_owners(v: &[(String, String, String)], f: &str) -> ::askama::Result<String> {

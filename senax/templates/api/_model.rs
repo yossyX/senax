@@ -125,7 +125,7 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@> for ResObj {
         })
     }
 }
-@%- if def.use_all_row_cache() && !def.use_filtered_row_cache() || def.use_cache() %@
+@%- if def.use_all_row_cache() || def.use_cache() %@
 
 impl TryFrom_<&dyn _domain_::@{ pascal_name }@Cache> for ResObj {
     fn try_from_(v: &dyn _domain_::@{ pascal_name }@Cache, _auth: &AuthInfo) -> anyhow::Result<Self> {

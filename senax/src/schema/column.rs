@@ -531,7 +531,7 @@ pub struct FieldDef {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hidden: Option<bool>,
     /// ### シークレット
-    /// ログに出力しない
+    /// trueの場合はログに出力しない
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secret: Option<bool>,
 }
@@ -647,7 +647,7 @@ pub struct FieldJson {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hidden: Option<bool>,
     /// ### シークレット
-    /// ログに出力しない
+    /// trueの場合はログに出力しない
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secret: Option<bool>,
 }
@@ -726,7 +726,7 @@ pub struct ValueObjectJson {
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub hidden: bool,
     /// ### シークレット
-    /// ログに出力しない
+    /// trueの場合はログに出力しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub secret: bool,
 }
@@ -1699,7 +1699,7 @@ impl FieldDef {
             format!("_obj.{name}().is_none()")
         }
     }
-    pub fn get_filter_eq(&self, index: Option<usize>) -> String {
+    pub fn get_filter_eq(&self, index: Option<usize>, _ref: bool) -> String {
         let as_ref = if self.id_class.is_none()
             && self.rel.is_none()
             && self.value_object.is_none()
@@ -1714,10 +1714,11 @@ impl FieldDef {
         } else {
             "".to_string()
         };
+        let r = if _ref { "&" } else { "" };
         if self.not_null {
-            format!("{as_ref}.eq(c{index})")
+            format!("{as_ref}.eq({r}c{index})")
         } else {
-            format!(".map(|v| v{as_ref}.eq(c{index})).unwrap_or(false)")
+            format!(".map(|v| v{as_ref}.eq({r}c{index})).unwrap_or(false)")
         }
     }
     pub fn get_filter_cmp(&self, index: Option<usize>) -> String {

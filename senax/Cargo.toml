@@ -1,6 +1,6 @@
 [package]
 name = "senax"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 authors = ["yossyX"]
 license = "MIT OR Apache-2.0"
@@ -63,6 +63,8 @@ thread_local = "1.1.7"
 tokio = { version = "1", features = ["full"] }
 validator = { version = "0.16", features = ["derive", "unic"] }
 webbrowser = "0.8.10"
+
+triomphe = "=0.1.11"
 
 [build-dependencies]
 includedir_codegen = "0.6.0"
