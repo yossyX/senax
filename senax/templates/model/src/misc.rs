@@ -54,6 +54,7 @@ pub(crate) trait BindTr {
     ) -> QueryAs<'_, DbType, T, DbArguments>;
     fn query_bind(self, query: Query<'_, DbType, DbArguments>) -> Query<'_, DbType, DbArguments>;
 }
+#[allow(dead_code)]
 pub(crate) trait BindArrayTr {
     fn query_as_each_bind<T>(
         self,

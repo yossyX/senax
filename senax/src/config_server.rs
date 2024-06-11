@@ -844,8 +844,8 @@ fn write_api_yml(
 async fn build_exec() -> impl Responder {
     let result = async move {
         use tokio::process::Command;
-        let shell_command = "bash -e build.sh > build_result.txt 2>&1";
-        let mut child = Command::new("bash").arg("-c").arg(shell_command).spawn()?;
+        let shell_command = "sh -e build.sh > build_result.txt 2>&1";
+        let mut child = Command::new("sh").arg("-c").arg(shell_command).spawn()?;
         tokio::spawn(async move {
             let _ = child.wait().await;
         });
@@ -879,11 +879,11 @@ async fn git_exec(cmd: web::Path<String>, data: web::Json<GitInfo>) -> impl Resp
     let result = async move {
         use tokio::process::Command;
         let shell_command = format!(
-            "bash -e git_proc.sh {} {}> git_result.txt 2>&1",
+            "sh -e git_proc.sh {} {}> git_result.txt 2>&1",
             shell_escape::escape(cmd.as_str().into()),
             shell_escape::escape(data.into_inner().msg.unwrap_or_default().into())
         );
-        let mut child = Command::new("bash").arg("-c").arg(shell_command).spawn()?;
+        let mut child = Command::new("sh").arg("-c").arg(shell_command).spawn()?;
         tokio::spawn(async move {
             let _ = child.wait().await;
         });

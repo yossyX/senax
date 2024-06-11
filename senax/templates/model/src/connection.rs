@@ -982,6 +982,8 @@ async fn get_source(
                                 iso
                             ))
                             .await?;
+                        } else {
+                            conn.execute("SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));").await?;
                         }
                         Ok(())
                     })
@@ -1031,6 +1033,8 @@ async fn get_replica(
                                     iso
                                 ))
                                 .await?;
+                            } else {
+                                conn.execute("SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));").await?;
                             }
                             Ok(())
                         })

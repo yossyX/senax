@@ -118,6 +118,7 @@ impl ErrorExtensions for GqlError {
     }
 }
 
+#[allow(dead_code)]
 struct RoleGuard(Role);
 
 #[async_trait::async_trait]
@@ -131,6 +132,7 @@ impl async_graphql::Guard for RoleGuard {
     }
 }
 
+#[allow(dead_code)]
 struct NoGuard;
 
 #[async_trait::async_trait]

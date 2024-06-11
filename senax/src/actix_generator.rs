@@ -57,11 +57,11 @@ pub fn generate(name: &str, db_list: Vec<&str>, force: bool) -> Result<()> {
     }
 
     let file_path = base_path.join("Cargo.toml");
-    if force || !file_path.exists() {
-        let tpl = CargoTemplate { name };
-        fs_write(&file_path, tpl.render()?)?;
-    }
-    let mut content = fs::read_to_string(&file_path)?;
+    let mut content = if force || !file_path.exists() {
+        CargoTemplate { name }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
     for db in &db_list {
         let db = &db.to_case(Case::Snake);
         let reg = Regex::new(&format!(r"(?m)^db_{}\s*=", db))?;
@@ -93,11 +93,11 @@ pub fn generate(name: &str, db_list: Vec<&str>, force: bool) -> Result<()> {
     }
 
     let file_path = src_path.join("db.rs");
-    if force || !file_path.exists() {
-        let tpl = DbTemplate;
-        fs_write(&file_path, tpl.render()?)?;
-    }
-    let mut content = fs::read_to_string(&file_path)?;
+    let mut content = if force || !file_path.exists() {
+        DbTemplate.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
     for db in &db_list {
         let reg = Regex::new(&format!(r"(?m)^\s*db_{}::start", &db.to_case(Case::Snake)))?;
         if !reg.is_match(&content) {

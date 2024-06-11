@@ -228,8 +228,10 @@ async fn main() -> Result<()> {
     .await?;
     tokio::spawn(async {
         // For rolling update
-        tokio::time::sleep(std::time::Duration::from_secs(300)).await;
-        db::clear_local_cache().await;
+        for _ in 0..15 {
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            db::clear_local_cache().await;
+        }
     });
 
     #[cfg(feature = "v8")]

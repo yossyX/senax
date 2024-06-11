@@ -354,11 +354,11 @@ fn write_db_file(
 ) -> Result<()> {
     let camel_case = config.camel_case();
     let file_path = path.join(format!("{}.rs", &db.to_case(Case::Snake)));
-    if force || !file_path.exists() {
-        let tpl = template::DbTemplate { db };
-        fs_write(&file_path, tpl.render()?)?;
-    }
-    let content = fs::read_to_string(&file_path)?;
+    let content = if force || !file_path.exists() {
+        template::DbTemplate { db }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
     let re = Regex::new(r"\n// Do not modify this line\. \(GqlMod:([_a-zA-Z0-9,]*)\)").unwrap();
     let caps = re
         .captures(&content)
@@ -376,41 +376,39 @@ fn write_db_file(
         .filter(|v| !all.contains(*v))
         .map(|v| v.to_string())
         .collect();
-    if !add_groups.is_empty() {
-        let add_groups = &add_groups;
-        add_groups.iter().for_each(|v| {
-            all.insert(v.clone());
-        });
-        let all = all.iter().cloned().collect::<Vec<_>>().join(",");
-        let tpl = template::DbModTemplate { all, add_groups };
-        let content = re.replace(&content, tpl.render()?);
-        let tpl = template::DbQueryTemplate {
+    let add_groups = &add_groups;
+    add_groups.iter().for_each(|v| {
+        all.insert(v.clone());
+    });
+    let all = all.iter().cloned().collect::<Vec<_>>().join(",");
+    let tpl = template::DbModTemplate { all, add_groups };
+    let content = re.replace(&content, tpl.render()?);
+    let tpl = template::DbQueryTemplate {
+        db,
+        add_groups,
+        camel_case,
+    };
+    let mut content = content.replace(
+        "\n    // Do not modify this line. (GqlQuery)",
+        &tpl.render()?,
+    );
+    for group in add_groups {
+        let tpl = template::DbMutationTemplate {
             db,
-            add_groups,
+            name: group,
             camel_case,
         };
-        let mut content = content.replace(
-            "\n    // Do not modify this line. (GqlQuery)",
+        content = content.replace(
+            "\n    // Do not modify this line. (GqlMutation)",
             &tpl.render()?,
         );
-        for group in add_groups {
-            let tpl = template::DbMutationTemplate {
-                db,
-                name: group,
-                camel_case,
-            };
-            content = content.replace(
-                "\n    // Do not modify this line. (GqlMutation)",
-                &tpl.render()?,
-            );
-        }
-        let tpl = template::DbJsonSchemaTemplate { add_groups };
-        let content = content.replace(
-            "\n    // Do not modify this line. (JsonSchema)",
-            &tpl.render()?,
-        );
-        fs_write(file_path, &*content)?;
     }
+    let tpl = template::DbJsonSchemaTemplate { add_groups };
+    let content = content.replace(
+        "\n    // Do not modify this line. (JsonSchema)",
+        &tpl.render()?,
+    );
+    fs_write(file_path, &*content)?;
     Ok(())
 }
 
@@ -425,11 +423,11 @@ fn write_group_file(
 ) -> Result<()> {
     let file_path = path.join(format!("{}.rs", group));
     remove_files.remove(file_path.as_os_str());
-    if force || !file_path.exists() {
-        let tpl = template::GroupTemplate { db, group };
-        fs_write(&file_path, tpl.render()?)?;
-    }
-    let content = fs::read_to_string(&file_path)?;
+    let content = if force || !file_path.exists() {
+        template::GroupTemplate { db, group }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
     let re = Regex::new(r"\n// Do not modify this line\. \(GqlMod:([_a-zA-Z0-9,]*)\)").unwrap();
     let caps = re
         .captures(&content)
@@ -447,43 +445,41 @@ fn write_group_file(
         .filter(|v| !all.contains(**v))
         .map(|v| v.to_string())
         .collect();
-    if !add_models.is_empty() {
-        let add_models = &add_models;
-        add_models.iter().for_each(|v| {
-            all.insert(v.clone());
-        });
-        let all = all.iter().cloned().collect::<Vec<_>>().join(",");
-        let tpl = template::GroupModTemplate { all, add_models };
-        let content = re.replace(&content, tpl.render()?);
-        let tpl = template::GroupImplTemplate {
-            db,
-            group,
-            add_models,
-            mode: "Query",
-            camel_case,
-        };
-        let content = content.replace(
-            "\n    // Do not modify this line. (GqlQuery)",
-            &tpl.render()?,
-        );
-        let tpl = template::GroupImplTemplate {
-            db,
-            group,
-            add_models,
-            mode: "Mutation",
-            camel_case,
-        };
-        let content = content.replace(
-            "\n    // Do not modify this line. (GqlMutation)",
-            &tpl.render()?,
-        );
-        let tpl = template::GroupJsonSchemaTemplate { add_models };
-        let content = content.replace(
-            "\n    // Do not modify this line. (JsonSchema)",
-            &tpl.render()?,
-        );
-        fs_write(file_path, &*content)?;
-    }
+    let add_models = &add_models;
+    add_models.iter().for_each(|v| {
+        all.insert(v.clone());
+    });
+    let all = all.iter().cloned().collect::<Vec<_>>().join(",");
+    let tpl = template::GroupModTemplate { all, add_models };
+    let content = re.replace(&content, tpl.render()?);
+    let tpl = template::GroupImplTemplate {
+        db,
+        group,
+        add_models,
+        mode: "Query",
+        camel_case,
+    };
+    let content = content.replace(
+        "\n    // Do not modify this line. (GqlQuery)",
+        &tpl.render()?,
+    );
+    let tpl = template::GroupImplTemplate {
+        db,
+        group,
+        add_models,
+        mode: "Mutation",
+        camel_case,
+    };
+    let content = content.replace(
+        "\n    // Do not modify this line. (GqlMutation)",
+        &tpl.render()?,
+    );
+    let tpl = template::GroupJsonSchemaTemplate { add_models };
+    let content = content.replace(
+        "\n    // Do not modify this line. (JsonSchema)",
+        &tpl.render()?,
+    );
+    fs_write(file_path, &*content)?;
     Ok(())
 }
 
@@ -521,8 +517,8 @@ fn write_model_file(
     fs::create_dir_all(path)?;
     let file_path = path.join(format!("{}.rs", mod_name));
     remove_files.remove(file_path.as_os_str());
-    if force || !file_path.exists() {
-        let tpl = template::ModelTemplate {
+    let content = if force || !file_path.exists() {
+        template::ModelTemplate {
             db,
             group,
             mod_name,
@@ -532,10 +528,11 @@ fn write_model_file(
             def,
             camel_case: config.camel_case(),
             api_def: &api_def,
-        };
-        fs_write(&file_path, tpl.render()?)?;
-    }
-    let content = fs::read_to_string(&file_path)?;
+        }
+        .render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
     let re = Regex::new(r"(?s)(// Do not modify below this line. \(GqlModelStart\)).+(// Do not modify up to this line. \(GqlModelEnd\))").unwrap();
     ensure!(
         re.is_match(&content),

@@ -341,7 +341,7 @@ impl FilterDef {
         if f.is_null.unwrap_or_default() && {null_ok} {{
             return false;
         }}
-        if f.is_not_null.unwrap_or_default() && ({null_ng}){{
+        if f.is_not_null.unwrap_or_default() && ({null_ng}) {{
             return false;
         }}
         if let Some(p) = &f.is_null_or_lt {{
@@ -384,7 +384,7 @@ impl FilterDef {
         if f.is_null.unwrap_or_default() && {null_ok} {{
             return false;
         }}
-        if f.is_not_null.unwrap_or_default() && ({null_ng}){{
+        if f.is_not_null.unwrap_or_default() && ({null_ng}) {{
             return false;
         }}
     }}"

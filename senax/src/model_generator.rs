@@ -402,11 +402,11 @@ fn write_value_objects_rs(file_path: &Path, mod_names: &BTreeMap<String, String>
 
 fn write_domain_models_rs(domain_src_dir: &Path, db: &str) -> Result<()> {
     let file_path = domain_src_dir.join("models.rs");
-    let tpl = template::DomainModelsTemplate.render()?;
-    if !file_path.exists() {
-        fs_write(&file_path, tpl)?;
-    }
-    let mut content = fs::read_to_string(&file_path)?;
+    let mut content = if !file_path.exists() {
+        template::DomainModelsTemplate.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
     let re = Regex::new(r"// Do not modify this line\. \(Mod:([_a-zA-Z0-9,]*)\)").unwrap();
     let caps = re
         .captures(&content)
@@ -465,11 +465,11 @@ fn write_domain_db_rs(
     force: bool,
 ) -> Result<()> {
     let file_path = domain_models_dir.join(format!("{}.rs", &db.to_case(Case::Snake)));
-    if force || !file_path.exists() {
-        let tpl = template::DomainDbTemplate { db }.render()?;
-        fs_write(&file_path, tpl)?;
-    }
-    let content = fs::read_to_string(&file_path)?;
+    let content = if force || !file_path.exists() {
+        template::DomainDbTemplate { db }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
 
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
     ensure!(
@@ -532,11 +532,11 @@ fn write_impl_domain_db_rs(
     force: bool,
 ) -> Result<()> {
     let file_path = model_src_dir.join("impl_domain.rs");
-    if force || !file_path.exists() {
-        let tpl = template::ImplDomainDbTemplate { db }.render()?;
-        fs_write(&file_path, tpl)?;
-    }
-    let content = fs::read_to_string(&file_path)?;
+    let content = if force || !file_path.exists() {
+        template::ImplDomainDbTemplate { db }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
 
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
     ensure!(
@@ -680,11 +680,11 @@ fn write_domain_group_rs(
 ) -> Result<()> {
     let file_path = domain_db_dir.join(format!("{}.rs", group_name));
     remove_files.remove(file_path.as_os_str());
-    if force || !file_path.exists() {
-        let tpl = template::DomainGroupTemplate { group_name }.render()?;
-        fs_write(&file_path, tpl)?;
-    }
-    let content = fs::read_to_string(&file_path)?;
+    let content = if force || !file_path.exists() {
+        template::DomainGroupTemplate { group_name }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
 
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
     ensure!(
@@ -810,11 +810,11 @@ fn write_impl_domain_group_rs(
 ) -> Result<()> {
     let file_path = impl_domain_dir.join(format!("{}.rs", group_name));
     remove_files.remove(file_path.as_os_str());
-    if force || !file_path.exists() {
-        let tpl = template::ImplDomainGroupTemplate { db, group_name }.render()?;
-        fs_write(&file_path, tpl)?;
-    }
-    let content = fs::read_to_string(&file_path)?;
+    let content = if force || !file_path.exists() {
+        template::ImplDomainGroupTemplate { db, group_name }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
 
     let mod_names: BTreeSet<String> = entities_mod_names.iter().map(|v| v.0.clone()).collect();
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
