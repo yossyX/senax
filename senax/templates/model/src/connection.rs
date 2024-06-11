@@ -72,6 +72,9 @@ static CACHE_SYNC_QUEUE: Lazy<Vec<SegQueue<Arc<AtomicU64>>>> =
 type NotifyFn = Box<dyn Fn(crate::models::TableName, crate::models::NotifyOp, &str) + Send + Sync>;
 static NOTIFY_RECEIVER: RwLock<Vec<NotifyFn>> = RwLock::const_new(Vec::new());
 static NOTIFY_RECEIVER_COUNT: AtomicUsize = AtomicUsize::new(0);
+static NOTIFY_LIST: RwLock<
+    Option<Vec<(crate::models::TableName, crate::models::NotifyOp, String)>>,
+> = RwLock::const_new(None);
 
 fn env_u32(etcd: &FxHashMap<String, String>, name: &str, default: &str) -> Result<u32> {
     let v = etcd.get(name).cloned();
@@ -880,14 +883,25 @@ impl DbConn {
     pub(crate) fn _has_update_notice() -> bool {
         NOTIFY_RECEIVER_COUNT.load(Ordering::Relaxed) > 0
     }
-    pub(crate) async fn _publish_update_notice(
+    pub(crate) async fn _push_update_notice(
         table: crate::models::TableName,
         op: crate::models::NotifyOp,
         id: &impl serde::Serialize,
     ) {
         let id = serde_json::to_string(id).unwrap();
-        for f in NOTIFY_RECEIVER.read().await.iter() {
-            f(table, op, &id);
+        let mut notify_list = NOTIFY_LIST.write().await;
+        let mut list = notify_list.take().unwrap_or_default();
+        list.push((table, op, id));
+        notify_list.replace(list);
+    }
+    pub(crate) async fn _publish_update_notice() {
+        let list = NOTIFY_LIST.write().await.take();
+        if let Some(list) = list {
+            for f in NOTIFY_RECEIVER.read().await.iter() {
+                for row in &list {
+                    f(row.0, row.1, &row.2);
+                }
+            }
         }
     }
     @%- if config.use_update_notice %@

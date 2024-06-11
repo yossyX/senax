@@ -101,6 +101,7 @@ impl CacheMsg {
                 CacheOp::_AllClear => _clear_cache(&_sync_map, false).await,
             };
         }
+        DbConn::_publish_update_notice().await;
     }
 
     pub(crate) async fn do_send(self) {

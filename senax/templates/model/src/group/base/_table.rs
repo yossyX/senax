@@ -351,7 +351,7 @@ impl CacheOp {
                     let mut cache = CacheWrapper::_from_data(data.clone(), shard_id, time);
                     let id = InnerPrimary::from(&cache._inner);
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::insert, &id).await;
+                        DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::insert, &id).await;
                     }
                     let id = PrimaryHasher(id, shard_id);
                     @%- if def.versioned %@
@@ -400,7 +400,7 @@ impl CacheOp {
                         let mut cache = CacheWrapper::_from_data(row._data.clone(), shard_id, time);
                         let id = InnerPrimary::from(&cache._inner);
                         if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                            DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::insert, &id).await;
+                            DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::insert, &id).await;
                         }
                         let id = PrimaryHasher(id, shard_id);
                         @%- if def.versioned %@
@@ -482,7 +482,7 @@ impl CacheOp {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_cache_all(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::update, &id).await;
+                        DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::update, &id).await;
                     }
                     if USE_CACHE {
                         let id = PrimaryHasher(id.clone(), shard_id);
@@ -550,7 +550,7 @@ impl CacheOp {
                     clear_cache_all(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
-                            DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::update, id).await;
+                            DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::update, id).await;
                         }
                     }
                     if USE_CACHE {
@@ -587,7 +587,7 @@ impl CacheOp {
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for data in &data_list {
                             let id = InnerPrimary::from(data);
-                            DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::upsert, &id).await;
+                            DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::upsert, &id).await;
                         }
                     }
                     if USE_CACHE {
@@ -614,7 +614,7 @@ impl CacheOp {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_cache_all(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::delete, &id).await;
+                        DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::delete, &id).await;
                     }
                     if USE_CACHE {
                         let id = PrimaryHasher(id.clone(), shard_id);
@@ -642,7 +642,7 @@ impl CacheOp {
                     clear_cache_all(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
-                            DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::delete, id).await;
+                            DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::delete, id).await;
                         }
                     }
                     if USE_CACHE {
@@ -672,7 +672,7 @@ impl CacheOp {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     _clear_cache(shard_id, sync).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::delete_all, &serde_json::Value::Null).await;
+                        DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::delete_all, &serde_json::Value::Null).await;
                     }
                 }
                 CacheOp::Cascade { ids, shard_id } => {
@@ -680,7 +680,7 @@ impl CacheOp {
                     clear_cache_all(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
-                            DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::delete, id).await;
+                            DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::delete, id).await;
                         }
                     }
                     if USE_CACHE {
@@ -710,7 +710,7 @@ impl CacheOp {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_cache_all(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::invalidate, &id).await;
+                        DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::invalidate, &id).await;
                     }
                     if USE_CACHE {
                         let id = PrimaryHasher(id.clone(), shard_id);
@@ -738,7 +738,7 @@ impl CacheOp {
                         _clear_cache(*shard_id, *sync).await;
                     }
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::invalidate_all, &serde_json::Value::Null).await;
+                        DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::invalidate_all, &serde_json::Value::Null).await;
                     }
                 }
                 @%- for (mod_name, rel_name, local, val, val2, rel) in def.relations_on_delete_not_cascade() %@
@@ -747,7 +747,7 @@ impl CacheOp {
                     clear_cache_all(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
-                            DbConn::_publish_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::update, id).await;
+                            DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::update, id).await;
                         }
                     }
                     if USE_CACHE {
