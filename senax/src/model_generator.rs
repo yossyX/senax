@@ -18,8 +18,10 @@ use crate::{
 
 pub mod template;
 
-pub fn generate(db: &str, force: bool, clean: bool) -> Result<()> {
-    check_version(db)?;
+pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) -> Result<()> {
+    if !skip_version_check {
+        check_version(db)?;
+    }
     let non_snake_case = crate::common::check_non_snake_case()?;
     schema::parse(db, false, false)?;
 
@@ -870,9 +872,10 @@ pub fn check_version(db: &str) -> Result<()> {
         let caps = re
             .captures(&content)
             .with_context(|| format!("Illegal file content:{}", &file_path.to_string_lossy()))?;
-        let req = semver::VersionReq::parse(caps.get(1).unwrap().as_str())?;
+        let ver = caps.get(1).unwrap().as_str();
+        let req = semver::VersionReq::parse(ver)?;
         let version = semver::Version::parse(crate::VERSION)?;
-        ensure!(req.matches(&version), "Using an older version of senax.");
+        ensure!(req.matches(&version), "Use the {} version of Senax.", ver);
     }
     Ok(())
 }

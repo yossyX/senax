@@ -78,6 +78,7 @@ pub struct ConnectionTemplate<'a> {
     pub read_tx_isolation: Option<&'a str>,
 }
 
+#[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "model/src/group/table.rs", escape = "none")]
 pub struct GroupTableTemplate<'a> {
@@ -108,6 +109,7 @@ pub struct GroupBaseTableTemplate<'a> {
     pub visibility: &'a str,
 }
 
+#[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "model/src/group/abstract.rs", escape = "none")]
 pub struct GroupAbstractTemplate<'a> {
@@ -121,6 +123,7 @@ pub struct GroupAbstractTemplate<'a> {
     pub visibility: &'a str,
 }
 
+#[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "model/src/group/base/_abstract.rs", escape = "none")]
 pub struct GroupBaseAbstractTemplate<'a> {
@@ -257,6 +260,7 @@ pub struct DomainModelsEmuImplRollbackTemplate<'a> {
     pub db: &'a str,
 }
 
+#[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "init/domain/src/value_objects/base.rs", escape = "none")]
 pub struct DomainValueObjectBaseTemplate<'a> {
@@ -604,6 +608,7 @@ pub struct DomainBaseAbstractTemplate<'a> {
     pub def: &'a Arc<ModelDef>,
 }
 
+#[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "init/impl_domain/entities/entity.rs", escape = "none")]
 pub struct ImplDomainEntityTemplate<'a> {
@@ -615,6 +620,7 @@ pub struct ImplDomainEntityTemplate<'a> {
     pub def: &'a Arc<ModelDef>,
 }
 
+#[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "init/impl_domain/entities/base/_entity.rs", escape = "none")]
 pub struct ImplDomainBaseEntityTemplate<'a> {

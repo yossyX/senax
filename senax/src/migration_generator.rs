@@ -173,7 +173,7 @@ pub async fn generate(
                     }
                     let mut sql_comment = col.sql_comment.clone();
                     if sql_comment.is_none() && config.use_label_as_sql_comment {
-                        sql_comment = col.label.clone();
+                        sql_comment.clone_from(&col.label);
                     }
                     let default = col.default.clone();
                     table.columns.insert(

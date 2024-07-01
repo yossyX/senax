@@ -179,7 +179,7 @@ pub struct ModelDef {
     #[serde(default, skip)]
     pub on_delete_list: BTreeSet<String>,
     #[serde(default, skip)]
-    pub cache_owners: Vec<(String, String, String)>,
+    pub cache_owners: Vec<(String, String, String, u64)>,
     #[serde(default, skip)]
     pub merged_fields: IndexMap<String, FieldDef>,
     #[serde(default, skip)]
@@ -237,13 +237,16 @@ pub struct ModelDef {
     pub use_cache: Option<bool>,
     /// ### 全行キャッシュを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_all_row_cache: Option<bool>,
+    pub use_all_rows_cache: Option<bool>,
     /// ### 条件付き全行キャッシュを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_filtered_row_cache: Option<bool>,
     /// ### 更新時に常にすべてのキャッシュをクリアする
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_clear_whole_cache: Option<bool>,
+    /// ### リレーションとして登録される場合にリプレースを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_auto_replace: Option<bool>,
     /// ### 更新通知を使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_update_notice: Option<bool>,
@@ -373,13 +376,16 @@ pub struct ModelJson {
     pub use_cache: Option<bool>,
     /// ### 全行キャッシュを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_all_row_cache: Option<bool>,
+    pub use_all_rows_cache: Option<bool>,
     /// ### 条件付き全行キャッシュを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_filtered_row_cache: Option<bool>,
     /// ### 更新時に常にすべてのキャッシュをクリアする
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_clear_whole_cache: Option<bool>,
+    /// ### リレーションとして登録される場合にリプレースを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_auto_replace: Option<bool>,
     /// ### 更新通知を使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_update_notice: Option<bool>,
@@ -471,9 +477,10 @@ impl From<ModelDef> for ModelJson {
             versioned: value.versioned,
             counting: value.counting,
             use_cache: value.use_cache,
-            use_all_row_cache: value.use_all_row_cache,
+            use_all_rows_cache: value.use_all_rows_cache,
             use_filtered_row_cache: value.use_filtered_row_cache,
             use_clear_whole_cache: value.use_clear_whole_cache,
+            use_auto_replace: value.use_auto_replace,
             use_update_notice: value.use_update_notice,
             use_insert_delayed: value.use_insert_delayed,
             use_save_delayed: value.use_save_delayed,
@@ -577,9 +584,10 @@ impl TryFrom<ModelJson> for ModelDef {
             versioned: value.versioned,
             counting: value.counting,
             use_cache: value.use_cache,
-            use_all_row_cache: value.use_all_row_cache,
+            use_all_rows_cache: value.use_all_rows_cache,
             use_filtered_row_cache: value.use_filtered_row_cache,
             use_clear_whole_cache: value.use_clear_whole_cache,
+            use_auto_replace: value.use_auto_replace,
             use_update_notice: value.use_update_notice,
             use_insert_delayed: value.use_insert_delayed,
             use_save_delayed: value.use_save_delayed,
@@ -803,9 +811,9 @@ impl ModelDef {
             .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_cache)
     }
 
-    pub fn use_all_row_cache(&self) -> bool {
-        self.use_all_row_cache
-            .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_all_row_cache)
+    pub fn use_all_rows_cache(&self) -> bool {
+        self.use_all_rows_cache
+            .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_all_rows_cache)
     }
 
     pub fn use_filtered_row_cache(&self) -> bool {
@@ -820,6 +828,12 @@ impl ModelDef {
                 .as_ref()
                 .unwrap()
                 .use_clear_whole_cache,
+        )
+    }
+
+    pub fn use_auto_replace(&self) -> bool {
+        self.use_auto_replace.unwrap_or(
+            !self.has_auto_primary() && self.is_soft_delete() && self.unique_index().is_empty(),
         )
     }
 
@@ -1132,6 +1146,12 @@ impl ModelDef {
         self.merged_fields
             .iter()
             .filter(|(_k, v)| !v.primary)
+            .collect()
+    }
+    pub fn non_primaries_without_created_at(&self) -> Vec<(&String, &FieldDef)> {
+        self.merged_fields
+            .iter()
+            .filter(|(k, v)| !v.primary && !ConfigDef::created_at().as_str().eq(k.as_str()))
             .collect()
     }
     pub fn non_primaries_addable(&self) -> Vec<(&String, &FieldDef)> {
@@ -1818,7 +1838,7 @@ impl ModelDef {
         while let Some(ref inheritance) = cur {
             let model = RelDef::get_model_by_name(&inheritance.extends, cur_group_name);
             cur_group_name = Some(model.group_name.clone());
-            cur = model.inheritance.clone();
+            cur.clone_from(&model.inheritance);
             if model.abstract_mode {
                 return vec![model];
             }
@@ -1832,7 +1852,7 @@ impl ModelDef {
         while let Some(ref inheritance) = cur {
             let model = RelDef::get_model_by_name(&inheritance.extends, cur_group_name);
             cur_group_name = Some(model.group_name.clone());
-            cur = model.inheritance.clone();
+            cur.clone_from(&model.inheritance);
             if model.abstract_mode {
                 vec.push(model.clone());
             }
@@ -1847,7 +1867,7 @@ impl ModelDef {
             if inheritance._type == InheritanceType::Simple {
                 let model = RelDef::get_model_by_name(&inheritance.extends, cur_group_name);
                 cur_group_name = Some(model.group_name.clone());
-                cur = model.inheritance.clone();
+                cur.clone_from(&model.inheritance);
                 vec.push(model.clone());
             } else {
                 break;
@@ -1867,7 +1887,7 @@ impl ModelDef {
             if inheritance._type == InheritanceType::ColumnAggregation {
                 let model = RelDef::get_model_by_name(&inheritance.extends, cur_group_name);
                 cur_group_name = Some(model.group_name.clone());
-                cur = model.inheritance.clone();
+                cur.clone_from(&model.inheritance);
                 vec.push(model.clone());
             } else {
                 break;

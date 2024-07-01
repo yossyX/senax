@@ -25,7 +25,13 @@ impl Extension for LoggerExtension {
         next: NextParseQuery<'_>,
     ) -> ServerResult<ExecutableDocument> {
         let _ctx: &crate::context::Ctx = ctx.data().unwrap();
-        let document = next.run(ctx, query, variables).await?;
+        let document = match next.run(ctx, query, variables).await {
+            Ok(d) => d,
+            Err(e) => {
+                info!(message = e.message, ctx = _ctx.ctx_no(); "");
+                return Err(e);
+            }
+        };
         let is_schema = document
             .operations
             .iter()

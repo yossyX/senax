@@ -57,7 +57,7 @@ include!(concat!(env!("OUT_DIR"), "/templates.rs"));
 include!(concat!(env!("OUT_DIR"), "/config_app.rs"));
 
 #[derive(Parser)]
-#[clap(name = "senax code generator", author, version, about, long_about = None)]
+#[clap(name = "Senax code generator", author, version, about, long_about = None)]
 #[clap(propagate_version = true)]
 struct Cli {
     #[clap(long)]
@@ -114,6 +114,9 @@ enum Commands {
         /// Delete files under the directory before generating
         #[clap(short, long)]
         clean: bool,
+        /// Skip Senax version check
+        #[clap(long)]
+        skip_version_check: bool,
     },
     /// generate api
     GenApi {
@@ -292,9 +295,14 @@ async fn exec(cli: Cli) -> Result<()> {
             ensure!(db_re.is_match(db), "bad db name!");
             db_generator::generate(db)?;
         }
-        Commands::Model { db, force, clean } => {
+        Commands::Model {
+            db,
+            force,
+            clean,
+            skip_version_check,
+        } => {
             ensure!(db_re.is_match(db), "bad db name!");
-            model_generator::generate(db, *force, *clean)?;
+            model_generator::generate(db, *force, *clean, *skip_version_check)?;
         }
         Commands::GenApi {
             path,

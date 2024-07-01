@@ -151,7 +151,7 @@ mockall::mock! {
     pub Query_ {}
     #[async_trait]
     impl _@{ pascal_name }@Query for Query_ {
-        @%- if def.use_all_row_cache() && !def.use_filtered_row_cache() %@
+        @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
         async fn all(&self) -> anyhow::Result<Box<dyn crate::models::EntityIterator<dyn @{ pascal_name }@Cache>>>;
         @%- endif %@
         @%- for (selector, selector_def) in def.selectors %@

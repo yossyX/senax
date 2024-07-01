@@ -34,7 +34,7 @@ Doctrine の inheritance も一通り対応しています。
 |**soft_delete**|[SoftDelete](##/definitions/SoftDelete)|論理削除のデフォルト設定||
 |**use_cache**|boolean|キャッシュ使用のデフォルト設定||
 |**use_fast_cache**|boolean|高速キャッシュ使用設定（experimental）||
-|**use_all_row_cache**|boolean|全キャッシュ使用のデフォルト設定||
+|**use_all_rows_cache**|boolean|全キャッシュ使用のデフォルト設定||
 |**use_insert_delayed**|boolean|遅延INSERTを使用する||
 |**use_save_delayed**|boolean|遅延SAVEを使用する||
 |**use_update_delayed**|boolean|遅延UPDATEを使用する||
@@ -158,7 +158,7 @@ Doctrine の inheritance も一通り対応しています。
 |**counting**|string|save_delayedでカウンターを使用するカラム||
 |**use_cache**|boolean|キャッシュを使用するか||
 |**use_fast_cache**|boolean|高速キャッシュを使用するか(experimental)||
-|**use_all_row_cache**|boolean|全キャッシュを使用するか||
+|**use_all_rows_cache**|boolean|全キャッシュを使用するか||
 |**use_filtered_row_cache**|boolean|条件付き全キャッシュを使用するか||
 |**use_insert_delayed**|boolean|遅延INSERTを使用する||
 |**use_save_delayed**|boolean|遅延SAVEを使用する||

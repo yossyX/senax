@@ -7,7 +7,7 @@ import { graphql } from '../../../gql';
 
 export const @{ db|pascal }@@{ group|pascal }@@{ pascal_name }@Fragment = graphql(`fragment @{ db|pascal }@@{ group|pascal }@@{ pascal_name }@ on Res@{ db|pascal }@@{ group|pascal }@@{ pascal_name }@{@{ gql_fields }@}`);
 
-@%- if def.use_all_row_cache() && !def.use_filtered_row_cache() %@
+@%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
 
 export const All@{ pascal_name }@Query = graphql(`query all_@{ db }@_@{ group }@_@{ mod_name }@{@{ db_case }@{@{ group_case }@{@{ model_case }@{all{...@{ db|pascal }@@{ group|pascal }@@{ pascal_name }@}}}}}`);
 @%- endif %@

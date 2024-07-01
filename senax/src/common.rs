@@ -3,7 +3,13 @@ use fancy_regex::Regex;
 use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
-use std::{convert::TryInto, fs, path::Path, sync::Mutex};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryInto,
+    fs,
+    path::Path,
+    sync::Mutex,
+};
 
 use crate::{schema::BAD_KEYWORDS, DOMAIN_PATH};
 
@@ -15,6 +21,29 @@ pub fn hash(v: &str) -> u64 {
     let result = hasher.finalize();
     let (int_bytes, _rest) = result.split_at(std::mem::size_of::<u64>());
     u64::from_ne_bytes(int_bytes.try_into().unwrap())
+}
+
+pub fn rel_hash(key: String) -> u64 {
+    static SET: Lazy<Mutex<HashSet<u64>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+    static MAP: Lazy<Mutex<HashMap<String, u64>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+    let mut set = SET.lock().unwrap();
+    let mut map = MAP.lock().unwrap();
+    if let Some(v) = map.get(&key) {
+        return *v;
+    }
+    let mut hash = hash(&key);
+    loop {
+        if hash < 10 {
+            hash = 10;
+        }
+        if set.contains(&hash) {
+            hash = hash.wrapping_add(1);
+            continue;
+        }
+        set.insert(hash);
+        map.insert(key, hash);
+        return hash;
+    }
 }
 
 pub fn check_struct_name(name: &str) {

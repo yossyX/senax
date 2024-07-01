@@ -143,7 +143,7 @@ function Config() {
               <AutoField name="use_cache" {...formData} />
               <AutoField name="use_fast_cache" {...formData} />
               <AutoField name="use_storage_cache" {...formData} />
-              <AutoField name="use_all_row_cache" {...formData} />
+              <AutoField name="use_all_rows_cache" {...formData} />
               <AutoField name="force_disable_cache" {...formData} />
               <AutoField name="use_clear_whole_cache" {...formData} />
               <AutoField name="use_update_notice" {...formData} />

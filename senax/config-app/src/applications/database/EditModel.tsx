@@ -186,7 +186,7 @@ function EditModel() {
               <AutoField name="counting" {...formData} hidden={!detail} />
               <AutoField name="use_cache" {...formData} hidden={!detail} />
               <AutoField
-                name="use_all_row_cache"
+                name="use_all_rows_cache"
                 {...formData}
                 hidden={!detail}
               />
@@ -197,6 +197,11 @@ function EditModel() {
               />
               <AutoField
                 name="use_clear_whole_cache"
+                {...formData}
+                hidden={!detail}
+              />
+              <AutoField
+                name="use_auto_replace"
                 {...formData}
                 hidden={!detail}
               />

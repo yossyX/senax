@@ -300,7 +300,7 @@ fn make_model(
             "{var}: {gql_type}",
             ",",
         )?,
-        has_all_query: def.use_all_row_cache() && !def.use_filtered_row_cache(),
+        has_all_query: def.use_all_rows_cache() && !def.use_filtered_row_cache(),
         use_find_by_pk: api_def.use_find_by_pk,
         use_import: api_def.use_import,
         disable_mutation: api_def.disable_mutation,

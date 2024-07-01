@@ -184,13 +184,20 @@ fn error_response(err: anyhow::Error, ctx: &Ctx) -> HttpResponse {
     } else if let Some(e) = err.downcast_ref::<sqlx::Error>() {
         match e {
             sqlx::Error::Database(e) => {
-                warn!(ctx = ctx.ctx_no(); "{}", err);
                 use sqlx::error::ErrorKind;
                 match e.kind() {
                     ErrorKind::UniqueViolation => {
+                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", err);
                         HttpResponse::Conflict().body("Conflict")
                     }
-                    _ => HttpResponse::BadRequest().body("Bad Request"),
+                    ErrorKind::Other => {
+                        error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", err);
+                        HttpResponse::InternalServerError().body("Internal Server Error")
+                    }
+                    _ => {
+                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", err);
+                        HttpResponse::BadRequest().body("Bad Request")
+                    }
                 }
             }
             sqlx::Error::RowNotFound => {

@@ -227,6 +227,7 @@ pub struct GroupJsonSchemaTemplate<'a> {
     pub add_models: &'a BTreeSet<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "api/model.rs", escape = "none")]
 pub struct ModelTemplate<'a> {
@@ -298,6 +299,7 @@ pub struct ConfigTemplate;
 #[template(path = "api/config.yml", escape = "none")]
 pub struct DbConfigTemplate;
 
+#[allow(dead_code)]
 #[derive(Template)]
 #[template(path = "api/model.tsx", escape = "none")]
 pub struct ModelTsTemplate<'a> {

@@ -83,7 +83,7 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         Ok(permission)
     }
 
-    @%- if def.use_all_row_cache() && !def.use_filtered_row_cache() %@
+    @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
     #[graphql(guard = "query_guard()")]
     async fn all(
         &self,

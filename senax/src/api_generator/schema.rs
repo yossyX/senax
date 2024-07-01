@@ -229,7 +229,7 @@ impl From<ApiDbDef> for ApiDbJson {
                 .into_iter()
                 .map(|(k, v)| {
                     let mut v: ApiGroupJson = v.unwrap_or_default().into();
-                    v.name = k.clone();
+                    v.name.clone_from(&k);
                     v._name = Some(k);
                     v
                 })

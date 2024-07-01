@@ -399,10 +399,13 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         ".filter(|data| data.--1--.deleted == 0)",
     );
     let ignore_soft_delete = foreign_model.soft_delete_tpl("", "_with_trashed", "_with_trashed");
+    let rel_hash =
+        crate::common::rel_hash(format!("{}::{}::{}", &model.group_name, &model.name, name));
     f.replace("{rel_name}", &_to_var_name(name))
         .replace("{raw_rel_name}", name)
         .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
         .replace("{rel_name_camel}", &name.to_case(Case::Camel))
+        .replace("{rel_hash}", &rel_hash.to_string())
         .replace("{class}", &rel.get_foreign_class_name())
         .replace("{class_mod}", &rel.get_group_mod_name())
         .replace("{group_var}", &rel.get_group_var())
@@ -503,12 +506,13 @@ fn _fmt_index_col(name: &&String, col: &&FieldDef, f: &str, index: usize) -> Str
         .replace("{filter_check_eq}", &col.get_filter_eq(Some(index), true))
 }
 
-pub fn fmt_cache_owners(v: &[(String, String, String)], f: &str) -> ::askama::Result<String> {
+pub fn fmt_cache_owners(v: &[(String, String, String, u64)], f: &str) -> ::askama::Result<String> {
     Ok(v.iter()
-        .map(|(mod_name, model_name, name)| {
+        .map(|(mod_name, model_name, name, rel_hash)| {
             f.replace("{mod}", mod_name)
                 .replace("{model_name}", &model_name.to_case(Case::Pascal))
                 .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
+                .replace("{rel_hash}", &rel_hash.to_string())
         })
         .collect::<Vec<_>>()
         .join(""))

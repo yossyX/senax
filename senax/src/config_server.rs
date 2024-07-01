@@ -439,7 +439,7 @@ async fn save_simple_vo_list(data: web::Json<Vec<ValueObjectJson>>) -> impl Resp
         let mut vo_map: IndexMap<String, FieldDef> = IndexMap::new();
         for v in data.0 {
             let name = v.name.clone();
-            let vo: FieldDef = v.try_into()?;
+            let vo: FieldDef = v.into();
             vo_map.insert(name, vo);
         }
         write_simple_vo_yml(&vo_map)?;
@@ -455,7 +455,7 @@ async fn create_simple_vo(data: web::Json<ValueObjectJson>) -> impl Responder {
         let mut vo_list = read_simple_vo_yml()?;
         anyhow::ensure!(!vo_list.contains_key(&data.name), "Duplicate names.");
         let name = data.name.clone();
-        let vo: FieldDef = data.0.try_into()?;
+        let vo: FieldDef = data.0.into();
         vo_list.insert(name, vo);
         write_simple_vo_yml(&vo_list)?;
         Ok(true)
@@ -472,7 +472,7 @@ async fn save_simple_vo(
     let result = async move {
         let mut vo_list = read_simple_vo_yml()?;
         let name = data.name.clone();
-        let vo: FieldDef = data.0.try_into()?;
+        let vo: FieldDef = data.0.into();
         if !name.eq(&*path) {
             anyhow::ensure!(!vo_list.contains_key(&name), "Duplicate names.");
             vo_list.insert(name, vo);
@@ -994,8 +994,8 @@ pub fn fix_schema(db: &str) -> anyhow::Result<()> {
         let group_def = group_def.unwrap_or_default();
         let mut models = read_group_yml(db, &group_name)?;
         for (name, model) in models.iter_mut() {
-            model.group_name = group_name.clone();
-            model.name = name.clone();
+            model.group_name.clone_from(&group_name);
+            model.name.clone_from(name);
             if model.exclude_group_from_table_name.is_none() {
                 model.exclude_group_from_table_name = Some(group_def.exclude_group_from_table_name);
             }

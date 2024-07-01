@@ -77,7 +77,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
         config.use_cache = false;
         config.use_fast_cache = false;
         config.use_storage_cache = false;
-        config.use_all_row_cache = false;
+        config.use_all_rows_cache = false;
     }
     config.fix_static_vars();
 
@@ -136,11 +136,11 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 bail!("{}_{} is duplicate", group_name, model_name);
             }
             def.db = db.to_string();
-            def.group_name = group_name.clone();
+            def.group_name.clone_from(group_name);
             def.name = model_name.to_string();
             if def.dummy_always_present() {
-                if def.use_all_row_cache.is_none() {
-                    def.use_all_row_cache = Some(false);
+                if def.use_all_rows_cache.is_none() {
+                    def.use_all_rows_cache = Some(false);
                 }
                 if def.skip_ddl.is_none() {
                     def.skip_ddl = Some(true);
@@ -162,7 +162,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 let mut col: FieldDef = serde_json::from_str(
                     r#"{"type":"datetime","not_null":true,"skip_factory":true}"#,
                 )?;
-                col.label = config.label_of_created_at.clone();
+                col.label.clone_from(&config.label_of_created_at);
                 col.time_zone = config.timestamp_time_zone;
                 col.auto_gen = true;
                 col.exclude_from_cache = Some(config.disable_timestamp_cache);
@@ -178,7 +178,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 let mut col: FieldDef = serde_json::from_str(
                     r#"{"type":"datetime","not_null":true,"skip_factory":true}"#,
                 )?;
-                col.label = config.label_of_updated_at.clone();
+                col.label.clone_from(&config.label_of_updated_at);
                 col.time_zone = config.timestamp_time_zone;
                 col.auto_gen = true;
                 col.exclude_from_cache = Some(config.disable_timestamp_cache);
@@ -194,7 +194,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         if !def.fields.contains_key(ConfigDef::deleted_at().as_str()) {
                             let mut col: FieldDef =
                                 serde_json::from_str(r#"{"type":"datetime","skip_factory":true}"#)?;
-                            col.label = config.label_of_deleted_at.clone();
+                            col.label.clone_from(&config.label_of_deleted_at);
                             col.time_zone = config.timestamp_time_zone;
                             col.auto_gen = true;
                             col.is_timestamp = true;
@@ -208,7 +208,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                             let mut col: FieldDef = serde_json::from_str(
                                 r#"{"type":"boolean","not_null":true,"skip_factory":true}"#,
                             )?;
-                            col.label = config.label_of_deleted.clone();
+                            col.label.clone_from(&config.label_of_deleted);
                             col.auto_gen = true;
                             col.is_timestamp = true;
                             col.hidden = Some(true);
@@ -221,7 +221,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                             let mut col: FieldDef = serde_json::from_str(
                                 r#"{"type":"int","not_null":true,"skip_factory":true}"#,
                             )?;
-                            col.label = config.label_of_deleted.clone();
+                            col.label.clone_from(&config.label_of_deleted);
                             col.auto_gen = true;
                             col.is_timestamp = true;
                             col.hidden = Some(true);
@@ -242,7 +242,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     let mut col: FieldDef = serde_json::from_str(
                         r#"{"type":"int","not_null":true,"skip_factory":true,"default":"0"}"#,
                     )?;
-                    col.label = config.label_of_version.clone();
+                    col.label.clone_from(&config.label_of_version);
                     col.auto_gen = true;
                     col.hidden = Some(true);
                     def.fields
@@ -270,7 +270,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                             let mut col: FieldDef = serde_json::from_str(
                                 r#"{"type":"varchar","not_null":true, "skip_factory": true}"#,
                             )?;
-                            col.label = config.label_of_aggregation_type.clone();
+                            col.label.clone_from(&config.label_of_aggregation_type);
                             col.auto_gen = true;
                             col.hidden = Some(true);
                             entry.insert(col.into());
@@ -357,7 +357,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 def.relations
                     .insert(name.clone(), BelongsToDef::convert(rel, group_name, name));
             }
-            def.merged_relations = def.relations.clone();
+            def.merged_relations.clone_from(&def.relations);
             def.merged_indexes =
                 def.indexes
                     .iter()
@@ -380,7 +380,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
             }
             if config.force_disable_cache {
                 def.use_cache = Some(false);
-                def.use_all_row_cache = Some(false);
+                def.use_all_rows_cache = Some(false);
                 def.use_filtered_row_cache = Some(false);
             }
             model_map.insert(model_name, RefCell::new(def));
@@ -562,6 +562,10 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         if rel_def.in_cache {
                             let ref_model = get_model(&rel_def.model, cur_group_name, &groups);
                             // let rel_id = rel_def.get_foreign_id(&def.borrow());
+                            let rel_hash = crate::common::rel_hash(format!(
+                                "{}::{}::{}",
+                                &cur_group_name, &cur_model_name, rel_name
+                            ));
                             ref_model.borrow_mut().cache_owners.push((
                                 format!(
                                     "{}::_base::_{}",
@@ -570,6 +574,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                                 ),
                                 cur_model_name.to_string(),
                                 rel_name.to_string(),
+                                rel_hash,
                             ));
                         }
                     }
@@ -654,7 +659,7 @@ fn fix_inheritance(
         let mut model = def.borrow_mut();
         let base_model_refcell = get_model(&inheritance.extends, &cur_g, groups);
         let mut base_model = base_model_refcell.borrow_mut();
-        cur_g = base_model.group_name.clone();
+        cur_g.clone_from(&base_model.group_name);
 
         let mut merged_fields = IndexMap::new();
         for (name, col) in &base_model.fields {
@@ -675,7 +680,7 @@ fn fix_inheritance(
         model.merged_fields = merged_fields;
 
         if inheritance._type != InheritanceType::Concrete {
-            sql_model_name = inheritance.extends.clone();
+            sql_model_name.clone_from(&inheritance.extends);
             for (name, def) in &model.fields {
                 if let Some(base) = base_model.merged_fields.get(name) {
                     if !base.eq(&def.exact()) {

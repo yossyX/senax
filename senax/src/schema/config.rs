@@ -62,7 +62,7 @@ pub struct ConfigDef {
     pub use_storage_cache: bool,
     /// ### デフォルトで全行キャッシュを使用する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_all_row_cache: bool,
+    pub use_all_rows_cache: bool,
     /// ### 全てのキャッシュを強制的に無効化
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub force_disable_cache: bool,
@@ -213,7 +213,7 @@ pub struct ConfigJson {
     pub use_storage_cache: bool,
     /// ### デフォルトで全行キャッシュを使用する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_all_row_cache: bool,
+    pub use_all_rows_cache: bool,
     /// ### 全てのキャッシュを強制的に無効化
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub force_disable_cache: bool,
@@ -328,7 +328,7 @@ impl From<ConfigDef> for ConfigJson {
             use_cache: value.use_cache,
             use_fast_cache: value.use_fast_cache,
             use_storage_cache: value.use_storage_cache,
-            use_all_row_cache: value.use_all_row_cache,
+            use_all_rows_cache: value.use_all_rows_cache,
             force_disable_cache: value.force_disable_cache,
             use_clear_whole_cache: value.use_clear_whole_cache,
             use_update_notice: value.use_update_notice,
@@ -364,7 +364,7 @@ impl From<ConfigDef> for ConfigJson {
                 .into_iter()
                 .map(|(k, v)| {
                     let mut v: GroupJson = v.unwrap_or_default().into();
-                    v.name = k.clone();
+                    v.name.clone_from(&k);
                     v._name = Some(k);
                     v
                 })
@@ -393,7 +393,7 @@ impl From<ConfigJson> for ConfigDef {
             use_cache: value.use_cache,
             use_fast_cache: value.use_fast_cache,
             use_storage_cache: value.use_storage_cache,
-            use_all_row_cache: value.use_all_row_cache,
+            use_all_rows_cache: value.use_all_rows_cache,
             force_disable_cache: value.force_disable_cache,
             use_clear_whole_cache: value.use_clear_whole_cache,
             use_update_notice: value.use_update_notice,

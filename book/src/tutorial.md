@@ -41,7 +41,7 @@ timestamp_time_zone: utc
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read
 use_cache: true
-use_all_row_cache: true
+use_all_rows_cache: true
 preserve_column_order: false
 groups:
   note:

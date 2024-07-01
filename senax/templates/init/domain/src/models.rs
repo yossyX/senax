@@ -322,6 +322,7 @@ pub enum Cursor<T> {
 #[graphql(input_name = "ImportOption")]
 #[serde(deny_unknown_fields)]
 pub struct ImportOption {
+    pub replace: Option<bool>,
     pub overwrite: Option<bool>,
     pub ignore: Option<bool>,
 }
