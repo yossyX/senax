@@ -62,6 +62,10 @@ const DEFAULT_DB_MAX_CONNECTIONS_FOR_READ: &str = "10";
 const DEFAULT_DB_MAX_CONNECTIONS_FOR_CACHE: &str = "10";
 #[allow(dead_code)]
 const DEFAULT_SEQUENCE_FETCH_NUM: &str = "1000";
+const ACQUIRE_TIMEOUT: u64 = 5;
+const CONNECT_CHECK_INTERVAL: u64 = 10;
+const CHECK_CONNECTION_TIMEOUT: u64 = 8;
+const ACQUIRE_CONNECTION_WAIT_TIME: u64 = 10;
 
 static SHUTDOWN_GUARD: OnceCell<Weak<mpsc::Sender<u8>>> = OnceCell::new();
 static EXIT: OnceCell<mpsc::Sender<i32>> = OnceCell::new();
@@ -109,7 +113,7 @@ pub async fn start(
 
     models::start(db_dir).await?;
     @%- if !config.force_disable_cache %@
-    let sync_map = DbConn::inc_all_cache_sync().await?;
+    let sync_map = DbConn::inc_all_cache_sync().await;
     models::_clear_cache(&sync_map, false).await;
 
     if let Some(port) = linker_port {
@@ -127,15 +131,8 @@ pub async fn start(
                 } else {
                     warn!("cache clear received");
                     tokio::spawn(async move {
-                        match DbConn::inc_all_cache_sync().await {
-                            Ok(sync_map) => {
-                                models::_clear_cache(&sync_map, false).await;
-                            }
-                            Err(e) => {
-                                warn!("{}", e);
-                                models::_clear_cache(&DbConn::empty_all_cache_sync(), false).await;
-                            }
-                        }
+                        let sync_map = DbConn::inc_all_cache_sync().await;
+                        models::_clear_cache(&sync_map, false).await;
                     });
                 }
             }
@@ -196,7 +193,7 @@ pub async fn migrate(use_test: bool, clean: bool, ignore_missing: bool) -> Resul
         connection::init().await?;
     }
     if clean {
-        models::_clear_cache(&DbConn::empty_all_cache_sync(), true).await;
+        models::_clear_cache(&DbConn::inc_all_cache_sync().await, true).await;
     }
     let mut join_set = tokio::task::JoinSet::new();
     for shard_id in DbConn::shard_num_range() {
@@ -250,7 +247,7 @@ pub fn is_test_mode() -> bool {
 }
 
 pub async fn clear_local_cache() -> Result<()> {
-    let sync_map = DbConn::inc_all_cache_sync().await?;
+    let sync_map = DbConn::inc_all_cache_sync().await;
     models::_clear_cache(&sync_map, false).await;
     Ok(())
 }
@@ -258,7 +255,7 @@ pub async fn clear_local_cache() -> Result<()> {
 pub async fn clear_whole_cache() -> Result<()> {
     CacheMsg(
         vec![CacheOp::_AllClear],
-        DbConn::inc_all_cache_sync().await?,
+        DbConn::inc_all_cache_sync().await,
     )
     .do_send()
     .await;

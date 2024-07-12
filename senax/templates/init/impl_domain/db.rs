@@ -38,8 +38,11 @@ impl @{ db|pascal }@Repositories for @{ db|pascal }@RepositoriesImpl {
     async fn end_of_without_transaction(&self) -> Result<()> {
         self._conn.lock().await.end_of_without_transaction().await
     }
-    async fn lock(&self, key: &str, time: i32) -> Result<()> {
+    async fn get_lock(&self, key: &str, time: i32) -> Result<()> {
         self._conn.lock().await.lock(key, time).await
+    }
+    fn should_retry(&self, err: &anyhow::Error) -> bool {
+        DbConn::is_retryable_error(err)
     }
     // Do not modify below this line. (RepoStart)
     // Do not modify up to this line. (RepoEnd)
@@ -51,7 +54,10 @@ impl @{ db|pascal }@Queries for @{ db|pascal }@RepositoriesImpl {
         self._conn.lock().await.begin_read_tx().await
     }
     async fn release_read_tx(&self) -> Result<()> {
-        self._conn.lock().await.begin_read_tx().await
+        self._conn.lock().await.release_read_tx()
+    }
+    fn should_retry(&self, err: &anyhow::Error) -> bool {
+        DbConn::is_retryable_error(err)
     }
     // Do not modify below this line. (QueriesStart)
     // Do not modify up to this line. (QueriesEnd)

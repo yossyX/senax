@@ -97,9 +97,9 @@ impl CacheOp {
 
 #[cfg(not(feature="cache_update_only"))]
 #[rustfmt::skip]
-pub(crate) async fn clear_all_rows_cache(shard_id: ShardId, sync: u64, clear_test: bool) {
+pub(crate) async fn _clear_cache(shard_id: ShardId, sync: u64, clear_test: bool) {
 @%- for (name, def) in models %@
-    _base::_@{ def.mod_name() }@::clear_all_rows_cache(shard_id, sync, clear_test).await;
+    _base::_@{ def.mod_name() }@::_clear_cache(shard_id, sync, clear_test).await;
 @%- endfor %@
 }
 @%- endif %@

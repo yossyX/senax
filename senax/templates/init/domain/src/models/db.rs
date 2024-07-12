@@ -15,7 +15,8 @@ pub trait @{ db|pascal }@Repositories: Send + Sync {
     async fn rollback(&self) -> Result<()>;
     async fn begin_without_transaction(&self) -> Result<()>;
     async fn end_of_without_transaction(&self) -> Result<()>;
-    async fn lock(&self, key: &str, time: i32) -> Result<()>;
+    async fn get_lock(&self, key: &str, time: i32) -> Result<()>;
+    fn should_retry(&self, err: &anyhow::Error) -> bool;
     // Do not modify below this line. (RepoStart)
     // Do not modify up to this line. (RepoEnd)
 }
@@ -25,6 +26,7 @@ pub trait @{ db|pascal }@Repositories: Send + Sync {
 pub trait @{ db|pascal }@Queries: Send + Sync {
     async fn begin_read_tx(&self) -> Result<()>;
     async fn release_read_tx(&self) -> Result<()>;
+    fn should_retry(&self, err: &anyhow::Error) -> bool;
     // Do not modify below this line. (QueriesStart)
     // Do not modify up to this line. (QueriesEnd)
 }
@@ -111,8 +113,11 @@ impl @{ db|pascal }@Repositories for Emu@{ db|pascal }@Repositories {
         self.wo_tx.release();
         Ok(())
     }
-    async fn lock(&self, _key: &str, _time: i32) -> Result<()> {
+    async fn get_lock(&self, _key: &str, _time: i32) -> Result<()> {
         Ok(())
+    }
+    fn should_retry(&self, err: &anyhow::Error) -> bool {
+        false
     }
     // Do not modify below this line. (EmuRepoStart)
     // Do not modify up to this line. (EmuRepoEnd)
@@ -128,6 +133,9 @@ impl @{ db|pascal }@Queries for Emu@{ db|pascal }@Repositories {
     async fn release_read_tx(&self) -> Result<()> {
         self.read_tx.release();
         Ok(())
+    }
+    fn should_retry(&self, err: &anyhow::Error) -> bool {
+        false
     }
     // Do not modify below this line. (EmuQueriesStart)
     // Do not modify up to this line. (EmuQueriesEnd)

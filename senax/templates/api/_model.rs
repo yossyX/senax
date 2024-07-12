@@ -330,7 +330,10 @@ pub fn gen_json_schema(dir: &std::path::Path) -> anyhow::Result<()> {
     });
     let gen = settings.into_generator();
     let schema = gen.into_root_schema_for::<ReqObj>();
-    crate::auto_api::write_json_schema(&dir.join("@{ model_name }@.tsx"), serde_json::to_string_pretty(&schema)?)?;
+    crate::auto_api::write_json_schema(
+        &dir.join("@{ model_name }@.tsx"),
+        serde_json::to_string_pretty(&schema)?,
+    )?;
     @%- endif %@
     Ok(())
 }
