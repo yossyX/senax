@@ -115,7 +115,7 @@ pub trait @{ pascal_name }@UpdaterBase: @{ pascal_name }@Common + crate::models:
 @{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.non_primaries_wo_read_only(true)|fmt_join("
-{label}{comment}    fn set_{raw_var}(&mut self, v: {domain_outer_owned});", "") }@
+{label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> Option<&mut dyn _model_::{class_mod_var}::{class}Updater>;
 {label}{comment}    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>);", "") }@

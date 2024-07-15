@@ -200,8 +200,12 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
         .replace("{outer}", &col.get_outer_type(false))
         .replace("{domain_outer}", &col.get_outer_type(true))
         .replace("{outer_ref}", &col.get_outer_ref_type())
-        .replace("{outer_owned}", &col.get_outer_owned_type(false))
-        .replace("{domain_outer_owned}", &col.get_outer_owned_type(true))
+        .replace("{outer_owned}", &col.get_outer_owned_type(false, false))
+        .replace(
+            "{domain_outer_owned}",
+            &col.get_outer_owned_type(true, false),
+        )
+        .replace("{domain_factory}", &col.get_outer_owned_type(true, true))
         .replace("{accessor}", &col.accessor(false, ""))
         .replace("{accessor_with_type}", &col.accessor(true, ""))
         .replace("{accessor_with_sep_type}", &col.accessor(true, "::"))
@@ -228,6 +232,7 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
             "{convert_domain_inner_type}",
             col.convert_domain_inner_type(),
         )
+        .replace("{convert_domain_factory}", col.convert_domain_factory())
         .replace(
             "{convert_impl_domain_outer_for_updater}",
             &col.convert_impl_domain_outer_for_updater(name),

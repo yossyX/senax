@@ -274,7 +274,7 @@ pub trait @{ pascal_name }@UpdaterBase: downcast_rs::Downcast + Send + Sync + @{
 @{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.non_primaries_wo_read_only(true)|fmt_join("
-{label}{comment}    fn set_{raw_var}(&mut self, v: {domain_outer_owned});", "") }@
+{label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> Option<&mut dyn _model_::{class_mod_var}::{class}Updater>;
 {label}{comment}    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>);", "") }@
@@ -290,7 +290,7 @@ downcast_rs::impl_downcast!(_Updater);
 #[serde(deny_unknown_fields)]
 pub struct @{ pascal_name }@Factory {
 @{- def.non_auto_primary_for_factory()|fmt_join("
-    pub {var}: {domain_outer_owned},", "") }@
+{label}{comment}    pub {var}: {domain_factory},", "") }@
 }
 
 impl @{ pascal_name }@Factory {
@@ -376,8 +376,8 @@ impl super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
 @{- parent.non_primaries_wo_read_only(true)|fmt_join("
-    fn set_{raw_var}(&mut self, v: {domain_outer_owned}) {
-        self.{var} = v
+    fn set_{raw_var}(&mut self, v: {domain_factory}) {
+        self.{var} = v{convert_domain_factory}
     }", "") }@
 @{- parent.relations_one(true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> Option<&mut dyn _model_::{class_mod_var}::{class}Updater> {
@@ -489,8 +489,8 @@ impl @{ pascal_name }@UpdaterBase for @{ pascal_name }@Entity {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
 @{- def.non_primaries_wo_read_only(true)|fmt_join("
-    fn set_{raw_var}(&mut self, v: {domain_outer_owned}) {
-        self.{var} = v
+    fn set_{raw_var}(&mut self, v: {domain_factory}) {
+        self.{var} = v{convert_domain_factory}
     }", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> Option<&mut dyn _model_::{class_mod_var}::{class}Updater> {
@@ -1465,7 +1465,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
     fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn _Updater> {
         Box::new(@{ pascal_name }@Entity {
 @{- def.non_auto_primary_for_factory()|fmt_join("
-            {var}: factory.{var},", "") }@
+            {var}: factory.{var}{convert_domain_factory},", "") }@
             ..Default::default()
         })
     }

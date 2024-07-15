@@ -46,7 +46,7 @@ use crate::cache::Cache;
 @%- else %@
 @% endif %@
 use crate::connection::{DbArguments, DbConn, DbRow, DbType};
-use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, IntoJson as _, OrderTr};
+use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, FromJson as _, IntoJson as _, OrderTr};
 use crate::misc::{BindValue, Updater, Size, TrashMode};
 use crate::models::USE_FAST_CACHE;
 use crate::{
@@ -1985,7 +1985,7 @@ impl From<domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name 
     fn from(v: domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Factory) -> Self {
         Self {
             _data: Data {
-@{ def.for_factory()|fmt_join("                {var}: v.{var}{convert_from_entity},", "\n") }@
+@{ def.for_factory()|fmt_join("                {var}: v.{var}{convert_domain_factory}{convert_from_entity},", "\n") }@
                 ..Data::default()
             },
             _update: Data::default(),

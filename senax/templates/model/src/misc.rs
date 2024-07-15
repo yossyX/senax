@@ -71,10 +71,7 @@ pub(crate) trait ColRelTr {
         self,
         query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments>;
-    fn query_bind(
-        self,
-        query: Query<'_, DbType, DbArguments>,
-    ) -> Query<'_, DbType, DbArguments>;
+    fn query_bind(self, query: Query<'_, DbType, DbArguments>) -> Query<'_, DbType, DbArguments>;
 }
 pub(crate) trait FilterTr
 where
@@ -571,6 +568,19 @@ where
     }
 }
 
+pub(crate) trait FromJson<T> {
+    fn _from_json(&self) -> T;
+}
+
+impl<T> FromJson<T> for str
+where
+    T: serde::de::DeserializeOwned
+{
+    fn _from_json(&self) -> T {
+        serde_json::from_str(self).unwrap()
+    }
+}
+
 pub(crate) trait Size {
     fn _size(&self) -> usize;
 }
@@ -611,26 +621,6 @@ impl Size for Vec<String> {
     }
 }
 
-impl Size for Value {
-    fn _size(&self) -> usize {
-        match self {
-            Value::String(v) => calc_mem_size(v.capacity()) + std::mem::size_of::<usize>() * 4,
-            Value::Array(v) => {
-                (calc_mem_size(v.capacity() * std::mem::size_of::<Value>())
-                    + std::mem::size_of::<usize>() * 4)
-                    + v.iter()
-                        .fold(0, |i, v| i + v._size() + std::mem::size_of::<usize>() * 2)
-            }
-            Value::Object(v) => v.iter().fold(0, |i, (k, v)| {
-                i + (calc_mem_size(k.capacity()) + std::mem::size_of::<usize>() * 4)
-                    + v._size()
-                    + std::mem::size_of::<usize>() * 2
-            }),
-            _ => 0,
-        }
-    }
-}
-
 pub trait Updater {
     fn is_new(&self) -> bool;
     fn has_been_deleted(&self) -> bool;
@@ -640,8 +630,6 @@ pub trait Updater {
     fn will_be_deleted(&self) -> bool;
     fn mark_for_upsert(&mut self);
     fn is_updated(&self) -> bool;
-    // fn __eq(&self, updater: &Self) -> bool;
-    // fn __set(&mut self, updater: Self);
     fn overwrite_except_skip(&mut self, updater: Self);
     fn overwrite_only_set(&mut self, updater: Self);
     fn overwrite_with(&mut self, updater: Self, set_only: bool);
