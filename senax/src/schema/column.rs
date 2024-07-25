@@ -1179,6 +1179,12 @@ impl FieldDef {
                     &format!("UUID_TO_BIN(\"{}\")", self.get_col_name(name))
                 )
             }
+            DataType::Json => {
+                format!(
+                    "    #[sql(query = {:?})]\n",
+                    &format!("JSON_UNQUOTE(\"{}\")", self.get_col_name(name))
+                )
+            }
             DataType::Point => {
                 format!(
                     "    #[sql(query = {:?})]\n",
@@ -1197,7 +1203,7 @@ impl FieldDef {
             DataType::Geometry => {
                 format!(
                     "    #[sql(query = {:?})]\n",
-                    &format!("ST_AsGeoJSON(\"{}\")", self.get_col_name(name))
+                    &format!("JSON_UNQUOTE(ST_AsGeoJSON(\"{}\"))", self.get_col_name(name))
                 )
             }
             _ => {
@@ -1218,6 +1224,9 @@ impl FieldDef {
             DataType::Uuid => {
                 format!("UUID_TO_BIN(\"{}\")", name)
             }
+            DataType::Json => {
+                format!("JSON_UNQUOTE(\"{}\")", name)
+            }
             DataType::Point => {
                 format!("ST_AsBinary(\"{}\")", name)
             }
@@ -1225,7 +1234,7 @@ impl FieldDef {
                 format!("ST_AsBinary(\"{}\", 'axis-order=lat-long')", name)
             }
             DataType::Geometry => {
-                format!("ST_AsGeoJSON(\"{}\")", name)
+                format!("JSON_UNQUOTE(ST_AsGeoJSON(\"{}\"))", name)
             }
             _ => {
                 format!("\"{}\"", name)
@@ -2171,14 +2180,14 @@ impl FieldDef {
             DataType::ArrayString if req => ".as_ref().to_owned()",
             DataType::ArrayString if !self.not_null => ".cloned()",
             DataType::ArrayString => ".clone()",
-            DataType::Json => ".clone()",
+            DataType::Json => "",
             DataType::DbEnum if !self.not_null => ".map(|v| v.to_string())",
             DataType::DbEnum => ".to_string()",
             DataType::DbSet if !self.not_null => ".map(|v| v.to_string())",
             DataType::DbSet => ".to_string()",
             DataType::Point => "",
             DataType::GeoPoint => "",
-            DataType::Geometry => ".clone()",
+            DataType::Geometry => "",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
@@ -3184,6 +3193,8 @@ impl FieldDef {
         if self.data_type == DataType::Char
             || self.data_type == DataType::Varchar
             || self.data_type == DataType::Text
+            || self.data_type == DataType::Json
+            || self.data_type == DataType::Geometry
         {
             if self.not_null {
                 return format!(
@@ -3215,8 +3226,6 @@ impl FieldDef {
         }
         if self.data_type == DataType::ArrayInt
             || self.data_type == DataType::ArrayString
-            || self.data_type == DataType::Json
-            || self.data_type == DataType::Geometry
         {
             let ty = self.get_inner_type(true, true);
             if self.not_null {

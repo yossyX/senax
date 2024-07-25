@@ -1465,8 +1465,36 @@ impl ModelDef {
                     true
                 })
             {
-                let fields: Vec<_> = def.fields.iter().map(|(n, _)| n.to_string()).collect();
-                map.insert(fields.join(","), def.clone());
+                for i in 2..=def.fields.len() {
+                    let mut def = def.clone();
+                    def.fields.truncate(i);
+                    let fields: Vec<_> = def.fields.iter().map(|(n, _)| n.to_string()).collect();
+                    let names: Vec<_> = fields.iter().map(|v| v.to_case(Case::Pascal)).collect();
+                    map.insert(names.join("_"), def);
+                }
+            }
+        }
+        for (_model, name, rel) in self.relations_belonging(false) {
+            let local_id = rel.get_local_id(name);
+            if local_id.len() > 1 {
+                let fields: Vec<_> = local_id
+                    .iter()
+                    .map(|local_id| {
+                        if let Some(local_col) = self.merged_fields.get(local_id) {
+                            local_col.get_col_name(local_id).to_string()
+                        } else {
+                            local_id.clone()
+                        }
+                    })
+                    .collect();
+                let names: Vec<_> = fields.iter().map(|v| v.to_case(Case::Pascal)).collect();
+                map.insert(
+                    names.join("_"),
+                    IndexDef {
+                        fields: fields.into_iter().map(|v| (v, None)).collect(),
+                        ..Default::default()
+                    },
+                );
             }
         }
         for (selector_name, selector) in &self.selectors {
@@ -1484,8 +1512,9 @@ impl ModelDef {
                     })
                 {
                     let fields: Vec<_> = order.fields.iter().map(|(n, _)| n.to_string()).collect();
+                    let names: Vec<_> = fields.iter().map(|v| v.to_case(Case::Pascal)).collect();
                     map.insert(
-                        fields.join(","),
+                        names.join("_"),
                         IndexDef {
                             fields: fields.into_iter().map(|v| (v, None)).collect(),
                             ..Default::default()
@@ -1646,6 +1675,20 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
+    pub fn relations_many_without_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+        self.merged_relations
+            .iter()
+            .filter(|v| v.1.is_type_of_has_many() && !v.1.limit.is_some())
+            .map(|v| (self, v.0, v.1))
+            .collect()
+    }
+    pub fn relations_many_with_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+        self.merged_relations
+            .iter()
+            .filter(|v| v.1.is_type_of_has_many() && v.1.limit.is_some())
+            .map(|v| (self, v.0, v.1))
+            .collect()
+    }
     pub fn relations_many_cache(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
@@ -1659,6 +1702,20 @@ impl ModelDef {
             .iter()
             .filter(|v| (!self_only || !v.1.in_abstract))
             .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache)
+            .map(|v| (self, v.0, v.1))
+            .collect()
+    }
+    pub fn relations_many_uncached_without_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+        self.merged_relations
+            .iter()
+            .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache && !v.1.limit.is_some())
+            .map(|v| (self, v.0, v.1))
+            .collect()
+    }
+    pub fn relations_many_uncached_with_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+        self.merged_relations
+            .iter()
+            .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache && v.1.limit.is_some())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
