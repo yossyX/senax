@@ -49,10 +49,8 @@ const DB_NAME: &str = "@{ db }@";
 const DB_UPPER_NAME: &str = "@{ db|upper_snake }@";
 #[allow(dead_code)]
 const DB_ID: u64 = @{ config.db_id() }@;
-const IN_CONDITION_LIMIT: usize = 1000;
+const IN_CONDITION_LIMIT: usize = 500;
 const UNION_LIMIT: usize = 100;
-#[allow(dead_code)]
-const CACHE_FETCH_LIMIT: usize = 50;
 @%- if !config.force_disable_cache %@
 #[allow(dead_code)]
 const CACHE_DB_DIR: &str = "cache/@{ db|snake }@";

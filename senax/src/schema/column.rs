@@ -1203,7 +1203,10 @@ impl FieldDef {
             DataType::Geometry => {
                 format!(
                     "    #[sql(query = {:?})]\n",
-                    &format!("JSON_UNQUOTE(ST_AsGeoJSON(\"{}\"))", self.get_col_name(name))
+                    &format!(
+                        "JSON_UNQUOTE(ST_AsGeoJSON(\"{}\"))",
+                        self.get_col_name(name)
+                    )
                 )
             }
             _ => {
@@ -1536,14 +1539,12 @@ impl FieldDef {
             DataType::ArrayInt => "std::sync::Arc<Vec<u64>>",
             DataType::ArrayString if raw => "Vec<String>",
             DataType::ArrayString => "std::sync::Arc<Vec<String>>",
-            DataType::Json if raw => "String",
-            DataType::Json => "std::sync::Arc<String>",
+            DataType::Json => "crate::misc::JsonBlob",
             DataType::DbEnum => "",
             DataType::DbSet => "String",
             DataType::Point => "senax_common::types::point::Point",
             DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
-            DataType::Geometry if raw => "String",
-            DataType::Geometry => "std::sync::Arc<String>",
+            DataType::Geometry => "crate::misc::JsonBlob",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
@@ -1887,12 +1888,12 @@ impl FieldDef {
             DataType::Decimal => "",
             DataType::ArrayInt => ".into()",
             DataType::ArrayString => ".into()",
-            DataType::Json => ".to_string().into()",
+            DataType::Json => "._to_json_blob().unwrap()",
             DataType::DbEnum => "",
             DataType::DbSet => "",
             DataType::Point => ".into()",
             DataType::GeoPoint => ".into()",
-            DataType::Geometry => ".to_string().into()",
+            DataType::Geometry => "._to_json_blob().unwrap()",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
@@ -1937,12 +1938,12 @@ impl FieldDef {
             DataType::Decimal => "",
             DataType::ArrayInt => "",
             DataType::ArrayString => "",
-            DataType::Json => ".to_string().into()",
+            DataType::Json => "._to_json_blob().unwrap()",
             DataType::DbEnum => "",
             DataType::DbSet => "",
             DataType::Point => ".to_tuple().to_point()",
             DataType::GeoPoint => ".to_tuple().to_geo_point()",
-            DataType::Geometry => ".to_string().into()",
+            DataType::Geometry => "._to_json_blob().unwrap()",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
@@ -2514,15 +2515,15 @@ impl FieldDef {
             DataType::ArrayInt => "",
             DataType::ArrayString if !self.not_null => ".as_ref()",
             DataType::ArrayString => "",
-            DataType::Json if !self.not_null => ".as_ref().map(|v| v._from_json())",
-            DataType::Json => "._from_json()",
+            DataType::Json if !self.not_null => ".as_ref().map(|v| v._to_value())",
+            DataType::Json => "._to_value()",
             DataType::DbEnum => "",
             DataType::DbSet if !self.not_null => ".as_deref()",
             DataType::DbSet => ".as_ref()",
             DataType::Point => "",
             DataType::GeoPoint => "",
-            DataType::Geometry if !self.not_null => ".as_ref().map(|v| v._from_json())",
-            DataType::Geometry => "._from_json()",
+            DataType::Geometry if !self.not_null => ".as_ref().map(|v| v._to_value())",
+            DataType::Geometry => "._to_value()",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
@@ -2769,8 +2770,8 @@ impl FieldDef {
                 format!("{var}{clone}.as_ref()")
             }
             DataType::ArrayString => format!("&{var}{clone}"),
-            DataType::Json if !self.not_null => format!("{var}.as_ref().map(|v| v._from_json())"),
-            DataType::Json => format!("{var}._from_json()"),
+            DataType::Json if !self.not_null => format!("{var}.as_ref().map(|v| v._to_value())"),
+            DataType::Json => format!("{var}._to_value()"),
             DataType::DbEnum => unimplemented!(),
             DataType::DbSet if !self.not_null => format!("{var}{clone}.as_deref()"),
             DataType::DbSet => format!("{var}{clone}.as_ref()"),
@@ -2783,9 +2784,9 @@ impl FieldDef {
                 format!("{var}{clone}.as_ref().map(|v| v.to_tuple().geo_point())")
             }
             DataType::Geometry if !self.not_null => {
-                format!("{var}.as_ref().map(|v| v._from_json())")
+                format!("{var}.as_ref().map(|v| v._to_value())")
             }
-            DataType::Geometry => format!("{var}._from_json()"),
+            DataType::Geometry => format!("{var}._to_value()"),
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
@@ -3161,30 +3162,23 @@ impl FieldDef {
                     _ => panic!("unsupported type"),
                 };
                 if self.not_null {
-                    return format!(
-                        "
-            row.try_get::<{}, _>({index})?.into()",
-                        typ,
-                    );
+                    return format!("row.try_get::<{}, _>({index})?.into()", typ,);
                 } else {
                     return format!(
-                        "
-            row.try_get::<Option<{}>, _>({index})?.map(|v| v.into())",
+                        "row.try_get::<Option<{}>, _>({index})?.map(|v| v.into())",
                         typ,
                     );
                 }
             } else if self.not_null {
                 return format!(
-                    "
-            {}::try_from(row.try_get::<&str, _>({index})?).map_err(|e| sqlx::Error::ColumnDecode {{
+                    "{}::try_from(row.try_get::<&str, _>({index})?).map_err(|e| sqlx::Error::ColumnDecode {{
                 index: {name:?}.to_string(),
                 source: Box::new(e),
             }})?",
                     &class.to_string()
                 );
             } else {
-                return format!("
-            row.try_get::<Option<&str>, _>({index})?.map({}::try_from).transpose().map_err(|e| sqlx::Error::ColumnDecode {{
+                return format!("row.try_get::<Option<&str>, _>({index})?.map({}::try_from).transpose().map_err(|e| sqlx::Error::ColumnDecode {{
                 index: {name:?}.to_string(),
                 source: Box::new(e),
             }})?", &class.to_string());
@@ -3193,19 +3187,24 @@ impl FieldDef {
         if self.data_type == DataType::Char
             || self.data_type == DataType::Varchar
             || self.data_type == DataType::Text
-            || self.data_type == DataType::Json
-            || self.data_type == DataType::Geometry
         {
             if self.not_null {
-                return format!(
-                    "
-            row.try_get::<String, _>({index})?.into()",
-                );
+                return format!("row.try_get::<String, _>({index})?.into()",);
             } else {
-                return format!(
-                    "
-            row.try_get::<Option<String>, _>({index})?.map(|v| v.into())",
-                );
+                return format!("row.try_get::<Option<String>, _>({index})?.map(|v| v.into())",);
+            }
+        }
+        if self.data_type == DataType::Json || self.data_type == DataType::Geometry {
+            if self.not_null {
+                return format!("row.try_get::<&str, _>({index})?.try_into().map_err(|e| sqlx::Error::ColumnDecode {{
+                index: {name:?}.to_string(),
+                source: e,
+            }})?",);
+            } else {
+                return format!("row.try_get::<Option<&str>, _>({index})?.map(|v| v.try_into()).transpose().map_err(|e| sqlx::Error::ColumnDecode {{
+                index: {name:?}.to_string(),
+                source: e,
+            }})?",);
             }
         }
         if self.data_type == DataType::Binary
@@ -3213,50 +3212,29 @@ impl FieldDef {
             || self.data_type == DataType::Blob
         {
             if self.not_null {
-                return format!(
-                    "
-            row.try_get::<Vec<u8>, _>({index})?.into()",
-                );
+                return format!("row.try_get::<Vec<u8>, _>({index})?.into()",);
             } else {
-                return format!(
-                    "
-            row.try_get::<Option<Vec<u8>>, _>({index})?.map(|v| v.into())",
-                );
+                return format!("row.try_get::<Option<Vec<u8>>, _>({index})?.map(|v| v.into())",);
             }
         }
-        if self.data_type == DataType::ArrayInt
-            || self.data_type == DataType::ArrayString
-        {
+        if self.data_type == DataType::ArrayInt || self.data_type == DataType::ArrayString {
             let ty = self.get_inner_type(true, true);
             if self.not_null {
-                return format!(
-                    "
-            row.try_get::<::sqlx::types::Json<{ty}>, _>({index})?.0.into()",
-                );
+                return format!("row.try_get::<::sqlx::types::Json<{ty}>, _>({index})?.0.into()",);
             } else {
                 return format!(
-                    "
-            row.try_get::<Option<::sqlx::types::Json<{ty}>>, _>({index})?.map(|x| x.0.into())",
+                    "row.try_get::<Option<::sqlx::types::Json<{ty}>>, _>({index})?.map(|x| x.0.into())",
                 );
             }
         }
         if self.data_type == DataType::Point || self.data_type == DataType::GeoPoint {
             if self.not_null {
-                return format!(
-                    "
-            row.try_get::<&[u8], _>({index})?.into()",
-                );
+                return format!("row.try_get::<&[u8], _>({index})?.into()",);
             } else {
-                return format!(
-                    "
-            row.try_get::<Option<&[u8]>, _>({index})?.map(|v| v.into())",
-                );
+                return format!("row.try_get::<Option<&[u8]>, _>({index})?.map(|v| v.into())",);
             }
         }
-        format!(
-            "
-            row.try_get({index})?",
-        )
+        format!("row.try_get({index})?",)
     }
 
     pub fn get_col_name<'a>(&'a self, name: &'a str) -> Cow<'a, str> {

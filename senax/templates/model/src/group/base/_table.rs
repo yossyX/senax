@@ -46,7 +46,7 @@ use crate::cache::Cache;
 @%- else %@
 @% endif %@
 use crate::connection::{DbArguments, DbConn, DbRow, DbType};
-use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, FromJson as _, IntoJson as _, OrderTr};
+use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, ToJsonBlob as _, IntoJson as _, OrderTr};
 use crate::misc::{BindValue, Updater, Size, TrashMode};
 use crate::models::USE_FAST_CACHE;
 use crate::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
@@ -1638,7 +1638,8 @@ impl sqlx::FromRow<'_, DbRow> for Data {
     fn from_row(row: &DbRow) -> sqlx::Result<Self> {
         use sqlx::Row;
         Ok(Data {
-            @{- def.all_fields()|fmt_join("{var}: {from_row},", "") }@
+            @{ def.all_fields()|fmt_join("{var}: {from_row},", "
+            ") }@
         })
     }
 }
@@ -1691,7 +1692,8 @@ impl sqlx::FromRow<'_, DbRow> for CacheData {
     fn from_row(row: &DbRow) -> sqlx::Result<Self> {
         use sqlx::Row;
         Ok(CacheData {
-            @{- def.cache_cols()|fmt_join("{var}: {from_row},", "") }@
+            @{ def.cache_cols()|fmt_join("{var}: {from_row},", "
+            ") }@
         })
     }
 }
@@ -3538,7 +3540,7 @@ impl ColRelTr for ColRel_ {
                 if without_key {
                     write!(buf, r#\"SELECT {} FROM {table} as _t{} WHERE \"#, rel_{class_mod}::Primary::cols(), idx + 1).unwrap();
                 } else {
-                    write!(buf, r#\"SELECT * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, rel_{class_mod}::Primary::cols_with_paren(), RelCol{rel_name_pascal}::cols_with_idx(idx)).unwrap();
+                    write!(buf, r#\"SELECT /*+ NO_SEMIJOIN() */ * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, rel_{class_mod}::Primary::cols_with_paren(), RelCol{rel_name_pascal}::cols_with_idx(idx)).unwrap();
                 }
                 let mut trash_mode = TrashMode::Not;
                 if let Some(filter) = c {
@@ -3563,7 +3565,7 @@ impl ColRelTr for ColRel_ {
                 if without_key {
                     write!(buf, r#\"SELECT {} FROM {table} as _t{} WHERE \"#, RelCol{rel_name_pascal}::cols(), idx + 1).unwrap();
                 } else {
-                    write!(buf, r#\"SELECT * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren()).unwrap();
+                    write!(buf, r#\"SELECT /*+ NO_SEMIJOIN() */ * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren()).unwrap();
                 }
                 let mut trash_mode = TrashMode::Not;
                 if let Some(filter) = c {
@@ -3588,7 +3590,7 @@ impl ColRelTr for ColRel_ {
                 if without_key {
                     write!(buf, r#\"SELECT {} FROM {table} as _t{} WHERE \"#, RelCol{rel_name_pascal}::cols(), idx + 1).unwrap();
                 } else {
-                    write!(buf, r#\"SELECT * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren()).unwrap();
+                    write!(buf, r#\"SELECT /*+ NO_SEMIJOIN() */ * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren()).unwrap();
                 }
                 let mut trash_mode = TrashMode::Not;
                 if let Some(filter) = c {
@@ -5996,7 +5998,6 @@ impl _@{ pascal_name }@ {
     #[cfg(not(feature="cache_update_only"))]
     #[allow(clippy::collapsible_if)]
     async fn ___find_many_from_cache(conn: &DbConn, ids: Vec<PrimaryHasher>) -> Result<Vec<_@{ pascal_name }@Cache>> {
-        static SEMAPHORE: Lazy<Vec<Semaphore>> = Lazy::new(|| DbConn::shard_num_range().map(|_| Semaphore::new(1)).collect());
         let mut list: Vec<_@{ pascal_name }@Cache> = Vec::new();
         let mut rest_ids = Vec::new();
         let shard_id = conn.shard_id();
@@ -6009,10 +6010,13 @@ impl _@{ pascal_name }@ {
             }
         }
         if !rest_ids.is_empty() {
-            for id in rest_ids.iter() {
-                BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].push(id.0.clone());
+            if rest_ids.len() <= 10 {
+                for id in rest_ids.iter() {
+                    BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].push(id.0.clone());
+                }
             }
-            let _guard = SEMAPHORE[shard_id as usize].acquire().await?;
+            let mut conn = DbConn::_new(shard_id);
+            conn.begin_cache_tx().await?;
             let mut rest_ids2 = FxHashSet::with_capacity_and_hasher(rest_ids.len() * 2, Default::default());
             for id in rest_ids.into_iter() {
                 if let Some(obj) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
@@ -6029,88 +6033,77 @@ impl _@{ pascal_name }@ {
                 for id in &rest_ids2 {
                     ids.insert(id.0.clone());
                 }
-                while let Some(x) = BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].pop() {
-                    ids.insert(x);
+                let mut len = ids.len();
+                if len < 100 {
+                    while let Some(x) = BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].pop() {
+                        ids.insert(x);
+                        len += 1;
+                        if len >= 100 {
+                            break;
+                        }
+                    }
                 }
                 let mut ids: Vec<InnerPrimary> = ids.drain().collect();
-                ids.sort();
-                let id_chunks = ids.chunks(crate::CACHE_FETCH_LIMIT);
-                use tokio::task::JoinSet;
-                let mut set: JoinSet<anyhow::Result<Vec<_@{ pascal_name }@Cache>>> = JoinSet::new();
-                let rest_ids2 = Arc::new(rest_ids2);
-                for ids in id_chunks {
-                    let ids = ids.to_owned();
-                    let rest_ids2 = rest_ids2.clone();
-                    set.spawn(async move {
-                        let mut conn = DbConn::_new(shard_id);
-                        conn.begin_cache_tx().await?;
-                        #[allow(unused_mut)]
-                        let mut result = Self::___find_many_for_cache(&mut conn, &ids).await?;
+                #[allow(unused_mut)]
+                let mut result = Self::___find_many_for_cache(&mut conn, &ids).await?;
 @{- def.relations_in_cache()|fmt_rel_join("
-                        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut result, &mut conn).await?;", "") }@
-                        let _lock = crate::models::CACHE_UPDATE_LOCK.read().await;
-                        let mut list: Vec<_@{ pascal_name }@Cache> = Vec::new();
-                        for v in result.into_iter() {
-                            let arc = Arc::new(v);
-                            let id = PrimaryHasher(InnerPrimary::from(&arc), shard_id);
-                            let sync = CACHE_RESET_SYNC.get().unwrap()[shard_id as usize].read().await;
-                            if *sync <= conn.cache_sync() {
-                                if Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0).is_none() {
-                                    @%- if def.versioned %@
-                                    let vw = VersionWrapper {
-                                        id: id.0.clone(),
-                                        shard_id,
-                                        time: MSec::default(),
-                                        version: 0,
-                                    };
-                                    if let Some(ver) = Cache::get_version::<VersionWrapper>(&vw, shard_id).await.filter(|o| o.id == id.0) {
-                                        if arc._inner.@{ version_col }@.greater_equal(ver.version) {
-                                            Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
-                                        }
-                                    } else {
-                                        let cs = CacheSyncWrapper {
-                                            id: id.0.clone(),
-                                            shard_id,
-                                            time: MSec::default(),
-                                            sync: 0,
-                                        };
-                                        if let Some(cs) = Cache::get_version::<CacheSyncWrapper>(&cs, shard_id).await.filter(|o| o.id == id.0) {
-                                            if cs.sync <= conn.cache_sync() {
-                                                Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
-                                            }
-                                        } else {
-                                            Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
-                                        }
-                                    }
-                                    @%- else %@
-                                    let cs = CacheSyncWrapper {
-                                        id: id.0.clone(),
-                                        shard_id,
-                                        time: MSec::default(),
-                                        sync: 0,
-                                    };
-                                    if let Some(cs) = Cache::get_version::<CacheSyncWrapper>(&cs, shard_id).await.filter(|o| o.id == id.0) {
-                                        if cs.sync <= conn.cache_sync() {
-                                            Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
-                                        }
-                                    } else {
+                CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut result, &mut conn).await?;", "") }@
+                let _lock = crate::models::CACHE_UPDATE_LOCK.read().await;
+                for v in result.into_iter() {
+                    let arc = Arc::new(v);
+                    let id = PrimaryHasher(InnerPrimary::from(&arc), shard_id);
+                    let sync = CACHE_RESET_SYNC.get().unwrap()[shard_id as usize].read().await;
+                    if *sync <= conn.cache_sync() {
+                        if Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0).is_none() {
+                            @%- if def.versioned %@
+                            let vw = VersionWrapper {
+                                id: id.0.clone(),
+                                shard_id,
+                                time: MSec::default(),
+                                version: 0,
+                            };
+                            if let Some(ver) = Cache::get_version::<VersionWrapper>(&vw, shard_id).await.filter(|o| o.id == id.0) {
+                                if arc._inner.@{ version_col }@.greater_equal(ver.version) {
+                                    Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
+                                }
+                            } else {
+                                let cs = CacheSyncWrapper {
+                                    id: id.0.clone(),
+                                    shard_id,
+                                    time: MSec::default(),
+                                    sync: 0,
+                                };
+                                if let Some(cs) = Cache::get_version::<CacheSyncWrapper>(&cs, shard_id).await.filter(|o| o.id == id.0) {
+                                    if cs.sync <= conn.cache_sync() {
                                         Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
                                     }
-                                    @%- endif %@
+                                } else {
+                                    Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
                                 }
                             }
-                            if rest_ids2.contains(&id) {
-                                list.push(arc.into());
+                            @%- else %@
+                            let cs = CacheSyncWrapper {
+                                id: id.0.clone(),
+                                shard_id,
+                                time: MSec::default(),
+                                sync: 0,
+                            };
+                            if let Some(cs) = Cache::get_version::<CacheSyncWrapper>(&cs, shard_id).await.filter(|o| o.id == id.0) {
+                                if cs.sync <= conn.cache_sync() {
+                                    Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
+                                }
+                            } else {
+                                Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
                             }
+                            @%- endif %@
                         }
-                        conn.release_cache_tx();
-                        Ok(list)
-                    });
-                }
-                while let Some(result) = set.join_next().await {
-                    list.append(&mut result??);
+                    }
+                    if rest_ids2.contains(&id) {
+                        list.push(arc.into());
+                    }
                 }
             }
+            conn.release_cache_tx();
         }
         Ok(list)
     }

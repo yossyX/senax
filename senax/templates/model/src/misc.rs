@@ -568,19 +568,6 @@ where
     }
 }
 
-pub(crate) trait FromJson<T> {
-    fn _from_json(&self) -> T;
-}
-
-impl<T> FromJson<T> for str
-where
-    T: serde::de::DeserializeOwned
-{
-    fn _from_json(&self) -> T {
-        serde_json::from_str(self).unwrap()
-    }
-}
-
 pub(crate) trait Size {
     fn _size(&self) -> usize;
 }
@@ -762,6 +749,54 @@ pub mod option_arc_bytes {
             Some(buf) => Ok(Some(Arc::new(buf.into_vec()))),
             None => Ok(None),
         }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Clone, Default, PartialEq)]
+pub(crate) struct JsonBlob(std::sync::Arc<Vec<u8>>);
+impl TryFrom<&str> for JsonBlob {
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let _: Value = serde_json::from_str(value)?;
+        Ok(Self(zstd::stream::encode_all(value.as_bytes(), 3)?.into()))
+    }
+}
+impl From<&JsonBlob> for String {
+    fn from(value: &JsonBlob) -> Self {
+        let v = zstd::stream::decode_all(value.0.as_slice()).unwrap();
+        unsafe { String::from_utf8_unchecked(v) }
+    }
+}
+impl Size for JsonBlob {
+    fn _size(&self) -> usize {
+        calc_mem_size(self.0.capacity()) + std::mem::size_of::<usize>() * 4
+    }
+}
+impl std::fmt::Debug for JsonBlob {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self._into_json())
+    }
+}
+impl JsonBlob {
+    pub fn _into_json(&self) -> String {
+        self.into()
+    }
+    pub fn _to_value<T: serde::de::DeserializeOwned>(&self) -> T {
+        let v = zstd::stream::decode_all(self.0.as_slice()).unwrap();
+        serde_json::from_slice(&v).unwrap()
+    }
+}
+pub(crate) trait ToJsonBlob {
+    fn _to_json_blob(&self) -> anyhow::Result<JsonBlob>;
+}
+
+impl<T> ToJsonBlob for T
+where
+    T: serde::Serialize,
+{
+    fn _to_json_blob(&self) -> anyhow::Result<JsonBlob> {
+        let v = serde_json::to_string(self)?;
+        Ok(JsonBlob(zstd::stream::encode_all(v.as_bytes(), 3)?.into()))
     }
 }
 @{-"\n"}@

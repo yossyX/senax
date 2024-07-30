@@ -1465,6 +1465,11 @@ impl ModelDef {
                     true
                 })
             {
+                let mut def = def.clone();
+                def.fields.retain(|k, _| {
+                    !ConfigDef::deleted_at().eq_ignore_ascii_case(k)
+                        && !ConfigDef::deleted().eq_ignore_ascii_case(k)
+                });
                 for i in 2..=def.fields.len() {
                     let mut def = def.clone();
                     def.fields.truncate(i);
@@ -1678,7 +1683,7 @@ impl ModelDef {
     pub fn relations_many_without_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| v.1.is_type_of_has_many() && !v.1.limit.is_some())
+            .filter(|v| v.1.is_type_of_has_many() && v.1.limit.is_none())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1708,7 +1713,7 @@ impl ModelDef {
     pub fn relations_many_uncached_without_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache && !v.1.limit.is_some())
+            .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache && v.1.limit.is_none())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
