@@ -57,12 +57,11 @@ const BULK_FETCH_RATE: usize = 20;
 const CACHE_DB_DIR: &str = "cache/@{ db|snake }@";
 @%- endif %@
 const DELAYED_DB_DIR: &str = "delayed/@{ db|snake }@";
-const DEFAULT_DB_MAX_CONNECTIONS_FOR_WRITE: &str = "10";
-const DEFAULT_DB_MAX_CONNECTIONS_FOR_READ: &str = "10";
-const DEFAULT_DB_MAX_CONNECTIONS_FOR_CACHE: &str = "10";
+const DEFAULT_DB_MAX_CONNECTIONS_FOR_WRITE: &str = "50";
+const DEFAULT_DB_MAX_CONNECTIONS_FOR_READ: &str = "100";
+const DEFAULT_DB_MAX_CONNECTIONS_FOR_CACHE: &str = "50";
 #[allow(dead_code)]
 const DEFAULT_SEQUENCE_FETCH_NUM: &str = "1000";
-const ACQUIRE_TIMEOUT: u64 = 5;
 const CONNECT_CHECK_INTERVAL: u64 = 10;
 const CHECK_CONNECTION_TIMEOUT: u64 = 8;
 const ACQUIRE_CONNECTION_WAIT_TIME: u64 = 10;
@@ -246,19 +245,22 @@ pub fn is_test_mode() -> bool {
     TEST_MODE.load(Ordering::Relaxed)
 }
 
-pub async fn clear_local_cache() -> Result<()> {
+pub async fn clear_local_cache() {
     let sync_map = DbConn::inc_all_cache_sync().await;
     models::_clear_cache(&sync_map, false).await;
-    Ok(())
 }
 
-pub async fn clear_whole_cache() -> Result<()> {
-    CacheMsg(
-        vec![CacheOp::_AllClear],
-        DbConn::inc_all_cache_sync().await,
-    )
-    .do_send()
-    .await;
-    Ok(())
+pub async fn clear_whole_cache() {
+    CacheMsg(vec![CacheOp::_AllClear], DbConn::inc_all_cache_sync().await)
+        .do_send()
+        .await;
+}
+
+pub(crate) fn db_options_for_write() -> sqlx::pool::PoolOptions<connection::DbType> {
+    sqlx::pool::PoolOptions::new().acquire_timeout(Duration::from_secs(5))
+}
+
+pub(crate) fn db_options_for_read() -> sqlx::pool::PoolOptions<connection::DbType> {
+    sqlx::pool::PoolOptions::new().acquire_timeout(Duration::from_secs(5))
 }
 @{-"\n"}@

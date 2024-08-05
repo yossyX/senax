@@ -1255,7 +1255,7 @@ async fn get_replica(
             if pools.contains_key(&addr) {
                 continue;
             }
-            pools.insert(addr, 
+            pools.insert(addr,
                 MySqlPoolOptions::new()
                     .max_connections(max_connections)
                     .acquire_timeout(Duration::from_secs(crate::ACQUIRE_TIMEOUT))
