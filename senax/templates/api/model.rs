@@ -188,7 +188,7 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                 let filter = readable_filter(auth)?;
                 query = query.visibility_filter(filter);
                 let mut previous = false;
-                let mut limit = 100;
+                let mut limit = 10000;
                 let order = order.unwrap_or_default();
                 query = query.order_by(order);
                 if first.is_some() || after.is_some() {
