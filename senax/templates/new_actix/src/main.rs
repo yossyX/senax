@@ -291,6 +291,7 @@ async fn main() -> Result<()> {
             .wrap(
                 senax_actix_session::SessionMiddleware::builder(_SessionStore, &session_secret_key)
                     .cookie_secure(!cfg!(debug_assertions))
+                    .cookie_name(if cfg!(debug_assertions) { "sid".into() } else { "__Host-sid".into() })
                     .build(),
             )
             .configure(routes::root::init)

@@ -116,7 +116,7 @@ impl @{ db|pascal }@Repositories for Emu@{ db|pascal }@Repositories {
     async fn get_lock(&self, _key: &str, _time: i32) -> Result<()> {
         Ok(())
     }
-    fn should_retry(&self, err: &anyhow::Error) -> bool {
+    fn should_retry(&self, _err: &anyhow::Error) -> bool {
         false
     }
     // Do not modify below this line. (EmuRepoStart)
@@ -134,7 +134,7 @@ impl @{ db|pascal }@Queries for Emu@{ db|pascal }@Repositories {
         self.read_tx.release();
         Ok(())
     }
-    fn should_retry(&self, err: &anyhow::Error) -> bool {
+    fn should_retry(&self, _err: &anyhow::Error) -> bool {
         false
     }
     // Do not modify below this line. (EmuQueriesStart)

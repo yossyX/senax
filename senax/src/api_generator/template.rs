@@ -66,6 +66,69 @@ pub fn gen_json_schema(dir: &std::path::Path) -> anyhow::Result<()> {
     // Do not modify this line. (JsonSchema)
     Ok(())
 }
+
+#[macro_export]
+macro_rules! gql_@{ db|snake }@_find {
+    ( $f:ident $p:tt, $repo:expr, $auth:expr, $gql_ctx:expr ) => {
+        match $f$p.await {
+            Ok(obj) => {
+                let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
+                Ok(ResObj::try_from_(&*obj, $auth)?)
+            }
+            Err(e) => {
+                if $repo.@{ db|snake }@_query().should_retry(&e) {
+                    let obj = $f$p
+                        .await
+                        .map_err(|e| GqlError::server_error($gql_ctx, e))?;
+                    let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
+                    Ok(ResObj::try_from_(&*obj, $auth)?)
+                } else {
+                    Err(GqlError::server_error($gql_ctx, e))
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! gql_@{ db|snake }@_selector {
+    ( $f:ident $p:tt, $repo:expr, $gql_ctx:expr ) => {
+        match $f$p
+        .await
+        {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                if $repo.@{ db|snake }@_query().should_retry(&e) {
+                    let result = $f$p
+                    .await
+                    .map_err(|e| GqlError::server_error($gql_ctx, e))?;
+                    Ok(result)
+                } else {
+                    Err(GqlError::server_error($gql_ctx, e))
+                }
+            }
+        }?
+    };
+}
+
+#[macro_export]
+macro_rules! gql_@{ db|snake }@_count {
+    ( $f:ident $p:tt, $repo:expr, $gql_ctx:expr ) => {
+        match $f$p.await {
+            Ok(count) => Ok(count),
+            Err(e) => {
+                if $repo.@{ db|snake }@_query().should_retry(&e) {
+                    let count = $f$p
+                        .await
+                        .map_err(|e| GqlError::server_error($gql_ctx, e))?;
+                    Ok(count)
+                } else {
+                    Err(GqlError::server_error($gql_ctx, e))
+                }
+            }
+        }
+    };
+}
 "###,
     ext = "txt",
     escape = "none"

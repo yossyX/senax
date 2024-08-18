@@ -30,7 +30,7 @@ async fn find(
     gql_ctx: &async_graphql::Context<'_>,
     repo: &RepositoriesImpl,
     auth: &AuthInfo,
-    primary: _domain_::@{ pascal_name }@Primary,
+    primary: &_domain_::@{ pascal_name }@Primary,
 ) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@>>> {
     let @{ db|snake }@_query = repo.@{ db|snake }@_query();
     @{ db|snake }@_query.begin_read_tx().await?;
@@ -38,7 +38,7 @@ async fn find(
     let filter = readable_filter(auth)?;
     let joiner = joiner(gql_ctx.look_ahead(), auth)?;
     let result = @{ mod_name }@_repo
-        .find(primary.into())
+        .find(primary.clone().into())
         .join(joiner)
         .visibility_filter(filter)
         .query()
@@ -50,18 +50,19 @@ async fn find(
 @%- for api_selector_def in api_def.selector(selector) %@
 
 #[rustfmt::skip]
+#[allow(clippy::too_many_arguments)]
 async fn _@{ selector }@(
     gql_ctx: &async_graphql::Context<'_>,
     repo: &RepositoriesImpl,
     auth: &AuthInfo,
-    after: Option<String>,
-    before: Option<String>,
+    after: &Option<String>,
+    before: &Option<String>,
     first: Option<usize>,
     last: Option<usize>,
     @%- if selector_def.filter_is_required() %@
-    filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+    filter: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
     @%- else %@
-    filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+    filter: &Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
     @%- endif %@
     order: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order,
     offset: Option<usize>,
@@ -78,10 +79,10 @@ async fn _@{ selector }@(
     let joiner = joiner(node, auth)?;
     let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(joiner);
     @%- if selector_def.filter_is_required() %@
-    query = query.query_filter(filter);
+    query = query.query_filter(filter.clone());
     @%- else %@
     if let Some(filter) = filter {
-        query = query.query_filter(filter);
+        query = query.query_filter(filter.clone());
     }
     @%- endif %@
     let filter = readable_filter(auth)?;
@@ -96,7 +97,7 @@ async fn _@{ selector }@(
             _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
                 if let Some(after) = after {
                     let c = _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
-                        &after,
+                        after,
                     )?;
                     query = query.cursor(
                         _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
@@ -118,7 +119,7 @@ async fn _@{ selector }@(
             _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
                 if let Some(before) = before {
                     let c = _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
-                        &before,
+                        before,
                     )?;
                     query = query.cursor(
                         _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
@@ -148,9 +149,9 @@ async fn _count_@{ selector }@(
     repo: &RepositoriesImpl,
     auth: &AuthInfo,
     @%- if selector_def.filter_is_required() %@
-    filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+    filter: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
     @%- else %@
-    filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+    filter: &Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
     @%- endif %@
 ) -> anyhow::Result<i64> {
     let @{ db|snake }@_query = repo.@{ db|snake }@_query();
@@ -158,10 +159,10 @@ async fn _count_@{ selector }@(
     let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
     let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
     @%- if selector_def.filter_is_required() %@
-    query = query.query_filter(filter);
+    query = query.query_filter(filter.clone());
     @%- else %@
     if let Some(filter) = filter {
-        query = query.query_filter(filter);
+        query = query.query_filter(filter.clone());
     }
     @%- endif %@
     let filter = readable_filter(auth)?;
@@ -206,8 +207,8 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         @%- endif %@
         Ok(permission)
     }
-
     @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
+
     #[graphql(guard = "query_guard()")]
     async fn all(
         &self,
@@ -230,6 +231,7 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     }
     @%- endif %@
     @%- if api_def.use_find_by_pk %@
+
     #[graphql(guard = "query_guard()")]
     async fn find_by_pk(
         &self,
@@ -245,25 +247,10 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        match find(gql_ctx, &repo, auth, primary.clone()).await {
-            Ok(obj) => {
-                let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
-                Ok(ResObj::try_from_(&*obj, auth)?)
-            }
-            Err(e) => {
-                if repo.@{ db|snake }@_query().should_retry(&e) {
-                    let obj = find(gql_ctx, &repo, auth, primary)
-                        .await
-                        .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-                    let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
-                    Ok(ResObj::try_from_(&*obj, auth)?)
-                } else {
-                    Err(GqlError::server_error(gql_ctx, e))
-                }
-            }
-        }
+        crate::gql_@{ db|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
+
     #[graphql(guard = "query_guard()")]
     async fn find(
         &self,
@@ -273,26 +260,11 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        match find(gql_ctx, &repo, auth, primary.clone()).await {
-            Ok(obj) => {
-                let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
-                Ok(ResObj::try_from_(&*obj, auth)?)
-            }
-            Err(e) => {
-                if repo.@{ db|snake }@_query().should_retry(&e) {
-                    let obj = find(gql_ctx, &repo, auth, primary)
-                        .await
-                        .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-                    let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
-                    Ok(ResObj::try_from_(&*obj, auth)?)
-                } else {
-                    Err(GqlError::server_error(gql_ctx, e))
-                }
-            }
-        }
+        crate::gql_@{ db|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
     }
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
+
     #[allow(clippy::too_many_arguments)]
     #[rustfmt::skip]
     #[graphql(guard = "query_guard()")]
@@ -330,51 +302,35 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                 let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
                 let auth: &AuthInfo = gql_ctx.data()?;
                 let order = order.unwrap_or_default();
-                let (mut list, previous, limit) = match _@{ selector }@(
-                    gql_ctx,
-                    &repo,
-                    auth,
-                    after.clone(),
-                    before.clone(),
-                    first,
-                    last,
-                    filter.clone(),
-                    order,
-                    offset,
-                )
-                .await
-                {
-                    Ok(result) => Ok(result),
-                    Err(e) => {
-                        if repo.@{ db|snake }@_query().should_retry(&e) {
-                            let result = _@{ selector }@(
-                                gql_ctx, &repo, auth, after, before, first, last, filter, order,
-                                offset,
-                            )
-                            .await
-                            .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-                            Ok(result)
-                        } else {
-                            Err(GqlError::server_error(gql_ctx, e))
-                        }
-                    }
-                }?;
+                let (mut list, previous, limit) = crate::gql_@{ db|snake }@_selector!(
+                    _@{ selector }@(
+                        gql_ctx, &repo, auth, &after, &before, first, last, &filter, order, offset,
+                    ),
+                    repo,
+                    gql_ctx
+                );
                 let mut connection = graphql_conn::Connection::new(previous, list.len() > limit);
                 list.truncate(limit);
                 if last.is_some() {
                     list.reverse();
                 }
-                connection.edges.extend(list.into_iter().map(|obj| {
-                    Edge::new(
-                        order.to_cursor(&obj).unwrap(),
-                        ResObj::try_from_(&*obj, auth).unwrap(),
-                    )
-                }));
+                let auth = auth.clone();
+                let connection = tokio::task::spawn_blocking(move || {
+                    connection.edges.extend(list.into_iter().map(|obj| {
+                        Edge::new(
+                            order.to_cursor(&obj).unwrap(),
+                            ResObj::try_from_(&*obj, &auth).unwrap(),
+                        )
+                    }));
+                    connection
+                })
+                .await?;
                 Ok::<_, async_graphql::Error>(connection)
             },
         )
         .await
     }
+
     #[graphql(guard = "query_guard()")]
     async fn count_@{ selector }@(
         &self,
@@ -396,19 +352,7 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         @%- endif %@
         let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
-        match _count_@{ selector }@(&repo, auth, filter.clone()).await {
-            Ok(count) => Ok(count),
-            Err(e) => {
-                if repo.gyomu_query().should_retry(&e) {
-                    let count = _count_@{ selector }@(&repo, auth, filter)
-                        .await
-                        .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-                    Ok(count)
-                } else {
-                    Err(GqlError::server_error(gql_ctx, e))
-                }
-            }
-        }
+        crate::gql_@{ db|snake }@_count!(_count_@{ selector }@(&repo, auth, &filter), repo, gql_ctx)
     }
     @%- endfor %@
     @%- endfor %@
@@ -552,6 +496,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
     @%- for (js_name, js_def) in api_selector_def.js_updater %@
+
     #[cfg(feature = "js_updater")]
     #[graphql(guard = "update_guard()")]
     async fn @{ js_name }@(
@@ -645,6 +590,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     }
     @%- endfor %@
     @%- if api_selector_def.use_for_update_by_operator %@
+
     #[graphql(guard = "update_guard()")]
     async fn update_by_@{ selector }@(
         &self,
@@ -700,6 +646,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     }
     @%- endif %@
     @%- if api_selector_def.use_for_delete %@
+
     #[graphql(guard = "delete_guard()")]
     async fn delete_by_@{ selector }@(
         &self,

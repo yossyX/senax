@@ -257,10 +257,20 @@ pub async fn clear_whole_cache() {
 }
 
 pub(crate) fn db_options_for_write() -> sqlx::pool::PoolOptions<connection::DbType> {
-    sqlx::pool::PoolOptions::new().acquire_timeout(Duration::from_secs(5))
+    sqlx::pool::PoolOptions::new()
+        .acquire_timeout(Duration::from_secs(5))
+        .max_connections(DbConn::max_connections_for_write())
 }
 
 pub(crate) fn db_options_for_read() -> sqlx::pool::PoolOptions<connection::DbType> {
-    sqlx::pool::PoolOptions::new().acquire_timeout(Duration::from_secs(5))
+    sqlx::pool::PoolOptions::new()
+        .acquire_timeout(Duration::from_secs(5))
+        .max_connections(DbConn::max_connections_for_read())
+}
+
+pub(crate) fn db_options_for_cache() -> sqlx::pool::PoolOptions<connection::DbType> {
+    sqlx::pool::PoolOptions::new()
+        .acquire_timeout(Duration::from_secs(5))
+        .max_connections(DbConn::max_connections_for_cache())
 }
 @{-"\n"}@
