@@ -31,7 +31,7 @@ async fn find(
     repo: &RepositoriesImpl,
     auth: &AuthInfo,
     primary: &_domain_::@{ pascal_name }@Primary,
-) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@>>> {
+) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
     let @{ db|snake }@_query = repo.@{ db|snake }@_query();
     @{ db|snake }@_query.begin_read_tx().await?;
     let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
@@ -66,7 +66,7 @@ async fn _@{ selector }@(
     @%- endif %@
     order: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order,
     offset: Option<usize>,
-) -> anyhow::Result<(Vec<Box<dyn _domain_::@{ pascal_name }@>>, bool, usize)> {
+) -> anyhow::Result<(Vec<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>, bool, usize)> {
     use domain::models::Cursor;
     let @{ db|snake }@_query = repo.@{ db|snake }@_query();
     @{ db|snake }@_query.begin_read_tx().await?;
