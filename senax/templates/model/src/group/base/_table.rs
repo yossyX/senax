@@ -77,7 +77,7 @@ static ALL_ROWS_CACHE: OnceCell<Vec<ArcSwapOption<Vec<_@{ pascal_name }@Cache>>>
 static ALL_ROWS_CACHE: OnceCell<Vec<ArcSwapOption<Vec<()>>>> = OnceCell::new();
 @% endif -%@
 static CACHE_RESET_SYNC: OnceCell<Vec<RwLock<u64>>> = OnceCell::new();
-static CACHE_RESET_SYNC_ALL: OnceCell<Vec<Mutex<u64>>> = OnceCell::new();
+static CACHE_RESET_SYNC_ALL_ROWS: OnceCell<Vec<Mutex<u64>>> = OnceCell::new();
 static BULK_FETCH_QUEUE: OnceCell<Vec<SegQueue<InnerPrimary>>> = OnceCell::new();
 static PRIMARY_TYPE_ID: u64 = @{ def.get_type_id("PRIMARY_TYPE_ID") }@;
 static COL_KEY_TYPE_ID: u64 = @{ def.get_type_id("COL_KEY_TYPE_ID") }@;
@@ -93,7 +93,7 @@ pub(crate) async fn init() -> Result<()> {
     if ALL_ROWS_CACHE.get().is_none() {
         ALL_ROWS_CACHE.set(DbConn::shard_num_range().map(|_| ArcSwapOption::const_empty()).collect()).unwrap();
         CACHE_RESET_SYNC.set(DbConn::shard_num_range().map(|_| RwLock::new(0)).collect()).unwrap();
-        CACHE_RESET_SYNC_ALL.set(DbConn::shard_num_range().map(|_| Mutex::new(0)).collect()).unwrap();
+        CACHE_RESET_SYNC_ALL_ROWS.set(DbConn::shard_num_range().map(|_| Mutex::new(0)).collect()).unwrap();
         @%- if def.use_save_delayed() %@
         SAVE_DELAYED_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
         @%- endif %@
@@ -390,6 +390,15 @@ impl CacheOp {
         async move {
             let time = MSec::now();
             _@{pascal_name}@::_receive_update_notice(&self).await;
+            for (shard_id, sync) in sync_map.iter() {
+                if *sync == 0 {
+                    let shard_id = *shard_id;
+                    tokio::spawn(async move {
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        _clear_cache(shard_id, 0, false).await;
+                    });
+                }
+            }
             match self {
                 CacheOp::None => {},
                 @%- if def.act_as_job_queue() %@
@@ -556,7 +565,7 @@ impl CacheOp {
                     }
                     @%- if def.has_auto_primary() %@
                     if overwrite {
-                        _clear_cache(shard_id, sync).await;
+                        _clear_cache(shard_id, sync, false).await;
                         if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                             DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::invalidate_all, &serde_json::Value::Null).await;
                         }
@@ -757,7 +766,7 @@ impl CacheOp {
                 }
                 CacheOp::DeleteAll { shard_id } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
-                    _clear_cache(shard_id, sync).await;
+                    _clear_cache(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::delete_all, &serde_json::Value::Null).await;
                     }
@@ -827,7 +836,7 @@ impl CacheOp {
                 }
                 CacheOp::InvalidateAll => {
                     for (shard_id, sync) in sync_map.iter() {
-                        _clear_cache(*shard_id, *sync).await;
+                        _clear_cache(*shard_id, *sync, false).await;
                     }
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         DbConn::_push_update_notice(crate::models::TableName::@{ table_name }@, crate::models::NotifyOp::invalidate_all, &serde_json::Value::Null).await;
@@ -879,13 +888,13 @@ impl CacheOp {
 @%- if !config.force_disable_cache %@
 
 #[cfg(not(feature="cache_update_only"))]
-pub(crate) async fn clear_all_rows_cache(shard_id: ShardId, sync: u64, clear_test: bool) {
+async fn clear_all_rows_cache(shard_id: ShardId, sync: u64, clear_test: bool) {
     @{- def.auto_inc_or_seq()|fmt_join("
     if clear_test {
         if let Some(ids) = GENERATED_IDS.get() { ids.write().unwrap().clear() }
     }", "") }@
     if USE_ALL_ROWS_CACHE {
-        if let Some(list) = CACHE_RESET_SYNC_ALL.get() {
+        if let Some(list) = CACHE_RESET_SYNC_ALL_ROWS.get() {
             if clear_test {
                 for shard in list {
                     let mut _sync = shard.lock().await;
@@ -893,7 +902,7 @@ pub(crate) async fn clear_all_rows_cache(shard_id: ShardId, sync: u64, clear_tes
                 }
             }
             let mut _sync = list[shard_id as usize].lock().await;
-            if sync > *_sync {
+            if sync == 0 || sync > *_sync {
                 *_sync = sync;
                 let _ = ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].swap(None);
             }
@@ -901,8 +910,8 @@ pub(crate) async fn clear_all_rows_cache(shard_id: ShardId, sync: u64, clear_tes
     }
 }
 #[cfg(not(feature="cache_update_only"))]
-async fn _clear_cache(shard_id: ShardId, sync: u64) {
-    clear_all_rows_cache(shard_id, sync, false).await;
+pub(crate) async fn _clear_cache(shard_id: ShardId, sync: u64, _clear_test: bool) {
+    clear_all_rows_cache(shard_id, sync, _clear_test).await;
     if USE_CACHE {
         let mut _sync = CACHE_RESET_SYNC.get().unwrap()[shard_id as usize].write().await;
         *_sync = sync;
@@ -4430,7 +4439,7 @@ impl QueryBuilder {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
-            conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await?;
+            conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
         Ok(result.rows_affected())
     }
@@ -4498,7 +4507,7 @@ impl QueryBuilder {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
-            conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await?;
+            conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
         Ok(result.rows_affected())
         @%- else %@
@@ -5073,7 +5082,7 @@ impl _@{ pascal_name }@Cache {
         if USE_CACHE || USE_ALL_ROWS_CACHE {
             @%- if def.act_as_job_queue() %@
             @%- else if def.use_clear_whole_cache() %@
-            let sync = DbConn::inc_cache_sync(conn.shard_id()).await?;
+            let sync = DbConn::inc_cache_sync(conn.shard_id()).await;
             let mut sync_map = FxHashMap::default();
             sync_map.insert(conn.shard_id(), sync);
             CacheMsg(vec![crate::CacheOp::_AllClear], sync_map)
@@ -5081,7 +5090,7 @@ impl _@{ pascal_name }@Cache {
                 .await;
             @%- else %@
             let id: InnerPrimary = (&id.into()).into();
-            let sync = DbConn::inc_cache_sync(conn.shard_id()).await?;
+            let sync = DbConn::inc_cache_sync(conn.shard_id()).await;
             let mut sync_map = FxHashMap::default();
             sync_map.insert(conn.shard_id(), sync);
             CacheMsg(vec![CacheOp::Invalidate{id, shard_id: conn.shard_id()}.wrap()], sync_map)
@@ -5099,7 +5108,7 @@ impl _@{ pascal_name }@Cache {
         @%- else %@
         if USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE {
             let id: InnerPrimary = (&id.into()).into();
-            conn.push_cache_op(CacheOp::Invalidate{id: id.clone(), shard_id: conn.shard_id()}.wrap()).await?;
+            conn.push_cache_op(CacheOp::Invalidate{id: id.clone(), shard_id: conn.shard_id()}.wrap()).await;
             @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
             @%- if def.use_cache() %@
             if !conn.clear_whole_cache {
@@ -5133,7 +5142,7 @@ impl _@{ pascal_name }@Cache {
         @%- else %@
         if USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE {
             let id: InnerPrimary = (&id.into()).into();
-            conn.push_cache_op(CacheOp::Notify{id, shard_id: conn.shard_id()}.wrap()).await?;
+            conn.push_cache_op(CacheOp::Notify{id, shard_id: conn.shard_id()}.wrap()).await;
         }
         @%- endif %@
         Ok(())
@@ -5603,7 +5612,7 @@ impl _@{ pascal_name }@ {
         @{- def.relations_in_cache()|fmt_rel_join("\n        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut list, &mut conn).await?;", "") }@
         let list: Vec<_@{ pascal_name }@Cache> = list.into_iter().map(|v| Arc::new(v).into()).collect();
         let arc = Arc::new(list);
-        let sync = CACHE_RESET_SYNC_ALL.get().unwrap()[shard_id as usize].lock().await;
+        let sync = CACHE_RESET_SYNC_ALL_ROWS.get().unwrap()[shard_id as usize].lock().await;
         if *sync <= conn.cache_sync() {
             ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].swap(Some(Arc::clone(&arc)));
         }
@@ -5655,7 +5664,7 @@ impl _@{ pascal_name }@ {
         @{- def.relations_in_cache()|fmt_rel_join("\n        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut list, &mut conn).await?;", "") }@
         let list: Vec<_@{ pascal_name }@Cache> = list.into_iter().map(|v| Arc::new(v).into()).collect();
         let arc = Arc::new(list);
-        let sync = CACHE_RESET_SYNC_ALL.get().unwrap()[shard_id as usize].lock().await;
+        let sync = CACHE_RESET_SYNC_ALL_ROWS.get().unwrap()[shard_id as usize].lock().await;
         if *sync <= conn.cache_sync() {
             ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].swap(Some(Arc::clone(&arc)));
         }
@@ -5672,12 +5681,12 @@ impl _@{ pascal_name }@ {
     pub@{ visibility }@ async fn clear_cache() -> Result<()> {
         @%- if def.act_as_job_queue() %@
         @%- else if def.use_clear_whole_cache() %@
-        let sync_map = DbConn::inc_all_cache_sync().await?;
+        let sync_map = DbConn::inc_all_cache_sync().await;
         CacheMsg(vec![crate::CacheOp::_AllClear], sync_map)
             .do_send()
             .await;
         @%- else %@
-        let sync_map = DbConn::inc_all_cache_sync().await?;
+        let sync_map = DbConn::inc_all_cache_sync().await;
         CacheMsg(vec![CacheOp::InvalidateAll.wrap()], sync_map)
             .do_send()
             .await;
@@ -6462,7 +6471,7 @@ impl _@{ pascal_name }@ {
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
         if let Some(cache_msg) = cache_msg {
-            conn.push_cache_op(cache_msg.wrap()).await?;
+            conn.push_cache_op(cache_msg.wrap()).await;
         }
         @%- else if def.use_clear_whole_cache() %@
         conn.clear_whole_cache = true;
@@ -6471,9 +6480,9 @@ impl _@{ pascal_name }@ {
             if let Some(cache_msg) = cache_msg {
                 @%- if def.disable_insert_cache_propagation %@
                 let internal = matches!(cache_msg, CacheOp::Insert { .. });
-                conn.push_cache_op_to(cache_msg.wrap(), internal).await?;
+                conn.push_cache_op_to(cache_msg.wrap(), internal).await;
                 @%- else %@
-                conn.push_cache_op(cache_msg.wrap()).await?;
+                conn.push_cache_op(cache_msg.wrap()).await;
                 @%- endif %@
             }
         }
@@ -6835,7 +6844,7 @@ impl _@{ pascal_name }@ {
                 data_list,
                 op: obj._op,
             };
-            conn.push_cache_op(cache_msg.wrap()).await?;
+            conn.push_cache_op(cache_msg.wrap()).await;
         }
         @%- endif %@
         @%- endif %@
@@ -6899,7 +6908,7 @@ impl _@{ pascal_name }@ {
         obj._op = OpData::default();
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
-        conn.push_cache_op(CacheOp::Queued.wrap()).await?;
+        conn.push_cache_op(CacheOp::Queued.wrap()).await;
         @%- else if def.use_clear_whole_cache() %@
         conn.clear_whole_cache = true;
         @%- else %@
@@ -6911,7 +6920,7 @@ impl _@{ pascal_name }@ {
 @{- def.relations_one_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
 @{- def.relations_many_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
             };
-            conn.push_cache_op(cache_msg.wrap()).await?;
+            conn.push_cache_op(cache_msg.wrap()).await;
         }
         @%- endif %@
         @%- endif %@
@@ -7078,7 +7087,7 @@ impl _@{ pascal_name }@ {
         let result = Self::___bulk_insert(conn, list, ignore, replace, overwrite).await?;
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
-        conn.push_cache_op(CacheOp::Queued.wrap()).await?;
+        conn.push_cache_op(CacheOp::Queued.wrap()).await;
         @%- else if def.use_clear_whole_cache() %@
         conn.clear_whole_cache = true;
         @%- else %@
@@ -7103,7 +7112,7 @@ impl _@{ pascal_name }@ {
                     shard_id: conn.shard_id(),
                     list,
                 };
-                conn.push_cache_op_to(cache_msg.wrap(), @{ def.disable_insert_cache_propagation }@).await?;
+                conn.push_cache_op_to(cache_msg.wrap(), @{ def.disable_insert_cache_propagation }@).await;
             }
         }
         @%- endif %@
@@ -7321,7 +7330,7 @@ impl _@{ pascal_name }@ {
                 update: obj._update.clone(),
                 op: obj._op.clone(),
             };
-            conn.push_cache_op(cache_msg.wrap()).await?;
+            conn.push_cache_op(cache_msg.wrap()).await;
         }
         @%- endif %@
         @%- endif %@
@@ -7402,9 +7411,9 @@ impl _@{ pascal_name }@ {
                     data_list: Vec::new(),
                     op: updater._op,
                 };
-                conn.push_cache_op(cache_msg.wrap()).await?;
+                conn.push_cache_op(cache_msg.wrap()).await;
                 @{- def.cache_owners|fmt_cache_owners("
-                conn.push_cache_op(crate::models::{mod}::CacheOp::InvalidateAll.wrap()).await?;") }@
+                conn.push_cache_op(crate::models::{mod}::CacheOp::InvalidateAll.wrap()).await;") }@
             }
             @%- endif %@
             @%- endif %@
@@ -7484,9 +7493,9 @@ impl _@{ pascal_name }@ {
             @%- else %@
             if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
                 let shard_id = conn.shard_id();
-                conn.push_cache_op(CacheOp::DeleteMany { ids, shard_id }.wrap()).await?;
+                conn.push_cache_op(CacheOp::DeleteMany { ids, shard_id }.wrap()).await;
                 @{- def.cache_owners|fmt_cache_owners("
-                conn.push_cache_op(crate::models::{mod}::CacheOp::InvalidateAll.wrap()).await?;") }@
+                conn.push_cache_op(crate::models::{mod}::CacheOp::InvalidateAll.wrap()).await;") }@
             }
             @%- endif %@
             @%- endif %@
@@ -7520,7 +7529,7 @@ impl _@{ pascal_name }@ {
         @%- else %@
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             if let Some(cache_msg) = cache_msg {
-                conn.push_cache_op(cache_msg.wrap()).await?;
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
         }
         @%- endif %@
@@ -7578,13 +7587,13 @@ impl _@{ pascal_name }@ {
         let (obj, cache_msg) = Self::__save_update(conn, obj).await?;
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
-        conn.push_cache_op(CacheOp::Queued.wrap()).await?;
+        conn.push_cache_op(CacheOp::Queued.wrap()).await;
         @%- else if def.use_clear_whole_cache() %@
         conn.clear_whole_cache = true;
         @%- else %@
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             if let Some(cache_msg) = cache_msg {
-                conn.push_cache_op(cache_msg.wrap()).await?;
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
         }
         @%- endif %@
@@ -7632,7 +7641,7 @@ impl _@{ pascal_name }@ {
         @%- else %@
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             let shard_id = conn.shard_id();
-            conn.push_cache_op(CacheOp::Delete { id, shard_id }.wrap()).await?;
+            conn.push_cache_op(CacheOp::Delete { id, shard_id }.wrap()).await;
         }
         @%- endif %@
         @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
@@ -7673,9 +7682,9 @@ impl _@{ pascal_name }@ {
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::DeleteAll {
                 shard_id: conn.shard_id(),
-            }.wrap()).await?;
+            }.wrap()).await;
             @{- def.cache_owners|fmt_cache_owners("
-            conn.push_cache_op(crate::models::{mod}::CacheOp::InvalidateAll.wrap()).await?;") }@
+            conn.push_cache_op(crate::models::{mod}::CacheOp::InvalidateAll.wrap()).await;") }@
         }
         @%- endif %@
         @%- endif %@
@@ -7695,9 +7704,9 @@ impl _@{ pascal_name }@ {
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::DeleteAll {
                 shard_id: conn.shard_id(),
-            }.wrap()).await?;
+            }.wrap()).await;
             @{- def.cache_owners|fmt_cache_owners("
-            conn.push_cache_op(crate::models::{mod}::CacheOp::InvalidateAll.wrap()).await?;") }@
+            conn.push_cache_op(crate::models::{mod}::CacheOp::InvalidateAll.wrap()).await;") }@
         }
         @%- endif %@
         @%- endif %@
@@ -7776,7 +7785,7 @@ impl _@{ pascal_name }@ {
             @%- else %@
             if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
                 let cache_msg = CacheOp::Cascade { ids: id_list.clone(), shard_id: conn.shard_id() };
-                conn.push_cache_op(cache_msg.wrap()).await?;
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
             @%- endif %@
 @%- endif %@
@@ -7806,7 +7815,7 @@ impl _@{ pascal_name }@ {
             @%- else %@
             if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
                 let cache_msg = CacheOp::Cascade { ids: id_list.clone(), shard_id: conn.shard_id() };
-                conn.push_cache_op(cache_msg.wrap()).await?;
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
             @%- endif %@
 @%- endif %@
@@ -7908,7 +7917,7 @@ impl _@{ pascal_name }@ {
             @%- else %@
             if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
                 let cache_msg = CacheOp::Reset@{ rel_name|pascal }@@{ val|pascal }@ { ids: id_list.clone(), shard_id: conn.shard_id() };
-                conn.push_cache_op(cache_msg.wrap()).await?;
+                conn.push_cache_op(cache_msg.wrap()).await;
             }
             @%- endif %@
 @%- endif %@

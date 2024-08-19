@@ -190,7 +190,10 @@ async fn main() -> Result<()> {
     )?;
     if arg.auto_migrate {
         info!("Starting migration");
-        db::migrate(false, false, true).await?;
+        if let Err(e) = db::migrate(false, false, true).await {
+            error!("{}", e);
+            std::process::exit(1);
+        }
     }
     let port = env::var(HOST_PORT).unwrap_or_else(|_| DEFAULT_HOST_PORT.to_owned());
     info!("HOST_PORT: {:?}", port);
@@ -214,7 +217,7 @@ async fn main() -> Result<()> {
     SHUTDOWN_GUARD.set(Arc::downgrade(&app_guard_tx)).unwrap();
     tokio::spawn(async move {
         let db_dir = Path::new(&dir);
-        db::start(
+        if let Err(e) = db::start(
             is_hot_deploy,
             exit_tx.clone(),
             &db_guard,
@@ -223,7 +226,10 @@ async fn main() -> Result<()> {
             &linker_pw,
         )
         .await
-        .unwrap();
+        {
+            error!("{}", e);
+            std::process::exit(1);
+        }
     })
     .await?;
     tokio::spawn(async {
@@ -285,6 +291,7 @@ async fn main() -> Result<()> {
             .wrap(
                 senax_actix_session::SessionMiddleware::builder(_SessionStore, &session_secret_key)
                     .cookie_secure(!cfg!(debug_assertions))
+                    .cookie_name(if cfg!(debug_assertions) { "sid".into() } else { "__Host-sid".into() })
                     .build(),
             )
             .configure(routes::root::init)

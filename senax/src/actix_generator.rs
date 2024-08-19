@@ -355,7 +355,7 @@ pub struct DbStopTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    let _ = db_@{ db|snake }@::clear_local_cache().await;
+    db_@{ db|snake }@::clear_local_cache().await;
     // Do not modify this line. (DbClearLocalCache)"###,
     ext = "txt",
     escape = "none"
@@ -367,7 +367,7 @@ pub struct DbClearLocalCacheTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    let _ = db_@{ db|snake }@::clear_whole_cache().await;
+    db_@{ db|snake }@::clear_whole_cache().await;
     // Do not modify this line. (DbClearCache)"###,
     ext = "txt",
     escape = "none"

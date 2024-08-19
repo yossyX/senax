@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 actix-utils = "3"
-actix-web = { version = "4", default_features = false, features = ["cookies", "secure-cookies"] }
+actix-web = { version = "4", default-features = false, features = ["cookies", "secure-cookies"] }
 anyhow = "1"
 ciborium = "0.2.1"
 derive_more = "0.99.5"

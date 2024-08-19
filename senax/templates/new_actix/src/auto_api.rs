@@ -13,7 +13,7 @@ use validator::ValidationErrors;
 pub use db_session::models::session::session::{_SessionStore, SESSION_ROLE};
 pub use senax_actix_session::Session;
 
-use crate::auth::{AuthInfo, Role};
+use crate::auth::{AuthInfo, AuthInfoInner, Role};
 use crate::context::Ctx;
 use crate::db::RepositoriesImpl;
 
@@ -62,22 +62,20 @@ impl GqlError {
         } else if let Some(e) = reason.downcast_ref::<sqlx::Error>() {
             use sqlx::error::ErrorKind;
             match e {
-                sqlx::Error::Database(e) => {
-                    match e.kind() {
-                        ErrorKind::UniqueViolation => {
-                            warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", reason);
-                            GqlError::Conflict.extend()
-                        }
-                        ErrorKind::Other => {
-                            error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", reason);
-                            GqlError::ServerError.extend()
-                        }
-                        _ => {
-                            warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", reason);
-                            GqlError::BadRequest.extend()
-                        },
+                sqlx::Error::Database(e) => match e.kind() {
+                    ErrorKind::UniqueViolation => {
+                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", reason);
+                        GqlError::Conflict.extend()
                     }
-                }
+                    ErrorKind::Other => {
+                        error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", reason);
+                        GqlError::ServerError.extend()
+                    }
+                    _ => {
+                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", reason);
+                        GqlError::BadRequest.extend()
+                    }
+                },
                 sqlx::Error::RowNotFound => {
                     log::warn!(ctx = ctx.ctx_no(); "{}", reason);
                     GqlError::BadRequest.extend()
@@ -162,11 +160,14 @@ impl MutationRoot {
             .checked_add_signed(chrono::Duration::hours(24))
             .expect("valid timestamp")
             .timestamp() as usize;
-        let auth = AuthInfo {
-            username,
-            role,
-            exp,
-        };
+        let auth = AuthInfo(
+            AuthInfoInner {
+                username,
+                role,
+                exp,
+            }
+            .into(),
+        );
 
         let jwt = jsonwebtoken::encode(
             &jsonwebtoken::Header::default(),
@@ -357,4 +358,70 @@ pub async fn js_update(
     })
     .await?
 }
+
+#[macro_export]
+macro_rules! gql_find_with_auto_retry {
+    ( $f:ident $p:tt, $repo:expr, $auth:expr, $gql_ctx:expr ) => {
+        match $f$p.await {
+            Ok(obj) => {
+                let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
+                Ok(ResObj::try_from_(&*obj, $auth)?)
+            }
+            Err(e) => {
+                if $repo.should_retry(&e) {
+                    let obj = $f$p
+                        .await
+                        .map_err(|e| GqlError::server_error($gql_ctx, e))?;
+                    let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
+                    Ok(ResObj::try_from_(&*obj, $auth)?)
+                } else {
+                    Err(GqlError::server_error($gql_ctx, e))
+                }
+            }
+        }
+    };
+}
+pub use gql_find_with_auto_retry as find;
+
+#[macro_export]
+macro_rules! gql_selector_with_auto_retry {
+    ( $f:ident $p:tt, $repo:expr, $gql_ctx:expr ) => {
+        match $f$p
+        .await
+        {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                if $repo.should_retry(&e) {
+                    let result = $f$p
+                    .await
+                    .map_err(|e| GqlError::server_error($gql_ctx, e))?;
+                    Ok(result)
+                } else {
+                    Err(GqlError::server_error($gql_ctx, e))
+                }
+            }
+        }?
+    };
+}
+pub use gql_selector_with_auto_retry as selector;
+
+#[macro_export]
+macro_rules! gql_count_with_auto_retry {
+    ( $f:ident $p:tt, $repo:expr, $gql_ctx:expr ) => {
+        match $f$p.await {
+            Ok(count) => Ok(count),
+            Err(e) => {
+                if $repo.should_retry(&e) {
+                    let count = $f$p
+                        .await
+                        .map_err(|e| GqlError::server_error($gql_ctx, e))?;
+                    Ok(count)
+                } else {
+                    Err(GqlError::server_error($gql_ctx, e))
+                }
+            }
+        }
+    };
+}
+pub use gql_count_with_auto_retry as count;
 @{-"\n"}@

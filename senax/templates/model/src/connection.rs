@@ -4,36 +4,40 @@ use anyhow::{ensure, Context as _, Result};
 #[allow(unused_imports)]
 use crossbeam::queue::SegQueue;
 use futures::future::BoxFuture;
-use fxhash::FxHashMap;
+use fxhash::{FxHashMap, FxHashSet};
 use log::LevelFilter;
 #[allow(unused_imports)]
 use once_cell::sync::{Lazy, OnceCell};
 use senax_common::ShardId;
 use sqlx::migrate::MigrateDatabase;
-use sqlx::mysql::{MySqlConnectOptions, MySqlPool, MySqlPoolOptions};
+use sqlx::mysql::{MySqlConnectOptions, MySqlPool};
 use sqlx::pool::PoolConnection;
 use sqlx::{ConnectOptions, Executor, MySqlConnection, Row, Transaction};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, VecDeque};
+use std::net::SocketAddr;
 #[allow(unused_imports)]
-use std::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 #[allow(unused_imports)]
 use std::sync::Arc;
 use std::time::SystemTime;
 use std::{cmp, env};
 #[allow(unused_imports)]
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, Semaphore};
+use tokio::task::JoinSet;
 
-use crate::models::CacheOp;
+use crate::models::{CacheOp, NotifyOp, TableName};
 use crate::*;
 
 pub type DbType = sqlx::MySql;
 pub type DbPool = MySqlPool;
 pub type DbConnection = MySqlConnection;
+pub type DbConnectOptions = MySqlConnectOptions;
 pub type DbArguments = sqlx::mysql::MySqlArguments;
 pub type DbRow = sqlx::mysql::MySqlRow;
 pub const TX_ISOLATION: Option<&'static str> = @{ tx_isolation|disp_opt }@;
 pub const READ_TX_ISOLATION: Option<&'static str> = @{ read_tx_isolation|disp_opt }@;
+const CHECK_SQL: &str = "select @@innodb_read_only OR @@read_only OR @@super_read_only";
 @%- if config.use_sequence %@
 const ID_OF_SEQUENCE: u32 = 1;
 @%- endif %@
@@ -45,11 +49,15 @@ static MAX_CONNECTIONS_FOR_WRITE: AtomicU32 = AtomicU32::new(0);
 static MAX_CONNECTIONS_FOR_READ: AtomicU32 = AtomicU32::new(0);
 static MAX_CONNECTIONS_FOR_CACHE: AtomicU32 = AtomicU32::new(0);
 static SEQUENCE_FETCH_NUM: AtomicU32 = AtomicU32::new(0);
+static ENABLE_FAST_FAILOVER: AtomicBool = AtomicBool::new(false);
+static USE_IPV4_ONLY: AtomicBool = AtomicBool::new(false);
+static USE_IPV6_ONLY: AtomicBool = AtomicBool::new(false);
 
-static SOURCE: RwLock<Vec<DbPool>> = RwLock::const_new(Vec::new());
-static SOURCE_NUM: OnceCell<usize> = OnceCell::new();
-static REPLICA: RwLock<Vec<Vec<DbPool>>> = RwLock::const_new(Vec::new());
-static CACHE: RwLock<Vec<Vec<DbPool>>> = RwLock::const_new(Vec::new());
+static SOURCE: RwLock<Vec<Option<(SocketAddr, DbPool)>>> = RwLock::const_new(Vec::new());
+static SHARD_NUM: OnceCell<usize> = OnceCell::new();
+type AddrPoolMap = FxHashMap<SocketAddr, (DbPool, bool)>;
+static REPLICA: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
+static CACHE: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
 static NEXT_REPLICA: AtomicUsize = AtomicUsize::new(0);
 @%- if !config.force_disable_cache %@
 static NEXT_CACHE: AtomicUsize = AtomicUsize::new(0);
@@ -62,29 +70,21 @@ static SEQUENCE: Lazy<Vec<Mutex<(u64, u64)>>> = Lazy::new(|| {
         .collect()
 });
 @%- endif %@
-@%- if !config.force_disable_cache %@
-static CACHE_SYNC: Lazy<Vec<Mutex<()>>> =
-    Lazy::new(|| DbConn::shard_num_range().map(|_| Mutex::new(())).collect());
-static CACHE_SYNC_QUEUE: Lazy<Vec<SegQueue<Arc<AtomicU64>>>> =
-    Lazy::new(|| DbConn::shard_num_range().map(|_| SegQueue::new()).collect());
-@%- endif %@
-type NotifyFn = Box<dyn Fn(crate::models::TableName, crate::models::NotifyOp, &str) + Send + Sync>;
+type NotifyFn = Box<dyn Fn(TableName, NotifyOp, &str) + Send + Sync>;
 static NOTIFY_RECEIVER: RwLock<Vec<NotifyFn>> = RwLock::const_new(Vec::new());
 static NOTIFY_RECEIVER_COUNT: AtomicUsize = AtomicUsize::new(0);
-static NOTIFY_LIST: RwLock<
-    Option<FxHashMap<(crate::models::TableName, String), crate::models::NotifyOp>>,
-> = RwLock::const_new(None);
+static NOTIFY_LIST: RwLock<Option<FxHashMap<(TableName, String), NotifyOp>>> =
+    RwLock::const_new(None);
+static TEST_MODE: AtomicBool = AtomicBool::new(false);
 
 fn env_u32(etcd: &FxHashMap<String, String>, name: &str, default: &str) -> Result<u32> {
     let v = etcd.get(name).cloned();
-    let v = v.unwrap_or_else(|| {
-        env::var(format!("@{ db|upper_snake }@_{}", name)).unwrap_or_else(|_| default.to_owned())
-    });
+    let v = v.unwrap_or_else(|| env::var(name).unwrap_or_else(|_| default.to_owned()));
     v.parse().with_context(|| format!("{} parse error", name))
 }
 fn env_opt_str(etcd: &FxHashMap<String, String>, name: &str) -> Option<String> {
     let v = etcd.get(name).cloned();
-    v.or_else(|| env::var(format!("@{ db|upper_snake }@_{}", name)).ok())
+    v.or_else(|| env::var(name).ok())
 }
 fn env_urls(etcd: &FxHashMap<String, String>, name: &str) -> Result<Option<String>> {
     let mut urls = etcd.get(name).cloned();
@@ -102,150 +102,454 @@ fn env_urls(etcd: &FxHashMap<String, String>, name: &str) -> Result<Option<Strin
             urls = Some(vec.join(" "));
         }
     }
-    Ok(urls.or_else(|| env::var(format!("@{ db|upper_snake }@_{}", name)).ok()))
+    Ok(urls.or_else(|| env::var(name).ok()))
 }
 #[rustfmt::skip]
 async fn config(etcd: &FxHashMap<String, String>) -> Result<()> {
-    let v = env_u32(etcd, "DB_MAX_CONNECTIONS_FOR_WRITE", DEFAULT_DB_MAX_CONNECTIONS_FOR_WRITE)?;
+    let v = env_u32(
+        etcd,
+        "@{ db|upper_snake }@_DB_MAX_CONNECTIONS_FOR_WRITE",
+        DEFAULT_DB_MAX_CONNECTIONS_FOR_WRITE,
+    )?;
     MAX_CONNECTIONS_FOR_WRITE.store(v, Ordering::SeqCst);
-    let v = env_u32(etcd, "DB_MAX_CONNECTIONS_FOR_READ", DEFAULT_DB_MAX_CONNECTIONS_FOR_READ)?;
+    let v = env_u32(
+        etcd,
+        "@{ db|upper_snake }@_DB_MAX_CONNECTIONS_FOR_READ",
+        DEFAULT_DB_MAX_CONNECTIONS_FOR_READ,
+    )?;
     MAX_CONNECTIONS_FOR_READ.store(v, Ordering::SeqCst);
-    let v = env_u32(etcd, "DB_MAX_CONNECTIONS_FOR_CACHE", DEFAULT_DB_MAX_CONNECTIONS_FOR_CACHE)?;
+    let v = env_u32(
+        etcd,
+        "@{ db|upper_snake }@_DB_MAX_CONNECTIONS_FOR_CACHE",
+        DEFAULT_DB_MAX_CONNECTIONS_FOR_CACHE,
+    )?;
     MAX_CONNECTIONS_FOR_CACHE.store(v, Ordering::SeqCst);
-    let v = env_u32(etcd, "SEQUENCE_FETCH_NUM", DEFAULT_SEQUENCE_FETCH_NUM)?;
+    let v = env_u32(etcd, "@{ db|upper_snake }@_SEQUENCE_FETCH_NUM", DEFAULT_SEQUENCE_FETCH_NUM)?;
     SEQUENCE_FETCH_NUM.store(cmp::max(1, v), Ordering::SeqCst);
+    if let Some(v) = env_opt_str(etcd, "@{ db|upper_snake }@_ENABLE_FAST_FAILOVER") {
+        ENABLE_FAST_FAILOVER.store(v.parse()?, Ordering::SeqCst);
+    }
+    if let Some(v) = env_opt_str(etcd, "@{ db|upper_snake }@_USE_IPV4_ONLY") {
+        USE_IPV4_ONLY.store(v.parse()?, Ordering::SeqCst);
+    }
+    if let Some(v) = env_opt_str(etcd, "@{ db|upper_snake }@_USE_IPV6_ONLY") {
+        USE_IPV6_ONLY.store(v.parse()?, Ordering::SeqCst);
+    }
     Ok(())
 }
 
 pub async fn init() -> Result<()> {
-    connect().await?;
+    log::info!("Connecting to database");
+    connect(true, true, true, None).await?;
+    {
+        let source = SOURCE.read().await;
+        ensure!(!source.is_empty(), "There are no writable database shards.");
+        for (i, s) in source.iter().enumerate() {
+            ensure!(
+                s.is_some(),
+                "There are no writable database connections.(code:0, {i})"
+            );
+        }
+    }
+    {
+        let replica = REPLICA.get().unwrap();
+        ensure!(
+            !replica.is_empty(),
+            "There are no readable database shards."
+        );
+        for (i, s) in replica.iter().enumerate() {
+            let s = s.read().await;
+            ensure!(
+                !s.is_empty(),
+                "There are no readable database connections.(code:0, {i})"
+            );
+        }
+    }
+    {
+        let cache = CACHE.get().unwrap();
+        ensure!(!cache.is_empty(), "There are no database shards for cache.");
+        for (i, s) in cache.iter().enumerate() {
+            let s = s.read().await;
+            ensure!(
+                !s.is_empty(),
+                "There are no database connections for cache.(code:0, {i})"
+            );
+        }
+    }
+    log::info!("Connection to database completed.");
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(crate::CONNECT_CHECK_INTERVAL)).await;
+            reconnect().await;
+        }
+    });
+
     #[cfg(feature = "etcd")]
     tokio::spawn(async {
-        let mut stream = match senax_common::etcd::watch("db/@{ db|upper_snake }@_", true).await {
-            Ok(stream) => stream,
-            Err(err) => {
-                log::error!("{}", err);
-                return;
-            }
-        };
         loop {
-            match stream.message().await {
-                Ok(Some(_)) => {}
-                Ok(None) => {
-                    log::error!("etcd connection has been lost.");
-                    break;
-                }
+            let mut stream = match senax_common::etcd::watch("db/", true).await {
+                Ok(stream) => stream,
                 Err(err) => {
                     log::error!("{}", err);
-                    break;
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                    continue;
                 }
-            }
-            if let Err(err) = connect().await {
-                log::error!("{}", err);
-                exit(1);
-            }
-            match DbConn::inc_all_cache_sync().await {
-                Ok(sync_map) => {
-                    models::_clear_cache(&sync_map, false).await;
+            };
+            loop {
+                match stream.message().await {
+                    Ok(Some(_)) => {}
+                    Ok(None) => {
+                        log::error!("etcd connection has been lost.");
+                        break;
+                    }
+                    Err(err) => {
+                        log::error!("{}", err);
+                        break;
+                    }
                 }
-                Err(e) => {
-                    log::error!("{}", e);
-                    exit(1);
-                }
+                reconnect().await;
             }
         }
     });
     Ok(())
 }
 
+macro_rules! split_shard {
+    ( $x:expr ) => {{
+        $x.split('\n').map(|v| v.trim()).filter(|v| !v.is_empty())
+    }};
+}
+
+pub async fn reconnect() {
+    let mut join_set = JoinSet::new();
+    for shard_id in DbConn::shard_num_range() {
+        join_set.spawn(async move {
+            if let Err(e) = connect(true, true, true, Some(shard_id)).await {
+                log::error!("{}", e);
+            }
+        });
+    }
+    while let Some(r) = join_set.join_next().await {
+        if let Err(e) = r {
+            log::error!("{}", e);
+        }
+    }
+}
+
 #[rustfmt::skip]
-pub async fn connect() -> Result<()> {
+pub async fn connect(
+    update_source: bool,
+    update_replica: bool,
+    update_cache: bool,
+    shard_id: Option<ShardId>,
+) -> Result<()> {
+    static SOURCE_LOCK: Lazy<Vec<Semaphore>> = Lazy::new(|| {
+        std::iter::repeat_with(|| Semaphore::new(1))
+            .take(DbConn::shard_num())
+            .collect()
+    });
+    static REPLICA_LOCK: Lazy<Vec<Semaphore>> = Lazy::new(|| {
+        std::iter::repeat_with(|| Semaphore::new(1))
+            .take(DbConn::shard_num())
+            .collect()
+    });
+    static CACHE_LOCK: Lazy<Vec<Semaphore>> = Lazy::new(|| {
+        std::iter::repeat_with(|| Semaphore::new(1))
+            .take(DbConn::shard_num())
+            .collect()
+    });
+
+    if TEST_MODE.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+    let _source_lock = if update_source {
+        if let Some(shard_id) = shard_id {
+            if let Some(lock) = SOURCE_LOCK.get(shard_id as usize) {
+                match lock.try_acquire() {
+                    Ok(lock) => Some(lock),
+                    Err(_) => {
+                        let _ = lock.acquire().await;
+                        return Ok(());
+                    }
+                }
+            } else {
+                return Ok(());
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let _replica_lock = if update_replica {
+        if let Some(shard_id) = shard_id {
+            if let Some(lock) = REPLICA_LOCK.get(shard_id as usize) {
+                match lock.try_acquire() {
+                    Ok(lock) => Some(lock),
+                    Err(_) => {
+                        let _ = lock.acquire().await;
+                        return Ok(());
+                    }
+                }
+            } else {
+                return Ok(());
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let _cache_lock = if update_cache {
+        if let Some(shard_id) = shard_id {
+            if let Some(lock) = CACHE_LOCK.get(shard_id as usize) {
+                match lock.try_acquire() {
+                    Ok(lock) => Some(lock),
+                    Err(_) => {
+                        let _ = lock.acquire().await;
+                        return Ok(());
+                    }
+                }
+            } else {
+                return Ok(());
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
     #[cfg(feature = "etcd")]
-    let etcd = senax_common::etcd::map("db/@{ db|upper_snake }@_").await?;
+    let etcd = senax_common::etcd::map("db/").await?;
     #[cfg(not(feature = "etcd"))]
     let etcd = FxHashMap::default();
     config(&etcd).await?;
-    let database_url = env_urls(&etcd, "DB_URL")?.with_context(|| "@{ db|upper_snake }@_DB_URL is required in the .env file.")?;
-    let user = env_opt_str(&etcd, "DB_USER");
-    let pw = env_opt_str(&etcd, "DB_PASSWORD");
-    let mut source = SOURCE.write().await;
-    source.clear();
-    source.append(&mut get_source(&database_url, &user, &pw, DbConn::max_connections_for_write()).await?);
-    ensure!(SOURCE_NUM.get_or_init(|| source.len()) == &source.len());
+    let s_url = env_urls(&etcd, "@{ db|upper_snake }@_DB_URL")?
+        .with_context(|| "@{ db|upper_snake }@_DB_URL is required in the .env file.")?;
+    let s_user = env_opt_str(&etcd, "@{ db|upper_snake }@_DB_USER");
+    let s_pw = env_opt_str(&etcd, "@{ db|upper_snake }@_DB_PASSWORD");
+    let r_url = env_urls(&etcd, "@{ db|upper_snake }@_REPLICA_DB_URL")?.unwrap_or_else(|| s_url.clone());
+    let r_user = env_opt_str(&etcd, "@{ db|upper_snake }@_REPLICA_DB_USER").or_else(|| s_user.clone());
+    let r_pw = env_opt_str(&etcd, "@{ db|upper_snake }@_REPLICA_DB_PASSWORD").or_else(|| s_pw.clone());
+    let cache_use_source = env_opt_str(&etcd, "@{ db|upper_snake }@_CACHE_DB_USE_SOURCE")
+        .map(|v| v.parse())
+        .transpose()?
+        .unwrap_or_default();
 
-    let replica_url = env_urls(&etcd, "REPLICA_DB_URL")?.unwrap_or_else(|| database_url.clone());
-    let user = env_opt_str(&etcd, "REPLICA_DB_USER").or(user);
-    let pw = env_opt_str(&etcd, "REPLICA_DB_PASSWORD").or(pw);
-    let mut replica = REPLICA.write().await;
-    replica.clear();
-    replica.append(&mut get_replica(&replica_url, &user, &pw, DbConn::max_connections_for_read()).await?);
+    if SHARD_NUM.get().is_none() {
+        let source_len = split_shard!(s_url).count();
+        ensure!(
+            source_len <= ShardId::MAX as usize + 1,
+            "Number of shards exceeds limit."
+        );
+        let replica_len = split_shard!(r_url).count();
+        ensure!(
+            source_len == replica_len,
+            "Number of shards for source and replica are different."
+        );
+        let _ = SHARD_NUM.set(source_len);
+        *SOURCE.write().await = vec![None; source_len];
+        let _ = REPLICA.set(
+            std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
+                .take(source_len)
+                .collect(),
+        );
+        let _ = CACHE.set(
+            std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
+                .take(source_len)
+                .collect(),
+        );
+    }
 
-    let cache_url = env_urls(&etcd, "CACHE_DB_URL")?.unwrap_or_else(|| replica_url.clone());
-    let user = env_opt_str(&etcd, "CACHE_DB_USER").or(user);
-    let pw = env_opt_str(&etcd, "CACHE_DB_PASSWORD").or(pw);
-    let mut cache = CACHE.write().await;
-    cache.clear();
-    cache.append(&mut get_replica(&cache_url, &user, &pw, DbConn::max_connections_for_cache()).await?);
+    let mut join_set = JoinSet::new();
+    if update_source {
+        let (s_url, s_user, s_pw) = (s_url.clone(), s_user.clone(), s_pw.clone());
+        let (r_url, r_user, r_pw) = (r_url.clone(), r_user.clone(), r_pw.clone());
+        join_set.spawn(async move {
+            tokio::spawn(async move {
+                reset_source_pool(
+                    &s_url,
+                    &s_user,
+                    &s_pw,
+                    &r_url,
+                    &r_user,
+                    &r_pw,
+                    db_options_for_write(),
+                    &SOURCE,
+                    shard_id,
+                )
+                .await
+            })
+            .await
+        });
+    }
 
-    ensure!(
-        source.len() == replica.len(),
-        "Source and replica shards have different lengths."
-    );
-    ensure!(
-        source.len() == cache.len(),
-        "Source and cache shards have different lengths."
-    );
-    ensure!(
-        DbConn::shard_num() <= ShardId::MAX as usize + 1,
-        "Number of shards exceeds limit."
-    );
+    if update_replica {
+        let (s_url, s_user, s_pw) = (s_url.clone(), s_user.clone(), s_pw.clone());
+        let (r_url, r_user, r_pw) = (r_url.clone(), r_user.clone(), r_pw.clone());
+        join_set.spawn(async move {
+            tokio::spawn(async move {
+                reset_replica_pool(
+                    &r_url,
+                    &r_user,
+                    &r_pw,
+                    &s_url,
+                    &s_user,
+                    &s_pw,
+                    db_options_for_read(),
+                    &REPLICA,
+                    shard_id,
+                )
+                .await
+            })
+            .await
+        });
+    }
+
+    if update_cache {
+        let (s_url, s_user, s_pw) = (s_url.clone(), s_user.clone(), s_pw.clone());
+        let (r_url, r_user, r_pw) = (r_url.clone(), r_user.clone(), r_pw.clone());
+        if cache_use_source {
+            join_set.spawn(async move {
+                tokio::spawn(async move {
+                    reset_replica_pool(
+                        &s_url,
+                        &s_user,
+                        &s_pw,
+                        &r_url,
+                        &r_user,
+                        &r_pw,
+                        db_options_for_cache(),
+                        &CACHE,
+                        shard_id,
+                    )
+                    .await
+                })
+                .await
+            });
+        } else {
+            join_set.spawn(async move {
+                tokio::spawn(async move {
+                    reset_replica_pool(
+                        &r_url,
+                        &r_user,
+                        &r_pw,
+                        &s_url,
+                        &s_user,
+                        &s_pw,
+                        db_options_for_cache(),
+                        &CACHE,
+                        shard_id,
+                    )
+                    .await
+                })
+                .await
+            });
+        }
+    }
+    while let Some(r) = join_set.join_next().await {
+        r???;
+    }
     Ok(())
 }
 
 #[rustfmt::skip]
 pub async fn init_test() -> Result<()> {
-    #[cfg(feature = "etcd")]
-    let etcd = senax_common::etcd::map("db/@{ db|upper_snake }@_").await?;
-    #[cfg(not(feature = "etcd"))]
+    TEST_MODE.store(true, Ordering::SeqCst);
     let etcd = FxHashMap::default();
     config(&etcd).await?;
-    let database_url = env_urls(&etcd, "TEST_DB_URL")?.with_context(|| "@{ db|upper_snake }@_TEST_DB_URL is required in the .env file.")?;
-    let user = env_opt_str(&etcd, "TEST_DB_USER");
-    let pw = env_opt_str(&etcd, "TEST_DB_PASSWORD");
-    let mut source = SOURCE.write().await;
-    source.clear();
-    source.append(&mut get_source(&database_url, &user, &pw, DbConn::max_connections_for_write()).await?);
-    SOURCE_NUM.get_or_init(|| source.len());
+    let s_url = env_urls(&etcd, "@{ db|upper_snake }@_TEST_DB_URL")?
+        .with_context(|| "@{ db|upper_snake }@_TEST_DB_URL is required in the .env file.")?;
+    let s_user = env_opt_str(&etcd, "@{ db|upper_snake }@_TEST_DB_USER");
+    let s_pw = env_opt_str(&etcd, "@{ db|upper_snake }@_TEST_DB_PASSWORD");
+    let r_url = s_url.clone();
+    let r_user = s_user.clone();
+    let r_pw = s_pw.clone();
 
-    let mut replica = REPLICA.write().await;
-    replica.clear();
-    replica.append(&mut get_replica(&database_url, &user, &pw, DbConn::max_connections_for_read()).await?);
+    if SHARD_NUM.get().is_none() {
+        let source_len = split_shard!(s_url).count();
+        ensure!(
+            source_len <= ShardId::MAX as usize + 1,
+            "Number of shards exceeds limit."
+        );
+        let replica_len = split_shard!(r_url).count();
+        ensure!(
+            source_len == replica_len,
+            "Number of shards for source and replica are different."
+        );
+        let _ = SHARD_NUM.set(source_len);
+        *SOURCE.write().await = vec![None; source_len];
+        let _ = REPLICA.set(
+            std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
+                .take(source_len)
+                .collect(),
+        );
+        let _ = CACHE.set(
+            std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
+                .take(source_len)
+                .collect(),
+        );
+    }
 
-    let mut cache = CACHE.write().await;
-    cache.clear();
-    cache.append(&mut get_replica(&database_url, &user, &pw, DbConn::max_connections_for_cache()).await?);
-
-    ensure!(
-        DbConn::shard_num() <= ShardId::MAX as usize + 1,
-        "Number of shards exceeds limit."
-    );
+    reset_source_pool(
+        &s_url,
+        &s_user,
+        &s_pw,
+        &r_url,
+        &r_user,
+        &r_pw,
+        db_options_for_write(),
+        &SOURCE,
+        None,
+    )
+    .await?;
+    reset_replica_pool(
+        &r_url,
+        &r_user,
+        &r_pw,
+        &s_url,
+        &s_user,
+        &s_pw,
+        db_options_for_read(),
+        &REPLICA,
+        None,
+    )
+    .await?;
+    reset_replica_pool(
+        &s_url,
+        &s_user,
+        &s_pw,
+        &r_url,
+        &r_user,
+        &r_pw,
+        db_options_for_cache(),
+        &CACHE,
+        None,
+    )
+    .await?;
     Ok(())
 }
 
 #[rustfmt::skip]
 pub(crate) async fn reset_database(is_test: bool, clean: bool) -> Result<()> {
     #[cfg(feature = "etcd")]
-    let etcd = senax_common::etcd::map("db/@{ db|upper_snake }@_").await?;
+    let etcd = senax_common::etcd::map("db/").await?;
     #[cfg(not(feature = "etcd"))]
     let etcd = FxHashMap::default();
     let (database_url, user, pw) = if is_test {
-        (env_urls(&etcd, "TEST_DB_URL")?.with_context(|| "@{ db|upper_snake }@_TEST_DB_URL is required in the .env file.")?,
-        env_opt_str(&etcd, "TEST_DB_USER"),
-        env_opt_str(&etcd, "TEST_DB_PASSWORD"))
+        (
+            env_urls(&etcd, "@{ db|upper_snake }@_TEST_DB_URL")?
+                .with_context(|| "@{ db|upper_snake }@_TEST_DB_URL is required in the .env file.")?,
+            env_opt_str(&etcd, "@{ db|upper_snake }@_TEST_DB_USER"),
+            env_opt_str(&etcd, "@{ db|upper_snake }@_TEST_DB_PASSWORD"),
+        )
     } else {
-        (env_urls(&etcd, "DB_URL")?.with_context(|| "@{ db|upper_snake }@_DB_URL is required in the .env file.")?,
-        env_opt_str(&etcd, "DB_USER"),
-        env_opt_str(&etcd, "DB_PASSWORD"))
+        (
+            env_urls(&etcd, "@{ db|upper_snake }@_DB_URL")?
+                .with_context(|| "@{ db|upper_snake }@_DB_URL is required in the .env file.")?,
+            env_opt_str(&etcd, "@{ db|upper_snake }@_DB_USER"),
+            env_opt_str(&etcd, "@{ db|upper_snake }@_DB_PASSWORD"),
+        )
     };
 
     for url in database_url.split('\n') {
@@ -290,8 +594,8 @@ pub struct DbConn {
     cache_tx: FxHashMap<ShardId, sqlx::Transaction<'static, DbType>>,
     @%- endif %@
     conn: FxHashMap<ShardId, PoolConnection<DbType>>,
-    cache_internal_op_list: Vec<CacheOp>,
-    cache_op_list: Vec<CacheOp>,
+    cache_internal_op_list: Vec<(ShardId, CacheOp)>,
+    cache_op_list: Vec<(ShardId, CacheOp)>,
     callback_list: VecDeque<Box<dyn FnOnce() -> BoxFuture<'static, ()> + Send + Sync>>,
     pub(crate) clear_whole_cache: bool,
     has_tx: bool,
@@ -420,7 +724,7 @@ impl DbConn {
     }
 
     pub fn shard_num() -> usize {
-        *SOURCE_NUM.get().unwrap()
+        *SHARD_NUM.get().unwrap()
     }
 
     pub fn shard_num_range() -> std::ops::RangeInclusive<ShardId> {
@@ -447,96 +751,195 @@ impl DbConn {
     }
     @%- endif %@
 
+    async fn __acquire_source(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
+        ensure!(
+            Self::shard_num_range().contains(&shard_id),
+            "shard_id is out of range."
+        );
+        let mut conn = {
+            let (_, pool) = SOURCE
+                .read()
+                .await
+                .get(shard_id as usize)
+                .context("There are no writable database connections.(code:1)")?
+                .clone()
+                .context("There are no writable database connections.(code:2)")?;
+            let mut join = JoinSet::new();
+            for i in 0..3 {
+                let pool = pool.clone();
+                join.spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(10 * i)).await;
+                    tokio::spawn(async move { pool.acquire().await }).await
+                });
+            }
+            join.join_next().await.unwrap()???
+        };
+        let row: (i8,) = sqlx::query_as(CHECK_SQL).fetch_one(conn.as_mut()).await?;
+        ensure!(
+            row.0 == 0,
+            "There are no writable database connections.(code:3)"
+        );
+        Ok(conn)
+    }
+
+    async fn _acquire_source(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
+        if let Ok(conn) = Self::__acquire_source(shard_id).await {
+            Ok(conn)
+        } else {
+            let now = SystemTime::now();
+            if let Err(e) = connect(true, false, false, Some(shard_id)).await {
+                log::warn!("{}", e);
+            }
+            if let Ok(conn) = Self::__acquire_source(shard_id).await {
+                Ok(conn)
+            } else {
+                if let Some(time) = Duration::from_secs(crate::ACQUIRE_CONNECTION_WAIT_TIME)
+                    .checked_sub(now.elapsed().unwrap_or_default())
+                {
+                    tokio::time::sleep(time).await;
+                }
+                connect(true, false, false, Some(shard_id)).await?;
+                Self::__acquire_source(shard_id).await
+            }
+        }
+    }
+
+    async fn _acquire_source_tx(shard_id: ShardId) -> Result<Transaction<'static, DbType>> {
+        let conn = Self::_acquire_source(shard_id).await?;
+        Ok(
+            Transaction::begin(sqlx::pool::maybe::MaybePoolConnection::PoolConnection(conn))
+                .await?,
+        )
+    }
+
     pub async fn acquire_source(&self) -> Result<PoolConnection<DbType>> {
-        Ok(SOURCE.read().await[self.shard_id as usize]
-            .acquire()
-            .await?)
+        Self::_acquire_source(self.shard_id).await
+    }
+
+    async fn acquire_reader(
+        shard_id: ShardId,
+        pool_collection: &OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>>,
+        index: usize,
+    ) -> Result<PoolConnection<DbType>> {
+        ensure!(
+            Self::shard_num_range().contains(&shard_id),
+            "shard_id is out of range."
+        );
+        let mut pools: Vec<_> = pool_collection.get().unwrap()[shard_id as usize]
+            .read()
+            .await
+            .values()
+            .cloned()
+            .collect();
+        let len = pools.len();
+        ensure!(
+            len != 0,
+            "There are no readable database connections.(code:11)"
+        );
+        let index = index % len;
+        if len < 4 {
+            pools.extend(pools.clone());
+        }
+        if len < 2 {
+            pools.extend(pools.clone());
+        }
+        let len = pools.len();
+        let mut join = JoinSet::new();
+        for (i, (pool, _)) in pools.into_iter().enumerate() {
+            let i = if i >= index {
+                i - index
+            } else {
+                i + len - index
+            };
+            join.spawn(async move {
+                tokio::time::sleep(Duration::from_millis(10 * i as u64)).await;
+                tokio::spawn(async move { pool.acquire().await }).await
+            });
+        }
+        while let Some(r) = join.join_next().await {
+            if let Ok(Ok(Ok(r))) = r {
+                return Ok(r);
+            }
+        }
+        anyhow::bail!("There are no readable database connections.(code:12)")
+    }
+
+    async fn __acquire_replica(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
+        Self::acquire_reader(
+            shard_id,
+            &REPLICA,
+            NEXT_REPLICA.fetch_add(1, Ordering::SeqCst),
+        )
+        .await
+    }
+
+    async fn _acquire_replica(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
+        if let Ok(conn) = Self::__acquire_replica(shard_id).await {
+            Ok(conn)
+        } else {
+            let now = SystemTime::now();
+            if let Err(e) = connect(false, true, false, Some(shard_id)).await {
+                log::warn!("{}", e);
+            }
+            if let Ok(conn) = Self::__acquire_replica(shard_id).await {
+                Ok(conn)
+            } else {
+                if let Some(time) = Duration::from_secs(crate::ACQUIRE_CONNECTION_WAIT_TIME)
+                    .checked_sub(now.elapsed().unwrap_or_default())
+                {
+                    tokio::time::sleep(time).await;
+                }
+                connect(false, true, false, Some(shard_id)).await?;
+                Self::__acquire_replica(shard_id).await
+            }
+        }
     }
 
     pub async fn acquire_replica(&self) -> Result<PoolConnection<DbType>> {
-        let replica = &REPLICA.read().await[self.shard_id as usize];
-        let len = replica.len();
-        if len == 1 {
-            return Ok(replica[0].acquire().await?);
-        }
-        let index = NEXT_REPLICA.fetch_add(1, Ordering::Relaxed) % len;
-        for i in 0..len {
-            let idx = (i + index) % len;
-            if DbConn::max_connections_for_read() - replica[idx].size()
-                + replica[idx].num_idle() as u32
-                > 0
-            {
-                if let Ok(conn) = replica[idx].acquire().await {
-                    return Ok(conn);
-                }
-            }
-        }
-        for i in 0..len {
-            let idx = (i + index) % len;
-            if let Ok(conn) = replica[idx].acquire().await {
-                return Ok(conn);
-            }
-        }
-        Ok(replica[index].acquire().await?)
+        Self::_acquire_replica(self.shard_id).await
     }
 
-    pub(crate) async fn acquire_replica_tx(
-        shard_id: ShardId,
-    ) -> Result<sqlx::Transaction<'static, DbType>> {
-        let replica = &REPLICA.read().await[shard_id as usize];
-        let len = replica.len();
-        if len == 1 {
-            return Ok(replica[0].begin().await?);
-        }
-        let index = NEXT_REPLICA.fetch_add(1, Ordering::Relaxed) % len;
-        for i in 0..len {
-            let idx = (i + index) % len;
-            if DbConn::max_connections_for_read() - replica[idx].size()
-                + replica[idx].num_idle() as u32
-                > 0
-            {
-                if let Ok(conn) = replica[idx].begin().await {
-                    return Ok(conn);
-                }
-            }
-        }
-        for i in 0..len {
-            let idx = (i + index) % len;
-            if let Ok(conn) = replica[idx].begin().await {
-                return Ok(conn);
-            }
-        }
-        Ok(replica[index].begin().await?)
+    async fn acquire_replica_tx(shard_id: ShardId) -> Result<sqlx::Transaction<'static, DbType>> {
+        let conn = Self::_acquire_replica(shard_id).await?;
+        Ok(
+            Transaction::begin(sqlx::pool::maybe::MaybePoolConnection::PoolConnection(conn))
+                .await?,
+        )
     }
     @%- if !config.force_disable_cache %@
 
-    pub(crate) async fn acquire_cache_tx(
-        shard_id: ShardId,
-    ) -> Result<sqlx::Transaction<'static, DbType>> {
-        let cache = &CACHE.read().await[shard_id as usize];
-        let len = cache.len();
-        if len == 1 {
-            return Ok(cache[0].begin().await?);
-        }
-        let index = NEXT_CACHE.fetch_add(1, Ordering::Relaxed) % len;
-        for i in 0..len {
-            let idx = (i + index) % len;
-            if DbConn::max_connections_for_cache() - cache[idx].size()
-                + cache[idx].num_idle() as u32
-                > 0
-            {
-                if let Ok(conn) = cache[idx].begin().await {
-                    return Ok(conn);
+    async fn __acquire_cache(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
+        Self::acquire_reader(shard_id, &CACHE, NEXT_CACHE.fetch_add(1, Ordering::SeqCst)).await
+    }
+
+    async fn _acquire_cache(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
+        if let Ok(conn) = Self::__acquire_cache(shard_id).await {
+            Ok(conn)
+        } else {
+            let now = SystemTime::now();
+            if let Err(e) = connect(false, false, true, Some(shard_id)).await {
+                log::warn!("{}", e);
+            }
+            if let Ok(conn) = Self::__acquire_cache(shard_id).await {
+                Ok(conn)
+            } else {
+                if let Some(time) = Duration::from_secs(crate::ACQUIRE_CONNECTION_WAIT_TIME)
+                    .checked_sub(now.elapsed().unwrap_or_default())
+                {
+                    tokio::time::sleep(time).await;
                 }
+                connect(false, false, true, Some(shard_id)).await?;
+                Self::__acquire_cache(shard_id).await
             }
         }
-        for i in 0..len {
-            let idx = (i + index) % len;
-            if let Ok(conn) = cache[idx].begin().await {
-                return Ok(conn);
-            }
-        }
-        Ok(cache[index].begin().await?)
+    }
+
+    async fn acquire_cache_tx(shard_id: ShardId) -> Result<sqlx::Transaction<'static, DbType>> {
+        let conn = Self::_acquire_cache(shard_id).await?;
+        Ok(
+            Transaction::begin(sqlx::pool::maybe::MaybePoolConnection::PoolConnection(conn))
+                .await?,
+        )
     }
     @%- endif %@
 
@@ -603,7 +1006,7 @@ impl DbConn {
         match self.tx.entry(self.shard_id) {
             Entry::Occupied(tx) => Ok(tx.into_mut()),
             Entry::Vacant(v) => {
-                let mut tx = SOURCE.read().await[self.shard_id as usize].begin().await?;
+                let mut tx = Self::_acquire_source_tx(self.shard_id).await?;
                 set_tx_isolation(&mut tx).await?;
                 for s in 0..self.save_point.len() {
                     let sql = format!("SAVEPOINT s{}", s);
@@ -615,33 +1018,37 @@ impl DbConn {
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn push_cache_op(&mut self, op: CacheOp) -> Result<()> {
+    pub(crate) async fn push_cache_op(&mut self, op: CacheOp) {
         if self.has_tx() {
-            self.cache_op_list.push(op);
+            self.cache_op_list.push((self.shard_id(), op));
         } else {
-            let sync = Self::inc_cache_sync(self.shard_id()).await?;
-            let mut sync_map = FxHashMap::default();
-            sync_map.insert(self.shard_id(), sync);
-            CacheMsg(vec![op], sync_map).do_send().await;
+            let shard_id = self.shard_id();
+            tokio::spawn(async move {
+                let sync = Self::inc_cache_sync(shard_id).await;
+                let mut sync_map = FxHashMap::default();
+                sync_map.insert(shard_id, sync);
+                CacheMsg(vec![op], sync_map).do_send().await;
+            });
         }
-        Ok(())
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn push_cache_op_to(&mut self, op: CacheOp, internal: bool) -> Result<()> {
+    pub(crate) async fn push_cache_op_to(&mut self, op: CacheOp, internal: bool) {
         if internal {
             if self.has_tx() {
-                self.cache_internal_op_list.push(op);
+                self.cache_internal_op_list.push((self.shard_id(), op));
             } else {
-                let sync = Self::inc_cache_sync(self.shard_id()).await?;
-                let mut sync_map = FxHashMap::default();
-                sync_map.insert(self.shard_id(), sync);
-                CacheMsg(vec![op], sync_map).do_send_to_internal().await;
+                let shard_id = self.shard_id();
+                tokio::spawn(async move {
+                    let sync = Self::inc_cache_sync(shard_id).await;
+                    let mut sync_map = FxHashMap::default();
+                    sync_map.insert(shard_id, sync);
+                    CacheMsg(vec![op], sync_map).do_send_to_internal().await;
+                });
             }
         } else {
-            self.push_cache_op(op).await?;
+            self.push_cache_op(op).await;
         }
-        Ok(())
     }
 
     #[allow(dead_code)]
@@ -672,34 +1079,50 @@ impl DbConn {
             return Ok(());
         }
         self.has_tx = false;
-        let mut sync_map = FxHashMap::default();
-        let use_sync_map = !self.clear_whole_cache
-            && (!self.cache_internal_op_list.is_empty() || !self.cache_op_list.is_empty());
+        let mut cache_internal_op_list: FxHashMap<ShardId, Vec<CacheOp>> = FxHashMap::default();
+        for (s, v) in self.cache_internal_op_list.drain(..) {
+            cache_internal_op_list.entry(s).or_default().push(v);
+        }
+        let mut cache_op_list: FxHashMap<ShardId, Vec<CacheOp>> = FxHashMap::default();
+        for (s, v) in self.cache_op_list.drain(..) {
+            cache_op_list.entry(s).or_default().push(v);
+        }
         for (shard_id, tx) in self.tx.drain() {
             tx.commit().await?;
-            if use_sync_map {
-                sync_map.insert(shard_id, Self::inc_cache_sync(shard_id).await?);
+            if !self.clear_whole_cache {
+                let cache_internal_op_list = cache_internal_op_list.remove(&shard_id);
+                let cache_op_list = cache_op_list.remove(&shard_id);
+                if cache_internal_op_list.is_some() || cache_op_list.is_some() {
+                    tokio::spawn(async move {
+                        let sync = Self::inc_cache_sync(shard_id).await;
+                        let mut sync_map = FxHashMap::default();
+                        sync_map.insert(shard_id, sync);
+                        if let Some(cache_internal_op_list) = cache_internal_op_list {
+                            CacheMsg(cache_internal_op_list, sync_map.clone())
+                                .do_send_to_internal()
+                                .await;
+                        }
+                        if let Some(cache_op_list) = cache_op_list {
+                            CacheMsg(cache_op_list, sync_map).do_send().await;
+                        }
+                    });
+                }
             }
         }
         self.lock_list.clear();
-        let mut cache_internal_op_list = Vec::new();
-        cache_internal_op_list.append(&mut self.cache_internal_op_list);
-        let mut cache_op_list = Vec::new();
-        cache_op_list.append(&mut self.cache_op_list);
         if self.clear_whole_cache {
-            crate::clear_whole_cache().await?;
-        } else {
-            CacheMsg(cache_internal_op_list, sync_map.clone())
-                .do_send_to_internal()
-                .await;
-            CacheMsg(cache_op_list, sync_map).do_send().await;
+            tokio::spawn(async move {
+                crate::clear_whole_cache().await;
+            });
         }
-        let mut fut = Vec::new();
-        while let Some(cb) = self.callback_list.pop_front() {
-            fut.push(cb());
-        }
-        if !fut.is_empty() {
-            futures::future::join_all(fut).await;
+        if !self.callback_list.is_empty() {
+            let mut fut = Vec::new();
+            while let Some(cb) = self.callback_list.pop_front() {
+                fut.push(cb());
+            }
+            tokio::spawn(async move {
+                futures::future::join_all(fut).await;
+            });
         }
         Ok(())
     }
@@ -823,49 +1246,67 @@ impl DbConn {
     }
     @%- endif %@
 
-    pub fn empty_all_cache_sync() -> FxHashMap<ShardId, u64> {
+    pub(crate) async fn inc_all_cache_sync() -> FxHashMap<ShardId, u64> {
         let mut sync_map = FxHashMap::default();
         for shard_id in DbConn::shard_num_range() {
-            sync_map.insert(shard_id, 0);
+            sync_map.insert(shard_id, Self::inc_cache_sync(shard_id).await);
         }
         sync_map
     }
-
-    pub async fn inc_all_cache_sync() -> Result<FxHashMap<ShardId, u64>> {
-        let mut sync_map = FxHashMap::default();
-        for shard_id in DbConn::shard_num_range() {
-            sync_map.insert(shard_id, Self::inc_cache_sync(shard_id).await?);
-        }
-        Ok(sync_map)
-    }
     @%- if !config.force_disable_cache %@
 
-    pub async fn inc_cache_sync(shard_id: ShardId) -> Result<u64> {
-        let buf = Arc::new(AtomicU64::default());
+    async fn ___inc_cache_sync(mut source: PoolConnection<DbType>) -> Result<u64> {
+        let sql = "UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;";
+        let query = sqlx::query(sql).bind(1).bind(ID_OF_CACHE_SYNC);
+        let result = query.execute(source.as_mut()).await?;
+        Ok(result.last_insert_id())
+    }
+
+    async fn __inc_cache_sync(shard_id: ShardId) -> Result<u64> {
+        let source = Self::_acquire_source(shard_id).await?;
+        Self::___inc_cache_sync(source).await
+    }
+
+    async fn _inc_cache_sync(shard_id: ShardId) -> u64 {
+        match Self::__inc_cache_sync(shard_id).await {
+            Ok(sync) => sync,
+            Err(e) => {
+                log::warn!("{}", e);
+                if Self::is_retryable_error(&e) {
+                    Self::__inc_cache_sync(shard_id).await.unwrap_or(0)
+                } else {
+                    0
+                }
+            }
+        }
+    }
+
+    pub(crate) async fn inc_cache_sync(shard_id: ShardId) -> u64 {
+        static CACHE_SYNC: Lazy<Vec<Mutex<()>>> =
+            Lazy::new(|| DbConn::shard_num_range().map(|_| Mutex::new(())).collect());
+        static CACHE_SYNC_QUEUE: Lazy<Vec<SegQueue<Arc<AtomicU64>>>> =
+            Lazy::new(|| DbConn::shard_num_range().map(|_| SegQueue::new()).collect());
+        let buf = Arc::new(AtomicU64::new(u64::MAX));
         CACHE_SYNC_QUEUE[shard_id as usize].push(Arc::clone(&buf));
         let _lock = CACHE_SYNC[shard_id as usize].lock().await;
         let sync = buf.load(Ordering::SeqCst);
-        if sync > 0 {
-            return Ok(sync);
+        if sync != u64::MAX {
+            return sync;
         }
         let mut list = Vec::new();
         while let Some(b) = CACHE_SYNC_QUEUE[shard_id as usize].pop() {
             list.push(b);
         }
-        let sql = "UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;";
-        let query = sqlx::query(sql).bind(1).bind(ID_OF_CACHE_SYNC);
-        let mut source = SOURCE.read().await[shard_id as usize].acquire().await?;
-        let result = query.execute(source.as_mut()).await?;
-        let sync = result.last_insert_id();
+        let sync = Self::_inc_cache_sync(shard_id).await;
         for b in list {
             b.store(sync, Ordering::Release);
         }
-        Ok(sync)
+        sync
     }
     @%- else %@
 
-    pub async fn inc_cache_sync(_shard_id: ShardId) -> Result<u64> {
-        Ok(0)
+    pub(crate) async fn inc_cache_sync(_shard_id: ShardId) -> u64 {
+        0
     }
     @%- endif %@
 
@@ -883,8 +1324,8 @@ impl DbConn {
         NOTIFY_RECEIVER_COUNT.load(Ordering::Relaxed) > 0
     }
     pub(crate) async fn _push_update_notice(
-        table: crate::models::TableName,
-        op: crate::models::NotifyOp,
+        table: TableName,
+        op: NotifyOp,
         id: &impl serde::Serialize,
     ) {
         let id = serde_json::to_string(id).unwrap();
@@ -938,6 +1379,23 @@ impl DbConn {
     pub fn take_lock(&mut self) -> Option<DbLock> {
         self.lock_list.pop()
     }
+
+    pub fn is_retryable_error(err: &anyhow::Error) -> bool {
+        if let Some(err) = err.downcast_ref::<sqlx::Error>() {
+            match err {
+                sqlx::Error::Io(..) => {
+                    log::warn!("{}", err);
+                    return true;
+                }
+                sqlx::Error::WorkerCrashed => {
+                    log::warn!("{}", err);
+                    return true;
+                }
+                _ => {}
+            }
+        }
+        false
+    }
 }
 
 pub struct DbLock {
@@ -967,105 +1425,501 @@ impl Drop for DbConn {
     }
 }
 
-async fn get_source(
-    database_url: &str,
-    user: &Option<String>,
-    pw: &Option<String>,
-    max_connections: u32,
-) -> Result<Vec<sqlx::Pool<DbType>>> {
-    let mut shards = Vec::new();
-    for url in database_url.split('\n') {
-        let url = url.trim();
-        if url.is_empty() {
-            continue;
-        }
-        let options: MySqlConnectOptions = url.parse()?;
-        let options = if let Some(user) = user {
-            options.username(user)
-        } else {
-            options
-        };
-        let options = if let Some(pw) = pw {
-            options.password(pw)
-        } else {
-            options
-        };
-        let options = options.log_statements(LevelFilter::Debug);
-        shards.push(
-            MySqlPoolOptions::new()
-                .max_connections(max_connections)
-                .after_connect(|conn, _meta| {
-                    Box::pin(async move {
-                        if let Some(iso) = TX_ISOLATION {
-                            conn.execute(&*format!(
-                                "SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));SET SESSION TRANSACTION ISOLATION LEVEL {};",
-                                iso
-                            ))
-                            .await?;
-                        } else {
-                            conn.execute("SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));").await?;
-                        }
-                        Ok(())
-                    })
-                })
-                .connect_with(options)
-                .await?,
-        );
-    }
-    Ok(shards)
+#[cfg(feature = "use_google_resolver")]
+async fn resolve_ips(host: &str, port: u16) -> std::io::Result<Vec<SocketAddr>> {
+    use hickory_resolver::config::{ResolverConfig, ResolverOpts};
+    use hickory_resolver::TokioAsyncResolver;
+    let resolver = TokioAsyncResolver::tokio(ResolverConfig::google(), ResolverOpts::default());
+    let response = resolver.lookup_ip(host).await?;
+    Ok(response
+        .iter()
+        .map(|ip| SocketAddr::new(ip, port))
+        .collect())
 }
 
-async fn get_replica(
-    database_url: &str,
+#[allow(clippy::explicit_counter_loop)]
+async fn lookup(url: &url::Url) -> Result<Vec<SocketAddr>> {
+    use std::net::{IpAddr, Ipv4Addr};
+    let port = url.port().unwrap_or(0);
+    if let Some(host) = url.host() {
+        match host {
+            url::Host::Domain(domain) => {
+                let mut set = FxHashSet::default();
+                let mut _count = 0;
+                for v in tokio::net::lookup_host(format!("{}:{}", domain, port)).await? {
+                    _count += 1;
+                    set.insert(v);
+                }
+                #[cfg(feature = "use_google_resolver")]
+                if domain.contains('.') && _count != set.len() {
+                    let mut task = JoinSet::new();
+                    for _ in 0..100 {
+                        let domain = domain.to_string();
+                        task.spawn(async move { resolve_ips(&domain, port).await });
+                    }
+                    while let Some(r) = task.join_next().await {
+                        if let Ok(Ok(r)) = r {
+                            for v in r {
+                                set.insert(v);
+                                if _count == set.len() {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if set.is_empty() {
+                    anyhow::bail!("Host not found: {}", url);
+                }
+                Ok(set
+                    .into_iter()
+                    .filter(|v| {
+                        if v.is_ipv4() {
+                            !USE_IPV6_ONLY.load(Ordering::Relaxed)
+                        } else {
+                            !USE_IPV4_ONLY.load(Ordering::Relaxed)
+                        }
+                    })
+                    .collect())
+            }
+            url::Host::Ipv4(ip) => Ok(vec![SocketAddr::new(IpAddr::V4(ip), port)]),
+            url::Host::Ipv6(ip) => Ok(vec![SocketAddr::new(IpAddr::V6(ip), port)]),
+        }
+    } else {
+        let ip = Ipv4Addr::new(127, 0, 0, 1);
+        Ok(vec![SocketAddr::new(IpAddr::V4(ip), port)])
+    }
+}
+
+async fn check_if_writable(options: &DbConnectOptions) -> Result<bool> {
+    use sqlx::{Acquire, Connection};
+    let mut conn = DbConnection::connect_with(options).await?;
+    let conn = conn.acquire().await?;
+    let row: (i8,) = sqlx::query_as(CHECK_SQL).fetch_one(conn).await?;
+    Ok(row.0 == 0)
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn check_connection(
+    urls: &str,
     user: &Option<String>,
     pw: &Option<String>,
-    max_connections: u32,
-) -> Result<Vec<Vec<sqlx::Pool<DbType>>>> {
-    let mut shards = Vec::new();
+    requires_writable: bool,
+    shard_id: usize,
+    old_pools: Option<AddrPoolMap>,
+    pool_option: Option<sqlx::pool::PoolOptions<connection::DbType>>,
+    pool_collection: Option<&'static OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>>>,
+) -> Result<Vec<(SocketAddr, DbConnectOptions, bool)>> {
     let re = regex::Regex::new(r"[ \t]+").unwrap();
-    for urls in database_url.split('\n') {
-        let urls = urls.trim();
-        if urls.is_empty() {
-            continue;
+    let mut join_set: JoinSet<Result<Vec<(SocketAddr, DbConnectOptions)>>> = JoinSet::new();
+    for url in re.split(urls) {
+        let mut url = url::Url::parse(url)?;
+        let user = user.clone();
+        let pw = pw.clone();
+        join_set.spawn(async move {
+            let mut list = Vec::new();
+            for addr in lookup(&url).await? {
+                let host = if addr.is_ipv4() {
+                    addr.ip().to_string()
+                } else {
+                    format!("[{}]", addr.ip())
+                };
+                url.set_host(Some(&host))?;
+                let options: DbConnectOptions = url.as_str().parse()?;
+                let options = if let Some(ref user) = user {
+                    options.username(user)
+                } else {
+                    options
+                };
+                let options = if let Some(ref pw) = pw {
+                    options.password(pw)
+                } else {
+                    options
+                };
+                let options = options.log_statements(LevelFilter::Trace);
+                list.push((addr, options));
+            }
+            Ok(list)
+        });
+    }
+    let mut list = Vec::new();
+    let mut check_set = FxHashSet::default();
+    while let Some(r) = join_set.join_next().await {
+        match r? {
+            Ok(r) => {
+                for (addr, options) in r {
+                    if check_set.insert(addr) {
+                        list.push((addr, options));
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("{}", e);
+            }
         }
-        let mut pools = Vec::new();
-        for url in re.split(urls) {
-            let options: MySqlConnectOptions = url.parse()?;
-            let options = if let Some(user) = user {
-                options.username(user)
-            } else {
-                options
-            };
-            let options = if let Some(pw) = pw {
-                options.password(pw)
-            } else {
-                options
-            };
-            let options = options.log_statements(LevelFilter::Debug);
-            pools.push(
-                MySqlPoolOptions::new()
-                    .max_connections(max_connections)
-                    .after_connect(|conn, _meta| {
-                        Box::pin(async move {
-                            if let Some(iso) = READ_TX_ISOLATION {
-                                conn.execute(&*format!(
-                                    "SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));SET SESSION TRANSACTION ISOLATION LEVEL {}, READ ONLY;",
-                                    iso
-                                ))
-                                .await?;
+    }
+
+    let mut join_set = JoinSet::new();
+    for (addr, options) in list {
+        join_set.spawn(async move {
+            match tokio::time::timeout(
+                Duration::from_secs(crate::CHECK_CONNECTION_TIMEOUT),
+                check_if_writable(&options),
+            )
+            .await
+            {
+                Ok(res) => match res {
+                    Ok(writable) => {
+                        let options = options.log_statements(LevelFilter::Debug);
+                        if requires_writable {
+                            if writable {
+                                Some((addr, options, writable))
                             } else {
-                                conn.execute("SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));").await?;
+                                None
                             }
-                            Ok(())
-                        })
-                    })
-                    .connect_with(options)
-                    .await?,
+                        } else {
+                            Some((addr, options, writable))
+                        }
+                    }
+                    Err(e) => {
+                        warn!("{}: {}", e, addr);
+                        None
+                    }
+                },
+                Err(_) => {
+                    warn!(
+                        "error communicating with database: Connection timeout: {}",
+                        addr
+                    );
+                    None
+                }
+            }
+        });
+    }
+    if requires_writable {
+        while let Some(r) = join_set.join_next().await {
+            if let Some(r) = r? {
+                return Ok(vec![r]);
+            }
+        }
+        Ok(vec![])
+    } else {
+        let (tx, mut rx) = mpsc::channel(10);
+        let mut old_pools = old_pools.unwrap();
+        let pool_option = pool_option.unwrap();
+        tokio::spawn(async move {
+            while let Some(r) = join_set.join_next().await {
+                if let Ok(Some(r)) = r {
+                    if let Err(r) = tx.send(r).await {
+                        if let Some(pool_collection) = pool_collection {
+                            let (addr, options, writable) = r.0;
+                            if writable {
+                                continue;
+                            }
+                            if let Some(old) = old_pools.remove(&addr) {
+                                let mut pools =
+                                    pool_collection.get().unwrap()[shard_id].write().await;
+                                pools.retain(|_, (_, w)| !*w);
+                                pools.insert(addr, (old.0, writable));
+                                continue;
+                            }
+                            let pool = replica_connect_with(pool_option.clone(), options).await;
+                            let conn = match pool {
+                                Ok(conn) => conn,
+                                Err(e) => {
+                                    warn!("{}", e);
+                                    continue;
+                                }
+                            };
+                            let mut pools = pool_collection.get().unwrap()[shard_id].write().await;
+                            pools.retain(|_, (_, w)| !*w);
+                            pools.insert(addr, (conn, writable));
+                        }
+                    }
+                }
+            }
+        });
+        let mut result = Vec::new();
+        let mut timeout = false;
+        let sleep = tokio::time::sleep(Duration::from_millis(500));
+        tokio::pin!(sleep);
+        loop {
+            tokio::select!(
+                r = rx.recv() => {
+                    if let Some(r) = r {
+                        result.push(r);
+                        if timeout {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                },
+                _ = &mut sleep => {
+                    if result.is_empty() {
+                        timeout = true;
+                    } else {
+                        break;
+                    }
+                }
             )
         }
-        shards.push(pools);
+        Ok(result)
     }
-    Ok(shards)
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn reset_source_pool(
+    s_url: &str,
+    s_user: &Option<String>,
+    s_pw: &Option<String>,
+    r_url: &str,
+    r_user: &Option<String>,
+    r_pw: &Option<String>,
+    pool_option: sqlx::pool::PoolOptions<connection::DbType>,
+    pool_collection: &'static RwLock<Vec<Option<(SocketAddr, DbPool)>>>,
+    shard_id: Option<ShardId>,
+) -> Result<()> {
+    let r_url_list: Vec<_> = split_shard!(r_url).collect();
+    let mut join_set: JoinSet<Result<()>> = JoinSet::new();
+    for (idx, s_url) in split_shard!(s_url).enumerate() {
+        if let Some(shard_id) = shard_id {
+            if shard_id as usize != idx {
+                continue;
+            }
+        }
+        let r_url = r_url_list
+            .get(idx)
+            .context("The number of shards differs between SOURCE and REPLICA.")?;
+        if idx >= DbConn::shard_num() {
+            break;
+        }
+        let _s_url = s_url.to_owned();
+        let _s_user = s_user.to_owned();
+        let _s_pw = s_pw.to_owned();
+        let _r_url = (*r_url).to_owned();
+        let _r_user = r_user.to_owned();
+        let _r_pw = r_pw.to_owned();
+        let pool_option = pool_option.clone();
+        let check_fast_failover = ENABLE_FAST_FAILOVER.load(Ordering::Relaxed) && s_url != *r_url;
+        join_set.spawn(async move {
+            let mut join = JoinSet::new();
+            join.spawn(async move {
+                check_connection(&_s_url, &_s_user, &_s_pw, true, idx, None, None, None).await
+            });
+            let (tx, mut rx) = tokio::sync::mpsc::channel(2);
+            if check_fast_failover {
+                join.spawn(async move {
+                    let _ = tokio::time::timeout(Duration::from_millis(500), rx.recv()).await;
+                    check_connection(&_r_url, &_r_user, &_r_pw, true, idx, None, None, None).await
+                });
+            }
+            let mut c = Vec::new();
+            while let Some(r) = join.join_next().await {
+                match r? {
+                    Ok(r) => {
+                        if r.is_empty() {
+                            let _ = tx.send(0).await;
+                        } else {
+                            c = r;
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        warn!("{}", e);
+                    }
+                }
+            }
+
+            if let Some((addr, options, _writable)) = c.pop() {
+                if let Some(old) = &pool_collection.read().await[idx] {
+                    if old.0 == addr {
+                        return Ok(());
+                    }
+                }
+                let new_pool = source_connect_with(pool_option, options).await?;
+                let pool = &mut pool_collection.write().await[idx];
+                *pool = Some((addr, new_pool.clone()));
+                @%- if !config.force_disable_cache %@
+                #[cfg(not(feature = "cache_update_only"))]
+                tokio::spawn(async move {
+                    if let Ok(source) = new_pool.acquire().await {
+                        let sync = DbConn::___inc_cache_sync(source).await.unwrap_or_default();
+                        models::common::_clear_cache(idx as ShardId, sync, false).await;
+                    }
+                });
+                @%- endif %@
+            }
+            Ok(())
+        });
+    }
+    while let Some(r) = join_set.join_next().await {
+        if let Err(e) = r? {
+            log::error!("{}", e);
+        }
+    }
+    Ok(())
+}
+
+async fn source_connect_with(
+    pool_option: sqlx::pool::PoolOptions<connection::DbType>,
+    options: DbConnectOptions,
+) -> Result<DbPool> {
+    Ok(pool_option
+        .after_connect(|conn, _meta| {
+            Box::pin(async move {
+                if let Some(iso) = TX_ISOLATION {
+                    conn.execute(&*format!(
+                        "SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));SET SESSION TRANSACTION ISOLATION LEVEL {};",
+                        iso
+                    ))
+                    .await?;
+                } else {
+                    conn.execute("SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));").await?;
+                }
+                Ok(())
+            })
+        })
+        .connect_with(options)
+        .await?)
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn reset_replica_pool(
+    r_url: &str,
+    r_user: &Option<String>,
+    r_pw: &Option<String>,
+    s_url: &str,
+    s_user: &Option<String>,
+    s_pw: &Option<String>,
+    pool_option: sqlx::pool::PoolOptions<connection::DbType>,
+    pool_collection: &'static OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>>,
+    shard_id: Option<ShardId>,
+) -> Result<()> {
+    let s_url_list: Vec<_> = split_shard!(s_url).collect();
+    let mut join_set: JoinSet<Result<()>> = JoinSet::new();
+    for (idx, r_url) in split_shard!(r_url).enumerate() {
+        if let Some(shard_id) = shard_id {
+            if shard_id as usize != idx {
+                continue;
+            }
+        }
+        let s_url = s_url_list
+            .get(idx)
+            .context("The number of shards differs between SOURCE and REPLICA.")?;
+        if idx >= DbConn::shard_num() {
+            break;
+        }
+        let _s_url = (*s_url).to_owned();
+        let _s_user = s_user.to_owned();
+        let _s_pw = s_pw.to_owned();
+        let _r_url = r_url.to_owned();
+        let _r_user = r_user.to_owned();
+        let _r_pw = r_pw.to_owned();
+        let pool_option = pool_option.clone();
+        let check_fast_failover = ENABLE_FAST_FAILOVER.load(Ordering::Relaxed) && r_url != *s_url;
+        join_set.spawn(async move {
+            let pools1 = pool_collection.get().unwrap()[idx].read().await.clone();
+            let pools2 = pools1.clone();
+            let option1 = pool_option.clone();
+            let option2 = option1.clone();
+            let mut join = JoinSet::new();
+            join.spawn(async move {
+                check_connection(
+                    &_r_url,
+                    &_r_user,
+                    &_r_pw,
+                    false,
+                    idx,
+                    Some(pools1),
+                    Some(option1),
+                    Some(pool_collection),
+                )
+                .await
+            });
+            let (tx, mut rx) = tokio::sync::mpsc::channel(2);
+            if check_fast_failover {
+                join.spawn(async move {
+                    let _ = tokio::time::timeout(Duration::from_millis(500), rx.recv()).await;
+                    check_connection(
+                        &_s_url,
+                        &_s_user,
+                        &_s_pw,
+                        false,
+                        idx,
+                        Some(pools2),
+                        Some(option2),
+                        Some(pool_collection),
+                    )
+                    .await
+                });
+            }
+            let mut c = Vec::new();
+            while let Some(r) = join.join_next().await {
+                match r? {
+                    Ok(r) => {
+                        if r.is_empty() {
+                            let _ = tx.send(0).await;
+                        } else {
+                            c = r;
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        warn!("{}", e);
+                    }
+                }
+            }
+            let new_addrs: FxHashSet<_> = c.iter().map(|v| v.0).collect();
+            let old_addrs: FxHashSet<_> = {
+                let pools = pool_collection.get().unwrap()[idx].read().await;
+                pools.keys().cloned().collect()
+            };
+            for (addr, options, writable) in c {
+                if old_addrs.contains(&addr) {
+                    let mut pools = pool_collection.get().unwrap()[idx].write().await;
+                    pools.entry(addr).and_modify(|(_, w)| *w = writable);
+                } else {
+                    let pool = replica_connect_with(pool_option.clone(), options).await?;
+                    let mut pools = pool_collection.get().unwrap()[idx].write().await;
+                    pools.insert(addr, (pool, writable));
+                }
+            }
+            let mut pools = pool_collection.get().unwrap()[idx].write().await;
+            let has_not_writable = pools.iter().any(|(_, v)| !v.1);
+            pools.retain(|k, v| new_addrs.contains(k) && (!has_not_writable || !v.1));
+            Ok(())
+        });
+    }
+    while let Some(r) = join_set.join_next().await {
+        if let Err(e) = r? {
+            log::error!("{}", e);
+        }
+    }
+    Ok(())
+}
+
+async fn replica_connect_with(
+    pool_option: sqlx::pool::PoolOptions<connection::DbType>,
+    options: DbConnectOptions,
+) -> Result<DbPool> {
+    Ok(pool_option
+        .after_connect(|conn, _meta| {
+            Box::pin(async move {
+                if let Some(iso) = READ_TX_ISOLATION {
+                    conn.execute(&*format!(
+                        "SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));SET SESSION TRANSACTION ISOLATION LEVEL {}, READ ONLY;",
+                        iso
+                    ))
+                    .await?;
+                } else {
+                    conn.execute("SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));").await?;
+                }
+                Ok(())
+            })
+        })
+        .connect_with(options)
+        .await?)
 }
 
 #[allow(dead_code)]

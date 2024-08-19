@@ -47,12 +47,12 @@ pub fn stop() {
 }
 
 pub async fn clear_local_cache() {
-    let _ = db_session::clear_local_cache().await;
+    db_session::clear_local_cache().await;
     // Do not modify this line. (DbClearLocalCache)
 }
 
 pub async fn clear_whole_cache() {
-    let _ = db_session::clear_whole_cache().await;
+    db_session::clear_whole_cache().await;
     // Do not modify this line. (DbClearCache)
 }
 

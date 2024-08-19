@@ -8,6 +8,7 @@ use argon2::{
 use jsonwebtoken::{DecodingKey, Validation};
 use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::context::Ctx;
 
@@ -47,13 +48,22 @@ impl Role {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AuthInfo {
+pub struct AuthInfoInner {
     #[serde(default)]
     pub username: String,
     #[serde(default)]
     pub role: Role,
     #[serde(default)]
     pub exp: usize,
+}
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AuthInfo(pub Arc<AuthInfoInner>);
+impl std::ops::Deref for AuthInfo {
+    type Target = AuthInfoInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 impl AuthInfo {
     pub fn retrieve(req: &HttpRequest) -> Option<AuthInfo> {
@@ -147,11 +157,14 @@ pub fn create_jwt(username: String, role: Role) -> String {
 
     jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
-        &AuthInfo {
-            username,
-            role,
-            exp,
-        },
+        &AuthInfo(
+            AuthInfoInner {
+                username,
+                role,
+                exp,
+            }
+            .into(),
+        ),
         &jsonwebtoken::EncodingKey::from_secret(SECRET.get().unwrap().as_bytes()),
     )
     .unwrap()
