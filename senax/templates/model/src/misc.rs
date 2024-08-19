@@ -71,10 +71,7 @@ pub(crate) trait ColRelTr {
         self,
         query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments>;
-    fn query_bind(
-        self,
-        query: Query<'_, DbType, DbArguments>,
-    ) -> Query<'_, DbType, DbArguments>;
+    fn query_bind(self, query: Query<'_, DbType, DbArguments>) -> Query<'_, DbType, DbArguments>;
 }
 pub(crate) trait FilterTr
 where
@@ -611,26 +608,6 @@ impl Size for Vec<String> {
     }
 }
 
-impl Size for Value {
-    fn _size(&self) -> usize {
-        match self {
-            Value::String(v) => calc_mem_size(v.capacity()) + std::mem::size_of::<usize>() * 4,
-            Value::Array(v) => {
-                (calc_mem_size(v.capacity() * std::mem::size_of::<Value>())
-                    + std::mem::size_of::<usize>() * 4)
-                    + v.iter()
-                        .fold(0, |i, v| i + v._size() + std::mem::size_of::<usize>() * 2)
-            }
-            Value::Object(v) => v.iter().fold(0, |i, (k, v)| {
-                i + (calc_mem_size(k.capacity()) + std::mem::size_of::<usize>() * 4)
-                    + v._size()
-                    + std::mem::size_of::<usize>() * 2
-            }),
-            _ => 0,
-        }
-    }
-}
-
 pub trait Updater {
     fn is_new(&self) -> bool;
     fn has_been_deleted(&self) -> bool;
@@ -640,8 +617,6 @@ pub trait Updater {
     fn will_be_deleted(&self) -> bool;
     fn mark_for_upsert(&mut self);
     fn is_updated(&self) -> bool;
-    // fn __eq(&self, updater: &Self) -> bool;
-    // fn __set(&mut self, updater: Self);
     fn overwrite_except_skip(&mut self, updater: Self);
     fn overwrite_only_set(&mut self, updater: Self);
     fn overwrite_with(&mut self, updater: Self, set_only: bool);
@@ -774,6 +749,54 @@ pub mod option_arc_bytes {
             Some(buf) => Ok(Some(Arc::new(buf.into_vec()))),
             None => Ok(None),
         }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Clone, Default, PartialEq)]
+pub(crate) struct JsonBlob(std::sync::Arc<Vec<u8>>);
+impl TryFrom<&str> for JsonBlob {
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let _: Value = serde_json::from_str(value)?;
+        Ok(Self(zstd::stream::encode_all(value.as_bytes(), 3)?.into()))
+    }
+}
+impl From<&JsonBlob> for String {
+    fn from(value: &JsonBlob) -> Self {
+        let v = zstd::stream::decode_all(value.0.as_slice()).unwrap();
+        unsafe { String::from_utf8_unchecked(v) }
+    }
+}
+impl Size for JsonBlob {
+    fn _size(&self) -> usize {
+        calc_mem_size(self.0.capacity()) + std::mem::size_of::<usize>() * 4
+    }
+}
+impl std::fmt::Debug for JsonBlob {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self._into_json())
+    }
+}
+impl JsonBlob {
+    pub fn _into_json(&self) -> String {
+        self.into()
+    }
+    pub fn _to_value<T: serde::de::DeserializeOwned>(&self) -> T {
+        let v = zstd::stream::decode_all(self.0.as_slice()).unwrap();
+        serde_json::from_slice(&v).unwrap()
+    }
+}
+pub(crate) trait ToJsonBlob {
+    fn _to_json_blob(&self) -> anyhow::Result<JsonBlob>;
+}
+
+impl<T> ToJsonBlob for T
+where
+    T: serde::Serialize,
+{
+    fn _to_json_blob(&self) -> anyhow::Result<JsonBlob> {
+        let v = serde_json::to_string(self)?;
+        Ok(JsonBlob(zstd::stream::encode_all(v.as_bytes(), 3)?.into()))
     }
 }
 @{-"\n"}@

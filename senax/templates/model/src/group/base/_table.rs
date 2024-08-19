@@ -46,12 +46,10 @@ use crate::cache::Cache;
 @%- else %@
 @% endif %@
 use crate::connection::{DbArguments, DbConn, DbRow, DbType};
-use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, IntoJson as _, OrderTr};
+use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, ToJsonBlob as _, IntoJson as _, OrderTr};
 use crate::misc::{BindValue, Updater, Size, TrashMode};
 use crate::models::USE_FAST_CACHE;
-use crate::{
-    accessor::*, CacheMsg, BULK_FETCH_SEMAPHORE, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT,
-};
+use crate::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
 @%- if !config.excluded_from_domain %@
 #[allow(unused_imports)]
 use domain::value_objects;
@@ -1640,7 +1638,8 @@ impl sqlx::FromRow<'_, DbRow> for Data {
     fn from_row(row: &DbRow) -> sqlx::Result<Self> {
         use sqlx::Row;
         Ok(Data {
-            @{- def.all_fields()|fmt_join("{var}: {from_row},", "") }@
+            @{ def.all_fields()|fmt_join("{var}: {from_row},", "
+            ") }@
         })
     }
 }
@@ -1693,7 +1692,8 @@ impl sqlx::FromRow<'_, DbRow> for CacheData {
     fn from_row(row: &DbRow) -> sqlx::Result<Self> {
         use sqlx::Row;
         Ok(CacheData {
-            @{- def.cache_cols()|fmt_join("{var}: {from_row},", "") }@
+            @{ def.cache_cols()|fmt_join("{var}: {from_row},", "
+            ") }@
         })
     }
 }
@@ -1985,7 +1985,7 @@ impl From<domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name 
     fn from(v: domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Factory) -> Self {
         Self {
             _data: Data {
-@{ def.for_factory()|fmt_join("                {var}: v.{var}{convert_from_entity},", "\n") }@
+@{ def.for_factory()|fmt_join("                {var}: v.{var}{convert_domain_factory}{convert_from_entity},", "\n") }@
                 ..Data::default()
             },
             _update: Data::default(),
@@ -2114,6 +2114,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
     }
     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Filter_ {
         use rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@ as rel;
+        @%- if rel.get_foreign_cols(def).len() == 1 %@
+        let mut vec = Vec::new();
+        for row in list {
+            let pk: Primary = row.into();
+            vec.push(pk.0.inner().into());
+        }
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{var}(vec))", "") }@
+        @%- else %@
         let mut filter = rel::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
@@ -2122,6 +2130,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
                 .and(rel::Filter_::Eq(rel::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
         }
         filter
+        @%- endif %@
     }
 }
 impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
@@ -2134,6 +2143,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
     }
     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Filter_ {
         use rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@ as rel;
+        @%- if rel.get_foreign_cols(def).len() == 1 %@
+        let mut vec = Vec::new();
+        for row in list {
+            let pk: Primary = row.into();
+            vec.push(pk.0.inner().into());
+        }
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{var}(vec))", "") }@
+        @%- else %@
         let mut filter = rel::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
@@ -2142,6 +2159,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
                 .and(rel::Filter_::Eq(rel::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
         }
         filter
+        @%- endif %@
     }
 }
 impl RelFil@{ rel_name|pascal }@ for &ForInsert {
@@ -2154,6 +2172,14 @@ impl RelFil@{ rel_name|pascal }@ for &ForInsert {
     }
     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Filter_ {
         use rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@ as rel;
+        @%- if rel.get_foreign_cols(def).len() == 1 %@
+        let mut vec = Vec::new();
+        for row in list {
+            let pk: Primary = (&row._data).into();
+            vec.push(pk.0.inner().into());
+        }
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{var}(vec))", "") }@
+        @%- else %@
         let mut filter = rel::Filter_::new_or();
         for row in list {
             let pk: Primary = (&row._data).into();
@@ -2162,6 +2188,7 @@ impl RelFil@{ rel_name|pascal }@ for &ForInsert {
                 .and(rel::Filter_::Eq(rel::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
         }
         filter
+        @%- endif %@
     }
 }
 @%- if !config.force_disable_cache %@
@@ -2175,6 +2202,14 @@ impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
     }
     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Filter_ {
         use rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@ as rel;
+        @%- if rel.get_foreign_cols(def).len() == 1 %@
+        let mut vec = Vec::new();
+        for row in list {
+            let pk: Primary = row.into();
+            vec.push(pk.0.inner().into());
+        }
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{var}(vec))", "") }@
+        @%- else %@
         let mut filter = rel::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
@@ -2183,6 +2218,7 @@ impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
                 .and(rel::Filter_::Eq(rel::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
         }
         filter
+        @%- endif %@
     }
 }
 impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
@@ -2195,6 +2231,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
     }
     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Filter_ {
         use rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@ as rel;
+        @%- if rel.get_foreign_cols(def).len() == 1 %@
+        let mut vec = Vec::new();
+        for row in list {
+            let pk: Primary = row.into();
+            vec.push(pk.0.inner().into());
+        }
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{var}(vec))", "") }@
+        @%- else %@
         let mut filter = rel::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
@@ -2203,6 +2247,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
                 .and(rel::Filter_::Eq(rel::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
         }
         filter
+        @%- endif %@
     }
 }
 @%- endif %@
@@ -2272,6 +2317,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
     }
     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Filter_ {
         use rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@ as rel;
+        @%- if rel.get_foreign_cols(def).len() == 1 %@
+        let mut vec = Vec::new();
+        for row in list {
+            let pk: Primary = row.into();
+            vec.push(pk.0.inner().into());
+        }
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{var}(vec))", "") }@
+        @%- else %@
         let mut filter = rel::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
@@ -2280,6 +2333,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
                 .and(rel::Filter_::Eq(rel::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
         }
         filter
+        @%- endif %@
     }
 }
 impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
@@ -2292,6 +2346,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
     }
     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Filter_ {
         use rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@ as rel;
+        @%- if rel.get_foreign_cols(def).len() == 1 %@
+        let mut vec = Vec::new();
+        for row in list {
+            let pk: Primary = row.into();
+            vec.push(pk.0.inner().into());
+        }
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{var}(vec))", "") }@
+        @%- else %@
         let mut filter = rel::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
@@ -2300,6 +2362,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
                 .and(rel::Filter_::Eq(rel::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
         }
         filter
+        @%- endif %@
     }
 }
 impl RelFil@{ rel_name|pascal }@ for &ForInsert {
@@ -2312,6 +2375,14 @@ impl RelFil@{ rel_name|pascal }@ for &ForInsert {
     }
     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Filter_ {
         use rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@ as rel;
+        @%- if rel.get_foreign_cols(def).len() == 1 %@
+        let mut vec = Vec::new();
+        for row in list {
+            let pk: Primary = (&row._data).into();
+            vec.push(pk.0.inner().into());
+        }
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{var}(vec))", "") }@
+        @%- else %@
         let mut filter = rel::Filter_::new_or();
         for row in list {
             let pk: Primary = (&row._data).into();
@@ -2320,6 +2391,7 @@ impl RelFil@{ rel_name|pascal }@ for &ForInsert {
                 .and(rel::Filter_::Eq(rel::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
         }
         filter
+        @%- endif %@
     }
 }
 @%- if !config.force_disable_cache %@
@@ -2333,6 +2405,14 @@ impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
     }
     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Filter_ {
         use rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@ as rel;
+        @%- if rel.get_foreign_cols(def).len() == 1 %@
+        let mut vec = Vec::new();
+        for row in list {
+            let pk: Primary = row.into();
+            vec.push(pk.0.inner().into());
+        }
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{var}(vec))", "") }@
+        @%- else %@
         let mut filter = rel::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
@@ -2341,6 +2421,7 @@ impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
                 .and(rel::Filter_::Eq(rel::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
         }
         filter
+        @%- endif %@
     }
 }
 impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
@@ -2353,6 +2434,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
     }
     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Filter_ {
         use rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@ as rel;
+        @%- if rel.get_foreign_cols(def).len() == 1 %@
+        let mut vec = Vec::new();
+        for row in list {
+            let pk: Primary = row.into();
+            vec.push(pk.0.inner().into());
+        }
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{var}(vec))", "") }@
+        @%- else %@
         let mut filter = rel::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
@@ -2361,6 +2450,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
                 .and(rel::Filter_::Eq(rel::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
         }
         filter
+        @%- endif %@
     }
 }
 @%- endif %@
@@ -2448,7 +2538,18 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
         self.{rel_name} = Some(rel_{class_mod}::{class}::query().filter(filter).join(joiner).select(conn).await?.pop().map(Box::new));
         Ok(())
     }", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many_without_limit()|fmt_rel_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        if self.{rel_name}.is_some() {
+            return Ok(());
+        }
+        let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
+        let mut l = rel_{class_mod}::{class}::query().filter(filter).join(joiner).select(conn).await?;
+        {list_sort}
+        self.{rel_name} = Some(l);
+        Ok(())
+    }", "") }@
+@{- def.relations_many_with_limit()|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.{rel_name}.is_some() {
             return Ok(());
@@ -2490,7 +2591,18 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
         self.{rel_name} = Some(rel_{class_mod}::{class}::query().filter(filter).join(joiner).select_for_update(conn).await?);
         Ok(())
     }", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many_without_limit()|fmt_rel_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        if self.{rel_name}.is_some() {
+            return Ok(());
+        }
+        let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
+        let mut l = rel_{class_mod}::{class}::query().filter(filter).join(joiner).select_for_update(conn).await?;
+        {list_sort_for_update}
+        self.{rel_name} = Some(l);
+        Ok(())
+    }", "") }@
+@{- def.relations_many_with_limit()|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.{rel_name}.is_some() {
             return Ok(());
@@ -2503,6 +2615,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
 }
 @%- endif %@
 @%- if !config.force_disable_cache %@
+@%- if def.use_cache() %@
 
 #[cfg(not(feature="cache_update_only"))]
 impl CacheWrapper {
@@ -2512,7 +2625,15 @@ impl CacheWrapper {
         self.{rel_name} = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).next();
         Ok(())
     }", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("
+@{- def.relations_many_without_limit()|fmt_rel_join("
+    async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()> {
+        let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
+        let mut l: Vec<_> = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
+        {list_sort}
+        self.{rel_name} = l;
+        Ok(())
+    }", "") }@
+@{- def.relations_many_with_limit()|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         let order = vec![{order}];
@@ -2598,7 +2719,18 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_uncached(false)|fmt_rel_join("
+@{- def.relations_many_uncached_without_limit()|fmt_rel_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        if self.{rel_name}.is_some() {
+            return Ok(());
+        }
+        let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
+        let mut l = rel_{class_mod}::{class}::query().filter(filter).join(joiner).select(conn).await?;
+        {list_sort}
+        self.{rel_name} = Some(l);
+        Ok(())
+    }", "") }@
+@{- def.relations_many_uncached_with_limit()|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.{rel_name}.is_some() {
             return Ok(());
@@ -2609,6 +2741,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         Ok(())
     }", "") }@
 }
+@%- endif %@
 @%- endif %@
 
 #[async_trait]
@@ -2632,12 +2765,8 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
 @{- def.relations_one(false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
-        let union: Vec<_> = self.iter().map(|v| {
-            let filter = RelFil{rel_name_pascal}::filter(v){additional_filter};
-            rel_{class_mod}::{class}::query().filter(filter)
-        }).collect();
-        use rel_{class_mod}::UnionBuilder;
-        let mut list = union.select(conn, None, None, None).await?;
+        let filter = RelFil{rel_name_pascal}::in_filter(self){additional_filter};
+        let mut list = rel_{class_mod}::{class}::query().filter(filter).select(conn).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let mut map = AHashMap::default();
         for row in list {
@@ -2650,7 +2779,26 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many_without_limit()|fmt_rel_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        if self.is_empty() { return Ok(()); }
+        let filter = RelFil{rel_name_pascal}::in_filter(self){additional_filter};
+        let mut list = rel_{class_mod}::{class}::query().filter(filter).select(conn).await?;
+        rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let mut map = AHashMap::default();
+        for row in list {
+            if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
+                map.entry(id).or_insert_with(Vec::new).push(row);
+            }
+        }
+        for val in self.iter_mut() {
+            let mut l = map.remove(&(&*val).into()).unwrap_or_default();
+            {list_sort}
+            val.{rel_name} = Some(l);
+        }
+        Ok(())
+    }", "") }@
+@{- def.relations_many_with_limit()|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let union: Vec<_> = self.iter().map(|v| {
@@ -2697,12 +2845,8 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
 @{- def.relations_one(false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
-        let union: Vec<_> = self.iter().map(|v| {
-            let filter = RelFil{rel_name_pascal}::filter(v){additional_filter};
-            rel_{class_mod}::{class}::query().filter(filter)
-        }).collect();
-        use rel_{class_mod}::UnionBuilder;
-        let mut list = union.select_for_update(conn).await?;
+        let filter = RelFil{rel_name_pascal}::in_filter(self){additional_filter};
+        let mut list = rel_{class_mod}::{class}::query().filter(filter).select_for_update(conn).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let mut map = AHashMap::default();
         for row in list {
@@ -2717,7 +2861,26 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many_without_limit()|fmt_rel_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        if self.is_empty() { return Ok(()); }
+        let filter = RelFil{rel_name_pascal}::in_filter(self){additional_filter};
+        let mut list = rel_{class_mod}::{class}::query().filter(filter).select_for_update(conn).await?;
+        rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let mut map = AHashMap::default();
+        for row in list {
+            if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._data) {
+                map.entry(id).or_insert_with(Vec::new).push(row);
+            }
+        }
+        for val in self.iter_mut() {
+            let mut l = map.remove(&(&*val).into()).unwrap_or_default();
+            {list_sort_for_update}
+            val.{rel_name} = Some(l);
+        }
+        Ok(())
+    }", "") }@
+@{- def.relations_many_with_limit()|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let union: Vec<_> = self.iter().map(|v| {
@@ -2743,18 +2906,15 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
 }
 @%- endif %@
 @%- if !config.force_disable_cache %@
+@%- if def.use_cache() %@
 
 #[cfg(not(feature="cache_update_only"))]
 impl CacheWrapper {
 @{- def.relations_one_cache(false)|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
-        let union: Vec<_> = vec.iter().map(|v| {
-            let filter = RelFil{rel_name_pascal}::filter(v){additional_filter};
-            rel_{class_mod}::{class}::query().filter(filter)
-        }).collect();
-        use rel_{class_mod}::_UnionBuilder;
-        let list: Vec<Arc<_>> = union.__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
+        let filter = RelFil{rel_name_pascal}::in_filter(vec){additional_filter};
+        let list: Vec<Arc<_>> = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
         let mut map = AHashMap::default();
         for row in list {
             if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
@@ -2766,7 +2926,25 @@ impl CacheWrapper {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("
+@{- def.relations_many_without_limit()|fmt_rel_join("
+    async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
+        if vec.is_empty() { return Ok(()); }
+        let filter = RelFil{rel_name_pascal}::in_filter(vec){additional_filter};
+        let list: Vec<Arc<_>> = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
+        let mut map = AHashMap::default();
+        for row in list {
+            if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
+                map.entry(id).or_insert_with(Vec::new).push(row);
+            }
+        }
+        for val in vec.iter_mut() {
+            let mut l = map.remove(&(&*val).into()).unwrap_or_default();
+            {list_sort}
+            val.{rel_name} = l;
+        }
+        Ok(())
+    }", "") }@
+@{- def.relations_many_with_limit()|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
         let union: Vec<_> = vec.iter().map(|v| {
@@ -2814,12 +2992,8 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
 @{- def.relations_one_uncached(false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
-        let union: Vec<_> = self.iter().map(|v| {
-            let filter = RelFil{rel_name_pascal}::filter(v){additional_filter};
-            rel_{class_mod}::{class}::query().filter(filter)
-        }).collect();
-        use rel_{class_mod}::UnionBuilder;
-        let mut list = union.select(conn, None, None, None).await?;
+        let filter = RelFil{rel_name_pascal}::in_filter(self){additional_filter};
+        let mut list = rel_{class_mod}::{class}::query().filter(filter).select(conn).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let mut map = AHashMap::default();
         for row in list {
@@ -2847,7 +3021,26 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_uncached(false)|fmt_rel_join("
+@{- def.relations_many_uncached_without_limit()|fmt_rel_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        if self.is_empty() { return Ok(()); }
+        let filter = RelFil{rel_name_pascal}::in_filter(self){additional_filter};
+        let mut list = rel_{class_mod}::{class}::query().filter(filter).select(conn).await?;
+        rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let mut map = AHashMap::default();
+        for row in list {
+            if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
+                map.entry(id).or_insert_with(Vec::new).push(row);
+            }
+        }
+        for val in self.iter_mut() {
+            let mut l = map.remove(&(&*val).into()).unwrap_or_default();
+            {list_sort}
+            val.{rel_name} = Some(l);
+        }
+        Ok(())
+    }", "") }@
+@{- def.relations_many_uncached_with_limit()|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let union: Vec<_> = self.iter().map(|v| {
@@ -2904,7 +3097,24 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
     }", "") }@
 }
 @%- endif %@
+@%- endif %@
 @%- if config.excluded_from_domain %@
+@%- for (index_name, index) in def.multi_index() %@
+
+#[allow(non_camel_case_types)]
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct _@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "pub {filter_type}", ", ") }@);
+impl<@{ index.join_fields(def, "T{index}", ", ") }@> TryFrom<(@{ index.join_fields(def, "T{index}", ", ") }@)> for _@{ pascal_name }@Index_@{ index_name }@
+where@{ index.join_fields(def, "
+    T{index}: TryInto<{filter_type}>,
+    T{index}::Error: Into<anyhow::Error>,", "") }@
+{
+    type Error = anyhow::Error;
+    fn try_from(value: (@{ index.join_fields(def, "T{index}", ", ") }@)) -> Result<Self, Self::Error> {
+        Ok(Self(@{ index.join_fields(def, "value.{index}.try_into().map_err(|e| e.into())?", ", ") }@))
+    }
+}
+@%- endfor %@
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
@@ -2928,7 +3138,7 @@ impl ColTr for Col_ {
 pub@{ visibility }@ enum ColOne_ {
 @{ def.all_fields_without_json()|fmt_join("    {var}({filter_type}),", "\n") }@
 @%- for (index_name, index) in def.multi_index() %@
-    @{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "{type}", ", ") }@),
+    @{ index.join_fields(def, "{name}", "_") }@(_@{ pascal_name }@Index_@{ index_name }@),
 @%- endfor %@
 }
 @%- else %@
@@ -2940,7 +3150,7 @@ impl BindTr for ColOne_ {
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(_) => r#\"{col_esc}\"#,", "\n") }@
 @%- for (index_name, index) in def.multi_index() %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "_", ", ") }@) => r#"(@{ index.join_fields(def, "{col_esc}", ", ") }@)"#,
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => r#"(@{ index.join_fields(def, "{col_esc}", ", ") }@)"#,
 @%- endfor %@
             _ => unreachable!(),
         }
@@ -2949,7 +3159,7 @@ impl BindTr for ColOne_ {
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(_) => \"{placeholder}\",", "\n") }@
 @%- for (index_name, index) in def.multi_index() %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "_", ", ") }@) => "(@{ index.join_fields(def, "{placeholder}", ", ") }@)",
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "(@{ index.join_fields(def, "{placeholder}", ", ") }@)",
 @%- endfor %@
             _ => "?",
         }
@@ -2962,7 +3172,7 @@ impl BindTr for ColOne_ {
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(v) => query.bind(v{bind_as_for_filter}),", "\n") }@
 @%- for (index_name, index) in def.multi_index() %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "v{index}", ", ") }@) => query@{ index.join_fields(def, ".bind(v{index}{bind_as_for_filter})", "") }@,
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(v) => query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@,
 @%- endfor %@
             _ => unreachable!(),
         }
@@ -2975,7 +3185,7 @@ impl BindTr for ColOne_ {
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(v) => query.bind(v{bind_as_for_filter}),", "\n") }@
 @%- for (index_name, index) in def.multi_index() %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "v{index}", ", ") }@) => query@{ index.join_fields(def, ".bind(v{index}{bind_as_for_filter})", "") }@,
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(v) => query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@,
 @%- endfor %@
             _ => unreachable!(),
         }
@@ -3049,7 +3259,7 @@ impl HashVal for VecColKey {
 pub@{ visibility }@ enum ColMany_ {
 @{ def.all_fields_without_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
 @%- for (index_name, index) in def.multi_index() %@
-    @{ index.join_fields(def, "{name}", "_") }@(Vec<(@{ index.join_fields(def, "{type}", ", ") }@)>),
+    @{ index.join_fields(def, "{name}", "_") }@(Vec<_@{ pascal_name }@Index_@{ index_name }@>),
 @%- endfor %@
 }
 @%- else %@
@@ -3330,7 +3540,7 @@ impl ColRelTr for ColRel_ {
                 if without_key {
                     write!(buf, r#\"SELECT {} FROM {table} as _t{} WHERE \"#, rel_{class_mod}::Primary::cols(), idx + 1).unwrap();
                 } else {
-                    write!(buf, r#\"SELECT * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, rel_{class_mod}::Primary::cols_with_paren(), RelCol{rel_name_pascal}::cols_with_idx(idx)).unwrap();
+                    write!(buf, r#\"SELECT /*+ NO_SEMIJOIN() */ * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, rel_{class_mod}::Primary::cols_with_paren(), RelCol{rel_name_pascal}::cols_with_idx(idx)).unwrap();
                 }
                 let mut trash_mode = TrashMode::Not;
                 if let Some(filter) = c {
@@ -3355,7 +3565,7 @@ impl ColRelTr for ColRel_ {
                 if without_key {
                     write!(buf, r#\"SELECT {} FROM {table} as _t{} WHERE \"#, RelCol{rel_name_pascal}::cols(), idx + 1).unwrap();
                 } else {
-                    write!(buf, r#\"SELECT * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren()).unwrap();
+                    write!(buf, r#\"SELECT /*+ NO_SEMIJOIN() */ * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren()).unwrap();
                 }
                 let mut trash_mode = TrashMode::Not;
                 if let Some(filter) = c {
@@ -3380,7 +3590,7 @@ impl ColRelTr for ColRel_ {
                 if without_key {
                     write!(buf, r#\"SELECT {} FROM {table} as _t{} WHERE \"#, RelCol{rel_name_pascal}::cols(), idx + 1).unwrap();
                 } else {
-                    write!(buf, r#\"SELECT * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren()).unwrap();
+                    write!(buf, r#\"SELECT /*+ NO_SEMIJOIN() */ * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren()).unwrap();
                 }
                 let mut trash_mode = TrashMode::Not;
                 if let Some(filter) = c {
@@ -3676,18 +3886,18 @@ pub@{ visibility }@ use @{ filter_macro_name }@_rel as filter_rel;
 macro_rules! @{ filter_macro_name }@ {
     () => (@{ model_path }@::Filter_::new_and());
 @%- for (index_name, index) in def.multi_index() %@
-    ((@{ index.join_fields(def, "{name}", ", ") }@) = (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Eq(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) > (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) >= (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) < (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Lt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) <= (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Lte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) = $e:expr) => (@{ model_path }@::Filter_::Eq(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e.{index}.clone().try_into()?", ", ") }@)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) = (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Eq(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) > (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) >= (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) < (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Lt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) <= (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Lte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) = $e:expr) => (@{ model_path }@::Filter_::Eq(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e.{index}.clone()", ", ") }@).try_into()?)));
     ((@{ index.join_fields(def, "{name}", ", ") }@) IN $e:expr) => (@{ model_path }@::Filter_::In(@{ model_path }@::ColMany_::@{ index.join_fields(def, "{name}", "_") }@($e.into_iter().map(|v| (@{ index.join_fields(def, "v.{index}.clone()", ", ") }@).try_into()).collect::<Result<_, _>>()?)));
     ((@{ index.join_fields(def, "{name}", ", ") }@) NOT IN $e:expr) => (@{ model_path }@::Filter_::NotIn(@{ model_path }@::ColMany_::@{ index.join_fields(def, "{name}", "_") }@($e.into_iter().map(|v| (@{ index.join_fields(def, "v.{index}.clone()", ", ") }@).try_into()).collect::<Result<_, _>>()?)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) > $e:expr) => (@{ model_path }@::Filter_::Gt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e.{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) >= $e:expr) => (@{ model_path }@::Filter_::Gte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e.{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) < $e:expr) => (@{ model_path }@::Filter_::Lt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e.{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) <= $e:expr) => (@{ model_path }@::Filter_::Lte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e.{index}.clone().try_into()?", ", ") }@)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) > $e:expr) => (@{ model_path }@::Filter_::Gt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e.{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) >= $e:expr) => (@{ model_path }@::Filter_::Gte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e.{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) < $e:expr) => (@{ model_path }@::Filter_::Lt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e.{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) <= $e:expr) => (@{ model_path }@::Filter_::Lte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e.{index}.clone()", ", ") }@).try_into()?)));
 @%- endfor %@
     (($($t:tt)*)) => (@{ model_path }@::filter!($($t)*));
     (NOT $t:tt) => (@{ model_path }@::Filter_::Not(Box::new(@{ model_path }@::filter!($t))));
@@ -4061,7 +4271,7 @@ impl QueryBuilder {
     @%- if !def.disable_update() %@
 
     pub@{ visibility }@ async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
-        let sql = self._sql(Data::_sql_cols(), true);
+        let sql = self._sql(Data::_sql_cols(), !conn.wo_tx());
         let mut query = sqlx::query_as::<_, Data>(&sql);
         let _span = debug_span!("query", sql = &query.sql());
         let joiner = self.joiner.take();
@@ -5356,11 +5566,12 @@ impl _@{ pascal_name }@ {
         order: Option<Vec<Order_>>,
         limit: Option<usize>,
     ) -> Result<Arc<Vec<_@{ pascal_name }@Cache>>> {
+        static SEMAPHORE: Lazy<Vec<Semaphore>> = Lazy::new(|| DbConn::shard_num_range().map(|_| Semaphore::new(1)).collect());
         let shard_id = conn.shard_id();
         if let Some(arc) = ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].load_full() {
             return Ok(arc);
         }
-        let _guard = BULK_FETCH_SEMAPHORE.get().unwrap()[shard_id as usize].acquire().await?;
+        let _guard = SEMAPHORE[shard_id as usize].acquire().await?;
         if let Some(arc) = ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].load_full() {
             return Ok(arc);
         }
@@ -5412,11 +5623,12 @@ impl _@{ pascal_name }@ {
         conn: &DbConn,
         order: Option<Vec<Order_>>,
     ) -> Result<Arc<Vec<_@{ pascal_name }@Cache>>> {
+        static SEMAPHORE: Lazy<Vec<Semaphore>> = Lazy::new(|| DbConn::shard_num_range().map(|_| Semaphore::new(1)).collect());
         let shard_id = conn.shard_id();
         if let Some(arc) = ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].load_full() {
             return Ok(arc);
         }
-        let _guard = BULK_FETCH_SEMAPHORE.get().unwrap()[shard_id as usize].acquire().await?;
+        let _guard = SEMAPHORE[shard_id as usize].acquire().await?;
         if let Some(arc) = ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].load_full() {
             return Ok(arc);
         }
@@ -5588,21 +5800,6 @@ impl _@{ pascal_name }@ {
     }
 @%- endif %@
 @%- if def.use_cache() %@
-
-    #[cfg(not(feature="cache_update_only"))]
-    pub(crate) async fn __find_many_for_cache<I, T>(conn: &mut DbConn, ids: I) -> Result<FxHashMap<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@, _@{ pascal_name }@Cache>>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Primary>,
-    {
-        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        let list = Self::___find_many_for_cache(conn, &ids).await?;
-        let map = list.into_iter()@{- def.soft_delete_tpl("",".filter(|data| data._inner.deleted_at.is_none())",".filter(|data| data._inner.deleted == 0)")}@.fold(FxHashMap::default(), |mut map, v| {
-            map.insert(@{ def.primaries()|fmt_join_with_paren("v._inner.{var}{clone}.into()", ", ") }@, Arc::new(v).into());
-            map
-        });
-        Ok(map)
-    }
 
     #[cfg(not(feature="cache_update_only"))]
     async fn ___find_many_for_cache(
@@ -5804,7 +6001,6 @@ impl _@{ pascal_name }@ {
         let mut list: Vec<_@{ pascal_name }@Cache> = Vec::new();
         let mut rest_ids = Vec::new();
         let shard_id = conn.shard_id();
-        let mut conn = DbConn::_new(shard_id);
         let cache_map = Cache::get_many::<CacheWrapper>(&ids.iter().map(|id| id.hash_val(shard_id)).collect(), shard_id, USE_FAST_CACHE).await;
         for id in ids {
             if let Some(obj) = cache_map.get(&id.hash_val(shard_id)).filter(|o| InnerPrimary::from(*o) == id.0) {
@@ -5814,11 +6010,14 @@ impl _@{ pascal_name }@ {
             }
         }
         if !rest_ids.is_empty() {
-            for id in rest_ids.iter() {
-                BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].push(id.0.clone());
+            if rest_ids.len() <= 10 {
+                for id in rest_ids.iter() {
+                    BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].push(id.0.clone());
+                }
             }
-            let _guard = BULK_FETCH_SEMAPHORE.get().unwrap()[shard_id as usize].acquire().await?;
-            let mut rest_ids2 = FxHashSet::with_capacity_and_hasher(rest_ids.len(), Default::default());
+            let mut conn = DbConn::_new(shard_id);
+            conn.begin_cache_tx().await?;
+            let mut rest_ids2 = FxHashSet::with_capacity_and_hasher(rest_ids.len() * 2, Default::default());
             for id in rest_ids.into_iter() {
                 if let Some(obj) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
                     list.push(obj.into());
@@ -5827,21 +6026,28 @@ impl _@{ pascal_name }@ {
                 }
             }
             if !rest_ids2.is_empty() {
-                conn.begin_cache_tx().await?;
                 let mut ids = FxHashSet::with_capacity_and_hasher(
-                    BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].len() + rest_ids2.len(),
+                    (BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].len() + rest_ids2.len()) * 2,
                     Default::default()
                 );
                 for id in &rest_ids2 {
                     ids.insert(id.0.clone());
                 }
-                while let Some(x) = BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].pop() {
-                    ids.insert(x);
+                let mut len = ids.len();
+                if len < 100 {
+                    while let Some(x) = BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].pop() {
+                        ids.insert(x);
+                        len += 1;
+                        if len >= 100 {
+                            break;
+                        }
+                    }
                 }
-                let ids: Vec<InnerPrimary> = ids.drain().collect();
+                let mut ids: Vec<InnerPrimary> = ids.drain().collect();
                 #[allow(unused_mut)]
                 let mut result = Self::___find_many_for_cache(&mut conn, &ids).await?;
-@{- def.relations_in_cache()|fmt_rel_join("\n                CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut result, &mut conn).await?;", "") }@
+@{- def.relations_in_cache()|fmt_rel_join("
+                CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut result, &mut conn).await?;", "") }@
                 let _lock = crate::models::CACHE_UPDATE_LOCK.read().await;
                 for v in result.into_iter() {
                     let arc = Arc::new(v);
@@ -5897,29 +6103,29 @@ impl _@{ pascal_name }@ {
                     }
                 }
             }
+            conn.release_cache_tx();
         }
-        conn.release_cache_tx();
         Ok(list)
     }
     @%- else %@
     @%- if !config.force_disable_cache %@
 
-    pub@{ visibility }@ async fn find_many_from_cache<I, T>(conn: &DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Cache>>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Primary>,
-    {
-        unimplemented!("@{ table_name }@ does not support caching.")
-    }
-    @%- if def.is_soft_delete() %@
+    // pub@{ visibility }@ async fn find_many_from_cache<I, T>(conn: &DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Cache>>
+    // where
+    //     I: IntoIterator<Item = T>,
+    //     T: Into<Primary>,
+    // {
+    //     unimplemented!("@{ table_name }@ does not support caching.")
+    // }
+    // @%- if def.is_soft_delete() %@
 
-    pub@{ visibility }@ async fn find_many_from_cache_with_trashed<I, T>(conn: &DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Cache>>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Primary>,
-    {
-        unimplemented!("@{ table_name }@ does not support caching.")
-    }
+    // pub@{ visibility }@ async fn find_many_from_cache_with_trashed<I, T>(conn: &DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Cache>>
+    // where
+    //     I: IntoIterator<Item = T>,
+    //     T: Into<Primary>,
+    // {
+    //     unimplemented!("@{ table_name }@ does not support caching.")
+    // }
     @%- endif %@
     @%- endif %@
     @%- endif %@
@@ -6042,20 +6248,20 @@ impl _@{ pascal_name }@ {
     @%- else %@
     @%- if !config.force_disable_cache %@
 
-    pub(crate) async fn find_optional_from_cache<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
-    where
-        T: Into<Primary>,
-    {
-        unimplemented!("@{ table_name }@ does not support caching.")
-    }
-    @%- if def.is_soft_delete() %@
+    // pub(crate) async fn find_optional_from_cache<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
+    // where
+    //     T: Into<Primary>,
+    // {
+    //     unimplemented!("@{ table_name }@ does not support caching.")
+    // }
+    // @%- if def.is_soft_delete() %@
 
-    pub@{ visibility }@ async fn find_optional_from_cache_with_trashed<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
-    where
-        T: Into<Primary>,
-    {
-        unimplemented!("@{ table_name }@ does not support caching.")
-    }
+    // pub@{ visibility }@ async fn find_optional_from_cache_with_trashed<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
+    // where
+    //     T: Into<Primary>,
+    // {
+    //     unimplemented!("@{ table_name }@ does not support caching.")
+    // }
     @%- endif %@
     @%- endif %@
     @%- endif %@

@@ -274,7 +274,7 @@ pub trait @{ pascal_name }@UpdaterBase: downcast_rs::Downcast + Send + Sync + @{
 @{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.non_primaries_wo_read_only(true)|fmt_join("
-{label}{comment}    fn set_{raw_var}(&mut self, v: {domain_outer_owned});", "") }@
+{label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> Option<&mut dyn _model_::{class_mod_var}::{class}Updater>;
 {label}{comment}    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>);", "") }@
@@ -290,7 +290,7 @@ downcast_rs::impl_downcast!(_Updater);
 #[serde(deny_unknown_fields)]
 pub struct @{ pascal_name }@Factory {
 @{- def.non_auto_primary_for_factory()|fmt_join("
-    pub {var}: {domain_outer_owned},", "") }@
+{label}{comment}    pub {var}: {domain_factory},", "") }@
 }
 
 impl @{ pascal_name }@Factory {
@@ -376,8 +376,8 @@ impl super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
 @{- parent.non_primaries_wo_read_only(true)|fmt_join("
-    fn set_{raw_var}(&mut self, v: {domain_outer_owned}) {
-        self.{var} = v
+    fn set_{raw_var}(&mut self, v: {domain_factory}) {
+        self.{var} = v{convert_domain_factory}
     }", "") }@
 @{- parent.relations_one(true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> Option<&mut dyn _model_::{class_mod_var}::{class}Updater> {
@@ -489,8 +489,8 @@ impl @{ pascal_name }@UpdaterBase for @{ pascal_name }@Entity {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
 @{- def.non_primaries_wo_read_only(true)|fmt_join("
-    fn set_{raw_var}(&mut self, v: {domain_outer_owned}) {
-        self.{var} = v
+    fn set_{raw_var}(&mut self, v: {domain_factory}) {
+        self.{var} = v{convert_domain_factory}
     }", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> Option<&mut dyn _model_::{class_mod_var}::{class}Updater> {
@@ -878,6 +878,22 @@ pub trait _@{ pascal_name }@Query: Send + Sync {
     @%- endif %@
     fn find_directly(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindDirectlyBuilder>;
 }
+@%- for (index_name, index) in def.multi_index() %@
+
+#[allow(non_camel_case_types)]
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct @{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "pub {filter_type}", ", ") }@);
+impl<@{ index.join_fields(def, "T{index}", ", ") }@> TryFrom<(@{ index.join_fields(def, "T{index}", ", ") }@)> for @{ pascal_name }@Index_@{ index_name }@
+where@{ index.join_fields(def, "
+    T{index}: TryInto<{filter_type}>,
+    T{index}::Error: Into<anyhow::Error>,", "") }@
+{
+    type Error = anyhow::Error;
+    fn try_from(value: (@{ index.join_fields(def, "T{index}", ", ") }@)) -> Result<Self, Self::Error> {
+        Ok(Self(@{ index.join_fields(def, "value.{index}.try_into().map_err(|e| e.into())?", ", ") }@))
+    }
+}
+@%- endfor %@
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
@@ -903,7 +919,7 @@ impl Col_ {
 pub enum ColOne_ {
 @{ def.all_fields_without_json()|fmt_join("    {var}({filter_type}),", "\n") }@
 @%- for (index_name, index) in def.multi_index() %@
-    @{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "{type}", ", ") }@),
+    @{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@),
 @%- endfor %@
 }
 #[allow(unreachable_patterns)]
@@ -914,7 +930,7 @@ impl ColOne_ {
             @{- def.equivalence_cache_fields_without_json()|fmt_join("
             ColOne_::{var}(c) => _obj.{var}(){filter_check_eq},", "") }@
             @%- for (index_name, index) in def.multi_index() %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "c{index}", ", ") }@) => @{ index.join_fields(def, "(_obj.{var}(){filter_check_eq})", " && ") }@,
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{var}(){filter_check_eq})", " && ") }@,
             @%- endfor %@
             _ => unimplemented!(),
         }
@@ -925,7 +941,7 @@ impl ColOne_ {
             @{- def.comparable_cache_fields_without_json()|fmt_join("
             ColOne_::{var}(c) => _obj.{var}(){filter_check_cmp},", "") }@
             @%- for (index_name, index) in def.multi_index() %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "c{index}", ", ") }@) => @{ index.join_fields(def, "(_obj.{var}(){filter_check_cmp})", ".then") }@,
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{var}(){filter_check_cmp})", ".then") }@,
             @%- endfor %@
             _ => unimplemented!(),
         };
@@ -955,7 +971,7 @@ pub enum ColKey_ {
 pub enum ColMany_ {
 @{ def.all_fields_without_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
 @%- for (index_name, index) in def.multi_index() %@
-    @{ index.join_fields(def, "{name}", "_") }@(Vec<(@{ index.join_fields(def, "{type}", ", ") }@)>),
+    @{ index.join_fields(def, "{name}", "_") }@(Vec<@{ pascal_name }@Index_@{ index_name }@>),
 @%- endfor %@
 }
 #[allow(unreachable_patterns)]
@@ -966,7 +982,7 @@ impl ColMany_ {
             @{- def.equivalence_cache_fields_without_json()|fmt_join("
             ColMany_::{var}(list) => list.iter().any(|c| _obj.{var}(){filter_check_eq}),", "") }@
             @%- for (index_name, index) in def.multi_index() %@
-            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(list) => list.iter().any(|(@{ index.join_fields(def, "c{index}", ", ") }@)| @{ index.join_fields(def, "(_obj.{var}(){filter_check_eq})", " && ") }@),
+            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(list) => list.iter().any(|@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)| @{ index.join_fields(def, "(_obj.{var}(){filter_check_eq})", " && ") }@),
             @%- endfor %@
             _ => unimplemented!(),
         }
@@ -1312,18 +1328,18 @@ pub use @{ filter_macro_name }@_rel as filter_rel;
 macro_rules! @{ filter_macro_name }@ {
     () => (@{ model_path }@::Filter_::new_and());
 @%- for (index_name, index) in def.multi_index() %@
-    ((@{ index.join_fields(def, "{name}", ", ") }@) = (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Eq(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) > (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) >= (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) < (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Lt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) <= (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Lte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) = $e:expr) => (@{ model_path }@::Filter_::Eq(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e.{index}.clone().try_into()?", ", ") }@)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) = (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Eq(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) > (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) >= (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) < (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Lt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) <= (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Lte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) = $e:expr) => (@{ model_path }@::Filter_::Eq(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e.{index}.clone()", ", ") }@).try_into()?)));
     ((@{ index.join_fields(def, "{name}", ", ") }@) IN $e:expr) => (@{ model_path }@::Filter_::In(@{ model_path }@::ColMany_::@{ index.join_fields(def, "{name}", "_") }@($e.into_iter().map(|v| (@{ index.join_fields(def, "v.{index}.clone()", ", ") }@).try_into()).collect::<Result<_, _>>()?)));
     ((@{ index.join_fields(def, "{name}", ", ") }@) NOT IN $e:expr) => (@{ model_path }@::Filter_::NotIn(@{ model_path }@::ColMany_::@{ index.join_fields(def, "{name}", "_") }@($e.into_iter().map(|v| (@{ index.join_fields(def, "v.{index}.clone()", ", ") }@).try_into()).collect::<Result<_, _>>()?)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) > $e:expr) => (@{ model_path }@::Filter_::Gt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e.{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) >= $e:expr) => (@{ model_path }@::Filter_::Gte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e.{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) < $e:expr) => (@{ model_path }@::Filter_::Lt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e.{index}.clone().try_into()?", ", ") }@)));
-    ((@{ index.join_fields(def, "{name}", ", ") }@) <= $e:expr) => (@{ model_path }@::Filter_::Lte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ index.join_fields(def, "$e.{index}.clone().try_into()?", ", ") }@)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) > $e:expr) => (@{ model_path }@::Filter_::Gt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e.{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) >= $e:expr) => (@{ model_path }@::Filter_::Gte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e.{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) < $e:expr) => (@{ model_path }@::Filter_::Lt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e.{index}.clone()", ", ") }@).try_into()?)));
+    ((@{ index.join_fields(def, "{name}", ", ") }@) <= $e:expr) => (@{ model_path }@::Filter_::Lte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e.{index}.clone()", ", ") }@).try_into()?)));
 @%- endfor %@
     (($($t:tt)*)) => (@{ model_path }@::filter!($($t)*));
     (NOT $t:tt) => (@{ model_path }@::Filter_::Not(Box::new(@{ model_path }@::filter!($t))));
@@ -1465,7 +1481,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
     fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn _Updater> {
         Box::new(@{ pascal_name }@Entity {
 @{- def.non_auto_primary_for_factory()|fmt_join("
-            {var}: factory.{var},", "") }@
+            {var}: factory.{var}{convert_domain_factory},", "") }@
             ..Default::default()
         })
     }

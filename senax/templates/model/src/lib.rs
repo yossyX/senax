@@ -49,9 +49,8 @@ const DB_NAME: &str = "@{ db }@";
 const DB_UPPER_NAME: &str = "@{ db|upper_snake }@";
 #[allow(dead_code)]
 const DB_ID: u64 = @{ config.db_id() }@;
-const IN_CONDITION_LIMIT: usize = 1000;
+const IN_CONDITION_LIMIT: usize = 500;
 const UNION_LIMIT: usize = 100;
-const BULK_FETCH_RATE: usize = 20;
 @%- if !config.force_disable_cache %@
 #[allow(dead_code)]
 const CACHE_DB_DIR: &str = "cache/@{ db|snake }@";
@@ -67,7 +66,6 @@ static SHUTDOWN_GUARD: OnceCell<Weak<mpsc::Sender<u8>>> = OnceCell::new();
 static EXIT: OnceCell<mpsc::Sender<i32>> = OnceCell::new();
 static SYS_STOP: AtomicBool = AtomicBool::new(false);
 static TEST_MODE: AtomicBool = AtomicBool::new(false);
-static BULK_FETCH_SEMAPHORE: OnceCell<Vec<Semaphore>> = OnceCell::new();
 static BULK_INSERT_MAX_SIZE: OnceCell<usize> = OnceCell::new();
 static LINKER_SENDER: OnceCell<linker::Sender<CacheMsg>> = OnceCell::new();
 static UUID_NODE: OnceCell<[u8; 6]> = OnceCell::new();
@@ -94,7 +92,6 @@ pub async fn start(
         UUID_NODE.set(*uuid_node).unwrap();
     }
 
-    set_bulk_fetch_lane();
     set_bulk_insert_max_size().await?;
     @%- if !config.force_disable_cache %@
 
@@ -146,22 +143,6 @@ pub async fn start(
     Ok(())
 }
 
-fn set_bulk_fetch_lane() {
-    if BULK_FETCH_SEMAPHORE.get().is_none() {
-        let bulk_fetch_lane = std::cmp::max(
-            1,
-            DbConn::max_connections_for_read() as usize * BULK_FETCH_RATE / 100,
-        );
-        BULK_FETCH_SEMAPHORE
-            .set(
-                DbConn::shard_num_range()
-                    .map(|_| Semaphore::new(bulk_fetch_lane))
-                    .collect(),
-            )
-            .unwrap();
-    }
-}
-
 async fn set_bulk_insert_max_size() -> Result<(), anyhow::Error> {
     if BULK_INSERT_MAX_SIZE.get().is_none() {
         let conn = DbConn::_new(0);
@@ -182,7 +163,6 @@ pub async fn start_test() -> Result<MutexGuard<'static, u8>> {
     let guard = TEST_LOCK.lock().await;
     TEST_MODE.store(true, Ordering::SeqCst);
     migrate(true, true, false).await?;
-    set_bulk_fetch_lane();
     set_bulk_insert_max_size().await?;
     models::start_test().await?;
     Ok(guard)

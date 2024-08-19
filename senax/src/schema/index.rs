@@ -215,7 +215,7 @@ impl IndexDef {
             v.push(
                 tpl.replace("{name}", name)
                     .replace("{var}", &_to_var_name(name))
-                    .replace("{type}", &col.get_filter_type(super::domain_mode()))
+                    .replace("{filter_type}", &col.get_filter_type(super::domain_mode()))
                     .replace("{col_esc}", &_to_db_col(name, true))
                     .replace("{index}", &index.to_string())
                     .replace("{bind_as_for_filter}", col.get_bind_as_for_filter())

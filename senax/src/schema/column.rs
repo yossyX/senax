@@ -1179,6 +1179,12 @@ impl FieldDef {
                     &format!("UUID_TO_BIN(\"{}\")", self.get_col_name(name))
                 )
             }
+            DataType::Json => {
+                format!(
+                    "    #[sql(query = {:?})]\n",
+                    &format!("JSON_UNQUOTE(\"{}\")", self.get_col_name(name))
+                )
+            }
             DataType::Point => {
                 format!(
                     "    #[sql(query = {:?})]\n",
@@ -1197,7 +1203,10 @@ impl FieldDef {
             DataType::Geometry => {
                 format!(
                     "    #[sql(query = {:?})]\n",
-                    &format!("ST_AsGeoJSON(\"{}\")", self.get_col_name(name))
+                    &format!(
+                        "JSON_UNQUOTE(ST_AsGeoJSON(\"{}\"))",
+                        self.get_col_name(name)
+                    )
                 )
             }
             _ => {
@@ -1218,6 +1227,9 @@ impl FieldDef {
             DataType::Uuid => {
                 format!("UUID_TO_BIN(\"{}\")", name)
             }
+            DataType::Json => {
+                format!("JSON_UNQUOTE(\"{}\")", name)
+            }
             DataType::Point => {
                 format!("ST_AsBinary(\"{}\")", name)
             }
@@ -1225,7 +1237,7 @@ impl FieldDef {
                 format!("ST_AsBinary(\"{}\", 'axis-order=lat-long')", name)
             }
             DataType::Geometry => {
-                format!("ST_AsGeoJSON(\"{}\")", name)
+                format!("JSON_UNQUOTE(ST_AsGeoJSON(\"{}\"))", name)
             }
             _ => {
                 format!("\"{}\"", name)
@@ -1481,8 +1493,6 @@ impl FieldDef {
             DataType::Char | DataType::Varchar | DataType::Text => true,
             DataType::Binary | DataType::Varbinary | DataType::Blob => true,
             DataType::ArrayInt | DataType::ArrayString => true,
-            DataType::Json => true,
-            DataType::Geometry => true,
             _ => false,
         }
     }
@@ -1529,28 +1539,21 @@ impl FieldDef {
             DataType::ArrayInt => "std::sync::Arc<Vec<u64>>",
             DataType::ArrayString if raw => "Vec<String>",
             DataType::ArrayString => "std::sync::Arc<Vec<String>>",
-            DataType::Json if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
-            DataType::Json => "serde_json::Value",
+            DataType::Json => "crate::misc::JsonBlob",
             DataType::DbEnum => "",
             DataType::DbSet => "String",
             DataType::Point => "senax_common::types::point::Point",
             DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
-            DataType::Geometry if raw => "serde_json::Value",
-            DataType::Geometry => "std::sync::Arc<serde_json::Value>",
+            DataType::Geometry => "crate::misc::JsonBlob",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
         };
-        let typ = if !raw && self.data_type == DataType::Json {
-            format!("std::sync::Arc<{typ}>")
-        } else {
-            typ.to_owned()
-        };
         if without_option {
-            return typ;
+            return typ.to_owned();
         }
         if self.not_null {
-            typ
+            typ.to_owned()
         } else {
             format!("Option<{}>", typ)
         }
@@ -1825,6 +1828,27 @@ impl FieldDef {
         }
     }
 
+    pub fn convert_domain_factory(&self) -> &str {
+        if self.id_class.is_some() || self.enum_class.is_some() || self.rel.is_some() {
+            return "";
+        }
+        match self.data_type {
+            DataType::Char | DataType::Varchar if !self.not_null => ".map(|v| v.into())",
+            DataType::Char | DataType::Varchar => ".into()",
+            DataType::Text if !self.not_null => ".map(|v| v.into())",
+            DataType::Text => ".into()",
+            DataType::Binary | DataType::Varbinary | DataType::Blob if !self.not_null => {
+                ".map(|v| v.into())"
+            }
+            DataType::Binary | DataType::Varbinary | DataType::Blob => ".into()",
+            DataType::ArrayInt if !self.not_null => ".map(|v| v.into())",
+            DataType::ArrayInt => ".into()",
+            DataType::ArrayString if !self.not_null => ".map(|v| v.into())",
+            DataType::ArrayString => ".into()",
+            _ => "",
+        }
+    }
+
     pub fn convert_factory_type(&self) -> String {
         let mut id_str = "";
         if self.auto.is_none() {
@@ -1864,18 +1888,22 @@ impl FieldDef {
             DataType::Decimal => "",
             DataType::ArrayInt => ".into()",
             DataType::ArrayString => ".into()",
-            DataType::Json => ".into()",
+            DataType::Json => "._to_json_blob().unwrap()",
             DataType::DbEnum => "",
             DataType::DbSet => "",
             DataType::Point => ".into()",
             DataType::GeoPoint => ".into()",
-            DataType::Geometry => ".into()",
+            DataType::Geometry => "._to_json_blob().unwrap()",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
         };
         if !self.not_null {
-            format!(".map(|v| v{}{})", id_str, conv_str)
+            if id_str.is_empty() && conv_str.is_empty() {
+                "".to_string()
+            } else {
+                format!(".map(|v| v{}{})", id_str, conv_str)
+            }
         } else {
             format!("{}{}", id_str, conv_str)
         }
@@ -1902,7 +1930,7 @@ impl FieldDef {
             DataType::Uuid => "",
             DataType::BinaryUuid => "",
             DataType::Binary | DataType::Varbinary | DataType::Blob if !id_str.is_empty() => "",
-            DataType::Binary | DataType::Varbinary | DataType::Blob => ".into()",
+            DataType::Binary | DataType::Varbinary | DataType::Blob => "",
             DataType::Timestamp => "",
             DataType::DateTime => "",
             DataType::Date => "",
@@ -1910,18 +1938,22 @@ impl FieldDef {
             DataType::Decimal => "",
             DataType::ArrayInt => "",
             DataType::ArrayString => "",
-            DataType::Json => "",
+            DataType::Json => "._to_json_blob().unwrap()",
             DataType::DbEnum => "",
             DataType::DbSet => "",
             DataType::Point => ".to_tuple().to_point()",
             DataType::GeoPoint => ".to_tuple().to_geo_point()",
-            DataType::Geometry => "",
+            DataType::Geometry => "._to_json_blob().unwrap()",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
         };
         if !self.not_null {
-            format!(".map(|v| v{}{})", id_str, conv_str)
+            if id_str.is_empty() && conv_str.is_empty() {
+                "".to_string()
+            } else {
+                format!(".map(|v| v{}{})", id_str, conv_str)
+            }
         } else {
             format!("{}{}", id_str, conv_str)
         }
@@ -1965,17 +1997,12 @@ impl FieldDef {
             DataType::DbSet => "String",
             DataType::Point => "domain::models::Point",
             DataType::GeoPoint => "domain::models::GeoPoint",
-            DataType::Geometry if req => "serde_json::Value",
-            DataType::Geometry => "std::sync::Arc<serde_json::Value>",
+            DataType::Geometry => "serde_json::Value",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
         };
-        let mut typ = if self.data_type == DataType::Json && !req {
-            format!("std::sync::Arc<{typ}>")
-        } else {
-            typ.to_owned()
-        };
+        let mut typ = typ.to_owned();
         if let Some(ref name) = self.value_object {
             if self.enum_values.is_some() {
                 let name = name.to_case(Case::Pascal);
@@ -2154,20 +2181,14 @@ impl FieldDef {
             DataType::ArrayString if req => ".as_ref().to_owned()",
             DataType::ArrayString if !self.not_null => ".cloned()",
             DataType::ArrayString => ".clone()",
-            DataType::Json if !self.not_null && req => ".map(|v| v.as_ref().to_owned())",
-            DataType::Json if req => ".as_ref().to_owned()",
-            DataType::Json if !self.not_null => ".cloned()",
-            DataType::Json => ".clone()",
+            DataType::Json => "",
             DataType::DbEnum if !self.not_null => ".map(|v| v.to_string())",
             DataType::DbEnum => ".to_string()",
             DataType::DbSet if !self.not_null => ".map(|v| v.to_string())",
             DataType::DbSet => ".to_string()",
             DataType::Point => "",
             DataType::GeoPoint => "",
-            DataType::Geometry if !self.not_null && req => ".map(|v| v.as_ref().to_owned())",
-            DataType::Geometry if req => ".as_ref().to_owned()",
-            DataType::Geometry if !self.not_null => ".cloned()",
-            DataType::Geometry => ".clone()",
+            DataType::Geometry => "",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
@@ -2234,23 +2255,11 @@ impl FieldDef {
             }
         }
         match self.data_type {
-            DataType::Char | DataType::Varchar | DataType::Text if !self.not_null => {
-                format!("input.{var}.map(|v| v.into())")
-            }
-            DataType::Char | DataType::Varchar | DataType::Text => format!("input.{var}.into()"),
-            DataType::ArrayInt | DataType::ArrayString if !self.not_null => {
-                format!("input.{var}.map(|v| v.into())")
-            }
-            DataType::ArrayInt | DataType::ArrayString => format!("input.{var}.into()"),
-            DataType::Json | DataType::Geometry if !self.not_null => {
-                format!("input.{var}.map(|v| v.into())")
-            }
-            DataType::Json | DataType::Geometry => format!("input.{var}.into()"),
             DataType::Binary | DataType::Varbinary | DataType::Blob if !self.not_null => {
-                format!("input.{var}.map(|v| v.to_vec().into())")
+                format!("input.{var}.map(|v| v.to_vec())")
             }
             DataType::Binary | DataType::Varbinary | DataType::Blob => {
-                format!("input.{var}.to_vec().into()")
+                format!("input.{var}.to_vec()")
             }
             _ => format!("input.{var}"),
         }
@@ -2311,16 +2320,12 @@ impl FieldDef {
                 DataType::Point => "senax_common::types::point::Point",
                 DataType::GeoPoint if is_domain => "domain::models::GeoPoint",
                 DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
-                DataType::Geometry => "&std::sync::Arc<serde_json::Value>",
+                DataType::Geometry => "serde_json::Value",
                 DataType::ValueObject => unimplemented!(),
                 DataType::AutoFk => unimplemented!(),
                 DataType::UnSupported => unimplemented!(),
             };
-            if self.data_type == DataType::Json {
-                format!("&std::sync::Arc<{typ}>")
-            } else {
-                typ.to_owned()
-            }
+            typ.to_owned()
         };
         if self.not_null {
             typ
@@ -2390,7 +2395,7 @@ impl FieldDef {
             format!("Option<{}>", typ)
         }
     }
-    pub fn get_outer_owned_type(&self, is_domain: bool) -> String {
+    pub fn get_outer_owned_type(&self, is_domain: bool, factory: bool) -> String {
         let typ = if is_domain && self.value_object.is_some() {
             let name = self.value_object.as_ref().unwrap().to_case(Case::Pascal);
             format!("value_objects::{}", name)
@@ -2420,11 +2425,14 @@ impl FieldDef {
                 DataType::BigInt => "u64",
                 DataType::Float => "f32",
                 DataType::Double => "f64",
+                DataType::Char | DataType::Varchar if factory => "String",
                 DataType::Char | DataType::Varchar => "std::sync::Arc<String>",
                 DataType::Boolean => "bool",
+                DataType::Text if factory => "String",
                 DataType::Text => "std::sync::Arc<String>",
                 DataType::Uuid => "uuid::Uuid",
                 DataType::BinaryUuid => "uuid::Uuid",
+                DataType::Binary | DataType::Varbinary | DataType::Blob if factory => "Vec<u8>",
                 DataType::Binary | DataType::Varbinary | DataType::Blob => {
                     "std::sync::Arc<Vec<u8>>"
                 }
@@ -2435,7 +2443,9 @@ impl FieldDef {
                 DataType::Date => "chrono::NaiveDate",
                 DataType::Time => "chrono::NaiveTime",
                 DataType::Decimal => "rust_decimal::Decimal",
+                DataType::ArrayInt if factory => "Vec<u64>",
                 DataType::ArrayInt => "std::sync::Arc<Vec<u64>>",
+                DataType::ArrayString if factory => "Vec<String>",
                 DataType::ArrayString => "std::sync::Arc<Vec<String>>",
                 DataType::Json if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
                 DataType::Json => "serde_json::Value",
@@ -2445,16 +2455,12 @@ impl FieldDef {
                 DataType::Point => "senax_common::types::point::Point",
                 DataType::GeoPoint if is_domain => "domain::models::GeoPoint",
                 DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
-                DataType::Geometry => "std::sync::Arc<serde_json::Value>",
+                DataType::Geometry => "serde_json::Value",
                 DataType::ValueObject => unimplemented!(),
                 DataType::AutoFk => unimplemented!(),
                 DataType::UnSupported => unimplemented!(),
             };
-            if self.data_type == DataType::Json {
-                format!("std::sync::Arc<{typ}>")
-            } else {
-                typ.to_owned()
-            }
+            typ.to_owned()
         };
         if self.not_null {
             typ
@@ -2470,8 +2476,6 @@ impl FieldDef {
             DataType::Binary | DataType::Varbinary | DataType::Blob => "&",
             DataType::ArrayInt => "&",
             DataType::ArrayString => "&",
-            DataType::Json => "&",
-            DataType::Geometry => "&",
             _ => "",
         }
     }
@@ -2511,15 +2515,15 @@ impl FieldDef {
             DataType::ArrayInt => "",
             DataType::ArrayString if !self.not_null => ".as_ref()",
             DataType::ArrayString => "",
-            DataType::Json if !self.not_null => ".as_ref()",
-            DataType::Json => "",
+            DataType::Json if !self.not_null => ".as_ref().map(|v| v._to_value())",
+            DataType::Json => "._to_value()",
             DataType::DbEnum => "",
             DataType::DbSet if !self.not_null => ".as_deref()",
             DataType::DbSet => ".as_ref()",
             DataType::Point => "",
             DataType::GeoPoint => "",
-            DataType::Geometry if !self.not_null => ".as_ref()",
-            DataType::Geometry => "",
+            DataType::Geometry if !self.not_null => ".as_ref().map(|v| v._to_value())",
+            DataType::Geometry => "._to_value()",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
@@ -2535,8 +2539,6 @@ impl FieldDef {
             DataType::Binary | DataType::Varbinary | DataType::Blob => "&",
             DataType::ArrayInt => "&",
             DataType::ArrayString => "&",
-            DataType::Json => "&",
-            DataType::Geometry => "&",
             _ => "",
         }
     }
@@ -2616,8 +2618,8 @@ impl FieldDef {
             DataType::ArrayString if is_impl => "",
             DataType::ArrayString if !self.not_null => ".as_ref()",
             DataType::ArrayString => "",
-            DataType::Json if is_impl => "",
-            DataType::Json if !self.not_null => ".as_ref()",
+            DataType::Json if !is_impl && !self.not_null => ".as_ref().cloned()",
+            DataType::Json if !is_impl => ".clone()",
             DataType::Json => "",
             DataType::DbEnum if is_impl => "",
             DataType::DbEnum => "",
@@ -2628,8 +2630,8 @@ impl FieldDef {
             DataType::Point => ".as_ref().map(|v| v.to_tuple().point())",
             DataType::GeoPoint if self.not_null => ".to_tuple().geo_point()",
             DataType::GeoPoint => ".as_ref().map(|v| v.to_tuple().geo_point())",
-            DataType::Geometry if is_impl => "",
-            DataType::Geometry if !self.not_null => ".as_ref()",
+            DataType::Geometry if !is_impl && !self.not_null => ".as_ref().cloned()",
+            DataType::Geometry if !is_impl => ".clone()",
             DataType::Geometry => "",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
@@ -2768,8 +2770,8 @@ impl FieldDef {
                 format!("{var}{clone}.as_ref()")
             }
             DataType::ArrayString => format!("&{var}{clone}"),
-            DataType::Json if !self.not_null => format!("{var}{clone}.as_ref()"),
-            DataType::Json => format!("&{var}{clone}"),
+            DataType::Json if !self.not_null => format!("{var}.as_ref().map(|v| v._to_value())"),
+            DataType::Json => format!("{var}._to_value()"),
             DataType::DbEnum => unimplemented!(),
             DataType::DbSet if !self.not_null => format!("{var}{clone}.as_deref()"),
             DataType::DbSet => format!("{var}{clone}.as_ref()"),
@@ -2781,8 +2783,10 @@ impl FieldDef {
             DataType::GeoPoint => {
                 format!("{var}{clone}.as_ref().map(|v| v.to_tuple().geo_point())")
             }
-            DataType::Geometry if !self.not_null => format!("{var}{clone}.as_ref()"),
-            DataType::Geometry => format!("&{var}{clone}"),
+            DataType::Geometry if !self.not_null => {
+                format!("{var}.as_ref().map(|v| v._to_value())")
+            }
+            DataType::Geometry => format!("{var}._to_value()"),
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
@@ -2971,6 +2975,17 @@ impl FieldDef {
             || self.data_type == DataType::Blob
         {
             format!("{}NullBlob", if_then_else!(null, "", "Not"))
+        } else if self.data_type == DataType::Json || self.data_type == DataType::Geometry {
+            if with_type {
+                format!(
+                    "{}NullJson{}<{}>",
+                    if_then_else!(null, "", "Not"),
+                    sep,
+                    outer
+                )
+            } else {
+                format!("{}NullJson", if_then_else!(null, "", "Not"))
+            }
         } else if self.is_arc() {
             if with_type {
                 format!(
@@ -3050,7 +3065,11 @@ impl FieldDef {
             DataType::UnSupported => unimplemented!(),
         };
         if !self.not_null {
-            format!(".map(|v| v{}{})", id_str, conv_str)
+            if id_str.is_empty() && conv_str.is_empty() {
+                "".to_string()
+            } else {
+                format!(".map(|v| v{}{})", id_str, conv_str)
+            }
         } else {
             format!("{}{}", id_str, conv_str)
         }
@@ -3143,30 +3162,23 @@ impl FieldDef {
                     _ => panic!("unsupported type"),
                 };
                 if self.not_null {
-                    return format!(
-                        "
-            row.try_get::<{}, _>({index})?.into()",
-                        typ,
-                    );
+                    return format!("row.try_get::<{}, _>({index})?.into()", typ,);
                 } else {
                     return format!(
-                        "
-            row.try_get::<Option<{}>, _>({index})?.map(|v| v.into())",
+                        "row.try_get::<Option<{}>, _>({index})?.map(|v| v.into())",
                         typ,
                     );
                 }
             } else if self.not_null {
                 return format!(
-                    "
-            {}::try_from(row.try_get::<&str, _>({index})?).map_err(|e| sqlx::Error::ColumnDecode {{
+                    "{}::try_from(row.try_get::<&str, _>({index})?).map_err(|e| sqlx::Error::ColumnDecode {{
                 index: {name:?}.to_string(),
                 source: Box::new(e),
             }})?",
                     &class.to_string()
                 );
             } else {
-                return format!("
-            row.try_get::<Option<&str>, _>({index})?.map({}::try_from).transpose().map_err(|e| sqlx::Error::ColumnDecode {{
+                return format!("row.try_get::<Option<&str>, _>({index})?.map({}::try_from).transpose().map_err(|e| sqlx::Error::ColumnDecode {{
                 index: {name:?}.to_string(),
                 source: Box::new(e),
             }})?", &class.to_string());
@@ -3177,15 +3189,22 @@ impl FieldDef {
             || self.data_type == DataType::Text
         {
             if self.not_null {
-                return format!(
-                    "
-            row.try_get::<String, _>({index})?.into()",
-                );
+                return format!("row.try_get::<String, _>({index})?.into()",);
             } else {
-                return format!(
-                    "
-            row.try_get::<Option<String>, _>({index})?.map(|v| v.into())",
-                );
+                return format!("row.try_get::<Option<String>, _>({index})?.map(|v| v.into())",);
+            }
+        }
+        if self.data_type == DataType::Json || self.data_type == DataType::Geometry {
+            if self.not_null {
+                return format!("row.try_get::<&str, _>({index})?.try_into().map_err(|e| sqlx::Error::ColumnDecode {{
+                index: {name:?}.to_string(),
+                source: e,
+            }})?",);
+            } else {
+                return format!("row.try_get::<Option<&str>, _>({index})?.map(|v| v.try_into()).transpose().map_err(|e| sqlx::Error::ColumnDecode {{
+                index: {name:?}.to_string(),
+                source: e,
+            }})?",);
             }
         }
         if self.data_type == DataType::Binary
@@ -3193,52 +3212,29 @@ impl FieldDef {
             || self.data_type == DataType::Blob
         {
             if self.not_null {
-                return format!(
-                    "
-            row.try_get::<Vec<u8>, _>({index})?.into()",
-                );
+                return format!("row.try_get::<Vec<u8>, _>({index})?.into()",);
             } else {
-                return format!(
-                    "
-            row.try_get::<Option<Vec<u8>>, _>({index})?.map(|v| v.into())",
-                );
+                return format!("row.try_get::<Option<Vec<u8>>, _>({index})?.map(|v| v.into())",);
             }
         }
-        if self.data_type == DataType::ArrayInt
-            || self.data_type == DataType::ArrayString
-            || self.data_type == DataType::Json
-            || self.data_type == DataType::Geometry
-        {
+        if self.data_type == DataType::ArrayInt || self.data_type == DataType::ArrayString {
             let ty = self.get_inner_type(true, true);
             if self.not_null {
-                return format!(
-                    "
-            row.try_get::<::sqlx::types::Json<{ty}>, _>({index})?.0.into()",
-                );
+                return format!("row.try_get::<::sqlx::types::Json<{ty}>, _>({index})?.0.into()",);
             } else {
                 return format!(
-                    "
-            row.try_get::<Option<::sqlx::types::Json<{ty}>>, _>({index})?.map(|x| x.0.into())",
+                    "row.try_get::<Option<::sqlx::types::Json<{ty}>>, _>({index})?.map(|x| x.0.into())",
                 );
             }
         }
         if self.data_type == DataType::Point || self.data_type == DataType::GeoPoint {
             if self.not_null {
-                return format!(
-                    "
-            row.try_get::<&[u8], _>({index})?.into()",
-                );
+                return format!("row.try_get::<&[u8], _>({index})?.into()",);
             } else {
-                return format!(
-                    "
-            row.try_get::<Option<&[u8]>, _>({index})?.map(|v| v.into())",
-                );
+                return format!("row.try_get::<Option<&[u8]>, _>({index})?.map(|v| v.into())",);
             }
         }
-        format!(
-            "
-            row.try_get({index})?",
-        )
+        format!("row.try_get({index})?",)
     }
 
     pub fn get_col_name<'a>(&'a self, name: &'a str) -> Cow<'a, str> {

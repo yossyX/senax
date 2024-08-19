@@ -7,11 +7,15 @@ use derive_more::Display;
 use log::kv::ToValue;
 use num_traits::{CheckedAdd, CheckedSub, Float, SaturatingAdd, SaturatingSub};
 use rust_decimal::Decimal;
+use serde::{de::DeserializeOwned, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::ops::{BitAnd, BitOr};
 use std::sync::Arc;
 use std::{fmt, fmt::Display, marker::PhantomData};
+
+use crate::misc::{JsonBlob, ToJsonBlob as _, Updater};
 
 #[derive(
     Serialize_repr, Deserialize_repr, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash,
@@ -373,6 +377,11 @@ where
         self.val.clone_from(&val);
         *self.update = val;
     }
+    pub fn set_none(&mut self) {
+        *self.op = Op::Set;
+        *self.val = None;
+        *self.update = None;
+    }
     pub(crate) fn _set(op: Op, prop: &mut Option<I>, update: &Option<I>) {
         if op == Op::Set {
             prop.clone_from(update);
@@ -481,6 +490,11 @@ impl<'a> AccessorNullBool<'a> {
         *self.val = val;
         *self.update = val;
     }
+    pub fn set_none(&mut self) {
+        *self.op = Op::Set;
+        *self.val = None;
+        *self.update = None;
+    }
     pub(crate) fn _set(op: Op, prop: &mut Option<i8>, update: &Option<i8>) {
         if op == Op::Set {
             *prop = *update;
@@ -534,10 +548,11 @@ impl<'a, I: Debug> AccessorNotNullArc<'a, I> {
     pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
-    pub fn set(&mut self, val: Arc<I>) {
+    pub fn set<T: Into<Arc<I>>>(&mut self, val: T) {
         *self.op = Op::Set;
-        *self.val = val.clone();
-        *self.update = val;
+        let v = val.into();
+        *self.val = v.clone();
+        *self.update = v;
     }
     pub(crate) fn _set(op: Op, prop: &mut Arc<I>, update: &Arc<I>) {
         if op == Op::Set {
@@ -583,10 +598,16 @@ impl<'a, I: Debug> AccessorNullArc<'a, I> {
     pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
-    pub fn set(&mut self, val: Option<Arc<I>>) {
+    pub fn set<T: Into<Arc<I>>>(&mut self, val: Option<T>) {
         *self.op = Op::Set;
-        self.val.clone_from(&val);
-        *self.update = val;
+        let v = val.map(|v| v.into());
+        self.val.clone_from(&v);
+        *self.update = v;
+    }
+    pub fn set_none(&mut self) {
+        *self.op = Op::Set;
+        *self.val = None;
+        *self.update = None;
     }
     pub(crate) fn _set(op: Op, prop: &mut Option<Arc<I>>, update: &Option<Arc<I>>) {
         if op == Op::Set {
@@ -625,6 +646,120 @@ impl<'a, I: Debug> AccessorNullArc<'a, I> {
     }
 }
 
+pub struct AccessorNotNullJson<'a, I: Serialize + DeserializeOwned> {
+    pub(crate) op: &'a mut Op,
+    pub(crate) val: &'a mut JsonBlob,
+    pub(crate) update: &'a mut JsonBlob,
+    pub(crate) _phantom: PhantomData<I>,
+}
+impl<'a, I: Serialize + DeserializeOwned> AccessorNotNullJson<'a, I> {
+    pub fn get(&self) -> I {
+        self.val._to_value()
+    }
+    pub fn mark_for_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_for_set(&mut self) {
+        *self.op = Op::Set;
+    }
+    pub fn set<T: Borrow<I>>(&mut self, val: T) {
+        *self.op = Op::Set;
+        let v = val.borrow()._to_json_blob().unwrap();
+        *self.val = v.clone();
+        *self.update = v;
+    }
+    pub(crate) fn _set(op: Op, prop: &mut JsonBlob, update: &JsonBlob) {
+        if op == Op::Set {
+            *prop = update.clone();
+        }
+    }
+
+    pub(crate) fn _write_insert(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        value: &JsonBlob,
+    ) -> fmt::Result {
+        write!(f, "{comma}{col}: {:?}", value)
+    }
+
+    pub(crate) fn _write_update(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        op: Op,
+        value: &JsonBlob,
+    ) -> fmt::Result {
+        if op != Op::None && op != Op::Skip {
+            write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
+        }
+        Ok(())
+    }
+}
+pub struct AccessorNullJson<'a, I: Serialize + DeserializeOwned> {
+    pub(crate) op: &'a mut Op,
+    pub(crate) val: &'a mut Option<JsonBlob>,
+    pub(crate) update: &'a mut Option<JsonBlob>,
+    pub(crate) _phantom: PhantomData<I>,
+}
+impl<'a, I: Serialize + DeserializeOwned> AccessorNullJson<'a, I> {
+    pub fn get(&self) -> Option<I> {
+        self.val.as_ref().map(|v| v._to_value())
+    }
+    pub fn mark_for_skip(&mut self) {
+        *self.op = Op::Skip;
+    }
+    pub fn mark_for_set(&mut self) {
+        *self.op = Op::Set;
+    }
+    pub fn set<T: Borrow<Option<I>>>(&mut self, val: T) {
+        *self.op = Op::Set;
+        let v = val.borrow().as_ref().map(|v| v._to_json_blob().unwrap());
+        self.val.clone_from(&v);
+        *self.update = v;
+    }
+    pub fn set_none(&mut self) {
+        *self.op = Op::Set;
+        *self.val = None;
+        *self.update = None;
+    }
+    pub(crate) fn _set(op: Op, prop: &mut Option<JsonBlob>, update: &Option<JsonBlob>) {
+        if op == Op::Set {
+            prop.clone_from(update);
+        }
+    }
+
+    pub(crate) fn _write_insert(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        value: &Option<JsonBlob>,
+    ) -> fmt::Result {
+        if let Some(value) = value {
+            write!(f, "{comma}{col}: {:?}", value)
+        } else {
+            write!(f, "{comma}{col}: null")
+        }
+    }
+
+    pub(crate) fn _write_update(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        op: Op,
+        value: &Option<JsonBlob>,
+    ) -> fmt::Result {
+        if op != Op::None && op != Op::Skip {
+            if let Some(value) = value {
+                write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
+            } else {
+                write!(f, "{comma}{col}: {{{op}: null}}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
 pub struct AccessorNotNullBlob<'a> {
     pub(crate) op: &'a mut Op,
     pub(crate) val: &'a mut Arc<Vec<u8>>,
@@ -641,10 +776,11 @@ impl<'a> AccessorNotNullBlob<'a> {
     pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
-    pub fn set(&mut self, val: Arc<Vec<u8>>) {
+    pub fn set<T: Into<Arc<Vec<u8>>>>(&mut self, val: T) {
         *self.op = Op::Set;
-        *self.val = val.clone();
-        *self.update = val;
+        let v = val.into();
+        *self.val = v.clone();
+        *self.update = v;
     }
     pub(crate) fn _set(op: Op, prop: &mut Arc<Vec<u8>>, update: &Arc<Vec<u8>>) {
         if op == Op::Set {
@@ -690,10 +826,16 @@ impl<'a> AccessorNullBlob<'a> {
     pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
-    pub fn set(&mut self, val: Option<Arc<Vec<u8>>>) {
+    pub fn set<T: Into<Arc<Vec<u8>>>>(&mut self, val: Option<T>) {
         *self.op = Op::Set;
-        self.val.clone_from(&val);
-        *self.update = val;
+        let v = val.map(|v| v.into());
+        self.val.clone_from(&v);
+        *self.update = v;
+    }
+    pub fn set_none(&mut self) {
+        *self.op = Op::Set;
+        *self.val = None;
+        *self.update = None;
     }
     pub(crate) fn _set(op: Op, prop: &mut Option<Arc<Vec<u8>>>, update: &Option<Arc<Vec<u8>>>) {
         if op == Op::Set {
@@ -844,6 +986,11 @@ impl<'a, I: Clone + Ord + Debug> AccessorNullOrd<'a, I> {
         *self.op = Op::Set;
         self.val.clone_from(&val);
         *self.update = val;
+    }
+    pub fn set_none(&mut self) {
+        *self.op = Op::Set;
+        *self.val = None;
+        *self.update = None;
     }
     pub fn max(&mut self, val: I) {
         if self.val.is_none() || val > *self.val.as_ref().unwrap() {
@@ -1152,6 +1299,11 @@ impl<
         *self.val = val;
         *self.update = val;
     }
+    pub fn set_none(&mut self) {
+        *self.op = Op::Set;
+        *self.val = None;
+        *self.update = None;
+    }
     pub fn add(&mut self, val: I) -> Result<()> {
         let mut overflow = false;
         let self_val = self.val.unwrap_or_default();
@@ -1436,6 +1588,11 @@ impl<'a, I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
         *self.val = val;
         *self.update = val;
     }
+    pub fn set_none(&mut self) {
+        *self.op = Op::Set;
+        *self.val = None;
+        *self.update = None;
+    }
     pub fn add(&mut self, val: I) {
         let self_val = self.val.unwrap_or_default();
         *self.val = Some(self_val + val);
@@ -1540,14 +1697,14 @@ impl<'a, I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
 
 pub struct AccessorHasOne<'a, I>
 where
-    I: crate::misc::Updater,
+    I: Updater,
 {
     pub(crate) name: &'static str,
     pub(crate) val: &'a mut Option<Vec<I>>,
 }
 impl<'a, I> AccessorHasOne<'a, I>
 where
-    I: crate::misc::Updater,
+    I: Updater,
 {
     pub fn get(&mut self) -> Option<&mut I> {
         self.val
@@ -1591,14 +1748,14 @@ where
 
 pub struct AccessorHasMany<'a, I>
 where
-    I: crate::misc::Updater,
+    I: Updater,
 {
     pub(crate) name: &'static str,
     pub(crate) val: &'a mut Option<Vec<I>>,
 }
 impl<'a, I> AccessorHasMany<'a, I>
 where
-    I: crate::misc::Updater,
+    I: Updater,
 {
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut I> {
         self.val
