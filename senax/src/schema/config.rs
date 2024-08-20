@@ -503,6 +503,12 @@ impl ConfigDef {
     pub fn version() -> CompactString {
         super::VERSION.read().unwrap().clone()
     }
+
+    pub fn max_db_str_len(&self) -> u64 {
+        match self.db {
+            DbType::Mysql => 4 * 1024 * 1024 * 1024 - 1,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema)]

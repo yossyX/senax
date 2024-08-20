@@ -564,7 +564,9 @@ where
     T: serde::Serialize,
 {
     fn _into_json(&self) -> String {
-        serde_json::to_string(self).unwrap()
+        let s = serde_json::to_string(self).unwrap();
+        assert!(s.len() <= @{ config.max_db_str_len() }@, "Incorrect JSON length.");
+        s
     }
 }
 
@@ -779,7 +781,9 @@ impl std::fmt::Debug for JsonBlob {
 }
 impl JsonBlob {
     pub fn _into_json(&self) -> String {
-        self.into()
+        let s: String = self.into();
+        assert!(s.len() <= @{ config.max_db_str_len() }@, "Incorrect JSON length.");
+        s
     }
     pub fn _to_value<T: serde::de::DeserializeOwned>(&self) -> T {
         let v = zstd::stream::decode_all(self.0.as_slice()).unwrap();

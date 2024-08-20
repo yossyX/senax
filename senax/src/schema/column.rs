@@ -12,6 +12,7 @@ use std::{borrow::Cow, fmt};
 use crate::{
     api_generator::schema::ApiFieldDef,
     common::{if_then_else, yaml_value_to_str},
+    migration_generator::UTF8_BYTE_LEN,
 };
 
 use super::{TimeZone, _to_var_name, domain_mode, to_id_name, CONFIG};
@@ -1269,11 +1270,11 @@ impl FieldDef {
                 )
             }
             DataType::Text if !self.not_null => {
-                let length =
-                    self.length.unwrap_or(65536) * crate::migration_generator::UTF8_BYTE_LEN;
-                if length >= 65536 {
-                    return "".to_owned();
-                }
+                let limit = CONFIG.read().unwrap().as_ref().unwrap().max_db_str_len();
+                let length = self
+                    .length
+                    .map(|l| limit.min(l as u64 * UTF8_BYTE_LEN as u64))
+                    .unwrap_or(limit);
                 format!(
                     r#"
         if let Some(v) = &self.{var_name} {{
@@ -1284,11 +1285,11 @@ impl FieldDef {
                 )
             }
             DataType::Text => {
-                let length =
-                    self.length.unwrap_or(65536) * crate::migration_generator::UTF8_BYTE_LEN;
-                if length >= 65536 {
-                    return "".to_owned();
-                }
+                let limit = CONFIG.read().unwrap().as_ref().unwrap().max_db_str_len();
+                let length = self
+                    .length
+                    .map(|l| limit.min(l as u64 * UTF8_BYTE_LEN as u64))
+                    .unwrap_or(limit);
                 format!(
                     r#"
         if self.{var_name}.as_ref().len() > {length} {{
@@ -1297,30 +1298,26 @@ impl FieldDef {
                 )
             }
             DataType::Binary | DataType::Varbinary | DataType::Blob if !self.not_null => {
-                if let Some(length) = self.length {
-                    format!(
-                        r#"
+                let limit = CONFIG.read().unwrap().as_ref().unwrap().max_db_str_len();
+                let length = self.length.map(|l| limit.min(l as u64)).unwrap_or(limit);
+                format!(
+                    r#"
         if let Some(v) = &self.{var_name} {{
             if v.as_ref().len() > {length} {{
                 errors.add({name:?}, validator::ValidationError::new("length"))
             }}
         }}"#
-                    )
-                } else {
-                    "".to_owned()
-                }
+                )
             }
             DataType::Binary | DataType::Varbinary | DataType::Blob => {
-                if let Some(length) = self.length {
-                    format!(
-                        r#"
+                let limit = CONFIG.read().unwrap().as_ref().unwrap().max_db_str_len();
+                let length = self.length.map(|l| limit.min(l as u64)).unwrap_or(limit);
+                format!(
+                    r#"
         if self.{var_name}.as_ref().len() > {length} {{
             errors.add({name:?}, validator::ValidationError::new("length"))
         }}"#
-                    )
-                } else {
-                    "".to_owned()
-                }
+                )
             }
             DataType::Double | DataType::Float if !self.signed && !self.not_null => {
                 format!(
