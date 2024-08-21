@@ -769,6 +769,7 @@ impl DbConn {
                 let pool = pool.clone();
                 join.spawn(async move {
                     tokio::time::sleep(Duration::from_millis(10 * i)).await;
+                    // spawn to prevent processing interruptions until a newly acquired connection enters the pool
                     tokio::spawn(async move { pool.acquire().await }).await
                 });
             }
@@ -853,6 +854,7 @@ impl DbConn {
             };
             join.spawn(async move {
                 tokio::time::sleep(Duration::from_millis(10 * i as u64)).await;
+                // spawn to prevent processing interruptions until a newly acquired connection enters the pool
                 tokio::spawn(async move { pool.acquire().await }).await
             });
         }
@@ -1087,13 +1089,16 @@ impl DbConn {
         for (s, v) in self.cache_op_list.drain(..) {
             cache_op_list.entry(s).or_default().push(v);
         }
+        let mut join_list: Vec<tokio::task::JoinHandle<Result<()>>> = Vec::new();
         for (shard_id, tx) in self.tx.drain() {
-            tx.commit().await?;
-            if !self.clear_whole_cache {
-                let cache_internal_op_list = cache_internal_op_list.remove(&shard_id);
-                let cache_op_list = cache_op_list.remove(&shard_id);
-                if cache_internal_op_list.is_some() || cache_op_list.is_some() {
-                    tokio::spawn(async move {
+            let cache_internal_op_list = cache_internal_op_list.remove(&shard_id);
+            let cache_op_list = cache_op_list.remove(&shard_id);
+            let clear_whole_cache = self.clear_whole_cache;
+            // JoinSet is not used to prevent processing interruptions
+            join_list.push(tokio::spawn(async move {
+                tx.commit().await?;
+                if !clear_whole_cache {
+                    if cache_internal_op_list.is_some() || cache_op_list.is_some() {
                         let sync = Self::inc_cache_sync(shard_id).await;
                         let mut sync_map = FxHashMap::default();
                         sync_map.insert(shard_id, sync);
@@ -1105,15 +1110,17 @@ impl DbConn {
                         if let Some(cache_op_list) = cache_op_list {
                             CacheMsg(cache_op_list, sync_map).do_send().await;
                         }
-                    });
+                    }
                 }
-            }
+                Ok(())
+            }));
+        }
+        for join in join_list {
+            join.await??;
         }
         self.lock_list.clear();
         if self.clear_whole_cache {
-            tokio::spawn(async move {
-                crate::clear_whole_cache().await;
-            });
+            crate::clear_whole_cache().await;
         }
         if !self.callback_list.is_empty() {
             let mut fut = Vec::new();
