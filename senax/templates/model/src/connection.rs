@@ -1746,16 +1746,19 @@ async fn reset_source_pool(
                 }
                 let new_pool = source_connect_with(pool_option, options).await?;
                 let pool = &mut pool_collection.write().await[idx];
-                *pool = Some((addr, new_pool.clone()));
                 @%- if !config.force_disable_cache %@
                 #[cfg(not(feature = "cache_update_only"))]
-                tokio::spawn(async move {
-                    if let Ok(source) = new_pool.acquire().await {
-                        let sync = DbConn::___inc_cache_sync(source).await.unwrap_or_default();
-                        models::common::_clear_cache(idx as ShardId, sync, false).await;
-                    }
-                });
+                if pool.is_some() {
+                    let new_pool = new_pool.clone();
+                    tokio::spawn(async move {
+                        if let Ok(source) = new_pool.acquire().await {
+                            let sync = DbConn::___inc_cache_sync(source).await.unwrap_or_default();
+                            models::common::_clear_cache(idx as ShardId, sync, false).await;
+                        }
+                    });
+                }
                 @%- endif %@
+                *pool = Some((addr, new_pool));
             }
             Ok(())
         });
