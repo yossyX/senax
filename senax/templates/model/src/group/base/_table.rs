@@ -2638,7 +2638,7 @@ impl CacheWrapper {
         self.{rel_name} = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).next();
         Ok(())
     }", "") }@
-@{- def.relations_many_without_limit()|fmt_rel_join("
+@{- def.relations_many_cache_without_limit()|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         let mut l: Vec<_> = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
@@ -2646,7 +2646,7 @@ impl CacheWrapper {
         self.{rel_name} = l;
         Ok(())
     }", "") }@
-@{- def.relations_many_with_limit()|fmt_rel_join("
+@{- def.relations_many_cache_with_limit()|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         let order = vec![{order}];
@@ -2939,7 +2939,7 @@ impl CacheWrapper {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_without_limit()|fmt_rel_join("
+@{- def.relations_many_cache_without_limit()|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
         let filter = RelFil{rel_name_pascal}::in_filter(vec){additional_filter};
@@ -2957,7 +2957,7 @@ impl CacheWrapper {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_with_limit()|fmt_rel_join("
+@{- def.relations_many_cache_with_limit()|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
         let union: Vec<_> = vec.iter().map(|v| {
