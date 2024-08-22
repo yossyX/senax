@@ -429,6 +429,7 @@ impl CacheOp {
                     if !replace && Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0).is_some() {
                         return;
                     }
+                    let can_cache = true@{ def.relations_one_cache(false)|fmt_rel_join(" && _{rel_name}.is_some()", "") }@@{ def.relations_many_cache(false)|fmt_rel_join(" && _{rel_name}.is_some()", "") }@;
     @{- def.relations_one_cache(false)|fmt_rel_join("
                     if let Some(_{rel_name}) = _{rel_name} {
                         cache.{rel_name} = rel_{class_mod}::CacheOp::apply_to_obj(&cache.{rel_name}, &_{rel_name}, shard_id, time){soft_delete_filter};
@@ -448,7 +449,9 @@ impl CacheOp {
                     if replace {
                         Cache::invalidate(&id, shard_id).await;
                     }
-                    Cache::insert_short(&id, Arc::new(cache)).await;
+                    if can_cache {
+                        Cache::insert_short(&id, Arc::new(cache)).await;
+                    }
                     @%- for (index_name, index) in def.unique_index() %@
                     if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("true", " data.{var}.is_some()", " && ") }@ {
                         let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{var}(data.{var}.clone(){inner_to_raw}.into())", "ColKey_::{var}(data.{var}.unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
@@ -515,6 +518,7 @@ impl CacheOp {
                             Cache::insert_version(&cs, Arc::new(cs.clone())).await;
                             Cache::invalidate(&id, shard_id).await;
                         }
+                        let can_cache = true@{ def.relations_one_cache(false)|fmt_rel_join(" && row.{rel_name}.is_some()", "") }@@{ def.relations_many_cache(false)|fmt_rel_join(" && row.{rel_name}.is_some()", "") }@;
                         @{- def.relations_one_cache(false)|fmt_rel_join("
                         if let Some(_{rel_name}) = row.{rel_name} {
                             cache.{rel_name} = _{rel_name}.as_ref(){soft_delete_filter}.map(|v| Arc::new(rel_{class_mod}::CacheWrapper::_from_data(v._data.clone(), shard_id, time)));
@@ -541,7 +545,7 @@ impl CacheOp {
                                 list: _{rel_name},
                             }.handle_cache_msg(Arc::clone(&sync_map)).await;
                         }", "")|replace1("_data") }@
-                        if !ignore @% if def.has_auto_primary() %@&& !overwrite @% endif %@{
+                        if !ignore && (has_cache || can_cache) @% if def.has_auto_primary() %@&& !overwrite @% endif %@{
                             Cache::insert(&id, Arc::new(cache), USE_FAST_CACHE, has_cache).await;
                         }
                         @%- for (index_name, index) in def.unique_index() %@
