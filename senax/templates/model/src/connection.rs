@@ -1097,19 +1097,19 @@ impl DbConn {
             // JoinSet is not used to prevent processing interruptions
             join_list.push(tokio::spawn(async move {
                 tx.commit().await?;
-                if !clear_whole_cache {
-                    if cache_internal_op_list.is_some() || cache_op_list.is_some() {
-                        let sync = Self::inc_cache_sync(shard_id).await;
-                        let mut sync_map = FxHashMap::default();
-                        sync_map.insert(shard_id, sync);
-                        if let Some(cache_internal_op_list) = cache_internal_op_list {
-                            CacheMsg(cache_internal_op_list, sync_map.clone())
-                                .do_send_to_internal()
-                                .await;
-                        }
-                        if let Some(cache_op_list) = cache_op_list {
-                            CacheMsg(cache_op_list, sync_map).do_send().await;
-                        }
+                if !clear_whole_cache
+                    && (cache_internal_op_list.is_some() || cache_op_list.is_some())
+                {
+                    let sync = Self::inc_cache_sync(shard_id).await;
+                    let mut sync_map = FxHashMap::default();
+                    sync_map.insert(shard_id, sync);
+                    if let Some(cache_internal_op_list) = cache_internal_op_list {
+                        CacheMsg(cache_internal_op_list, sync_map.clone())
+                            .do_send_to_internal()
+                            .await;
+                    }
+                    if let Some(cache_op_list) = cache_op_list {
+                        CacheMsg(cache_op_list, sync_map).do_send().await;
                     }
                 }
                 Ok(())
