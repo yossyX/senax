@@ -1702,6 +1702,20 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
+    pub fn relations_many_cache_without_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+        self.merged_relations
+            .iter()
+            .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache && v.1.limit.is_none())
+            .map(|v| (self, v.0, v.1))
+            .collect()
+    }
+    pub fn relations_many_cache_with_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+        self.merged_relations
+            .iter()
+            .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache && v.1.limit.is_some())
+            .map(|v| (self, v.0, v.1))
+            .collect()
+    }
     pub fn relations_many_uncached(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
