@@ -73,30 +73,41 @@ struct AppArg {
 
 #[derive(Subcommand, PartialEq, Clone, Debug)]
 enum Command {
+    /// Generate GraphQL schema
     GqlSchema,
+    /// Execute database migration
     Migrate {
-        /// Drop DB before migrating
+        /// Drop database before migrating
         #[clap(short, long)]
         clean: bool,
-        /// Drop DB before migrating in release environment
+        /// Drop database before migrating in release environment
         #[clap(long)]
         force_delete_all_db: bool,
+        /// ignore missing migration error
+        #[clap(long)]
+        ignore_missing: bool,
         /// Use test environment
         #[clap(short, long)]
         test: bool,
     },
+    /// Generate a schema for the seed
     GenSeedSchema,
+    /// Import the database seed.
     Seed {
         /// Use clean migration
         #[clap(short, long)]
         clean: bool,
-        /// Drop DB before migrating in release environment
+        /// Drop database before migrating in release environment
         #[clap(long)]
         force_delete_all_db: bool,
+        /// ignore missing migration error
+        #[clap(long)]
+        ignore_missing: bool,
         /// Use test environment
         #[clap(short, long)]
         test: bool,
     },
+    /// Check database tables
     Check {
         /// Use test environment
         #[clap(short, long)]
@@ -140,8 +151,9 @@ async fn main() -> Result<()> {
             }
             Command::Migrate {
                 clean,
-                test,
                 force_delete_all_db,
+                ignore_missing,
+                test,
             } => {
                 if clean {
                     ensure!(
@@ -149,7 +161,7 @@ async fn main() -> Result<()> {
                         "clean migrate is debug environment only"
                     );
                 }
-                db::migrate(test, clean || force_delete_all_db, false).await?;
+                db::migrate(test, clean || force_delete_all_db, ignore_missing).await?;
                 return Ok(());
             }
             Command::GenSeedSchema => {
@@ -158,15 +170,16 @@ async fn main() -> Result<()> {
             }
             Command::Seed {
                 clean,
-                test,
                 force_delete_all_db,
+                ignore_missing,
+                test,
             } => {
                 if clean {
                     ensure!(
                         force_delete_all_db || cfg!(debug_assertions),
                         "clean migrate is debug environment only"
                     );
-                    db::migrate(test, clean || force_delete_all_db, false).await?;
+                    db::migrate(test, clean || force_delete_all_db, ignore_missing).await?;
                 }
                 db::seed(test).await?;
                 return Ok(());
