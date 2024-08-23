@@ -914,8 +914,8 @@ async fn clear_all_rows_cache(shard_id: ShardId, sync: u64, clear_test: bool) {
     }
 }
 #[cfg(not(feature="cache_update_only"))]
-pub(crate) async fn _clear_cache(shard_id: ShardId, sync: u64, _clear_test: bool) {
-    clear_all_rows_cache(shard_id, sync, _clear_test).await;
+pub(crate) async fn _clear_cache(shard_id: ShardId, sync: u64, clear_test: bool) {
+    clear_all_rows_cache(shard_id, sync, clear_test).await;
     if USE_CACHE {
         if let Some(s) = CACHE_RESET_SYNC.get() {
             let mut _sync = s[shard_id as usize].write().await;

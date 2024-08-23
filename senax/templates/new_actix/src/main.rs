@@ -207,6 +207,7 @@ async fn main() -> Result<()> {
             error!("{}", e);
             std::process::exit(1);
         }
+        info!("Migration completed");
     }
     let port = env::var(HOST_PORT).unwrap_or_else(|_| DEFAULT_HOST_PORT.to_owned());
     info!("HOST_PORT: {:?}", port);
