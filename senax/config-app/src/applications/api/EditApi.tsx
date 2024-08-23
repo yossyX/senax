@@ -413,7 +413,8 @@ function Selector({ formData, definitions }: any) {
         />
         <AutoField name="use_for_update_by_operator" {...formData} />
         <AutoField name="use_for_delete" {...formData} />
-      </SpaceBetween>
+        <AutoField name="limit" {...formData} />
+        </SpaceBetween>
     </>
   );
 }

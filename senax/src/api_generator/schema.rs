@@ -27,8 +27,11 @@ pub struct ApiConfigDef {
     #[serde(default)]
     pub with_comment: bool,
     /// ### タイムスタンプを非表示にする
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub hide_timestamp: bool,
+    /// ### セレクタ取得数デフォルト上限
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_limit: Option<u64>,
     /// ### 権限
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub roles: IndexMap<String, Option<ApiRoleDef>>,
@@ -51,8 +54,11 @@ pub struct ApiConfigJson {
     #[serde(default)]
     pub with_comment: bool,
     /// ### タイムスタンプを非表示にする
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pub hide_timestamp: bool,
+    /// ### セレクタ取得数デフォルト上限
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_limit: Option<u64>,
     /// ### 権限
     #[serde(default)]
     pub roles: Vec<ApiRoleJson>,
@@ -68,6 +74,7 @@ impl From<ApiConfigDef> for ApiConfigJson {
             with_label: value.with_label,
             with_comment: value.with_comment,
             hide_timestamp: value.hide_timestamp,
+            selector_limit: value.selector_limit,
             roles: value
                 .roles
                 .into_iter()
@@ -89,6 +96,7 @@ impl From<ApiConfigJson> for ApiConfigDef {
             with_label: value.with_label,
             with_comment: value.with_comment,
             hide_timestamp: value.hide_timestamp,
+            selector_limit: value.selector_limit,
             roles: value
                 .roles
                 .into_iter()
@@ -147,16 +155,16 @@ impl From<ApiRoleJson> for ApiRoleDef {
 pub struct ApiDbDef {
     /// ### キャメルケースを使用する
     #[serde(default)]
-    camel_case: Option<bool>,
+    pub camel_case: Option<bool>,
     /// ### APIのスキーマに論理名を設定する
     #[serde(default)]
-    with_label: Option<bool>,
+    pub with_label: Option<bool>,
     /// ### APIのスキーマにコメントを設定する
     #[serde(default)]
-    with_comment: Option<bool>,
+    pub with_comment: Option<bool>,
     /// ### タイムスタンプを非表示にする
     #[serde(default)]
-    hide_timestamp: Option<bool>,
+    pub hide_timestamp: Option<bool>,
     /// ### グループ
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub groups: IndexMap<String, Option<ApiGroupDef>>,
@@ -211,7 +219,7 @@ pub struct ApiDbJson {
     pub with_comment: Option<bool>,
     /// ### タイムスタンプを非表示にする
     #[serde(default)]
-    hide_timestamp: Option<bool>,
+    pub hide_timestamp: Option<bool>,
     /// ### グループ
     #[serde(default)]
     pub groups: Vec<ApiGroupJson>,
@@ -1143,6 +1151,9 @@ pub struct ApiSelectorDef {
     /// ### 削除に使用する
     #[serde(default, skip_serializing_if = "crate::schema::is_false")]
     pub use_for_delete: bool,
+    /// ### 取得数上限
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u64>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema, Validate)]
@@ -1165,6 +1176,9 @@ pub struct ApiSelectorJson {
     /// ### 削除に使用する
     #[serde(default, skip_serializing_if = "crate::schema::is_false")]
     pub use_for_delete: bool,
+    /// ### 取得数上限
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u64>,
 }
 impl From<ApiSelectorDef> for ApiSelectorJson {
     fn from(value: ApiSelectorDef) -> Self {
@@ -1181,6 +1195,7 @@ impl From<ApiSelectorDef> for ApiSelectorJson {
                 .collect(),
             use_for_update_by_operator: value.use_for_update_by_operator,
             use_for_delete: value.use_for_delete,
+            limit: value.limit,
         }
     }
 }
@@ -1198,9 +1213,40 @@ impl From<ApiSelectorJson> for ApiSelectorDef {
                 .collect(),
             use_for_update_by_operator: value.use_for_update_by_operator,
             use_for_delete: value.use_for_delete,
+            limit: value.limit,
         }
     }
 }
+impl ApiSelectorDef {
+    pub fn limit(&self) -> Option<u64> {
+        let mut limit = self.limit;
+        let selector_limit = API_CONFIG.read().unwrap().as_ref().unwrap().selector_limit;
+        if limit.is_none() {
+            limit = selector_limit;
+        }
+        limit
+    }
+    pub fn limit_def(&self) -> String {
+        self.limit()
+            .map(|l| format!("\n    const LIMIT: usize = {l};"))
+            .unwrap_or_default()
+    }
+    pub fn limit_str(&self) -> &'static str {
+        if self.limit().is_some() {
+            "Some(LIMIT)"
+        } else {
+            "None"
+        }
+    }
+    pub fn check_limit(&self) -> &'static str {
+        if self.limit().is_some() {
+            ".map(|l| l.min(LIMIT))"
+        } else {
+            ""
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
 /// ### JavaScript Updater定義

@@ -66,7 +66,7 @@ async fn _@{ selector }@(
     @%- endif %@
     order: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order,
     offset: Option<usize>,
-) -> anyhow::Result<(Vec<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>, bool, usize)> {
+) -> anyhow::Result<(Vec<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>, bool, Option<usize>)> {
     use domain::models::Cursor;
     let @{ db|snake }@_query = repo.@{ db|snake }@_query();
     @{ db|snake }@_query.begin_read_tx().await?;
@@ -88,7 +88,8 @@ async fn _@{ selector }@(
     let filter = readable_filter(auth)?;
     query = query.visibility_filter(filter);
     let mut previous = false;
-    let mut limit = 10000;
+    @{- api_selector_def.limit_def() }@
+    let mut limit = @{ api_selector_def.limit_str() }@;
     query = query.order_by(order);
     if first.is_some() || after.is_some() {
         previous = after.is_some();
@@ -108,8 +109,8 @@ async fn _@{ selector }@(
             }
             @%- endfor %@
         }
-        if let Some(first) = first {
-            limit = first;
+        if first.is_some() {
+            limit = first@{ api_selector_def.check_limit() }@;
         }
     }
     if last.is_some() || before.is_some() {
@@ -131,15 +132,17 @@ async fn _@{ selector }@(
             }
             @%- endfor %@
         }
-        if let Some(last) = last {
-            limit = last;
+        if last.is_some() {
+            limit = last@{ api_selector_def.check_limit() }@;
         }
     }
     if let Some(offset) = offset {
         previous = previous || offset > 0;
         query = query.offset(offset);
     }
-    query = query.limit(limit + 1);
+    if let Some(limit) = limit {
+        query = query.limit(limit + 1);
+    }
     let list = query.query().await?;
     @{ db|snake }@_query.release_read_tx().await?;
     Ok((list, previous, limit))
@@ -309,8 +312,10 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                     repo,
                     gql_ctx
                 );
-                let mut connection = graphql_conn::Connection::new(previous, list.len() > limit);
-                list.truncate(limit);
+                let mut connection = graphql_conn::Connection::new(previous, limit.map(|l| list.len() > l).unwrap_or(false));
+                if let Some(limit) = limit {
+                    list.truncate(limit);
+                }
                 if last.is_some() {
                     list.reverse();
                 }

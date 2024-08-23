@@ -106,6 +106,7 @@ function Config() {
               <AutoField name="with_label" {...formData} />
               <AutoField name="with_comment" {...formData} />
               <AutoField name="hide_timestamp" {...formData} />
+              <AutoField name="selector_limit" {...formData} />
               <AutoField
                 name="roles"
                 {...formData}
