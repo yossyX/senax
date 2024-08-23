@@ -188,7 +188,8 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                 let filter = readable_filter(auth)?;
                 query = query.visibility_filter(filter);
                 let mut previous = false;
-                let mut limit = 100;
+                @{- api_selector_def.limit_def() }@
+                let mut limit = @{ api_selector_def.limit_str() }@;
                 let order = order.unwrap_or_default();
                 query = query.order_by(order);
                 if first.is_some() || after.is_some() {
@@ -204,8 +205,8 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                         }
                         @%- endfor %@
                     }
-                    if let Some(first) = first {
-                        limit = first;
+                    if first.is_some() {
+                        limit = first@{ api_selector_def.check_limit() }@;
                     }
                 }
                 if last.is_some() || before.is_some() {
@@ -222,19 +223,23 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                         }
                         @%- endfor %@
                     }
-                    if let Some(last) = last {
-                        limit = last;
+                    if last.is_some() {
+                        limit = last@{ api_selector_def.check_limit() }@;
                     }
                 }
                 if let Some(offset) = offset {
                     previous = previous || offset > 0;
                     query = query.offset(offset);
                 }
-                query = query.limit(limit + 1);
+                if let Some(limit) = limit {
+                    query = query.limit(limit + 1);
+                }
                 let mut list = query.query().await
                     .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-                let mut connection = graphql_conn::Connection::new(previous, list.len() > limit);
-                list.truncate(limit);
+                let mut connection = graphql_conn::Connection::new(previous, limit.map(|l| list.len() > l).unwrap_or(false));
+                if let Some(limit) = limit {
+                    list.truncate(limit);
+                }
                 if last.is_some() {
                     list.reverse();
                 }
