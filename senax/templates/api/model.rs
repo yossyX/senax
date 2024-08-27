@@ -276,7 +276,9 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         gql_ctx: &async_graphql::Context<'_>,
         after: Option<String>,
         before: Option<String>,
+        #[graphql(validator(minimum = 0@{ api_selector_def.limit_validator() }@))] 
         first: Option<i32>,
+        #[graphql(validator(minimum = 0@{ api_selector_def.limit_validator() }@))] 
         last: Option<i32>,
         @%- if selector_def.filter_is_required() %@
         filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
