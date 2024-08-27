@@ -1231,6 +1231,13 @@ impl ApiSelectorDef {
             .map(|l| format!("\n                const LIMIT: usize = {l};"))
             .unwrap_or_default()
     }
+    pub fn limit_validator(&self) -> String {
+        if let Some(l) = self.limit() {
+            format!(", maximum = {l}")
+        } else {
+            "".to_string()
+        }
+    }
     pub fn limit_str(&self) -> &'static str {
         if self.limit().is_some() {
             "Some(LIMIT)"
