@@ -1233,7 +1233,7 @@ impl ApiSelectorDef {
     }
     pub fn limit_validator(&self) -> String {
         if let Some(l) = self.limit() {
-            format!(", maximum = {l}")
+            format!("#[graphql(validator(maximum = {l}))] ")
         } else {
             "".to_string()
         }
