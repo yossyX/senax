@@ -3778,7 +3778,7 @@ dependencies = [
 
 [[package]]
 name = "senax-actix-session"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "actix-utils",
  "actix-web",
@@ -3786,51 +3786,11 @@ dependencies = [
  "ciborium",
  "derive_more",
  "log",
- "senax-common 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "senax-common 0.3.0",
  "serde",
  "sha2",
  "time",
  "tokio",
-]
-
-[[package]]
-name = "senax-common"
-version = "0.3.0"
-dependencies = [
- "anyhow",
- "arc-swap",
- "async-graphql",
- "async-trait",
- "base64 0.21.7",
- "bincode",
- "byte-unit",
- "bytes",
- "chrono",
- "ciborium",
- "crc32fast",
- "crossbeam",
- "derive_more",
- "downcast-rs",
- "etcd-client",
- "futures",
- "fxhash",
- "hex",
- "log",
- "lz4_flex",
- "moka",
- "nom",
- "once_cell",
- "rand 0.8.5",
- "regex",
- "schemars",
- "serde",
- "serde_bytes",
- "serde_json",
- "sha2",
- "time",
- "tokio",
- "tokio-uring",
- "zstd 0.12.4",
 ]
 
 [[package]]
@@ -3870,6 +3830,46 @@ dependencies = [
  "sha2",
  "time",
  "tokio",
+ "zstd 0.12.4",
+]
+
+[[package]]
+name = "senax-common"
+version = "0.3.1"
+dependencies = [
+ "anyhow",
+ "arc-swap",
+ "async-graphql",
+ "async-trait",
+ "base64 0.21.7",
+ "bincode",
+ "byte-unit",
+ "bytes",
+ "chrono",
+ "ciborium",
+ "crc32fast",
+ "crossbeam",
+ "derive_more",
+ "downcast-rs",
+ "etcd-client",
+ "futures",
+ "fxhash",
+ "hex",
+ "log",
+ "lz4_flex",
+ "moka",
+ "nom",
+ "once_cell",
+ "rand 0.8.5",
+ "regex",
+ "schemars",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "sha2",
+ "time",
+ "tokio",
+ "tokio-uring",
  "zstd 0.12.4",
 ]
 
@@ -3922,7 +3922,7 @@ dependencies = [
 
 [[package]]
 name = "senax-logger"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "ahash",
  "anyhow",

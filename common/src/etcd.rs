@@ -102,7 +102,7 @@ pub async fn delete(key: &str) -> Result<()> {
 
 pub async fn watch(key: &str, with_prefix: bool) -> Result<WatchStream> {
     let mut opt = WatchOptions::new();
-    let mut key = format!("/senax/{key}");
+    let key = format!("/senax/{key}");
     if with_prefix {
         opt = opt.with_prefix();
     }

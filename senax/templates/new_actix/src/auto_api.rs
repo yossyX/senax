@@ -13,7 +13,7 @@ use validator::ValidationErrors;
 pub use db_session::models::session::session::{_SessionStore, SESSION_ROLE};
 pub use senax_actix_session::Session;
 
-use crate::auth::{AuthInfo, AuthInfoInner, Role};
+use crate::auth::{AuthInfo, Role};
 use crate::context::Ctx;
 use crate::db::RepositoriesImpl;
 
@@ -161,7 +161,7 @@ impl MutationRoot {
             .expect("valid timestamp")
             .timestamp() as usize;
         let auth = AuthInfo(
-            AuthInfoInner {
+            crate::auth::AuthInfoInner {
                 username,
                 role,
                 exp,

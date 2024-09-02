@@ -1,6 +1,6 @@
 [package]
 name = "senax-common"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = ["yossyX"]
 license = "MIT OR Apache-2.0"
@@ -21,29 +21,29 @@ base64 = "0.21.5"
 bincode = "1.3.3"
 byte-unit = { version = "4.0", default-features = false, features = ["std"] }
 bytes = "1.4"
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 ciborium = "0.2.1"
 crc32fast = "1.3.2"
-crossbeam = "0.8.2"
+crossbeam = { version = "0.8.2", default-features = false, features = ["alloc"] }
 derive_more = "0.99"
 downcast-rs = "1.2.0"
 etcd-client = { version = "0.11", features = ["tls"], optional = true }
 futures = "0.3.13"
 fxhash = "0.2"
 hex = "0.4.3"
-log = { version = "0.4", features = [ "release_max_level_info", "kv_unstable_serde" ] }
-lz4_flex = { version = "0.9.3" }
+log = "0.4"
+lz4_flex = { version = "0.9.3", default-features = false, features = ["frame"] }
 moka = { version = "0.9", features = ["future"] }
 nom = "7"
 once_cell = "1.8.0"
 rand = "0.8"
 regex = "1"
-schemars = { version = "0.8.10" }
-serde = { version = "1.0", features = ["derive"] }
+schemars = "0.8.10"
+serde = "1.0"
 serde_bytes = "0.11.12"
 serde_json = "1.0.51"
 sha2 = "0.10.6"
 time = "0.3.19"
-tokio = { version = "1.28", features = [ "full" ] }
+tokio = { version = "1.28", features = ["macros", "sync", "time"] }
 tokio-uring = { version = "0.4", features = ["bytes"], optional = true }
-zstd = "0.12"
+zstd = { version = "0.12", default-features = false }
