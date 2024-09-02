@@ -403,7 +403,6 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         ".filter(|data| data.--1--.deleted_at.is_none())",
         ".filter(|data| data.--1--.deleted == 0)",
     );
-    let ignore_soft_delete = foreign_model.soft_delete_tpl("", "_with_trashed", "_with_trashed");
     let rel_hash =
         crate::common::rel_hash(format!("{}::{}::{}", &model.group_name, &model.name, name));
     f.replace("{rel_name}", &_to_var_name(name))
@@ -461,7 +460,6 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         .replace("{id_name}", &to_id_name(&model.name))
         .replace("{with_trashed}", with_trashed)
         .replace("{soft_delete_filter}", &soft_delete_filter)
-        .replace("{ignore_soft_delete}", &ignore_soft_delete)
         .replace("{local_keys}", &local_keys)
 }
 
