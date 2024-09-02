@@ -2699,7 +2699,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         }
         if let Some(ref obj) = self._wrapper.{rel_name} {
             let id: rel_{class_mod}::InnerPrimary = obj.into();
-            let mut obj = rel_{class_mod}::{class}::find_optional_from_cache{ignore_soft_delete}(conn, &id).await?;
+            let mut obj = rel_{class_mod}::{class}::find_optional_from_cache(conn, &id).await?;
             if let Some(mut obj) = obj {
                 rel_{class_mod}::{class}Joiner::join(&mut obj, conn, joiner).await?;
                 self.{rel_name} = Some(Some(Box::new(obj)));
@@ -2725,7 +2725,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         }
         let ids: Vec<rel_{class_mod}::InnerPrimary> = self._wrapper.{rel_name}.iter().map(|v| v.into()).collect();
         if !ids.is_empty() {
-            let mut list = rel_{class_mod}::{class}::find_many_from_cache{ignore_soft_delete}(conn, ids.iter()).await?;
+            let mut list = rel_{class_mod}::{class}::find_many_from_cache(conn, ids.iter()).await?;
             rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
             let mut map: AHashMap<_, _> = list.into_iter().map(|v| (rel_{class_mod}::InnerPrimary::from(&v), v)).collect();
             self.{rel_name} = Some(ids.iter().flat_map(|id| map.remove(id)).collect());
@@ -2928,12 +2928,14 @@ impl CacheWrapper {
 @{- def.relations_one_cache(false)|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
-        let filter = RelFil{rel_name_pascal}::in_filter(vec){additional_filter};
-        let list: Vec<Arc<_>> = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
         let mut map = AHashMap::default();
-        for row in list {
-            if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
-                map.insert(id, row);
+        for chunk in vec.chunks(IN_CONDITION_LIMIT) {
+            let filter = RelFil{rel_name_pascal}::in_filter(chunk){additional_filter};
+            let list: Vec<Arc<_>> = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
+            for row in list {
+                if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
+                    map.insert(id, row);
+                }
             }
         }
         for val in vec.iter_mut() {
@@ -2944,12 +2946,14 @@ impl CacheWrapper {
 @{- def.relations_many_cache_without_limit()|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
-        let filter = RelFil{rel_name_pascal}::in_filter(vec){additional_filter};
-        let list: Vec<Arc<_>> = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
         let mut map = AHashMap::default();
-        for row in list {
-            if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
-                map.entry(id).or_insert_with(Vec::new).push(row);
+        for chunk in vec.chunks(IN_CONDITION_LIMIT) {
+            let filter = RelFil{rel_name_pascal}::in_filter(chunk){additional_filter};
+            let list: Vec<Arc<_>> = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
+            for row in list {
+                if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
+                    map.entry(id).or_insert_with(Vec::new).push(row);
+                }
             }
         }
         for val in vec.iter_mut() {
@@ -2992,7 +2996,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         }
         let ids: Vec<rel_{class_mod}::InnerPrimary> = self.iter().flat_map(|v| &v._wrapper.{rel_name}).map(|v| v.into()).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = rel_{class_mod}::{class}::find_many_from_cache{ignore_soft_delete}(conn, ids.iter()).await?;
+        let mut list = rel_{class_mod}::{class}::find_many_from_cache(conn, ids.iter()).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let mut map: AHashMap<_, _> = list.into_iter().map(|v| (rel_{class_mod}::InnerPrimary::from(&v), v)).collect();
         for val in self.iter_mut() {
@@ -3028,7 +3032,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         }
         let ids: Vec<rel_{class_mod}::InnerPrimary> = self.iter().flat_map(|v| &v._wrapper.{rel_name}).map(|v| v.into()).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = rel_{class_mod}::{class}::find_many_from_cache{ignore_soft_delete}(conn, ids.iter()).await?;
+        let mut list = rel_{class_mod}::{class}::find_many_from_cache(conn, ids.iter()).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let mut map: AHashMap<_, _> = list.into_iter().map(|v| (rel_{class_mod}::InnerPrimary::from(&v), v)).collect();
         for val in self.iter_mut() {
