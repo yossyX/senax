@@ -606,89 +606,31 @@ pub struct DbConn {
 
 impl Clone for DbConn {
     fn clone(&self) -> Self {
-        DbConn {
-            ctx_no: self.ctx_no,
-            time: self.time,
-            shard_id: self.shard_id,
-            @%- if !config.force_disable_cache %@
-            cache_sync: 0,
-            @%- endif %@
-            tx: FxHashMap::default(),
-            save_point: Vec::new(),
-            read_tx: FxHashMap::default(),
-            @%- if !config.force_disable_cache %@
-            cache_tx: FxHashMap::default(),
-            @%- endif %@
-            conn: FxHashMap::default(),
-            cache_internal_op_list: Vec::new(),
-            cache_op_list: Vec::new(),
-            callback_list: VecDeque::new(),
-            clear_whole_cache: false,
-            has_tx: false,
-            wo_tx: 0,
-            has_read_tx: 0,
-            lock_list: Vec::new(),
-        }
+        DbConn::__new(self.ctx_no, self.time, self.shard_id)
     }
 }
 
 impl DbConn {
     pub fn new(ctx_no: u64) -> DbConn {
-        DbConn {
-            ctx_no,
-            time: SystemTime::now(),
-            shard_id: 0,
-            @%- if !config.force_disable_cache %@
-            cache_sync: 0,
-            @%- endif %@
-            tx: FxHashMap::default(),
-            save_point: Vec::new(),
-            read_tx: FxHashMap::default(),
-            @%- if !config.force_disable_cache %@
-            cache_tx: FxHashMap::default(),
-            @%- endif %@
-            conn: FxHashMap::default(),
-            cache_internal_op_list: Vec::new(),
-            cache_op_list: Vec::new(),
-            callback_list: VecDeque::new(),
-            clear_whole_cache: false,
-            has_tx: false,
-            wo_tx: 0,
-            has_read_tx: 0,
-            lock_list: Vec::new(),
-        }
+        DbConn::__new(ctx_no, SystemTime::now(), 0)
     }
 
     pub fn new_with_time(ctx_no: u64, time: SystemTime) -> DbConn {
-        DbConn {
-            ctx_no,
-            time,
-            shard_id: 0,
-            @%- if !config.force_disable_cache %@
-            cache_sync: 0,
-            @%- endif %@
-            tx: FxHashMap::default(),
-            save_point: Vec::new(),
-            read_tx: FxHashMap::default(),
-            @%- if !config.force_disable_cache %@
-            cache_tx: FxHashMap::default(),
-            @%- endif %@
-            conn: FxHashMap::default(),
-            cache_internal_op_list: Vec::new(),
-            cache_op_list: Vec::new(),
-            callback_list: VecDeque::new(),
-            clear_whole_cache: false,
-            has_tx: false,
-            wo_tx: 0,
-            has_read_tx: 0,
-            lock_list: Vec::new(),
-        }
+        DbConn::__new(ctx_no, time, 0)
     }
 
     pub(crate) fn _new(shard_id: ShardId) -> DbConn {
+        DbConn::__new(0, SystemTime::now(), shard_id)
+    }
+
+    pub(crate) fn _new_with_ctx(ctx_no: u64, shard_id: ShardId) -> DbConn {
+        DbConn::__new(ctx_no, SystemTime::now(), shard_id)
+    }
+
+    fn __new(ctx_no: u64, time: SystemTime, shard_id: ShardId) -> DbConn {
         DbConn {
-            ctx_no: 0,
-            time: SystemTime::now(),
+            ctx_no,
+            time,
             shard_id,
             @%- if !config.force_disable_cache %@
             cache_sync: 0,

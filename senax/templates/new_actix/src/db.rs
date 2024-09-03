@@ -46,6 +46,7 @@ pub fn stop() {
     // Do not modify this line. (DbStop)
 }
 
+#[allow(dead_code)]
 pub async fn clear_local_cache() {
     db_session::clear_local_cache().await;
     // Do not modify this line. (DbClearLocalCache)

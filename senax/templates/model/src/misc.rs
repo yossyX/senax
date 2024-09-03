@@ -759,12 +759,18 @@ pub(crate) struct JsonBlob(std::sync::Arc<Vec<u8>>);
 impl TryFrom<&str> for JsonBlob {
     type Error = Box<dyn std::error::Error + Send + Sync>;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if value.is_empty() {
+            return Ok(Default::default());
+        }
         let _: Value = serde_json::from_str(value)?;
         Ok(Self(zstd::stream::encode_all(value.as_bytes(), 3)?.into()))
     }
 }
 impl From<&JsonBlob> for String {
     fn from(value: &JsonBlob) -> Self {
+        if value.0.is_empty() {
+            return String::new();
+        }
         let v = zstd::stream::decode_all(value.0.as_slice()).unwrap();
         unsafe { String::from_utf8_unchecked(v) }
     }
@@ -785,9 +791,12 @@ impl JsonBlob {
         assert!(s.len() <= @{ config.max_db_str_len() }@, "Incorrect JSON length.");
         s
     }
-    pub fn _to_value<T: serde::de::DeserializeOwned>(&self) -> T {
+    pub fn _to_value<T: serde::de::DeserializeOwned>(&self) -> Option<T> {
+        if self.0.is_empty() {
+            return None;
+        }
         let v = zstd::stream::decode_all(self.0.as_slice()).unwrap();
-        serde_json::from_slice(&v).unwrap()
+        Some(serde_json::from_slice(&v).unwrap())
     }
 }
 pub(crate) trait ToJsonBlob {

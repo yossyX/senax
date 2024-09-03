@@ -4177,7 +4177,7 @@ impl QueryBuilder {
     {
         let sql = self._sql(T::_sql_cols(), false);
         let mut query = sqlx::query_as::<_, T>(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         query = self._bind(query);
         let result = crate::misc::fetch!(conn, query, fetch_all);
         Ok(result)
@@ -4249,9 +4249,10 @@ impl QueryBuilder {
         let sql = self._sql(T::_sql_cols(), false);
         let (tx, rx) = mpsc::channel(1000);
         let mut executor = conn.acquire_replica().await?;
+        let ctx_no = conn.ctx_no();
         tokio::spawn(async move {
             let mut query = sqlx::query_as::<_, T>(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = ctx_no);
             query = self._bind(query);
             let mut result = query.fetch(executor.as_mut());
             while let Some(v) = result.try_next().await.unwrap_or_else(|e| {
@@ -4283,7 +4284,7 @@ impl QueryBuilder {
             write!(sql, " offset {}", offset)?;
         }
         let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let joiner = self.joiner.take();
         query = self._bind(query);
         let result = crate::misc::fetch!(conn, query, fetch_all);
@@ -4304,7 +4305,7 @@ impl QueryBuilder {
     pub@{ visibility }@ async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
         let sql = self._sql(Data::_sql_cols(), !conn.wo_tx());
         let mut query = sqlx::query_as::<_, Data>(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let joiner = self.joiner.take();
         query = self._bind(query);
         let result = if conn.wo_tx() {
@@ -4429,7 +4430,7 @@ impl QueryBuilder {
             write!(sql, " limit {}", limit)?;
         }
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         @{- def.non_primaries()|fmt_join("
         for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{var}{bind_as});
@@ -4502,7 +4503,7 @@ impl QueryBuilder {
             write!(sql, " limit {}", limit)?;
         }
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "delete_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "");
         if let Some(c) = self.filter {
             query = c.query_bind(query);
@@ -4551,7 +4552,7 @@ impl QueryBuilder {
             write!(sql, " FOR UPDATE").unwrap();
         }
         let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         query = self._bind(query);
         let result = crate::misc::fetch!(conn, query, fetch_all);
         let ids: Vec<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> = result.iter().map(|id| id.into()).collect();
@@ -4602,7 +4603,7 @@ where
                 .collect::<Vec<_>>()
                 .join(" UNION ALL ");
             let mut query = sqlx::query_as::<_, T>(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for builder in chunk {
                 query = builder._bind(query);
             }
@@ -4623,7 +4624,7 @@ where
             write!(sql, " offset {}", offset)?;
         }
         let mut query = sqlx::query_as::<_, T>(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for builder in list {
             query = builder._bind(query);
         }
@@ -5599,6 +5600,7 @@ impl _@{ pascal_name }@ {
     ) -> Result<Arc<Vec<_@{ pascal_name }@Cache>>> {
         static SEMAPHORE: Lazy<Vec<Semaphore>> = Lazy::new(|| DbConn::shard_num_range().map(|_| Semaphore::new(1)).collect());
         let shard_id = conn.shard_id();
+        let ctx_no = conn.ctx_no();
         if let Some(arc) = ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].load_full() {
             return Ok(arc);
         }
@@ -5606,7 +5608,7 @@ impl _@{ pascal_name }@ {
         if let Some(arc) = ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].load_full() {
             return Ok(arc);
         }
-        let mut conn = DbConn::_new(shard_id);
+        let mut conn = DbConn::_new_with_ctx(ctx_no, shard_id);
         conn.begin_cache_tx().await?;
         let mut sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {} {}"#,
@@ -5624,7 +5626,7 @@ impl _@{ pascal_name }@ {
             write!(sql, " limit {}", limit)?;
         }
         let mut query = sqlx::query_as::<_, CacheData>(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
             query = c.query_as_bind(query);
         }
@@ -5656,6 +5658,7 @@ impl _@{ pascal_name }@ {
     ) -> Result<Arc<Vec<_@{ pascal_name }@Cache>>> {
         static SEMAPHORE: Lazy<Vec<Semaphore>> = Lazy::new(|| DbConn::shard_num_range().map(|_| Semaphore::new(1)).collect());
         let shard_id = conn.shard_id();
+        let ctx_no = conn.ctx_no();
         if let Some(arc) = ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].load_full() {
             return Ok(arc);
         }
@@ -5663,7 +5666,7 @@ impl _@{ pascal_name }@ {
         if let Some(arc) = ALL_ROWS_CACHE.get().unwrap()[shard_id as usize].load_full() {
             return Ok(arc);
         }
-        let mut conn = DbConn::_new(shard_id);
+        let mut conn = DbConn::_new_with_ctx(ctx_no, shard_id);
         conn.begin_cache_tx().await?;
         let mut sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {} {}"#,
@@ -5678,7 +5681,7 @@ impl _@{ pascal_name }@ {
             Order_::write_order(&order)
         );
         let mut query = sqlx::query_as::<_, CacheData>(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = crate::misc::fetch!(conn, query, fetch_all);
         let time = MSec::now();
         #[allow(clippy::needless_collect)]
@@ -5821,7 +5824,7 @@ impl _@{ pascal_name }@ {
             &q[0..q.len() - 1]
         );
         let mut query = sqlx::query_as::<_, T>(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
             @{- def.primaries()|fmt_join("
             query = query.bind(id.{index}{bind_as});", "") }@
@@ -6032,9 +6035,11 @@ impl _@{ pascal_name }@ {
         let mut list: Vec<_@{ pascal_name }@Cache> = Vec::new();
         let mut rest_ids = Vec::new();
         let shard_id = conn.shard_id();
-        let cache_map = Cache::get_many::<CacheWrapper>(&ids.iter().map(|id| id.hash_val(shard_id)).collect(), shard_id, USE_FAST_CACHE).await;
-        for id in ids {
-            if let Some(obj) = cache_map.get(&id.hash_val(shard_id)).filter(|o| InnerPrimary::from(*o) == id.0) {
+        let ctx_no = conn.ctx_no();
+        let hash_and_id: Vec<_> = ids.into_iter().map(|id| (id.hash_val(shard_id), id)).collect();
+        let cache_map = Cache::get_many::<CacheWrapper>(&hash_and_id.iter().map(|(hash, id)| *hash).collect(), shard_id, USE_FAST_CACHE).await;
+        for (hash, id) in hash_and_id {
+            if let Some(obj) = cache_map.get(&hash).filter(|o| InnerPrimary::from(*o) == id.0) {
                 list.push(obj.clone().into());
             } else {
                 rest_ids.push(id);
@@ -6046,7 +6051,7 @@ impl _@{ pascal_name }@ {
                     BULK_FETCH_QUEUE.get().unwrap()[shard_id as usize].push(id.0.clone());
                 }
             }
-            let mut conn = DbConn::_new(shard_id);
+            let mut conn = DbConn::_new_with_ctx(ctx_no, shard_id);
             conn.begin_cache_tx().await?;
             let mut rest_ids2 = FxHashSet::with_capacity_and_hasher(rest_ids.len() * 2, Default::default());
             for id in rest_ids.into_iter() {
@@ -6221,7 +6226,7 @@ impl _@{ pascal_name }@ {
         }
         let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#, T::_sql_cols());
         let mut query = sqlx::query_as::<_, T>(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
             query = c.query_as_bind(query);
         }
@@ -6332,7 +6337,7 @@ impl _@{ pascal_name }@ {
         }
         let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ FOR UPDATE"#, Data::_sql_cols());
         let mut query = sqlx::query_as::<_, Data>(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
             query = c.query_as_bind(query);
         }
@@ -6382,7 +6387,7 @@ impl _@{ pascal_name }@ {
                 &q[0..q.len() - 1],
             );
             let mut query = sqlx::query_as::<_, Data>(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 @{- def.primaries()|fmt_join("
                 query = query.bind(id.{index}{bind_as});", "") }@
@@ -6442,7 +6447,7 @@ impl _@{ pascal_name }@ {
             }
         }
         let filter = Filter_::And(vec![@{- index.fields(index_name, def)|fmt_index_col("Filter_::EqKey(ColKey_::{var}(c{index}.clone().into()))", ", ") }@]);
-        let mut conn = DbConn::_new(conn.shard_id());
+        let mut conn = DbConn::_new_with_ctx(conn.ctx_no(), conn.shard_id());
         conn.begin_cache_tx().await?;
         let obj = Self::query().filter(filter).select_from_cache(&mut conn).await?.pop()
             .with_context(|| err::RowNotFound::new("@{ table_name }@", format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("c{index}", ", ") }@)))?;
@@ -6578,7 +6583,7 @@ impl _@{ pascal_name }@ {
             r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields()|fmt_join("{placeholder}", ",") }@)"#
         };
         let query = query_bind(sql, &obj._data);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_source().await?.as_mut()).await?
         } else {
@@ -6643,7 +6648,7 @@ impl _@{ pascal_name }@ {
             let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#, &vec.join(","));
             @%- endif %@
             let mut query = sqlx::query(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             @{- def.non_primaries_wo_read_only(false)|fmt_join("
             for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
                 query = query.bind(obj._update.{var}{bind_as});
@@ -6731,7 +6736,7 @@ impl _@{ pascal_name }@ {
             (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) 
             VALUES (@{ def.all_fields()|fmt_join("{placeholder}", ",") }@) ON DUPLICATE KEY UPDATE {}"#, &vec.join(","));
         let query = query_bind(&sql, &obj._data);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let query = Self::bind_non_primaries(&obj, query, &sql);
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_source().await?.as_mut()).await?
@@ -6886,7 +6891,7 @@ impl _@{ pascal_name }@ {
         let q = "@{ def.primaries()|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
         let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({})"#, &vec.join(","), &q[0..q.len() - 1]);
         let query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let mut query = Self::bind_non_primaries(&obj, query, &sql);
         for id in ids {
             @{- def.primaries()|fmt_join("
@@ -6911,7 +6916,7 @@ impl _@{ pascal_name }@ {
         let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) 
             VALUES (@{ def.all_fields()|fmt_join("{placeholder}", ",") }@)"#;
         let query = query_bind(sql, &obj._data);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_source().await?.as_mut()).await?
         } else {
@@ -7189,7 +7194,7 @@ impl _@{ pascal_name }@ {
                 sql.push_str(SQL3);
             }
             let mut query = sqlx::query(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for data in list {
     @{- def.all_fields()|fmt_join("\n                query = query.bind(data._data.{var}{bind_as});", "") }@
             }
@@ -7326,7 +7331,7 @@ impl _@{ pascal_name }@ {
         @%- endif %@
         write!(sql, " ON DUPLICATE KEY UPDATE {}", &vec.join(","))?;
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for data in list {
 @{- def.all_fields()|fmt_join("
             query = query.bind(data.{var}{bind_as});", "") }@
@@ -7389,7 +7394,7 @@ impl _@{ pascal_name }@ {
                     &q[0..q.len() - 1]
                 );
                 let mut query = sqlx::query(&sql);
-                let _span = debug_span!("query", sql = &query.sql());
+                let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     @{- def.soft_delete_tpl2("","
                 query = query.bind(deleted_at);","","
                 query = query.bind(deleted);")}@
@@ -7469,7 +7474,7 @@ impl _@{ pascal_name }@ {
                     &q[0..q.len() - 1]
                 );
                 let mut query = sqlx::query_as::<_, Data>(&sql);
-                let _span = debug_span!("query", sql = &query.sql());
+                let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
                 for id in ids {
                     @{- def.primaries()|fmt_join("
                     query = query.bind(id.{index}{bind_as});", "") }@
@@ -7495,7 +7500,7 @@ impl _@{ pascal_name }@ {
                     &q[0..q.len() - 1]
                 );
                 let mut query = sqlx::query(&sql);
-                let _span = debug_span!("query", sql = &query.sql());
+                let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
                 for id in ids {
                     @{- def.primaries()|fmt_join("
                     query = query.bind(id.{index}{bind_as});", "") }@
@@ -7640,7 +7645,7 @@ impl _@{ pascal_name }@ {
         crate::models::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, &[id.clone()], false).await?;
 @%- endfor %@
         let mut query = sqlx::query(r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
         if conn.wo_tx() {
@@ -7689,7 +7694,7 @@ impl _@{ pascal_name }@ {
 
     pub@{ visibility }@ async fn force_delete_all(conn: &mut DbConn) -> Result<()> {
         let query = sqlx::query(r#"DELETE FROM @{ table_name|db_esc }@"#);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if conn.wo_tx() {
             query.execute(conn.acquire_source().await?.as_mut()).await?;
         } else {
@@ -7715,7 +7720,7 @@ impl _@{ pascal_name }@ {
 
     pub@{ visibility }@ async fn truncate(conn: &mut DbConn) -> Result<()> {
         let query = sqlx::query(r#"TRUNCATE TABLE @{ table_name|db_esc }@"#);
-        let _span = debug_span!("query", sql = &query.sql());
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         query.execute(conn.acquire_source().await?.as_mut()).await?;
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "truncate", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
@@ -7782,7 +7787,7 @@ impl _@{ pascal_name }@ {
                 &q[0..q.len() - 1]
             );
             let mut query = sqlx::query_as::<_, Data>(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
@@ -7820,7 +7825,7 @@ impl _@{ pascal_name }@ {
                 &q[0..q.len() - 1]
             );
             let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
@@ -7850,7 +7855,7 @@ impl _@{ pascal_name }@ {
                 &q[0..q.len() - 1]
             );
             let mut query = sqlx::query(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
@@ -7886,7 +7891,7 @@ impl _@{ pascal_name }@ {
                 &q[0..q.len() - 1]
             );
             let mut query = sqlx::query_as::<_, Count>(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
@@ -7922,7 +7927,7 @@ impl _@{ pascal_name }@ {
                 &q[0..q.len() - 1]
             );
             let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
@@ -7948,7 +7953,7 @@ impl _@{ pascal_name }@ {
                 &q[0..q.len() - 1]
             );
             let mut query = sqlx::query(&sql);
-            let _span = debug_span!("query", sql = &query.sql());
+            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }

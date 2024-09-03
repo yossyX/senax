@@ -646,15 +646,15 @@ impl<'a, I: Debug> AccessorNullArc<'a, I> {
     }
 }
 
-pub struct AccessorNotNullJson<'a, I: Serialize + DeserializeOwned> {
+pub struct AccessorNotNullJson<'a, I: Serialize + DeserializeOwned + Default> {
     pub(crate) op: &'a mut Op,
     pub(crate) val: &'a mut JsonBlob,
     pub(crate) update: &'a mut JsonBlob,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Serialize + DeserializeOwned> AccessorNotNullJson<'a, I> {
+impl<'a, I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'a, I> {
     pub fn get(&self) -> I {
-        self.val._to_value()
+        self.val._to_value().unwrap_or_default()
     }
     pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
@@ -704,7 +704,7 @@ pub struct AccessorNullJson<'a, I: Serialize + DeserializeOwned> {
 }
 impl<'a, I: Serialize + DeserializeOwned> AccessorNullJson<'a, I> {
     pub fn get(&self) -> Option<I> {
-        self.val.as_ref().map(|v| v._to_value())
+        self.val.as_ref().map(|v| v._to_value()).flatten()
     }
     pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;

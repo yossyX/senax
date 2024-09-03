@@ -246,6 +246,7 @@ async fn main() -> Result<()> {
         }
     })
     .await?;
+    #[cfg(not(debug_assertions))]
     tokio::spawn(async {
         // For rolling update
         for _ in 0..15 {
