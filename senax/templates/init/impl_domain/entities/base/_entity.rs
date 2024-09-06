@@ -403,7 +403,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
             id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@,
-            visibility_filter: Option<Filter_>,
+            filter: Option<Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -419,18 +419,18 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 #[allow(unused_mut)]
                 @%- if def.is_soft_delete() %@
                 let mut obj = if self.with_trashed {
-                    _@{ pascal_name }@::find_for_update_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.visibility_filter).await?
+                    _@{ pascal_name }@::find_for_update_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.filter).await?
                 } else {
-                    _@{ pascal_name }@::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.visibility_filter).await?
+                    _@{ pascal_name }@::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.filter).await?
                 };
                 @%- else %@
-                let mut obj = _@{ pascal_name }@::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.visibility_filter).await?;
+                let mut obj = _@{ pascal_name }@::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.filter).await?;
                 @%- endif %@
                 _@{ pascal_name }@Joiner::join(&mut obj, conn, self.joiner).await?;
                 Ok(Box::new(obj) as Box<dyn @{ pascal_name }@Updater>)
             }
-            fn visibility_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindForUpdateBuilder> {
-                self.visibility_filter = Some(filter);
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindForUpdateBuilder> {
+                self.filter = Some(filter);
                 self
             }
             @%- if def.is_soft_delete() %@
@@ -447,7 +447,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         Box::new(V {
             conn: self.0.clone(),
             id,
-            visibility_filter: None,
+            filter: None,
             @%- if def.is_soft_delete() %@
             with_trashed: false,
             @%- endif %@
@@ -526,8 +526,8 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
     fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder> {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
-            query_filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
-            visibility_filter: Option<Filter_>,
+            selector: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+            filter: Option<Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -537,16 +537,16 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         use @{ pascal_name }@Repository@{ selector|pascal }@Builder as _Repository@{ selector|pascal }@Builder;
         #[async_trait]
         impl @{ pascal_name }@Repository@{ selector|pascal }@Builder for V {
-            async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>> {
+            async fn query_for_update(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(filter) = self.query_filter {
-                    _filter_@{ selector }@(&filter)?
+                let mut fltr = if let Some(selector) = self.selector {
+                    _filter_@{ selector }@(&selector)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = self.visibility_filter {
+                if let Some(filter) = self.filter {
                     query = query.join(Joiner_::merge(self.joiner, filter.joiner()));
                     fltr = fltr.and(filter);
                 } else {
@@ -562,12 +562,12 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(filter) = self.query_filter {
-                    _filter_@{ selector }@(&filter)?
+                let mut fltr = if let Some(selector) = self.selector {
+                    _filter_@{ selector }@(&selector)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = self.visibility_filter {
+                if let Some(filter) = self.filter {
                     fltr = fltr.and(filter);
                 }
                 query = query.filter(fltr);
@@ -576,11 +576,11 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 @%- endif %@
                 Ok(query.count(conn).await?)
             }
-            fn query_filter(mut self: Box<Self>, filter: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder> {
-                self.query_filter = Some(filter);
+            fn selector(mut self: Box<Self>, filter: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder> {
+                self.selector = Some(filter);
                 self
             }
-            fn visibility_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.visibility_filter = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
             @%- if def.is_soft_delete() %@
             fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.with_trashed = mode; self  }
             @%- endif %@
@@ -591,8 +591,8 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         }
         Box::new(V {
             conn: self.0.clone(),
-            query_filter: None,
-            visibility_filter: None,
+            selector: None,
+            filter: None,
             @%- if def.is_soft_delete() %@
             with_trashed: false,
             @%- endif %@
@@ -656,8 +656,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
     fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder> {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
-            query_filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
-            visibility_filter: Option<Filter_>,
+            selector: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+            filter: Option<Filter_>,
             cursor: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Cursor>,
             order: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order>,
             reverse: bool,
@@ -688,12 +688,12 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(filter) = self.query_filter {
-                    _filter_@{ selector }@(&filter)?
+                let mut fltr = if let Some(selector) = self.selector {
+                    _filter_@{ selector }@(&selector)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = self.visibility_filter {
+                if let Some(filter) = self.filter {
                     query = query.join(Joiner_::merge(self.joiner, filter.joiner()));
                     fltr = fltr.and(filter);
                 } else {
@@ -725,12 +725,12 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(filter) = self.query_filter {
-                    _filter_@{ selector }@(&filter)?
+                let mut fltr = if let Some(selector) = self.selector {
+                    _filter_@{ selector }@(&selector)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = self.visibility_filter {
+                if let Some(filter) = self.filter {
                     fltr = fltr.and(filter);
                 }
                 if let Some(cursor) = self.cursor {
@@ -742,8 +742,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 @%- endif %@
                 Ok(query.count(conn).await?)
             }
-            fn query_filter(mut self: Box<Self>, filter: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.query_filter = Some(filter); self }
-            fn visibility_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.visibility_filter = Some(filter); self }
+            fn selector(mut self: Box<Self>, filter: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.selector = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
             fn cursor(mut self: Box<Self>, cursor: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.cursor = Some(cursor); self }
             fn order_by(mut self: Box<Self>, order: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.order = Some(order); self  }
             fn reverse(mut self: Box<Self>, mode: bool) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.reverse = mode; self  }
@@ -759,8 +759,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
         }
         Box::new(V {
             conn: self.0.clone(),
-            query_filter: None,
-            visibility_filter: None,
+            selector: None,
+            filter: None,
             cursor: None,
             order: None,
             reverse: false,
@@ -778,7 +778,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
             id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@,
-            visibility_filter: Option<Filter_>,
+            filter: Option<Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -801,7 +801,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 let obj = _@{ pascal_name }@::find_optional_from_cache(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@).await?;
                 @%- endif %@
                 if let Some(mut obj) = obj {
-                    if let Some(filter) = self.visibility_filter {
+                    if let Some(filter) = self.filter {
                         _@{ pascal_name }@Joiner::join(&mut obj, conn, Joiner_::merge(self.joiner, filter.joiner())).await?;
                         use domain::models::Check_ as _;
                         if filter.check(&obj as &dyn @{ pascal_name }@Cache) {
@@ -817,8 +817,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                     Ok(None)
                 }
             }
-            fn visibility_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> {
-                self.visibility_filter = Some(filter);
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> {
+                self.filter = Some(filter);
                 self
             }
             @%- if def.is_soft_delete() %@
@@ -835,7 +835,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
         Box::new(V {
             conn: self.0.clone(),
             id,
-            visibility_filter: None,
+            filter: None,
             @%- if def.is_soft_delete() %@
             with_trashed: false,
             @%- endif %@
@@ -851,7 +851,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
             id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@,
-            visibility_filter: Option<Filter_>,
+            filter: Option<Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -866,12 +866,12 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 let conn = conn.deref_mut();
                 @%- if def.is_soft_delete() %@
                 let obj = if self.with_trashed {
-                    _@{ pascal_name }@::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.visibility_filter).await?
+                    _@{ pascal_name }@::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.filter).await?
                 } else {
-                    _@{ pascal_name }@::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.visibility_filter).await?
+                    _@{ pascal_name }@::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.filter).await?
                 };
                 @%- else %@
-                let obj = _@{ pascal_name }@::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.visibility_filter).await?;
+                let obj = _@{ pascal_name }@::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.filter).await?;
                 @%- endif %@
                 if let Some(mut obj) = obj {
                     _@{ pascal_name }@Joiner::join(&mut obj, conn, self.joiner).await?;
@@ -880,8 +880,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                     Ok(None)
                 }
             }
-            fn visibility_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindDirectlyBuilder> {
-                self.visibility_filter = Some(filter);
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindDirectlyBuilder> {
+                self.filter = Some(filter);
                 self
             }
             @%- if def.is_soft_delete() %@
@@ -898,7 +898,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
         Box::new(V {
             conn: self.0.clone(),
             id,
-            visibility_filter: None,
+            filter: None,
             @%- if def.is_soft_delete() %@
             with_trashed: false,
             @%- endif %@

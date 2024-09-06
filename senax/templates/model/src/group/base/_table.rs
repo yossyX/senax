@@ -5138,7 +5138,9 @@ impl fmt::Display for _@{ pascal_name }@Updater {
         } else {
             write!(f, "{{UPDATE: {{")?;
             @%- if !def.disable_update() %@
-            @{- def.all_except_secret()|fmt_join("
+            @{- def.primaries()|fmt_join("
+            Accessor{accessor_with_sep_type}::_write_insert(f, \"{comma}\", \"{raw_var}\", &self._data.{var})?;", "") }@
+            @{- def.all_except_secret_without_primary()|fmt_join("
             Accessor{accessor_with_sep_type}::_write_update(f, \"{comma}\", \"{raw_var}\", self._op.{var}, &self._update.{var})?;", "") }@
             @%- endif %@
             write!(f, "}}}}")?;

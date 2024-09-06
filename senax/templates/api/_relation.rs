@@ -218,7 +218,7 @@ pub fn update_list(
         .collect();
     let mut list = Vec::new();
     for row in data_list.into_iter() {
-        @%- if def.primary_except_is_auto(rel_id) %@
+        @%- if def.is_auto_primary_except(rel_id) %@
         if let Some(id) = row.@{ def.primary_except(rel_id)|to_var_name }@ {
             if let Some(mut updater) = map.remove(&id) {
                 updater.unmark_for_delete();

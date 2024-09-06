@@ -40,7 +40,7 @@ async fn find(
     let obj = @{ mod_name }@_repo
         .find(primary.into())
         .join(joiner)
-        .visibility_filter(filter)
+        .filter(filter)
         .query()
         .await
         .map_err(|e| GqlError::server_error(gql_ctx, e))?
@@ -179,14 +179,13 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                 let joiner = joiner(node, auth)?;
                 let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(joiner);
                 @%- if selector_def.filter_is_required() %@
-                query = query.query_filter(filter);
+                query = query.selector(filter);
                 @%- else %@
                 if let Some(filter) = filter {
-                    query = query.query_filter(filter);
+                    query = query.selector(filter);
                 }
                 @%- endif %@
-                let filter = readable_filter(auth)?;
-                query = query.visibility_filter(filter);
+                query = query.filter(readable_filter(auth)?);
                 let mut previous = false;
                 @{- api_selector_def.limit_def() }@
                 let mut limit = @{ api_selector_def.limit_str() }@;
@@ -277,14 +276,13 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
         @%- if selector_def.filter_is_required() %@
-        query = query.query_filter(filter);
+        query = query.selector(filter);
         @%- else %@
         if let Some(filter) = filter {
-            query = query.query_filter(filter);
+            query = query.selector(filter);
         }
         @%- endif %@
-        let filter = readable_filter(auth)?;
-        query = query.visibility_filter(filter);
+        query = query.filter(readable_filter(auth)?);
         let count = query
             .count()
             .await
@@ -397,7 +395,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.find_for_update(id.into());
-        query = query.visibility_filter(updatable_filter(auth)?);
+        query = query.filter(updatable_filter(auth)?);
         let obj = query
             .join(updater_joiner())
             .query()
@@ -420,7 +418,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.find_for_update(id.into());
-        query = query.visibility_filter(deletable_filter(auth)?);
+        query = query.filter(deletable_filter(auth)?);
         let obj = query
             .query()
             .await
@@ -463,13 +461,13 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
-        query = query.query_filter(filter);
+        query = query.selector(filter);
         @%- else %@
         if let Some(filter) = filter {
-            query = query.query_filter(filter);
+            query = query.selector(filter);
         }
         @%- endif %@
-        query = query.visibility_filter(updatable_filter(auth)?);
+        query = query.filter(updatable_filter(auth)?);
         let mut updater_map: HashMap<async_graphql::ID, _> = query
             .query()
             .await
@@ -548,16 +546,16 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
-        query = query.query_filter(filter);
+        query = query.selector(filter);
         @%- else %@
         if let Some(filter) = filter {
-            query = query.query_filter(filter);
+            query = query.selector(filter);
         }
         @%- endif %@
-        query = query.visibility_filter(updatable_filter(auth)?);
+        query = query.filter(updatable_filter(auth)?);
 
         let mut result = Vec::new();
-        for mut obj in query.query().await
+        for mut obj in query.query_for_update().await
             .map_err(|e| GqlError::server_error(gql_ctx, e))? {
             let org = serde_json::to_value(ReqObj::from(&mut *obj))?;
             let val = senax_common::update_operator::apply_operator(org, &operator, ctx.utc())?;
@@ -594,15 +592,15 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
         @%- if selector_def.filter_is_required() %@
-        query = query.query_filter(filter);
+        query = query.selector(filter);
         @%- else %@
         if let Some(filter) = filter {
-            query = query.query_filter(filter);
+            query = query.selector(filter);
         }
         @%- endif %@
-        query = query.visibility_filter(deletable_filter(auth)?);
+        query = query.filter(deletable_filter(auth)?);
         let mut result = Vec::new();
-        for obj in query.query().await
+        for obj in query.query_for_update().await
             .map_err(|e| GqlError::server_error(gql_ctx, e))? {
             result.push((&*obj).into());
             _domain_::delete(repo, obj).await
