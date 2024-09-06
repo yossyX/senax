@@ -408,8 +408,8 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         for (idx, data) in list.into_iter().enumerate() {
             if let Some(_id) = data._id.clone() {
                 let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-                let query = @{ mod_name }@_repo.find_for_update(id.into());
-                match query.join(updater_joiner()).query().await {
+                let query = @{ mod_name }@_repo.find(id.into());
+                match query.join(updater_joiner()).query_for_update().await {
                     Ok(obj) => {
                         _domain_::update(repo, obj, |obj| update_updater(&mut *obj, data, repo, auth))
                             .await
@@ -462,11 +462,11 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         };
         let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-        let mut query = @{ mod_name }@_repo.find_for_update(id.into());
+        let mut query = @{ mod_name }@_repo.find(id.into());
         query = query.filter(updatable_filter(auth)?);
         let obj = query
             .join(updater_joiner())
-            .query()
+            .query_for_update()
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         let obj = _domain_::update(repo, obj, |obj| update_updater(&mut *obj, data, repo, auth))
@@ -485,10 +485,10 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let auth: &AuthInfo = gql_ctx.data()?;
         let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-        let mut query = @{ mod_name }@_repo.find_for_update(id.into());
+        let mut query = @{ mod_name }@_repo.find(id.into());
         query = query.filter(deletable_filter(auth)?);
         let obj = query
-            .query()
+            .query_for_update()
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         _domain_::delete(repo, obj)

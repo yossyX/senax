@@ -399,7 +399,7 @@ pub struct @{ pascal_name }@RepositoryImpl(std::sync::Arc<tokio::sync::Mutex<cra
 #[async_trait]
 impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
     @%- if !def.disable_update() %@
-    fn find_for_update(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@RepositoryFindForUpdateBuilder> {
+    fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@RepositoryFindBuilder> {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
             id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@,
@@ -410,10 +410,10 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             joiner: Option<Box<Joiner_>>,
         }
         #[allow(unused_imports)]
-        use @{ pascal_name }@RepositoryFindForUpdateBuilder as _RepositoryFindForUpdateBuilder;
+        use @{ pascal_name }@RepositoryFindBuilder as _RepositoryFindBuilder;
         #[async_trait]
-        impl @{ pascal_name }@RepositoryFindForUpdateBuilder for V {
-            async fn query(self: Box<Self>) -> anyhow::Result<Box<dyn @{ pascal_name }@Updater>> {
+        impl @{ pascal_name }@RepositoryFindBuilder for V {
+            async fn query_for_update(self: Box<Self>) -> anyhow::Result<Box<dyn @{ pascal_name }@Updater>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 #[allow(unused_mut)]
@@ -429,17 +429,36 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 _@{ pascal_name }@Joiner::join(&mut obj, conn, self.joiner).await?;
                 Ok(Box::new(obj) as Box<dyn @{ pascal_name }@Updater>)
             }
-            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindForUpdateBuilder> {
+            async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
+                let mut conn = self.conn.lock().await;
+                let conn = conn.deref_mut();
+                @%- if def.is_soft_delete() %@
+                let obj = if self.with_trashed {
+                    _@{ pascal_name }@::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.filter).await?
+                } else {
+                    _@{ pascal_name }@::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.filter).await?
+                };
+                @%- else %@
+                let obj = _@{ pascal_name }@::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.filter).await?;
+                @%- endif %@
+                if let Some(mut obj) = obj {
+                    _@{ pascal_name }@Joiner::join(&mut obj, conn, self.joiner).await?;
+                    Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@>))
+                } else {
+                    Ok(None)
+                }
+            }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindBuilder> {
                 self.filter = Some(filter);
                 self
             }
             @%- if def.is_soft_delete() %@
-            fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _RepositoryFindForUpdateBuilder> {
+            fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _RepositoryFindBuilder> {
                 self.with_trashed = mode;
                 self
             }
             @%- endif %@
-            fn join(mut self: Box<Self>, joiner: Option<Box<Joiner_>>) -> Box<dyn _RepositoryFindForUpdateBuilder> {
+            fn join(mut self: Box<Self>, joiner: Option<Box<Joiner_>>) -> Box<dyn _RepositoryFindBuilder> {
                 self.joiner = Joiner_::merge(self.joiner, joiner);
                 self
             }
@@ -533,6 +552,34 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             @%- endif %@
             joiner: Option<Box<Joiner_>>,
         }
+        impl V {
+            fn _query(
+                selector: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+                filter: Option<Filter_>,
+                @%- if def.is_soft_delete() %@
+                with_trashed: bool,
+                @%- endif %@
+                joiner: Option<Box<Joiner_>>,
+            ) -> anyhow::Result<crate::models::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::QueryBuilder> {
+                let mut query = _@{ pascal_name }@::query();
+                let mut fltr = if let Some(selector) = selector {
+                    _filter_@{ selector }@(&selector)?
+                } else {
+                    filter!()
+                };
+                if let Some(filter) = filter {
+                    query = query.join(Joiner_::merge(joiner, filter.joiner()));
+                    fltr = fltr.and(filter);
+                } else {
+                    query = query.join(joiner);
+                }
+                query = query.filter(fltr);
+                @%- if def.is_soft_delete() %@
+                query = query.when(with_trashed, |v| v.with_trashed());
+                @%- endif %@
+                Ok(query)
+            }
+        }
         #[allow(unused_imports)]
         use @{ pascal_name }@Repository@{ selector|pascal }@Builder as _Repository@{ selector|pascal }@Builder;
         #[async_trait]
@@ -540,40 +587,19 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             async fn query_for_update(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(selector) = self.selector {
-                    _filter_@{ selector }@(&selector)?
-                } else {
-                    filter!()
-                };
-                if let Some(filter) = self.filter {
-                    query = query.join(Joiner_::merge(self.joiner, filter.joiner()));
-                    fltr = fltr.and(filter);
-                } else {
-                    query = query.join(self.joiner);
-                }
-                query = query.filter(fltr);
-                @%- if def.is_soft_delete() %@
-                query = query.when(self.with_trashed, |v| v.with_trashed());
-                @%- endif %@
+                let query = Self::_query(self.selector, self.filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ self.joiner)?;
                 Ok(query.select_for_update(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@Updater>).collect())
+            }
+            async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>> {
+                let mut conn = self.conn.lock().await;
+                let conn = conn.deref_mut();
+                let query = Self::_query(self.selector, self.filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ self.joiner)?;
+                Ok(query.select(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>).collect())
             }
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(selector) = self.selector {
-                    _filter_@{ selector }@(&selector)?
-                } else {
-                    filter!()
-                };
-                if let Some(filter) = self.filter {
-                    fltr = fltr.and(filter);
-                }
-                query = query.filter(fltr);
-                @%- if def.is_soft_delete() %@
-                query = query.when(self.with_trashed, |v| v.with_trashed());
-                @%- endif %@
+                let query = Self::_query(self.selector, self.filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ None)?;
                 Ok(query.count(conn).await?)
             }
             fn selector(mut self: Box<Self>, filter: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder> {
@@ -843,11 +869,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
         })
     }
     @%- else %@
-    fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindDirectlyBuilder> {
-        self.find_directly(id)
-    }
-    @%- endif %@
-    fn find_directly(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindDirectlyBuilder> {
+    fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindBuilder> {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
             id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@,
@@ -858,9 +880,9 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
             joiner: Option<Box<Joiner_>>,
         }
         #[allow(unused_imports)]
-        use @{ pascal_name }@QueryFindDirectlyBuilder as _QueryFindDirectlyBuilder;
+        use @{ pascal_name }@QueryFindBuilder as _QueryFindBuilder;
         #[async_trait]
-        impl @{ pascal_name }@QueryFindDirectlyBuilder for V {
+        impl @{ pascal_name }@QueryFindBuilder for V {
             async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
@@ -880,17 +902,17 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                     Ok(None)
                 }
             }
-            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindDirectlyBuilder> {
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> {
                 self.filter = Some(filter);
                 self
             }
             @%- if def.is_soft_delete() %@
-            fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _QueryFindDirectlyBuilder> {
+            fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _QueryFindBuilder> {
                 self.with_trashed = mode;
                 self
             }
             @%- endif %@
-            fn join(mut self: Box<Self>, joiner: Option<Box<Joiner_>>) -> Box<dyn _QueryFindDirectlyBuilder> {
+            fn join(mut self: Box<Self>, joiner: Option<Box<Joiner_>>) -> Box<dyn _QueryFindBuilder> {
                 self.joiner = Joiner_::merge(self.joiner, joiner);
                 self
             }
@@ -905,5 +927,6 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
             joiner: None,
         })
     }
+    @%- endif %@
 }
 @{-"\n"}@

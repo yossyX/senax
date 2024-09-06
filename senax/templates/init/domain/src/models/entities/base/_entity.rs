@@ -589,22 +589,23 @@ macro_rules! join_@{ fetch_macro_name }@ {
 pub use join_@{ fetch_macro_name }@ as join;
 
 #[allow(unused_imports)]
-use @{ pascal_name }@RepositoryFindForUpdateBuilder as _RepositoryFindForUpdateBuilder;
+use @{ pascal_name }@RepositoryFindBuilder as _RepositoryFindBuilder;
 
 #[async_trait]
-pub trait @{ pascal_name }@RepositoryFindForUpdateBuilder: Send + Sync {
-    async fn query(self: Box<Self>) -> anyhow::Result<Box<dyn _Updater>>;
-    fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindForUpdateBuilder>;
+pub trait @{ pascal_name }@RepositoryFindBuilder: Send + Sync {
+    async fn query_for_update(self: Box<Self>) -> anyhow::Result<Box<dyn _Updater>>;
+    async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>>;
+    fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindBuilder>;
     @%- if def.is_soft_delete() %@
-    fn with_trashed(self: Box<Self>, mode: bool) -> Box<dyn _RepositoryFindForUpdateBuilder>;
+    fn with_trashed(self: Box<Self>, mode: bool) -> Box<dyn _RepositoryFindBuilder>;
     @%- endif %@
-    fn join(self: Box<Self>, joiner: Option<Box<Joiner_>>) -> Box<dyn _RepositoryFindForUpdateBuilder>;
+    fn join(self: Box<Self>, joiner: Option<Box<Joiner_>>) -> Box<dyn _RepositoryFindBuilder>;
 }
 
 #[async_trait]
 pub trait _@{ pascal_name }@Repository: Send + Sync {
 @%- if !def.disable_update() %@
-    fn find_for_update(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@RepositoryFindForUpdateBuilder>;
+    fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@RepositoryFindBuilder>;
 @%- endif %@
     fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn _Updater>;
     #[deprecated(note = "This method should not be used outside the domain.")]
@@ -642,6 +643,7 @@ use @{ pascal_name }@Repository@{ selector|pascal }@Builder as _Repository@{ sel
 #[async_trait]
 pub trait @{ pascal_name }@Repository@{ selector|pascal }@Builder: Send + Sync {
     async fn query_for_update(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn _Updater>>>;
+    async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>>;
     async fn count(self: Box<Self>) -> anyhow::Result<i64>;
     fn selector(self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
     fn selector_in_json(self: Box<Self>, filter: serde_json::Value) -> anyhow::Result<Box<dyn _Repository@{ selector|pascal }@Builder>> {
@@ -850,19 +852,6 @@ pub trait @{ pascal_name }@QueryFindBuilder: Send + Sync {
     fn join(self: Box<Self>, joiner: Option<Box<Joiner_>>) -> Box<dyn _QueryFindBuilder>;
 }
 
-#[allow(unused_imports)]
-use @{ pascal_name }@QueryFindDirectlyBuilder as _QueryFindDirectlyBuilder;
-
-#[async_trait]
-pub trait @{ pascal_name }@QueryFindDirectlyBuilder: Send + Sync {
-    async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>>;
-    fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindDirectlyBuilder>;
-    @%- if def.is_soft_delete() %@
-    fn with_trashed(self: Box<Self>, mode: bool) -> Box<dyn _QueryFindDirectlyBuilder>;
-    @%- endif %@
-    fn join(self: Box<Self>, joiner: Option<Box<Joiner_>>) -> Box<dyn _QueryFindDirectlyBuilder>;
-}
-
 #[async_trait]
 pub trait _@{ pascal_name }@Query: Send + Sync {
     @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
@@ -871,12 +860,7 @@ pub trait _@{ pascal_name }@Query: Send + Sync {
     @%- for (selector, selector_def) in def.selectors %@
     fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder>;
     @%- endfor %@
-    @%- if def.use_cache() %@
     fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindBuilder>;
-    @%- else %@
-    fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindDirectlyBuilder>;
-    @%- endif %@
-    fn find_directly(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindDirectlyBuilder>;
 }
 @%- for (index_name, index) in def.multi_index() %@
 
@@ -1457,22 +1441,26 @@ impl Emu@{ pascal_name }@Repository {
 #[async_trait]
 impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
     @%- if !def.disable_update() %@
-    fn find_for_update(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@RepositoryFindForUpdateBuilder> {
+    fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@RepositoryFindBuilder> {
         struct V(Option<@{ pascal_name }@Entity>, Option<Filter_>);
         #[async_trait]
-        impl @{ pascal_name }@RepositoryFindForUpdateBuilder for V {
-            async fn query(self: Box<Self>) -> anyhow::Result<Box<dyn _Updater>> {
+        impl @{ pascal_name }@RepositoryFindBuilder for V {
+            async fn query_for_update(self: Box<Self>) -> anyhow::Result<Box<dyn _Updater>> {
                 use anyhow::Context;
                 let filter = self.1;
                 self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true))
                     .map(|v| Box::new(v) as Box<dyn _Updater>)
                     .with_context(|| "Not Found")
             }
-            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindForUpdateBuilder> { self.1 = Some(filter); self }
+            async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
+                let filter = self.1;
+                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true)).map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
+            }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindBuilder> { self.1 = Some(filter); self }
             @%- if def.is_soft_delete() %@
-            fn with_trashed(self: Box<Self>, _mode: bool) -> Box<dyn _RepositoryFindForUpdateBuilder> { self }
+            fn with_trashed(self: Box<Self>, _mode: bool) -> Box<dyn _RepositoryFindBuilder> { self }
             @%- endif %@
-            fn join(self: Box<Self>, _join: Option<Box<Joiner_>>) -> Box<dyn _RepositoryFindForUpdateBuilder> { self }
+            fn join(self: Box<Self>, _join: Option<Box<Joiner_>>) -> Box<dyn _RepositoryFindBuilder> { self }
         }
         let map = self.0.lock().unwrap();
         Box::new(V(map.get(&id).cloned(), None))
@@ -1628,6 +1616,24 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
                         @{ def.soft_delete_tpl2("true","self.with_trashed || v.deleted_at.is_none()","self.with_trashed || !v.deleted","self.with_trashed || v.deleted == 0")}@
                     })
                     .map(|v| Box::new(v) as Box<dyn _Updater>).collect();
+                Ok(list)
+            }
+            async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>> {
+                let list: Vec<_> = self._list.into_iter()
+                    .filter(|v| {
+                        if let Some(selector) = &self.selector {
+                            if !_filter_@{ selector }@(v, selector) {
+                                return false;
+                            }
+                        }
+                        if let Some(filter) = &self.filter {
+                            if !filter.check(v as &dyn @{ pascal_name }@) {
+                                return false;
+                            }
+                        }
+                        @{ def.soft_delete_tpl2("true","self.with_trashed || v.deleted_at.is_none()","self.with_trashed || !v.deleted","self.with_trashed || v.deleted == 0")}@
+                    })
+                    .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>).collect();
                 Ok(list)
             }
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
@@ -1827,26 +1833,23 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
         Box::new(V(map.get(&id).cloned(), false, None))
     }
     @%- else %@
-    fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindDirectlyBuilder> {
-        self.find_directly(id)
-    }
-    @%- endif %@
-    fn find_directly(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindDirectlyBuilder> {
+    fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindBuilder> {
         struct V(Option<@{ pascal_name }@Entity>, Option<Filter_>);
         #[async_trait]
-        impl @{ pascal_name }@QueryFindDirectlyBuilder for V {
+        impl @{ pascal_name }@QueryFindBuilder for V {
             async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
-                let filter = self.1;
-                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true)).map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
+                let filter = self.2;
+                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true))@{- def.soft_delete_tpl2("",".filter(|v| self.1 || v.deleted_at.is_none())",".filter(|v| self.1 || !v.deleted)",".filter(|v| self.1 || v.deleted == 0)")}@.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
             }
-            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindDirectlyBuilder> { self.1 = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> { self.2 = Some(filter); self }
             @%- if def.is_soft_delete() %@
-            fn with_trashed(self: Box<Self>, _mode: bool) -> Box<dyn _QueryFindDirectlyBuilder> { self }
+            fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _QueryFindBuilder> { self.1 = mode; self }
             @%- endif %@
-            fn join(self: Box<Self>, _join: Option<Box<Joiner_>>) -> Box<dyn _QueryFindDirectlyBuilder> { self }
+            fn join(self: Box<Self>, _join: Option<Box<Joiner_>>) -> Box<dyn _QueryFindBuilder> { self }
         }
         let map = self.0.lock().unwrap();
         Box::new(V(map.get(&id).cloned(), None))
     }
+    @%- endif %@
 }
 @{-"\n"}@

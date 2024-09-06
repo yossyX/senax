@@ -30,7 +30,7 @@ pub use super::_base::_@{ mod_name }@::{
 };
 use super::_base::_@{ mod_name }@::{_@{ pascal_name }@Query, _@{ pascal_name }@Repository};
 #[rustfmt::skip]
-pub use super::_base::_@{ mod_name }@::{@{ pascal_name }@QueryFindBuilder, @{ pascal_name }@QueryFindDirectlyBuilder, @{ pascal_name }@RepositoryFindForUpdateBuilder};
+pub use super::_base::_@{ mod_name }@::{@{ pascal_name }@QueryFindBuilder, @{ pascal_name }@RepositoryFindBuilder};
 #[cfg(any(feature = "mock", test))]
 pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Entity;
 @%- for (selector, selector_def) in def.selectors %@
@@ -118,7 +118,7 @@ mockall::mock! {
     #[async_trait]
     impl _@{ pascal_name }@Repository for Repository_ {
         @%- if !def.disable_update() %@
-        fn find_for_update(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@RepositoryFindForUpdateBuilder>;
+        fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@RepositoryFindBuilder>;
         @%- endif %@
         fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn @{ pascal_name }@Updater>;
         async fn save(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<Option<Box<dyn _@{ mod_name }@::@{ pascal_name }@>>>;
@@ -157,12 +157,7 @@ mockall::mock! {
         @%- for (selector, selector_def) in def.selectors %@
         fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder>;
         @%- endfor %@
-        @%- if def.use_cache() %@
         fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindBuilder>;
-        @%- else %@
-        fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindDirectlyBuilder>;
-        @%- endif %@
-        fn find_directly(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindDirectlyBuilder>;
     }
     #[async_trait]
     impl @{ pascal_name }@Query for Query_ {}
