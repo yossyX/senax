@@ -1035,6 +1035,12 @@ impl ModelDef {
             .filter(|(_k, v)| !v.secret.unwrap_or_default())
             .collect()
     }
+    pub fn all_except_secret_without_primary(&self) -> Vec<(&String, &FieldDef)> {
+        self.merged_fields
+            .iter()
+            .filter(|(_k, v)| !v.secret.unwrap_or_default() && !v.primary)
+            .collect()
+    }
     pub fn nullable(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
@@ -1097,7 +1103,7 @@ impl ModelDef {
                 )
             })
     }
-    pub fn primary_except_is_auto(&self, except: &[String]) -> bool {
+    pub fn is_auto_primary_except(&self, except: &[String]) -> bool {
         self.primaries()
             .iter()
             .filter(|(k, _v)| !except.contains(*k))

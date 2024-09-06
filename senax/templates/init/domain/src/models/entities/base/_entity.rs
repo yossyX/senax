@@ -594,7 +594,7 @@ use @{ pascal_name }@RepositoryFindForUpdateBuilder as _RepositoryFindForUpdateB
 #[async_trait]
 pub trait @{ pascal_name }@RepositoryFindForUpdateBuilder: Send + Sync {
     async fn query(self: Box<Self>) -> anyhow::Result<Box<dyn _Updater>>;
-    fn visibility_filter(self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindForUpdateBuilder>;
+    fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindForUpdateBuilder>;
     @%- if def.is_soft_delete() %@
     fn with_trashed(self: Box<Self>, mode: bool) -> Box<dyn _RepositoryFindForUpdateBuilder>;
     @%- endif %@
@@ -641,13 +641,13 @@ use @{ pascal_name }@Repository@{ selector|pascal }@Builder as _Repository@{ sel
 
 #[async_trait]
 pub trait @{ pascal_name }@Repository@{ selector|pascal }@Builder: Send + Sync {
-    async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn _Updater>>>;
+    async fn query_for_update(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn _Updater>>>;
     async fn count(self: Box<Self>) -> anyhow::Result<i64>;
-    fn query_filter(self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
-    fn query_filter_by_json(self: Box<Self>, filter: serde_json::Value) -> anyhow::Result<Box<dyn _Repository@{ selector|pascal }@Builder>> {
-        Ok(self.query_filter(serde_json::from_value(filter)?))
+    fn selector(self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
+    fn selector_in_json(self: Box<Self>, filter: serde_json::Value) -> anyhow::Result<Box<dyn _Repository@{ selector|pascal }@Builder>> {
+        Ok(self.selector(serde_json::from_value(filter)?))
     }
-    fn visibility_filter(self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
+    fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
     @%- if def.is_soft_delete() %@
     fn with_trashed(self: Box<Self>, mode: bool) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
     @%- endif %@
@@ -820,11 +820,11 @@ impl @{ pascal_name }@Query@{ selector|pascal }@Cursor {
 pub trait @{ pascal_name }@Query@{ selector|pascal }@Builder: Send + Sync {
     async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>>;
     async fn count(self: Box<Self>) -> anyhow::Result<i64>;
-    fn query_filter(self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder>;
-    fn query_filter_by_json(self: Box<Self>, filter: serde_json::Value) -> anyhow::Result<Box<dyn _Query@{ selector|pascal }@Builder>> {
-        Ok(self.query_filter(serde_json::from_value(filter)?))
+    fn selector(self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder>;
+    fn selector_in_json(self: Box<Self>, filter: serde_json::Value) -> anyhow::Result<Box<dyn _Query@{ selector|pascal }@Builder>> {
+        Ok(self.selector(serde_json::from_value(filter)?))
     }
-    fn visibility_filter(self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder>;
+    fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder>;
     fn cursor(self: Box<Self>, cursor: @{ pascal_name }@Query@{ selector|pascal }@Cursor) -> Box<dyn _Query@{ selector|pascal }@Builder>;
     fn order_by(self: Box<Self>, order: @{ pascal_name }@Query@{ selector|pascal }@Order) -> Box<dyn _Query@{ selector|pascal }@Builder>;
     fn reverse(self: Box<Self>, mode: bool) -> Box<dyn _Query@{ selector|pascal }@Builder>;
@@ -843,7 +843,7 @@ use @{ pascal_name }@QueryFindBuilder as _QueryFindBuilder;
 #[async_trait]
 pub trait @{ pascal_name }@QueryFindBuilder: Send + Sync {
     async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>>;
-    fn visibility_filter(self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder>;
+    fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder>;
     @%- if def.is_soft_delete() %@
     fn with_trashed(self: Box<Self>, mode: bool) -> Box<dyn _QueryFindBuilder>;
     @%- endif %@
@@ -856,7 +856,7 @@ use @{ pascal_name }@QueryFindDirectlyBuilder as _QueryFindDirectlyBuilder;
 #[async_trait]
 pub trait @{ pascal_name }@QueryFindDirectlyBuilder: Send + Sync {
     async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>>;
-    fn visibility_filter(self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindDirectlyBuilder>;
+    fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindDirectlyBuilder>;
     @%- if def.is_soft_delete() %@
     fn with_trashed(self: Box<Self>, mode: bool) -> Box<dyn _QueryFindDirectlyBuilder>;
     @%- endif %@
@@ -1468,7 +1468,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
                     .map(|v| Box::new(v) as Box<dyn _Updater>)
                     .with_context(|| "Not Found")
             }
-            fn visibility_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindForUpdateBuilder> { self.1 = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindForUpdateBuilder> { self.1 = Some(filter); self }
             @%- if def.is_soft_delete() %@
             fn with_trashed(self: Box<Self>, _mode: bool) -> Box<dyn _RepositoryFindForUpdateBuilder> { self }
             @%- endif %@
@@ -1604,23 +1604,23 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
         #[derive(Default)]
         struct V {
             _list: Vec<@{ pascal_name }@Entity>,
-            query_filter: Option<@{ pascal_name }@Query@{ selector|pascal }@Filter>,
-            visibility_filter: Option<Filter_>,
+            selector: Option<@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+            filter: Option<Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
         }
         #[async_trait]
         impl @{ pascal_name }@Repository@{ selector|pascal }@Builder for V {
-            async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn _Updater>>> {
+            async fn query_for_update(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn _Updater>>> {
                 let list: Vec<_> = self._list.into_iter()
                     .filter(|v| {
-                        if let Some(filter) = &self.query_filter {
-                            if !_filter_@{ selector }@(v, filter) {
+                        if let Some(selector) = &self.selector {
+                            if !_filter_@{ selector }@(v, selector) {
                                 return false;
                             }
                         }
-                        if let Some(filter) = &self.visibility_filter {
+                        if let Some(filter) = &self.filter {
                             if !filter.check(v as &dyn @{ pascal_name }@) {
                                 return false;
                             }
@@ -1633,12 +1633,12 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
                 let list: Vec<_> = self._list.into_iter()
                     .filter(|v| {
-                        if let Some(filter) = &self.query_filter {
-                            if !_filter_@{ selector }@(v, filter) {
+                        if let Some(selector) = &self.selector {
+                            if !_filter_@{ selector }@(v, selector) {
                                 return false;
                             }
                         }
-                        if let Some(filter) = &self.visibility_filter {
+                        if let Some(filter) = &self.filter {
                             if !filter.check(v as &dyn @{ pascal_name }@) {
                                 return false;
                             }
@@ -1648,8 +1648,8 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
                     .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>).collect();
                 Ok(list.len() as i64)
             }
-            fn query_filter(mut self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.query_filter = Some(filter); self }
-            fn visibility_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.visibility_filter = Some(filter); self }
+            fn selector(mut self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.selector = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
             @%- if def.is_soft_delete() %@
             fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.with_trashed = mode; self  }
             @%- endif %@
@@ -1706,8 +1706,8 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
         #[derive(Default)]
         struct V {
             _list: Vec<@{ pascal_name }@Entity>,
-            query_filter: Option<@{ pascal_name }@Query@{ selector|pascal }@Filter>,
-            visibility_filter: Option<Filter_>,
+            selector: Option<@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+            filter: Option<Filter_>,
             cursor: Option<@{ pascal_name }@Query@{ selector|pascal }@Cursor>,
             order: Option<@{ pascal_name }@Query@{ selector|pascal }@Order>,
             reverse: bool,
@@ -1734,12 +1734,12 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
             async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
                 let mut list: Vec<_> = self._list.into_iter()
                     .filter(|v| {
-                        if let Some(filter) = &self.query_filter {
-                            if !_filter_@{ selector }@(v, filter) {
+                        if let Some(selector) = &self.selector {
+                            if !_filter_@{ selector }@(v, selector) {
                                 return false;
                             }
                         }
-                        if let Some(filter) = &self.visibility_filter {
+                        if let Some(filter) = &self.filter {
                             if !filter.check(v as &dyn @{ pascal_name }@) {
                                 return false;
                             }
@@ -1773,12 +1773,12 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
                 let list: Vec<_> = self._list.into_iter()
                     .filter(|v| {
-                        if let Some(filter) = &self.query_filter {
-                            if !_filter_@{ selector }@(v, filter) {
+                        if let Some(selector) = &self.selector {
+                            if !_filter_@{ selector }@(v, selector) {
                                 return false;
                             }
                         }
-                        if let Some(filter) = &self.visibility_filter {
+                        if let Some(filter) = &self.filter {
                             if !filter.check(v as &dyn @{ pascal_name }@) {
                                 return false;
                             }
@@ -1793,8 +1793,8 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
                     .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>).collect();
                 Ok(list.len() as i64)
             }
-            fn query_filter(mut self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.query_filter = Some(filter); self }
-            fn visibility_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.visibility_filter = Some(filter); self }
+            fn selector(mut self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.selector = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
             fn cursor(mut self: Box<Self>, cursor: @{ pascal_name }@Query@{ selector|pascal }@Cursor) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.cursor = Some(cursor); self }
             fn order_by(mut self: Box<Self>, order: @{ pascal_name }@Query@{ selector|pascal }@Order) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.order = Some(order); self  }
             fn reverse(mut self: Box<Self>, mode: bool) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.reverse = mode; self  }
@@ -1817,7 +1817,7 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
                 let filter = self.2;
                 Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true))@{- def.soft_delete_tpl2("",".filter(|v| self.1 || v.deleted_at.is_none())",".filter(|v| self.1 || !v.deleted)",".filter(|v| self.1 || v.deleted == 0)")}@.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>))
             }
-            fn visibility_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> { self.2 = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> { self.2 = Some(filter); self }
             @%- if def.is_soft_delete() %@
             fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _QueryFindBuilder> { self.1 = mode; self }
             @%- endif %@
@@ -1839,7 +1839,7 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
                 let filter = self.1;
                 Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true)).map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
             }
-            fn visibility_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindDirectlyBuilder> { self.1 = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindDirectlyBuilder> { self.1 = Some(filter); self }
             @%- if def.is_soft_delete() %@
             fn with_trashed(self: Box<Self>, _mode: bool) -> Box<dyn _QueryFindDirectlyBuilder> { self }
             @%- endif %@
