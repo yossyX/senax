@@ -614,7 +614,6 @@ pub trait Updater {
     fn is_new(&self) -> bool;
     fn has_been_deleted(&self) -> bool;
     fn mark_for_delete(&mut self);
-    fn mark_for_delete_and_return_self(self) -> Self;
     fn unmark_for_delete(&mut self);
     fn will_be_deleted(&self) -> bool;
     fn mark_for_upsert(&mut self);

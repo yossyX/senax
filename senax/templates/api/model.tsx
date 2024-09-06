@@ -37,7 +37,10 @@ export const Import@{ pascal_name }@Query = graphql(`mutation import_@{ db }@_@{
 export const Update@{ pascal_name }@Query = graphql(`mutation update_@{ db }@_@{ group }@_@{ mod_name }@($data:Req@{ db|pascal }@@{ group|pascal }@@{ pascal_name }@!){@{ db_case }@{@{ group_case }@{@{ model_case }@{update(data:$data){...@{ db|pascal }@@{ group|pascal }@@{ pascal_name }@}}}}}`);
 
 export const Delete@{ pascal_name }@Query = graphql(`mutation delete_@{ db }@_@{ group }@_@{ mod_name }@($_id:ID!){@{ db_case }@{@{ group_case }@{@{ model_case }@{delete(_id:$_id)}}}}`);
+@%- if api_def.use_delete_by_pk %@
 
+export const DeleteByPk@{ pascal_name }@Query = graphql(`query delete_by_pk_@{ db }@_@{ group }@_@{ mod_name }@(@{ def.primaries()|fmt_join("${var}:{gql_type}", ",") }@){@{ db_case }@{@{ group_case }@{@{ model_case }@{deleteByPk(@{ def.primaries()|fmt_join("{var}: ${var}", ",") }@)}}}}`);
+@%- endif %@
 @%- for (selector, selector_def) in def.selectors %@
 @%- for api_selector_def in api_def.selector(selector) %@
 @% for (js_name, js_def) in api_selector_def.js_updater %@

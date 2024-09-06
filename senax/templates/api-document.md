@@ -82,6 +82,9 @@ SOBO-WEBの業務DBの GraphQL API 定義を記載する。
 {%- endif %}
 * 更新：mutation { {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { update(data: <a href="#{{model.gql_name | lower}}">{{model.gql_name}}</a>) } } } }
 * 削除：mutation { {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { delete(_id: ID!) } } } }
+{%- if api_def.use_delete_by_pk %}
+* 主キーでの削除：{ {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { deleteByPk({{model.pk}}) } } } }
+{%- endif %}
 {%- for selector_def in model.selectors %}
 {% for js_name, js_def in selector_def.js_updater %}
 * 更新：mutation { {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { update{{js_name | gql_pascal}}(filter: <a href="#{{model.gql_name | lower}}query{{selector_def.name | lower}}filter">{{model.gql_name}}Query{{selector_def.name | pascal}}Filter</a>, value: JSON!) } } } }
