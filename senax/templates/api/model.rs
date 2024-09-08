@@ -79,13 +79,13 @@ async fn _@{ selector }@(
     let joiner = joiner(node, auth)?;
     let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(joiner);
     @%- if selector_def.filter_is_required() %@
-    query = query.selector(filter.clone());
+    query = query.filter(filter.clone());
     @%- else %@
     if let Some(filter) = filter {
-        query = query.selector(filter.clone());
+        query = query.filter(filter.clone());
     }
     @%- endif %@
-    query = query.filter(readable_filter(auth)?);
+    query = query.extra_filter(readable_filter(auth)?);
     let mut previous = false;
     @{- api_selector_def.limit_def() }@
     let mut limit = @{ api_selector_def.limit_str() }@;
@@ -161,13 +161,13 @@ async fn _count_@{ selector }@(
     let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
     let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
     @%- if selector_def.filter_is_required() %@
-    query = query.selector(filter.clone());
+    query = query.filter(filter.clone());
     @%- else %@
     if let Some(filter) = filter {
-        query = query.selector(filter.clone());
+        query = query.filter(filter.clone());
     }
     @%- endif %@
-    query = query.filter(readable_filter(auth)?);
+    query = query.extra_filter(readable_filter(auth)?);
     let count = query.count().await?;
     @{ db|snake }@_query.release_read_tx().await?;
     Ok(count)
@@ -532,13 +532,13 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
-        query = query.selector(filter);
+        query = query.filter(filter);
         @%- else %@
         if let Some(filter) = filter {
-            query = query.selector(filter);
+            query = query.filter(filter);
         }
         @%- endif %@
-        query = query.filter(updatable_filter(auth)?);
+        query = query.extra_filter(updatable_filter(auth)?);
         let mut updater_map: HashMap<async_graphql::ID, _> = query
             .query_for_update()
             .await
@@ -620,13 +620,13 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
-        query = query.selector(filter);
+        query = query.filter(filter);
         @%- else %@
         if let Some(filter) = filter {
-            query = query.selector(filter);
+            query = query.filter(filter);
         }
         @%- endif %@
-        query = query.filter(updatable_filter(auth)?);
+        query = query.extra_filter(updatable_filter(auth)?);
 
         let mut result = Vec::new();
         for mut obj in query
@@ -674,13 +674,13 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
         @%- if selector_def.filter_is_required() %@
-        query = query.selector(filter);
+        query = query.filter(filter);
         @%- else %@
         if let Some(filter) = filter {
-            query = query.selector(filter);
+            query = query.filter(filter);
         }
         @%- endif %@
-        query = query.filter(deletable_filter(auth)?);
+        query = query.extra_filter(deletable_filter(auth)?);
         let mut result = Vec::new();
         for obj in query
             .query_for_update()

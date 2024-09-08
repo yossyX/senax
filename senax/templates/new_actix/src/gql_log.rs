@@ -1,7 +1,9 @@
 use async_graphql::{
-    extensions::{Extension, ExtensionContext, ExtensionFactory, NextExecute, NextParseQuery},
+    extensions::{
+        Extension, ExtensionContext, ExtensionFactory, NextExecute, NextParseQuery, NextValidation,
+    },
     parser::types::{ExecutableDocument, OperationType, Selection},
-    PathSegment, Response, ServerResult, Variables,
+    PathSegment, Response, ServerError, ServerResult, ValidationResult, Variables,
 };
 use std::{fmt::Write, sync::Arc};
 
@@ -25,10 +27,11 @@ impl Extension for LoggerExtension {
         next: NextParseQuery<'_>,
     ) -> ServerResult<ExecutableDocument> {
         let _ctx: &crate::context::Ctx = ctx.data().unwrap();
+        debug!(ctx = _ctx.ctx_no(), gql_query = query; "");
         let document = match next.run(ctx, query, variables).await {
             Ok(d) => d,
             Err(e) => {
-                info!(message = e.message, ctx = _ctx.ctx_no(); "");
+                warn!(ctx = _ctx.ctx_no(); "{}", e.message);
                 return Err(e);
             }
         };
@@ -41,6 +44,23 @@ impl Extension for LoggerExtension {
             info!(target:"request", ctx = _ctx.ctx_no(), gql = ctx.stringify_execute_doc(&document, variables); "");
         }
         Ok(document)
+    }
+
+    async fn validation(
+        &self,
+        ctx: &ExtensionContext<'_>,
+        next: NextValidation<'_>,
+    ) -> Result<ValidationResult, Vec<ServerError>> {
+        match next.run(ctx).await {
+            Ok(r) => Ok(r),
+            Err(err_list) => {
+                let _ctx: &crate::context::Ctx = ctx.data().unwrap();
+                for err in &err_list {
+                    warn!(ctx = _ctx.ctx_no(); "{} {:?}", err.message, err.locations);
+                }
+                Err(err_list)
+            }
+        }
     }
 
     async fn execute(
@@ -68,9 +88,9 @@ impl Extension for LoggerExtension {
                             }
                         }
                     }
-                    warn!(path = path, message = err.message, ctx = _ctx.ctx_no(); "");
+                    warn!(path = path, ctx = _ctx.ctx_no(); "{}", err.message);
                 } else {
-                    warn!(message = err.message, ctx = _ctx.ctx_no(); "");
+                    warn!(ctx = _ctx.ctx_no(); "{}", err.message);
                 }
             }
         } else {
@@ -79,3 +99,4 @@ impl Extension for LoggerExtension {
         resp
     }
 }
+@{-"\n"}@
