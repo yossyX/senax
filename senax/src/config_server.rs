@@ -984,7 +984,7 @@ fn error_response(err: anyhow::Error) -> HttpResponse {
     }
 }
 
-pub fn fix_schema(db: &str) -> anyhow::Result<()> {
+pub fn reflect_migration_changes(db: &str) -> anyhow::Result<()> {
     let path = Path::new(SCHEMA_PATH).join(format!("{db}.yml"));
     let config: ConfigDef = parse_yml_file(&path)?;
     config.fix_static_vars();

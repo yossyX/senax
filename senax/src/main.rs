@@ -151,8 +151,8 @@ enum Commands {
         #[clap(long)]
         use_test_db: bool,
     },
-    /// Finalize and save the names in the schema
-    FixSchema,
+    /// Reflect the name change in the schema after generating the migration.
+    ReflectMigrationChanges,
     /// generate a import data file
     GenSeed {
         /// Specify the db
@@ -326,9 +326,9 @@ async fn exec(cli: Cli) -> Result<()> {
             ensure!(db_re.is_match(db), "bad db name!");
             migration_generator::generate(db, description, *skip_empty, *use_test_db).await?;
         }
-        Commands::FixSchema => {
+        Commands::ReflectMigrationChanges => {
             for db in crate::db_generator::list()? {
-                config_server::fix_schema(&db)?;
+                config_server::reflect_migration_changes(&db)?;
             }
         }
         Commands::GenSeed { db, description } => {
