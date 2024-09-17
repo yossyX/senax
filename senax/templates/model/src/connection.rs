@@ -1172,6 +1172,21 @@ impl DbConn {
         self.cache_tx.clear();
     }
     @%- endif %@
+
+    pub fn reset_tx(&mut self) {
+        self.save_point.clear();
+        self.has_tx = false;
+        self.tx.clear();
+        self.lock_list.clear();
+        self.cache_internal_op_list.clear();
+        self.cache_op_list.clear();
+        self.callback_list.clear();
+        self.has_read_tx = 0;
+        self.read_tx.clear();
+        @%- if !config.force_disable_cache %@
+        self.cache_tx.clear();
+        @%- endif %@
+    }
     @%- if config.use_sequence %@
 
     pub async fn sequence(&mut self, num: u64) -> Result<u64> {
