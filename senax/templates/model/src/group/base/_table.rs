@@ -4248,7 +4248,7 @@ impl QueryBuilder {
     {
         let sql = self._sql(T::_sql_cols(), false);
         let (tx, rx) = mpsc::channel(1000);
-        let mut executor = conn.acquire_replica().await?;
+        let mut executor = conn.acquire_reader().await?;
         let ctx_no = conn.ctx_no();
         tokio::spawn(async move {
             let mut query = sqlx::query_as::<_, T>(&sql);
@@ -4309,7 +4309,7 @@ impl QueryBuilder {
         let joiner = self.joiner.take();
         query = self._bind(query);
         let result = if conn.wo_tx() {
-            query.fetch_all(conn.acquire_source().await?.as_mut()).await?
+            query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
         } else {
             query.fetch_all(conn.get_tx().await?.as_mut()).await?
         };
@@ -4457,7 +4457,7 @@ impl QueryBuilder {
             };
         }
         let result = if conn.wo_tx() {
-            query.execute(conn.acquire_source().await?.as_mut()).await?
+            query.execute(conn.acquire_writer().await?.as_mut()).await?
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
@@ -4525,7 +4525,7 @@ impl QueryBuilder {
             };
         }
         let result = if conn.wo_tx() {
-            query.execute(conn.acquire_source().await?.as_mut()).await?
+            query.execute(conn.acquire_writer().await?.as_mut()).await?
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
@@ -5799,7 +5799,7 @@ impl _@{ pascal_name }@ {
                 }
             }
         } else {
-            let replica = conn.get_replica_conn().await?;
+            let replica = conn.get_reader().await?;
             let mut stream = replica.fetch_many(&*sql);
             while let Some(result) = stream.try_next().await? {
                 if let Some(row) = result.right() {
@@ -6346,7 +6346,7 @@ impl _@{ pascal_name }@ {
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
         if conn.wo_tx() {
-            Ok(query.fetch_optional(conn.acquire_source().await?.as_mut()).await?)
+            Ok(query.fetch_optional(conn.acquire_writer().await?.as_mut()).await?)
         } else {
             Ok(query.fetch_optional(conn.get_tx().await?.as_mut()).await?)
         }
@@ -6395,7 +6395,7 @@ impl _@{ pascal_name }@ {
                 query = query.bind(id.{index}{bind_as});", "") }@
             }
             let result = if conn.wo_tx() {
-                query.fetch_all(conn.acquire_source().await?.as_mut()).await?
+                query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.fetch_all(conn.get_tx().await?.as_mut()).await?
             };
@@ -6587,7 +6587,7 @@ impl _@{ pascal_name }@ {
         let query = query_bind(sql, &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = if conn.wo_tx() {
-            query.execute(conn.acquire_source().await?.as_mut()).await?
+            query.execute(conn.acquire_writer().await?.as_mut()).await?
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
@@ -6662,7 +6662,7 @@ impl _@{ pascal_name }@ {
             info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "update", ctx = conn.ctx_no(); "{}", &obj);
             debug!("{:?}", &obj);
             let result = if conn.wo_tx() {
-                query.execute(conn.acquire_source().await?.as_mut()).await?
+                query.execute(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.execute(conn.get_tx().await?.as_mut()).await?
             };
@@ -6741,7 +6741,7 @@ impl _@{ pascal_name }@ {
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let query = Self::bind_non_primaries(&obj, query, &sql);
         let result = if conn.wo_tx() {
-            query.execute(conn.acquire_source().await?.as_mut()).await?
+            query.execute(conn.acquire_writer().await?.as_mut()).await?
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
@@ -6900,7 +6900,7 @@ impl _@{ pascal_name }@ {
             query = query.bind(id.{index}{bind_as});", "") }@
         }
         let result = if conn.wo_tx() {
-            query.execute(conn.acquire_source().await?.as_mut()).await?
+            query.execute(conn.acquire_writer().await?.as_mut()).await?
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
@@ -6920,7 +6920,7 @@ impl _@{ pascal_name }@ {
         let query = query_bind(sql, &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = if conn.wo_tx() {
-            query.execute(conn.acquire_source().await?.as_mut()).await?
+            query.execute(conn.acquire_writer().await?.as_mut()).await?
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
@@ -7201,7 +7201,7 @@ impl _@{ pascal_name }@ {
     @{- def.all_fields()|fmt_join("\n                query = query.bind(data._data.{var}{bind_as});", "") }@
             }
             let result = if conn.wo_tx() {
-                query.execute(conn.acquire_source().await?.as_mut()).await?
+                query.execute(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.execute(conn.get_tx().await?.as_mut()).await?
             };
@@ -7343,7 +7343,7 @@ impl _@{ pascal_name }@ {
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "bulk_upsert_updater", ctx = conn.ctx_no(); "{}", obj);
         let query = Self::bind_non_primaries(&obj, query, &sql);
         if conn.wo_tx() {
-            query.execute(conn.acquire_source().await?.as_mut()).await?;
+            query.execute(conn.acquire_writer().await?.as_mut()).await?;
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?;
         }
@@ -7408,7 +7408,7 @@ impl _@{ pascal_name }@ {
                     query = query.bind(id.{index}{bind_as});", "") }@
                 }
                 let result = if conn.wo_tx() {
-                    query.execute(conn.acquire_source().await?.as_mut()).await?
+                    query.execute(conn.acquire_writer().await?.as_mut()).await?
                 } else {
                     query.execute(conn.get_tx().await?.as_mut()).await?
                 };
@@ -7482,7 +7482,7 @@ impl _@{ pascal_name }@ {
                     query = query.bind(id.{index}{bind_as});", "") }@
                 }
                 let result = if conn.wo_tx() {
-                    query.fetch_all(conn.acquire_source().await?.as_mut()).await?
+                    query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
                 } else {
                     query.fetch_all(conn.get_tx().await?.as_mut()).await?
                 };
@@ -7508,7 +7508,7 @@ impl _@{ pascal_name }@ {
                     query = query.bind(id.{index}{bind_as});", "") }@
                 }
                 let result = if conn.wo_tx() {
-                    query.execute(conn.acquire_source().await?.as_mut()).await?
+                    query.execute(conn.acquire_writer().await?.as_mut()).await?
                 } else {
                     query.execute(conn.get_tx().await?.as_mut()).await?
                 };
@@ -7651,7 +7651,7 @@ impl _@{ pascal_name }@ {
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
         if conn.wo_tx() {
-            query.execute(conn.acquire_source().await?.as_mut()).await?;
+            query.execute(conn.acquire_writer().await?.as_mut()).await?;
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?;
         }
@@ -7698,7 +7698,7 @@ impl _@{ pascal_name }@ {
         let query = sqlx::query(r#"DELETE FROM @{ table_name|db_esc }@"#);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if conn.wo_tx() {
-            query.execute(conn.acquire_source().await?.as_mut()).await?;
+            query.execute(conn.acquire_writer().await?.as_mut()).await?;
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?;
         }
@@ -7723,7 +7723,7 @@ impl _@{ pascal_name }@ {
     pub@{ visibility }@ async fn truncate(conn: &mut DbConn) -> Result<()> {
         let query = sqlx::query(r#"TRUNCATE TABLE @{ table_name|db_esc }@"#);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        query.execute(conn.acquire_source().await?.as_mut()).await?;
+        query.execute(conn.acquire_writer().await?.as_mut()).await?;
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "truncate", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
@@ -7794,7 +7794,7 @@ impl _@{ pascal_name }@ {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
             let result = if conn.wo_tx() {
-                query.fetch_all(conn.acquire_source().await?.as_mut()).await?
+                query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.fetch_all(conn.get_tx().await?.as_mut()).await?
             };
@@ -7832,7 +7832,7 @@ impl _@{ pascal_name }@ {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
             let id_list = if conn.wo_tx() {
-                query.fetch_all(conn.acquire_source().await?.as_mut()).await?
+                query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.fetch_all(conn.get_tx().await?.as_mut()).await?
             };
@@ -7862,7 +7862,7 @@ impl _@{ pascal_name }@ {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
             let result = if conn.wo_tx() {
-                query.execute(conn.acquire_source().await?.as_mut()).await?
+                query.execute(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.execute(conn.get_tx().await?.as_mut()).await?
             };
@@ -7898,7 +7898,7 @@ impl _@{ pascal_name }@ {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
             let result = if conn.wo_tx() {
-                query.fetch_one(conn.acquire_source().await?.as_mut()).await?
+                query.fetch_one(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.fetch_one(conn.get_tx().await?.as_mut()).await?
             };
@@ -7934,7 +7934,7 @@ impl _@{ pascal_name }@ {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
             let id_list = if conn.wo_tx() {
-                query.fetch_all(conn.acquire_source().await?.as_mut()).await?
+                query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.fetch_all(conn.get_tx().await?.as_mut()).await?
             };
@@ -7960,7 +7960,7 @@ impl _@{ pascal_name }@ {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
             let result = if conn.wo_tx() {
-                query.execute(conn.acquire_source().await?.as_mut()).await?
+                query.execute(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.execute(conn.get_tx().await?.as_mut()).await?
             };

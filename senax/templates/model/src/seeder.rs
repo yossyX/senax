@@ -125,7 +125,7 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
         let caps = re1.captures(&name).unwrap();
         let version: i64 = caps.get(1).unwrap().as_str().parse()?;
         let description = caps.get(3).unwrap().as_str().to_string();
-        let mut source = DbConn::_new(0).acquire_source().await?;
+        let mut writer = DbConn::_new(0).acquire_writer().await?;
         exec_ddl(
             r#"
                 CREATE TABLE IF NOT EXISTS _seeds (
@@ -134,12 +134,12 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
                     installed_on DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
             "#,
-            source.as_mut(),
+            writer.as_mut(),
         )
         .await?;
         let result = sqlx::query("SELECT version FROM _seeds WHERE version=?")
             .bind(version)
-            .fetch_optional(source.as_mut())
+            .fetch_optional(writer.as_mut())
             .await?;
         if result.is_some() {
             continue;
@@ -148,7 +148,7 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
         sqlx::query("INSERT INTO _seeds (version, description) VALUES (?,?)")
             .bind(version)
             .bind(description)
-            .execute(source.as_mut())
+            .execute(writer.as_mut())
             .await?;
     }
     FILES.get().unwrap().write().unwrap().clear();

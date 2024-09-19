@@ -755,7 +755,7 @@ impl DbConn {
         )
     }
 
-    pub async fn acquire_source(&self) -> Result<PoolConnection<DbType>> {
+    pub async fn acquire_writer(&self) -> Result<PoolConnection<DbType>> {
         Self::_acquire_source(self.shard_id).await
     }
 
@@ -839,7 +839,7 @@ impl DbConn {
         }
     }
 
-    pub async fn acquire_replica(&self) -> Result<PoolConnection<DbType>> {
+    pub async fn acquire_reader(&self) -> Result<PoolConnection<DbType>> {
         Self::_acquire_replica(self.shard_id).await
     }
 
@@ -887,11 +887,11 @@ impl DbConn {
     }
     @%- endif %@
 
-    pub async fn get_replica_conn(&mut self) -> Result<&mut PoolConnection<DbType>> {
+    pub async fn get_reader(&mut self) -> Result<&mut PoolConnection<DbType>> {
         let conn = if self.conn.contains_key(&self.shard_id) {
             None
         } else {
-            Some(self.acquire_replica().await?)
+            Some(self.acquire_reader().await?)
         };
         Ok(self
             .conn
@@ -1197,7 +1197,7 @@ impl DbConn {
             let fetch_num = (num / base + 1) * base;
             let sql = "UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;";
             let query = sqlx::query(sql).bind(fetch_num).bind(ID_OF_SEQUENCE);
-            let result = query.execute(self.acquire_source().await?.as_mut()).await?;
+            let result = query.execute(self.acquire_writer().await?.as_mut()).await?;
             let ceiling = result.last_insert_id();
             let ret = ceiling - fetch_num + 1;
             *cur = (ret + num - 1, ceiling);
@@ -1326,7 +1326,7 @@ impl DbConn {
     /// Obtain a lock during a transaction
     pub async fn lock(&mut self, key: &str, time: i32) -> Result<()> {
         let hash = senax_common::hash64(key);
-        let mut conn = self.acquire_source().await?;
+        let mut conn = self.acquire_writer().await?;
         let result: (Option<i64>,) = sqlx::query_as("SELECT GET_LOCK(?, ?)")
             .bind(hash)
             .bind(time)

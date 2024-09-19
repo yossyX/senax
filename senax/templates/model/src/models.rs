@@ -163,11 +163,11 @@ where
 
 pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Result<()> {
     let conn = DbConn::_new(shard_id);
-    let mut source = conn.acquire_source().await?;
+    let mut writer = conn.acquire_writer().await?;
     @%- if config.collation.is_some() %@
     exec_ddl(
         r#"ALTER DATABASE COLLATE @{ config.collation.as_ref().unwrap() }@;"#,
-        source.as_mut(),
+        writer.as_mut(),
     )
     .await?;
     @%- endif %@
@@ -182,7 +182,7 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
                 execution_time BIGINT NOT NULL
             );
         "#,
-        source.as_mut(),
+        writer.as_mut(),
     )
     .await?;
     @%- if config.use_sequence || !config.force_disable_cache %@
@@ -195,13 +195,13 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
             INSERT IGNORE INTO "_sequence" VALUES (1, 0);
             INSERT IGNORE INTO "_sequence" VALUES (2, 0);
         "#,
-        source.as_mut(),
+        writer.as_mut(),
     )
     .await?;
     @%- endif %@
     sqlx::migrate!()
         .set_ignore_missing(ignore_missing)
-        .run(source.as_mut())
+        .run(writer.as_mut())
         .await?;
     Ok(())
 }

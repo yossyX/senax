@@ -142,9 +142,9 @@ pub async fn start(
 async fn set_bulk_insert_max_size() -> Result<(), anyhow::Error> {
     if BULK_INSERT_MAX_SIZE.get().is_none() {
         let conn = DbConn::_new(0);
-        let mut conn = conn.acquire_source().await?;
+        let mut writer = conn.acquire_writer().await?;
         let row = sqlx::query("SHOW VARIABLES LIKE 'max_allowed_packet';")
-            .fetch_one(conn.as_mut())
+            .fetch_one(writer.as_mut())
             .await?;
         let max_allowed_packet: String = row.get(1);
         BULK_INSERT_MAX_SIZE
