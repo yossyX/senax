@@ -234,6 +234,7 @@ impl FilterDef {
             FilterType::Json => "models::JsonValueFilter".to_string(),
             FilterType::Geometry => "Vec<models::GeometryFilter>".to_string(),
             FilterType::RawQuery if self.query_param_num() == 0 => "bool".to_string(),
+            FilterType::RawQuery if self.query_param_num() == 1 => "String".to_string(),
             FilterType::RawQuery => "Vec<String>".to_string(),
         };
         if self.required {
@@ -694,7 +695,15 @@ impl FilterDef {
                     .as_ref()
                     .unwrap_or_else(|| panic!("query is required for {}.", vname));
                 let param_num = self.query_param_num();
-                if param_num > 0 {
+                if param_num == 1 {
+                    format!(
+                        "
+    {prefix}
+        fltr = fltr.and(filter!(RAW {:?}, [f]));
+    }}",
+                        query
+                    )
+                } else if param_num > 0 {
                     format!(
                         "
     {prefix}
