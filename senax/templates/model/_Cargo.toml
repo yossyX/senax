@@ -34,6 +34,7 @@ log.workspace = true
 num-traits = "0.2"
 once_cell.workspace = true
 phf = "0.8.0"
+rand.workspace = true
 regex.workspace = true
 rust_decimal.workspace = true
 schemars.workspace = true

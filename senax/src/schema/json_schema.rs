@@ -1,14 +1,16 @@
 use std::path::Path;
 
-use schemars::{gen::SchemaSettings, schema::RootSchema};
+use schemars::gen::SchemaSettings;
 use serde_json::Value;
 
-use crate::{
-    api_generator::schema::{ApiConfigJson, ApiDbJson, ApiModelJson},
-    schema::SchemaDef,
-};
+use crate::schema::SchemaDef;
 
+#[cfg(feature = "config")]
 use super::{ConfigJson, ModelJson, ValueObjectJson};
+#[cfg(feature = "config")]
+use crate::api_generator::schema::{ApiConfigJson, ApiDbJson, ApiModelJson};
+#[cfg(feature = "config")]
+use schemars::schema::RootSchema;
 
 pub fn write_schema(base_path: &Path) -> Result<(), anyhow::Error> {
     let schema = whole_schema()?;
@@ -193,6 +195,7 @@ pub fn whole_schema() -> Result<String, anyhow::Error> {
     Ok(schema)
 }
 
+#[cfg(feature = "config")]
 pub fn json_config_schema() -> Result<RootSchema, anyhow::Error> {
     let settings = SchemaSettings::draft07().with(|s| {
         s.option_nullable = true;
@@ -203,6 +206,7 @@ pub fn json_config_schema() -> Result<RootSchema, anyhow::Error> {
     Ok(schema)
 }
 
+#[cfg(feature = "config")]
 pub fn json_model_schema() -> Result<RootSchema, anyhow::Error> {
     let settings = SchemaSettings::draft07().with(|s| {
         s.option_nullable = true;
@@ -213,6 +217,7 @@ pub fn json_model_schema() -> Result<RootSchema, anyhow::Error> {
     Ok(schema)
 }
 
+#[cfg(feature = "config")]
 pub fn json_simple_vo_schema() -> Result<RootSchema, anyhow::Error> {
     let settings = SchemaSettings::draft07().with(|s| {
         s.option_nullable = true;
@@ -223,6 +228,7 @@ pub fn json_simple_vo_schema() -> Result<RootSchema, anyhow::Error> {
     Ok(schema)
 }
 
+#[cfg(feature = "config")]
 pub fn json_api_config_schema() -> Result<RootSchema, anyhow::Error> {
     let settings = SchemaSettings::draft07().with(|s| {
         s.option_nullable = true;
@@ -233,6 +239,7 @@ pub fn json_api_config_schema() -> Result<RootSchema, anyhow::Error> {
     Ok(schema)
 }
 
+#[cfg(feature = "config")]
 pub fn json_api_db_schema() -> Result<RootSchema, anyhow::Error> {
     let settings = SchemaSettings::draft07().with(|s| {
         s.option_nullable = true;
@@ -243,6 +250,7 @@ pub fn json_api_db_schema() -> Result<RootSchema, anyhow::Error> {
     Ok(schema)
 }
 
+#[cfg(feature = "config")]
 pub fn json_api_schema() -> Result<RootSchema, anyhow::Error> {
     let settings = SchemaSettings::draft07().with(|s| {
         s.option_nullable = true;

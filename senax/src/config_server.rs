@@ -6,31 +6,28 @@ use derive_more::Display;
 use includedir::Compression;
 use indexmap::IndexMap;
 use mime_guess::Mime;
-use once_cell::sync::OnceCell;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::path::Path;
+use std::sync::atomic::Ordering;
 use validator::Validate;
 
 use crate::api_generator::schema::{
-    ApiConfigDef, ApiConfigJson, ApiDbDef, ApiDbJson, ApiModelDef, ApiModelJson, API_CONFIG,
+    ApiConfigDef, ApiConfigJson, ApiDbDef, ApiDbJson, ApiModelDef, ApiModelJson,
 };
-use crate::common::{parse_yml, parse_yml_file, simplify_yml};
+use crate::common::{
+    parse_yml, parse_yml_file, read_api_yml, read_group_yml, read_simple_vo_yml, set_api_config,
+    simplify_yml, write_api_yml, write_group_yml, write_simple_vo_yml, BACKUP, READ_ONLY,
+};
 use crate::schema::{self, ConfigDef, ConfigJson, FieldDef, ModelDef, ModelJson, ValueObjectJson};
-use crate::{API_SCHEMA_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE};
+use crate::{API_SCHEMA_PATH, SCHEMA_PATH};
 
-pub static BACKUP: OnceCell<PathBuf> = OnceCell::new();
-pub static READ_ONLY: AtomicBool = AtomicBool::new(false);
-
-#[cfg(feature = "config")]
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(files);
 }
 
-#[allow(dead_code)]
 pub fn api(cfg: &mut web::ServiceConfig) {
     cfg.service(get_db)
         .service(get_db_config)
@@ -70,7 +67,6 @@ pub fn api(cfg: &mut web::ServiceConfig) {
         .service(git_result);
 }
 
-#[cfg(feature = "config")]
 #[get("/{filename:.*}")]
 async fn files(req: HttpRequest) -> impl Responder {
     let mut path = req.match_info().query("filename").to_string();
@@ -85,7 +81,7 @@ async fn files(req: HttpRequest) -> impl Responder {
         HttpResponse::NotFound().body("not found")
     }
 }
-#[allow(dead_code)]
+
 fn file_response(tpl: (Compression, Cow<'static, [u8]>), mime: Option<Mime>) -> HttpResponse {
     if let Some(mime) = mime {
         match tpl.0 {
@@ -275,46 +271,6 @@ async fn get_models(path: web::Path<(String, String)>) -> impl Responder {
     json_response(result)
 }
 
-fn read_group_yml(db: &str, group_name: &str) -> anyhow::Result<IndexMap<String, ModelDef>> {
-    crate::common::check_ascii_name(db);
-    crate::common::check_ascii_name(group_name);
-    let path = Path::new(SCHEMA_PATH)
-        .join(db)
-        .join(format!("{group_name}.yml"));
-    if path.exists() {
-        parse_yml_file(&path)
-    } else {
-        Ok(IndexMap::default())
-    }
-}
-
-fn write_group_yml(
-    db: &str,
-    group_name: &str,
-    data: &IndexMap<String, ModelDef>,
-) -> anyhow::Result<()> {
-    if READ_ONLY.load(Ordering::SeqCst) {
-        return Ok(());
-    }
-    crate::common::check_ascii_name(db);
-    crate::common::check_ascii_name(group_name);
-    let path = Path::new(SCHEMA_PATH)
-        .join(db)
-        .join(format!("{group_name}.yml"));
-    if let Some(bk) = BACKUP.get() {
-        if path.exists() {
-            let content = fs::read_to_string(&path)?;
-            let dir = bk.join(format!("group-{db}-{group_name}-{}.yml", Local::now()));
-            fs::write(dir, content)?;
-        }
-    }
-    let mut buf =
-        "# yaml-language-server: $schema=../../senax-schema.json#properties/model\n\n".to_string();
-    buf.push_str(&simplify_yml(serde_yaml::to_string(&data)?)?);
-    fs::write(path, &buf)?;
-    Ok(())
-}
-
 #[post("/models/{db}/{group}")]
 async fn create_model(
     path: web::Path<(String, String)>,
@@ -385,35 +341,6 @@ async fn save_models(
     }
     .await;
     json_response(result)
-}
-
-fn read_simple_vo_yml() -> anyhow::Result<IndexMap<String, FieldDef>> {
-    let path = Path::new(SCHEMA_PATH).join(SIMPLE_VALUE_OBJECTS_FILE);
-    if path.exists() {
-        parse_yml_file(&path)
-    } else {
-        Ok(IndexMap::default())
-    }
-}
-
-fn write_simple_vo_yml(data: &IndexMap<String, FieldDef>) -> anyhow::Result<()> {
-    if READ_ONLY.load(Ordering::SeqCst) {
-        return Ok(());
-    }
-    let path = Path::new(SCHEMA_PATH).join(SIMPLE_VALUE_OBJECTS_FILE);
-    if let Some(bk) = BACKUP.get() {
-        if path.exists() {
-            let content = fs::read_to_string(&path)?;
-            let dir = bk.join(format!("vo-{}.yml", Local::now()));
-            fs::write(dir, content)?;
-        }
-    }
-    let mut buf =
-        "# yaml-language-server: $schema=../senax-schema.json#properties/simple_value_object\n\n"
-            .to_string();
-    buf.push_str(&simplify_yml(serde_yaml::to_string(&data)?)?);
-    fs::write(path, &buf)?;
-    Ok(())
 }
 
 #[get("/vo/simple")]
@@ -778,68 +705,6 @@ async fn delete_api_server_model(
     json_response(result)
 }
 
-fn read_api_yml(
-    server: &str,
-    db: &str,
-    group: &str,
-) -> anyhow::Result<IndexMap<String, Option<ApiModelDef>>> {
-    let server = sanitize_filename::sanitize(server);
-    let db = sanitize_filename::sanitize(db);
-    crate::common::check_ascii_name(group);
-
-    let config_path = Path::new(&server).join(API_SCHEMA_PATH).join("_config.yml");
-    let config: ApiConfigDef = parse_yml_file(&config_path)?;
-    API_CONFIG.write().unwrap().replace(config);
-
-    let path = Path::new(&server)
-        .join(API_SCHEMA_PATH)
-        .join(db)
-        .join(format!("{}.yml", group));
-    if path.exists() {
-        let mut map: IndexMap<String, Option<ApiModelDef>> = parse_yml_file(&path)?;
-        for (_, def) in map.iter_mut() {
-            if let Some(v) = def.as_mut() {
-                v.fix()
-            }
-        }
-        Ok(map)
-    } else {
-        Ok(IndexMap::default())
-    }
-}
-
-fn write_api_yml(
-    server: &str,
-    db: &str,
-    group: &str,
-    data: &IndexMap<String, Option<ApiModelDef>>,
-) -> anyhow::Result<()> {
-    if READ_ONLY.load(Ordering::SeqCst) {
-        return Ok(());
-    }
-    let server = sanitize_filename::sanitize(server);
-    let db = sanitize_filename::sanitize(db);
-    crate::common::check_ascii_name(group);
-
-    let path = Path::new(&server)
-        .join(API_SCHEMA_PATH)
-        .join(&db)
-        .join(format!("{}.yml", group));
-    if let Some(bk) = BACKUP.get() {
-        if path.exists() {
-            let content = fs::read_to_string(&path)?;
-            let dir = bk.join(format!("api-{server}-{db}-{group}-{}.yml", Local::now()));
-            fs::write(dir, content)?;
-        }
-    }
-    let mut buf =
-        "# yaml-language-server: $schema=../../../senax-schema.json#properties/api_model\n\n"
-            .to_string();
-    buf.push_str(&simplify_yml(serde_yaml::to_string(&data)?)?);
-    fs::write(path, &buf)?;
-    Ok(())
-}
-
 #[post("/build/exec")]
 async fn build_exec() -> impl Responder {
     let result = async move {
@@ -938,7 +803,6 @@ impl std::fmt::Display for NotFound {
 }
 impl std::error::Error for NotFound {}
 
-#[allow(dead_code)]
 pub fn json_response<T: Serialize>(r: Result<T, anyhow::Error>) -> impl Responder {
     match r {
         Ok(data) => {
@@ -957,7 +821,6 @@ pub fn json_response<T: Serialize>(r: Result<T, anyhow::Error>) -> impl Responde
     }
 }
 
-#[allow(dead_code)]
 pub fn json_error_handler(err: error::JsonPayloadError, _req: &HttpRequest) -> error::Error {
     use actix_web::error::JsonPayloadError;
 
@@ -982,47 +845,4 @@ fn error_response(err: anyhow::Error) -> HttpResponse {
     } else {
         HttpResponse::InternalServerError().body(err.to_string())
     }
-}
-
-pub fn reflect_migration_changes(db: &str) -> anyhow::Result<()> {
-    let path = Path::new(SCHEMA_PATH).join(format!("{db}.yml"));
-    let config: ConfigDef = parse_yml_file(&path)?;
-    config.fix_static_vars();
-    schema::CONFIG.write().unwrap().replace(config.clone());
-
-    for (group_name, group_def) in config.groups {
-        let group_def = group_def.unwrap_or_default();
-        let mut models = read_group_yml(db, &group_name)?;
-        for (name, model) in models.iter_mut() {
-            model.group_name.clone_from(&group_name);
-            model.name.clone_from(name);
-            if model.exclude_group_from_table_name.is_none() {
-                model.exclude_group_from_table_name = Some(group_def.exclude_group_from_table_name);
-            }
-            model._name = Some(model.table_name());
-            model._soft_delete = model
-                .soft_delete()
-                .map(|s| format!("{},{}", model.soft_delete_col().unwrap(), s.as_ref()));
-            for (name, field) in model.fields.clone().into_iter() {
-                let mut field = field.exact();
-                field._name = Some(field.get_col_name(&name).to_string());
-                model
-                    .fields
-                    .insert(name, schema::FieldDefOrSubsetType::Exact(field));
-            }
-        }
-        write_group_yml(db, &group_name, &models)?;
-    }
-    Ok(())
-}
-
-fn set_api_config(server: &str) -> anyhow::Result<()> {
-    let path = Path::new(server).join(API_SCHEMA_PATH).join("_config.yml");
-    if !path.exists() {
-        API_CONFIG.write().unwrap().replace(ApiConfigDef::default());
-    } else {
-        let config: ApiConfigDef = parse_yml_file(&path)?;
-        API_CONFIG.write().unwrap().replace(config);
-    }
-    Ok(())
 }

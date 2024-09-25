@@ -1442,28 +1442,28 @@ impl Emu@{ pascal_name }@Repository {
 impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
     @%- if !def.disable_update() %@
     fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@RepositoryFindBuilder> {
-        struct V(Option<@{ pascal_name }@Entity>, Option<Filter_>);
+        struct V(Option<@{ pascal_name }@Entity>, Option<Filter_>@% if def.is_soft_delete() %@, bool@% endif %@);
         #[async_trait]
         impl @{ pascal_name }@RepositoryFindBuilder for V {
             async fn query_for_update(self: Box<Self>) -> anyhow::Result<Box<dyn _Updater>> {
                 use anyhow::Context;
                 let filter = self.1;
-                self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true))
+                self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true))@{- def.soft_delete_tpl2("",".filter(|v| self.2 || v.deleted_at.is_none())",".filter(|v| self.2 || !v.deleted)",".filter(|v| self.2 || v.deleted == 0)")}@
                     .map(|v| Box::new(v) as Box<dyn _Updater>)
                     .with_context(|| "Not Found")
             }
             async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
                 let filter = self.1;
-                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true)).map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
+                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true))@{- def.soft_delete_tpl2("",".filter(|v| self.2 || v.deleted_at.is_none())",".filter(|v| self.2 || !v.deleted)",".filter(|v| self.2 || v.deleted == 0)")}@.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
             }
             fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindBuilder> { self.1 = Some(filter); self }
             @%- if def.is_soft_delete() %@
-            fn with_trashed(self: Box<Self>, _mode: bool) -> Box<dyn _RepositoryFindBuilder> { self }
+            fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _RepositoryFindBuilder> { self.2 = mode; self }
             @%- endif %@
             fn join(self: Box<Self>, _join: Option<Box<Joiner_>>) -> Box<dyn _RepositoryFindBuilder> { self }
         }
         let map = self.0.lock().unwrap();
-        Box::new(V(map.get(&id).cloned(), None))
+        Box::new(V(map.get(&id).cloned(), None@% if def.is_soft_delete() %@, false@% endif %@))
     }
     @%- endif %@
     fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn _Updater> {
@@ -1816,39 +1816,39 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
     @%- endfor %@
     @%- if def.use_cache() %@
     fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindBuilder> {
-        struct V(Option<@{ pascal_name }@Entity>, bool, Option<Filter_>);
+        struct V(Option<@{ pascal_name }@Entity>, Option<Filter_>@% if def.is_soft_delete() %@, bool@% endif %@);
         #[async_trait]
         impl @{ pascal_name }@QueryFindBuilder for V {
             async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
-                let filter = self.2;
-                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true))@{- def.soft_delete_tpl2("",".filter(|v| self.1 || v.deleted_at.is_none())",".filter(|v| self.1 || !v.deleted)",".filter(|v| self.1 || v.deleted == 0)")}@.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>))
+                let filter = self.1;
+                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true))@{- def.soft_delete_tpl2("",".filter(|v| self.2 || v.deleted_at.is_none())",".filter(|v| self.2 || !v.deleted)",".filter(|v| self.2 || v.deleted == 0)")}@.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>))
             }
-            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> { self.2 = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> { self.1 = Some(filter); self }
             @%- if def.is_soft_delete() %@
-            fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _QueryFindBuilder> { self.1 = mode; self }
+            fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _QueryFindBuilder> { self.2 = mode; self }
             @%- endif %@
             fn join(self: Box<Self>, _join: Option<Box<Joiner_>>) -> Box<dyn _QueryFindBuilder> { self }
         }
         let map = self.0.lock().unwrap();
-        Box::new(V(map.get(&id).cloned(), false, None))
+        Box::new(V(map.get(&id).cloned(), None@% if def.is_soft_delete() %@, false@% endif %@))
     }
     @%- else %@
     fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindBuilder> {
-        struct V(Option<@{ pascal_name }@Entity>, Option<Filter_>);
+        struct V(Option<@{ pascal_name }@Entity>, Option<Filter_>@% if def.is_soft_delete() %@, bool@% endif %@);
         #[async_trait]
         impl @{ pascal_name }@QueryFindBuilder for V {
             async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
-                let filter = self.2;
-                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true))@{- def.soft_delete_tpl2("",".filter(|v| self.1 || v.deleted_at.is_none())",".filter(|v| self.1 || !v.deleted)",".filter(|v| self.1 || v.deleted == 0)")}@.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
+                let filter = self.1;
+                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(true))@{- def.soft_delete_tpl2("",".filter(|v| self.2 || v.deleted_at.is_none())",".filter(|v| self.2 || !v.deleted)",".filter(|v| self.2 || v.deleted == 0)")}@.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
             }
-            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> { self.2 = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> { self.1 = Some(filter); self }
             @%- if def.is_soft_delete() %@
-            fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _QueryFindBuilder> { self.1 = mode; self }
+            fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _QueryFindBuilder> { self.2 = mode; self }
             @%- endif %@
             fn join(self: Box<Self>, _join: Option<Box<Joiner_>>) -> Box<dyn _QueryFindBuilder> { self }
         }
         let map = self.0.lock().unwrap();
-        Box::new(V(map.get(&id).cloned(), None))
+        Box::new(V(map.get(&id).cloned(), None@% if def.is_soft_delete() %@, false@% endif %@))
     }
     @%- endif %@
 }

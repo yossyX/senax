@@ -132,21 +132,21 @@ impl CacheActor {
     }
 }
 
-pub(crate) async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, _clear_test: bool) {
+pub(crate) async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, clear_test: bool) {
 @%- if !config.force_disable_cache %@
     #[cfg(not(feature = "cache_update_only"))]
     for (shard_id, sync) in _sync_map.iter() {
-        if *sync == 0 {
+        if *sync == 0 && !clear_test {
             let shard_id = *shard_id;
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                 @%- for (name, defs) in groups %@
-                @{ name|snake|to_var_name }@::_clear_cache(shard_id, 0, _clear_test).await;
+                @{ name|snake|to_var_name }@::_clear_cache(shard_id, 0, clear_test).await;
                 @%- endfor %@
             });
         }
         @%- for (name, defs) in groups %@
-        @{ name|snake|to_var_name }@::_clear_cache(*shard_id, *sync, _clear_test).await;
+        @{ name|snake|to_var_name }@::_clear_cache(*shard_id, *sync, clear_test).await;
         @%- endfor %@
     }
 @%- endif %@
@@ -163,11 +163,11 @@ where
 
 pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Result<()> {
     let conn = DbConn::_new(shard_id);
-    let mut source = conn.acquire_source().await?;
+    let mut writer = conn.acquire_writer().await?;
     @%- if config.collation.is_some() %@
     exec_ddl(
         r#"ALTER DATABASE COLLATE @{ config.collation.as_ref().unwrap() }@;"#,
-        source.as_mut(),
+        writer.as_mut(),
     )
     .await?;
     @%- endif %@
@@ -182,7 +182,7 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
                 execution_time BIGINT NOT NULL
             );
         "#,
-        source.as_mut(),
+        writer.as_mut(),
     )
     .await?;
     @%- if config.use_sequence || !config.force_disable_cache %@
@@ -195,13 +195,13 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
             INSERT IGNORE INTO "_sequence" VALUES (1, 0);
             INSERT IGNORE INTO "_sequence" VALUES (2, 0);
         "#,
-        source.as_mut(),
+        writer.as_mut(),
     )
     .await?;
     @%- endif %@
     sqlx::migrate!()
         .set_ignore_missing(ignore_missing)
-        .run(source.as_mut())
+        .run(writer.as_mut())
         .await?;
     Ok(())
 }

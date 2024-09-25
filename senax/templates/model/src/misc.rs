@@ -21,7 +21,7 @@ macro_rules! fetch {
             $query.$method($conn.get_tx().await?.as_mut()).await?
         } else {
             $query
-                .$method($conn.get_replica_conn().await?.as_mut())
+                .$method($conn.get_reader().await?.as_mut())
                 .await?
         }
     };

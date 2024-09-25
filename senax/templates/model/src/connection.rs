@@ -38,6 +38,7 @@ pub type DbRow = sqlx::mysql::MySqlRow;
 pub const TX_ISOLATION: Option<&'static str> = @{ tx_isolation|disp_opt }@;
 pub const READ_TX_ISOLATION: Option<&'static str> = @{ read_tx_isolation|disp_opt }@;
 const CHECK_SQL: &str = "select @@innodb_read_only OR @@read_only OR @@super_read_only";
+const CHECK_SQL_WRITABLE_RESULT: i8 = 0;
 @%- if config.use_sequence %@
 const ID_OF_SEQUENCE: u32 = 1;
 @%- endif %@
@@ -45,6 +46,13 @@ const ID_OF_SEQUENCE: u32 = 1;
 const ID_OF_CACHE_SYNC: u32 = 2;
 @%- endif %@
 
+static DB_URL: RwLock<String> = RwLock::const_new(String::new());
+static DB_USER: RwLock<Option<String>> = RwLock::const_new(None);
+static DB_PASSWORD: RwLock<Option<String>> = RwLock::const_new(None);
+static REPLICA_DB_URL: RwLock<String> = RwLock::const_new(String::new());
+static REPLICA_DB_USER: RwLock<Option<String>> = RwLock::const_new(None);
+static REPLICA_DB_PASSWORD: RwLock<Option<String>> = RwLock::const_new(None);
+static CACHE_DB_USE_SOURCE: AtomicBool = AtomicBool::new(false);
 static MAX_CONNECTIONS_FOR_WRITE: AtomicU32 = AtomicU32::new(0);
 static MAX_CONNECTIONS_FOR_READ: AtomicU32 = AtomicU32::new(0);
 static MAX_CONNECTIONS_FOR_CACHE: AtomicU32 = AtomicU32::new(0);
@@ -53,15 +61,11 @@ static ENABLE_FAST_FAILOVER: AtomicBool = AtomicBool::new(false);
 static USE_IPV4_ONLY: AtomicBool = AtomicBool::new(false);
 static USE_IPV6_ONLY: AtomicBool = AtomicBool::new(false);
 
-static SOURCE: RwLock<Vec<Option<(SocketAddr, DbPool)>>> = RwLock::const_new(Vec::new());
+static WRITER: RwLock<Vec<Option<(SocketAddr, DbPool)>>> = RwLock::const_new(Vec::new());
 static SHARD_NUM: OnceCell<usize> = OnceCell::new();
 type AddrPoolMap = FxHashMap<SocketAddr, (DbPool, bool)>;
-static REPLICA: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
+static READER: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
 static CACHE: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
-static NEXT_REPLICA: AtomicUsize = AtomicUsize::new(0);
-@%- if !config.force_disable_cache %@
-static NEXT_CACHE: AtomicUsize = AtomicUsize::new(0);
-@%- endif %@
 @%- if config.use_sequence %@
 
 static SEQUENCE: Lazy<Vec<Mutex<(u64, u64)>>> = Lazy::new(|| {
@@ -75,37 +79,76 @@ static NOTIFY_RECEIVER: RwLock<Vec<NotifyFn>> = RwLock::const_new(Vec::new());
 static NOTIFY_RECEIVER_COUNT: AtomicUsize = AtomicUsize::new(0);
 static NOTIFY_LIST: RwLock<Option<FxHashMap<(TableName, String), NotifyOp>>> =
     RwLock::const_new(None);
-static TEST_MODE: AtomicBool = AtomicBool::new(false);
 
-fn env_u32(etcd: &FxHashMap<String, String>, name: &str, default: &str) -> Result<u32> {
-    let v = etcd.get(name).cloned();
-    let v = v.unwrap_or_else(|| env::var(name).unwrap_or_else(|_| default.to_owned()));
-    v.parse().with_context(|| format!("{} parse error", name))
+macro_rules! split_shard {
+    ( $x:expr ) => {{
+        $x.split('\n').map(|v| v.trim()).filter(|v| !v.is_empty())
+    }};
 }
-fn env_opt_str(etcd: &FxHashMap<String, String>, name: &str) -> Option<String> {
-    let v = etcd.get(name).cloned();
-    v.or_else(|| env::var(name).ok())
-}
-fn env_urls(etcd: &FxHashMap<String, String>, name: &str) -> Result<Option<String>> {
-    let mut urls = etcd.get(name).cloned();
-    if urls.is_none() && !etcd.is_empty() {
-        let prefix = format!("{}/", name);
-        let mut values = BTreeMap::new();
-        for (k, v) in etcd {
-            if k.starts_with(&prefix) {
-                let i: usize = k.trim_start_matches(&prefix).parse()?;
-                values.insert(i, v);
-            }
-        }
-        if !values.is_empty() {
-            let vec: Vec<_> = values.values().map(|v| v.to_string()).collect();
-            urls = Some(vec.join(" "));
-        }
-    }
-    Ok(urls.or_else(|| env::var(name).ok()))
-}
+
 #[rustfmt::skip]
-async fn config(etcd: &FxHashMap<String, String>) -> Result<()> {
+async fn config(etcd: &FxHashMap<String, String>, test_mode: bool) -> Result<()> {
+    if test_mode {
+        let s_url = env_urls(etcd, "@{ db|upper_snake }@_TEST_DB_URL")?
+            .with_context(|| "@{ db|upper_snake }@_TEST_DB_URL is required in the .env file.")?;
+        let r_url = s_url.clone();
+        *DB_URL.write().await = s_url;
+        *REPLICA_DB_URL.write().await = r_url;
+        let s_user = env_opt_str(etcd, "@{ db|upper_snake }@_TEST_DB_USER");
+        let r_user = s_user.clone();
+        *DB_USER.write().await = s_user;
+        *REPLICA_DB_USER.write().await = r_user;
+        let s_pw = env_opt_str(etcd, "@{ db|upper_snake }@_TEST_DB_PASSWORD");
+        let r_pw = s_pw.clone();
+        *DB_PASSWORD.write().await = s_pw;
+        *REPLICA_DB_PASSWORD.write().await = r_pw;
+    } else {
+        let s_url = env_urls(etcd, "@{ db|upper_snake }@_DB_URL")?
+            .with_context(|| "@{ db|upper_snake }@_DB_URL is required in the .env file.")?;
+        let r_url = env_urls(etcd, "@{ db|upper_snake }@_REPLICA_DB_URL")?.unwrap_or_else(|| s_url.clone());
+        *DB_URL.write().await = s_url;
+        *REPLICA_DB_URL.write().await = r_url;
+        let s_user = env_opt_str(etcd, "@{ db|upper_snake }@_DB_USER");
+        let r_user = env_opt_str(etcd, "@{ db|upper_snake }@_REPLICA_DB_USER").or_else(|| s_user.clone());
+        *DB_USER.write().await = s_user;
+        *REPLICA_DB_USER.write().await = r_user;
+        let s_pw = env_opt_str(etcd, "@{ db|upper_snake }@_DB_PASSWORD");
+        let r_pw = env_opt_str(etcd, "@{ db|upper_snake }@_REPLICA_DB_PASSWORD").or_else(|| s_pw.clone());
+        *DB_PASSWORD.write().await = s_pw;
+        *REPLICA_DB_PASSWORD.write().await = r_pw;
+        let cache_use_source = env_opt_str(etcd, "@{ db|upper_snake }@_CACHE_DB_USE_SOURCE")
+            .map(|v| v.parse())
+            .transpose()?
+            .unwrap_or_default();
+        CACHE_DB_USE_SOURCE.store(cache_use_source, Ordering::SeqCst);
+    }
+    if SHARD_NUM.get().is_none() {
+        let s_url = DB_URL.read().await.to_owned();
+        let r_url = REPLICA_DB_URL.read().await.to_owned();
+        let source_len = split_shard!(s_url).count();
+        ensure!(
+            source_len <= ShardId::MAX as usize + 1,
+            "Number of shards exceeds limit."
+        );
+        let replica_len = split_shard!(r_url).count();
+        ensure!(
+            source_len == replica_len,
+            "Number of shards for source and replica are different."
+        );
+        let _ = SHARD_NUM.set(source_len);
+        *WRITER.write().await = vec![None; source_len];
+        let _ = READER.set(
+            std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
+                .take(source_len)
+                .collect(),
+        );
+        let _ = CACHE.set(
+            std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
+                .take(source_len)
+                .collect(),
+        );
+    }
+
     let v = env_u32(
         etcd,
         "@{ db|upper_snake }@_DB_MAX_CONNECTIONS_FOR_WRITE",
@@ -140,44 +183,44 @@ async fn config(etcd: &FxHashMap<String, String>) -> Result<()> {
 
 pub async fn init() -> Result<()> {
     log::info!("Connecting to database");
+    #[cfg(feature = "etcd")]
+    let etcd = senax_common::etcd::map("db/").await?;
+    #[cfg(not(feature = "etcd"))]
+    let etcd = FxHashMap::default();
+    config(&etcd, false).await?;
     connect(true, true, true, None).await?;
-    {
-        let source = SOURCE.read().await;
-        ensure!(!source.is_empty(), "There are no writable database shards.");
-        for (i, s) in source.iter().enumerate() {
-            ensure!(
-                s.is_some(),
-                "There are no writable database connections.(code:0, {i})"
-            );
-        }
-    }
-    {
-        let replica = REPLICA.get().unwrap();
+
+    let writer = WRITER.read().await;
+    ensure!(!writer.is_empty(), "There are no writable database shards.");
+    for (i, s) in writer.iter().enumerate() {
         ensure!(
-            !replica.is_empty(),
-            "There are no readable database shards."
+            s.is_some(),
+            "There are no writable database connections.(code:0, {i})"
         );
-        for (i, s) in replica.iter().enumerate() {
-            let s = s.read().await;
-            ensure!(
-                !s.is_empty(),
-                "There are no readable database connections.(code:0, {i})"
-            );
-        }
     }
-    {
-        let cache = CACHE.get().unwrap();
-        ensure!(!cache.is_empty(), "There are no database shards for cache.");
-        for (i, s) in cache.iter().enumerate() {
-            let s = s.read().await;
-            ensure!(
-                !s.is_empty(),
-                "There are no database connections for cache.(code:0, {i})"
-            );
-        }
+
+    let reader = READER.get().unwrap();
+    ensure!(!reader.is_empty(), "There are no readable database shards.");
+    for (i, s) in reader.iter().enumerate() {
+        let s = s.read().await;
+        ensure!(
+            !s.is_empty(),
+            "There are no readable database connections.(code:0, {i})"
+        );
+    }
+
+    let cache = CACHE.get().unwrap();
+    ensure!(!cache.is_empty(), "There are no database shards for cache.");
+    for (i, s) in cache.iter().enumerate() {
+        let s = s.read().await;
+        ensure!(
+            !s.is_empty(),
+            "There are no database connections for cache.(code:0, {i})"
+        );
     }
     log::info!("Connection to database completed.");
-    tokio::spawn(async move {
+
+    tokio::spawn(async {
         loop {
             tokio::time::sleep(Duration::from_secs(crate::CONNECT_CHECK_INTERVAL)).await;
             reconnect().await;
@@ -207,17 +250,13 @@ pub async fn init() -> Result<()> {
                         break;
                     }
                 }
+                let etcd = senax_common::etcd::map("db/").await?;
+                config(&etcd, false).await?;
                 reconnect().await;
             }
         }
     });
     Ok(())
-}
-
-macro_rules! split_shard {
-    ( $x:expr ) => {{
-        $x.split('\n').map(|v| v.trim()).filter(|v| !v.is_empty())
-    }};
 }
 
 pub async fn reconnect() {
@@ -236,19 +275,18 @@ pub async fn reconnect() {
     }
 }
 
-#[rustfmt::skip]
 pub async fn connect(
-    update_source: bool,
-    update_replica: bool,
+    update_writer: bool,
+    update_reader: bool,
     update_cache: bool,
     shard_id: Option<ShardId>,
 ) -> Result<()> {
-    static SOURCE_LOCK: Lazy<Vec<Semaphore>> = Lazy::new(|| {
+    static WRITER_LOCK: Lazy<Vec<Semaphore>> = Lazy::new(|| {
         std::iter::repeat_with(|| Semaphore::new(1))
             .take(DbConn::shard_num())
             .collect()
     });
-    static REPLICA_LOCK: Lazy<Vec<Semaphore>> = Lazy::new(|| {
+    static READER_LOCK: Lazy<Vec<Semaphore>> = Lazy::new(|| {
         std::iter::repeat_with(|| Semaphore::new(1))
             .take(DbConn::shard_num())
             .collect()
@@ -259,115 +297,41 @@ pub async fn connect(
             .collect()
     });
 
-    if TEST_MODE.load(Ordering::Relaxed) {
-        return Ok(());
-    }
-    let _source_lock = if update_source {
-        if let Some(shard_id) = shard_id {
-            if let Some(lock) = SOURCE_LOCK.get(shard_id as usize) {
-                match lock.try_acquire() {
-                    Ok(lock) => Some(lock),
-                    Err(_) => {
-                        let _ = lock.acquire().await;
-                        return Ok(());
-                    }
-                }
-            } else {
-                return Ok(());
-            }
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-    let _replica_lock = if update_replica {
-        if let Some(shard_id) = shard_id {
-            if let Some(lock) = REPLICA_LOCK.get(shard_id as usize) {
-                match lock.try_acquire() {
-                    Ok(lock) => Some(lock),
-                    Err(_) => {
-                        let _ = lock.acquire().await;
-                        return Ok(());
-                    }
-                }
-            } else {
-                return Ok(());
-            }
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-    let _cache_lock = if update_cache {
-        if let Some(shard_id) = shard_id {
-            if let Some(lock) = CACHE_LOCK.get(shard_id as usize) {
-                match lock.try_acquire() {
-                    Ok(lock) => Some(lock),
-                    Err(_) => {
-                        let _ = lock.acquire().await;
-                        return Ok(());
-                    }
-                }
-            } else {
-                return Ok(());
-            }
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-    #[cfg(feature = "etcd")]
-    let etcd = senax_common::etcd::map("db/").await?;
-    #[cfg(not(feature = "etcd"))]
-    let etcd = FxHashMap::default();
-    config(&etcd).await?;
-    let s_url = env_urls(&etcd, "@{ db|upper_snake }@_DB_URL")?
-        .with_context(|| "@{ db|upper_snake }@_DB_URL is required in the .env file.")?;
-    let s_user = env_opt_str(&etcd, "@{ db|upper_snake }@_DB_USER");
-    let s_pw = env_opt_str(&etcd, "@{ db|upper_snake }@_DB_PASSWORD");
-    let r_url = env_urls(&etcd, "@{ db|upper_snake }@_REPLICA_DB_URL")?.unwrap_or_else(|| s_url.clone());
-    let r_user = env_opt_str(&etcd, "@{ db|upper_snake }@_REPLICA_DB_USER").or_else(|| s_user.clone());
-    let r_pw = env_opt_str(&etcd, "@{ db|upper_snake }@_REPLICA_DB_PASSWORD").or_else(|| s_pw.clone());
-    let cache_use_source = env_opt_str(&etcd, "@{ db|upper_snake }@_CACHE_DB_USE_SOURCE")
-        .map(|v| v.parse())
-        .transpose()?
-        .unwrap_or_default();
-
-    if SHARD_NUM.get().is_none() {
-        let source_len = split_shard!(s_url).count();
-        ensure!(
-            source_len <= ShardId::MAX as usize + 1,
-            "Number of shards exceeds limit."
-        );
-        let replica_len = split_shard!(r_url).count();
-        ensure!(
-            source_len == replica_len,
-            "Number of shards for source and replica are different."
-        );
-        let _ = SHARD_NUM.set(source_len);
-        *SOURCE.write().await = vec![None; source_len];
-        let _ = REPLICA.set(
-            std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
-                .take(source_len)
-                .collect(),
-        );
-        let _ = CACHE.set(
-            std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
-                .take(source_len)
-                .collect(),
-        );
-    }
+    let cache_use_source = CACHE_DB_USE_SOURCE.load(Ordering::Relaxed);
+    let update_source = update_writer || (cache_use_source && update_cache);
+    let update_replica = update_reader || (!cache_use_source && update_cache);
+    let update_writer = update_source;
+    let update_reader = update_replica;
+    let update_cache = (cache_use_source && update_source) || (!cache_use_source && update_replica);
 
     let mut join_set = JoinSet::new();
-    if update_source {
-        let (s_url, s_user, s_pw) = (s_url.clone(), s_user.clone(), s_pw.clone());
-        let (r_url, r_user, r_pw) = (r_url.clone(), r_user.clone(), r_pw.clone());
+    if update_writer {
         join_set.spawn(async move {
             tokio::spawn(async move {
-                reset_source_pool(
+                let _lock = if let Some(shard_id) = shard_id {
+                    if let Some(lock) = WRITER_LOCK.get(shard_id as usize) {
+                        match lock.try_acquire() {
+                            Ok(lock) => Some(lock),
+                            Err(_) => {
+                                let _ = lock.acquire().await;
+                                return Ok(());
+                            }
+                        }
+                    } else {
+                        return Ok(());
+                    }
+                } else {
+                    None
+                };
+
+                let s_url = DB_URL.read().await.to_owned();
+                let s_user = DB_USER.read().await.to_owned();
+                let s_pw = DB_PASSWORD.read().await.to_owned();
+                let r_url = REPLICA_DB_URL.read().await.to_owned();
+                let r_user = REPLICA_DB_USER.read().await.to_owned();
+                let r_pw = REPLICA_DB_PASSWORD.read().await.to_owned();
+
+                reset_writer_pool(
                     &s_url,
                     &s_user,
                     &s_pw,
@@ -375,7 +339,7 @@ pub async fn connect(
                     &r_user,
                     &r_pw,
                     db_options_for_write(),
-                    &SOURCE,
+                    &WRITER,
                     shard_id,
                 )
                 .await
@@ -384,12 +348,33 @@ pub async fn connect(
         });
     }
 
-    if update_replica {
-        let (s_url, s_user, s_pw) = (s_url.clone(), s_user.clone(), s_pw.clone());
-        let (r_url, r_user, r_pw) = (r_url.clone(), r_user.clone(), r_pw.clone());
+    if update_reader {
         join_set.spawn(async move {
             tokio::spawn(async move {
-                reset_replica_pool(
+                let _lock = if let Some(shard_id) = shard_id {
+                    if let Some(lock) = READER_LOCK.get(shard_id as usize) {
+                        match lock.try_acquire() {
+                            Ok(lock) => Some(lock),
+                            Err(_) => {
+                                let _ = lock.acquire().await;
+                                return Ok(());
+                            }
+                        }
+                    } else {
+                        return Ok(());
+                    }
+                } else {
+                    None
+                };
+
+                let s_url = DB_URL.read().await.to_owned();
+                let s_user = DB_USER.read().await.to_owned();
+                let s_pw = DB_PASSWORD.read().await.to_owned();
+                let r_url = REPLICA_DB_URL.read().await.to_owned();
+                let r_user = REPLICA_DB_USER.read().await.to_owned();
+                let r_pw = REPLICA_DB_PASSWORD.read().await.to_owned();
+
+                reset_reader_pool(
                     &r_url,
                     &r_user,
                     &r_pw,
@@ -397,7 +382,7 @@ pub async fn connect(
                     &s_user,
                     &s_pw,
                     db_options_for_read(),
-                    &REPLICA,
+                    &READER,
                     shard_id,
                 )
                 .await
@@ -407,45 +392,52 @@ pub async fn connect(
     }
 
     if update_cache {
-        let (s_url, s_user, s_pw) = (s_url.clone(), s_user.clone(), s_pw.clone());
-        let (r_url, r_user, r_pw) = (r_url.clone(), r_user.clone(), r_pw.clone());
-        if cache_use_source {
-            join_set.spawn(async move {
-                tokio::spawn(async move {
-                    reset_replica_pool(
-                        &s_url,
-                        &s_user,
-                        &s_pw,
-                        &r_url,
-                        &r_user,
-                        &r_pw,
-                        db_options_for_cache(),
-                        &CACHE,
-                        shard_id,
-                    )
-                    .await
-                })
+        join_set.spawn(async move {
+            tokio::spawn(async move {
+                let _lock = if let Some(shard_id) = shard_id {
+                    if let Some(lock) = CACHE_LOCK.get(shard_id as usize) {
+                        match lock.try_acquire() {
+                            Ok(lock) => Some(lock),
+                            Err(_) => {
+                                let _ = lock.acquire().await;
+                                return Ok(());
+                            }
+                        }
+                    } else {
+                        return Ok(());
+                    }
+                } else {
+                    None
+                };
+
+                let s_url = DB_URL.read().await.to_owned();
+                let s_user = DB_USER.read().await.to_owned();
+                let s_pw = DB_PASSWORD.read().await.to_owned();
+                let r_url = REPLICA_DB_URL.read().await.to_owned();
+                let r_user = REPLICA_DB_USER.read().await.to_owned();
+                let r_pw = REPLICA_DB_PASSWORD.read().await.to_owned();
+
+                let (r_url, r_user, r_pw, s_url, s_user, s_pw) = if cache_use_source {
+                    (s_url, s_user, s_pw, r_url, r_user, r_pw)
+                } else {
+                    (r_url, r_user, r_pw, s_url, s_user, s_pw)
+                };
+
+                reset_reader_pool(
+                    &r_url,
+                    &r_user,
+                    &r_pw,
+                    &s_url,
+                    &s_user,
+                    &s_pw,
+                    db_options_for_cache(),
+                    &CACHE,
+                    shard_id,
+                )
                 .await
-            });
-        } else {
-            join_set.spawn(async move {
-                tokio::spawn(async move {
-                    reset_replica_pool(
-                        &r_url,
-                        &r_user,
-                        &r_pw,
-                        &s_url,
-                        &s_user,
-                        &s_pw,
-                        db_options_for_cache(),
-                        &CACHE,
-                        shard_id,
-                    )
-                    .await
-                })
-                .await
-            });
-        }
+            })
+            .await
+        });
     }
     while let Some(r) = join_set.join_next().await {
         r???;
@@ -455,78 +447,21 @@ pub async fn connect(
 
 #[rustfmt::skip]
 pub async fn init_test() -> Result<()> {
-    TEST_MODE.store(true, Ordering::SeqCst);
-    let etcd = FxHashMap::default();
-    config(&etcd).await?;
-    let s_url = env_urls(&etcd, "@{ db|upper_snake }@_TEST_DB_URL")?
-        .with_context(|| "@{ db|upper_snake }@_TEST_DB_URL is required in the .env file.")?;
-    let s_user = env_opt_str(&etcd, "@{ db|upper_snake }@_TEST_DB_USER");
-    let s_pw = env_opt_str(&etcd, "@{ db|upper_snake }@_TEST_DB_PASSWORD");
-    let r_url = s_url.clone();
-    let r_user = s_user.clone();
-    let r_pw = s_pw.clone();
-
-    if SHARD_NUM.get().is_none() {
-        let source_len = split_shard!(s_url).count();
-        ensure!(
-            source_len <= ShardId::MAX as usize + 1,
-            "Number of shards exceeds limit."
-        );
-        let replica_len = split_shard!(r_url).count();
-        ensure!(
-            source_len == replica_len,
-            "Number of shards for source and replica are different."
-        );
-        let _ = SHARD_NUM.set(source_len);
-        *SOURCE.write().await = vec![None; source_len];
-        let _ = REPLICA.set(
-            std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
-                .take(source_len)
-                .collect(),
-        );
-        let _ = CACHE.set(
-            std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
-                .take(source_len)
-                .collect(),
-        );
+    let source_len = DbConn::shard_num();
+    *WRITER.write().await = vec![None; source_len];
+    if let Some(list) = READER.get() {
+        for pool in list {
+            pool.write().await.clear();
+        }
     }
-
-    reset_source_pool(
-        &s_url,
-        &s_user,
-        &s_pw,
-        &r_url,
-        &r_user,
-        &r_pw,
-        db_options_for_write(),
-        &SOURCE,
-        None,
-    )
-    .await?;
-    reset_replica_pool(
-        &r_url,
-        &r_user,
-        &r_pw,
-        &s_url,
-        &s_user,
-        &s_pw,
-        db_options_for_read(),
-        &REPLICA,
-        None,
-    )
-    .await?;
-    reset_replica_pool(
-        &s_url,
-        &s_user,
-        &s_pw,
-        &r_url,
-        &r_user,
-        &r_pw,
-        db_options_for_cache(),
-        &CACHE,
-        None,
-    )
-    .await?;
+    if let Some(list) = CACHE.get() {
+        for pool in list {
+            pool.write().await.clear();
+        }
+    }
+    let etcd = FxHashMap::default();
+    config(&etcd, true).await?;
+    connect(true, true, true, None).await?;
     Ok(())
 }
 
@@ -536,23 +471,12 @@ pub(crate) async fn reset_database(is_test: bool, clean: bool) -> Result<()> {
     let etcd = senax_common::etcd::map("db/").await?;
     #[cfg(not(feature = "etcd"))]
     let etcd = FxHashMap::default();
-    let (database_url, user, pw) = if is_test {
-        (
-            env_urls(&etcd, "@{ db|upper_snake }@_TEST_DB_URL")?
-                .with_context(|| "@{ db|upper_snake }@_TEST_DB_URL is required in the .env file.")?,
-            env_opt_str(&etcd, "@{ db|upper_snake }@_TEST_DB_USER"),
-            env_opt_str(&etcd, "@{ db|upper_snake }@_TEST_DB_PASSWORD"),
-        )
-    } else {
-        (
-            env_urls(&etcd, "@{ db|upper_snake }@_DB_URL")?
-                .with_context(|| "@{ db|upper_snake }@_DB_URL is required in the .env file.")?,
-            env_opt_str(&etcd, "@{ db|upper_snake }@_DB_USER"),
-            env_opt_str(&etcd, "@{ db|upper_snake }@_DB_PASSWORD"),
-        )
-    };
+    config(&etcd, is_test).await?;
+    let db_url = DB_URL.read().await.to_owned();
+    let user = DB_USER.read().await.to_owned();
+    let pw = DB_PASSWORD.read().await.to_owned();
 
-    for url in database_url.split('\n') {
+    for url in db_url.split('\n') {
         let url = url.trim();
         if url.is_empty() {
             continue;
@@ -693,47 +617,36 @@ impl DbConn {
     }
     @%- endif %@
 
-    async fn __acquire_source(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
+    async fn __acquire_writer(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
         ensure!(
             Self::shard_num_range().contains(&shard_id),
             "shard_id is out of range."
         );
-        let mut conn = {
-            let (_, pool) = SOURCE
-                .read()
-                .await
-                .get(shard_id as usize)
-                .context("There are no writable database connections.(code:1)")?
-                .clone()
-                .context("There are no writable database connections.(code:2)")?;
-            let mut join = JoinSet::new();
-            for i in 0..3 {
-                let pool = pool.clone();
-                join.spawn(async move {
-                    tokio::time::sleep(Duration::from_millis(10 * i)).await;
-                    // spawn to prevent processing interruptions until a newly acquired connection enters the pool
-                    tokio::spawn(async move { pool.acquire().await }).await
-                });
-            }
-            join.join_next().await.unwrap()???
-        };
+        let (_, pool) = WRITER
+            .read()
+            .await
+            .get(shard_id as usize)
+            .context("There are no writable database connections.(code:1)")?
+            .clone()
+            .context("There are no writable database connections.(code:2)")?;
+        let mut conn = pool.acquire().await?;
         let row: (i8,) = sqlx::query_as(CHECK_SQL).fetch_one(conn.as_mut()).await?;
         ensure!(
-            row.0 == 0,
+            row.0 == CHECK_SQL_WRITABLE_RESULT,
             "There are no writable database connections.(code:3)"
         );
         Ok(conn)
     }
 
-    async fn _acquire_source(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
-        if let Ok(conn) = Self::__acquire_source(shard_id).await {
+    async fn _acquire_writer(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
+        if let Ok(conn) = Self::__acquire_writer(shard_id).await {
             Ok(conn)
         } else {
             let now = SystemTime::now();
             if let Err(e) = connect(true, false, false, Some(shard_id)).await {
                 log::warn!("{}", e);
             }
-            if let Ok(conn) = Self::__acquire_source(shard_id).await {
+            if let Ok(conn) = Self::__acquire_writer(shard_id).await {
                 Ok(conn)
             } else {
                 if let Some(time) = Duration::from_secs(crate::ACQUIRE_CONNECTION_WAIT_TIME)
@@ -742,33 +655,32 @@ impl DbConn {
                     tokio::time::sleep(time).await;
                 }
                 connect(true, false, false, Some(shard_id)).await?;
-                Self::__acquire_source(shard_id).await
+                Self::__acquire_writer(shard_id).await
             }
         }
     }
 
-    async fn _acquire_source_tx(shard_id: ShardId) -> Result<Transaction<'static, DbType>> {
-        let conn = Self::_acquire_source(shard_id).await?;
+    async fn _acquire_writer_tx(shard_id: ShardId) -> Result<Transaction<'static, DbType>> {
+        let conn = Self::_acquire_writer(shard_id).await?;
         Ok(
             Transaction::begin(sqlx::pool::maybe::MaybePoolConnection::PoolConnection(conn))
                 .await?,
         )
     }
 
-    pub async fn acquire_source(&self) -> Result<PoolConnection<DbType>> {
-        Self::_acquire_source(self.shard_id).await
+    pub async fn acquire_writer(&self) -> Result<PoolConnection<DbType>> {
+        Self::_acquire_writer(self.shard_id).await
     }
 
-    async fn acquire_reader(
+    async fn acquire_from_pool(
         shard_id: ShardId,
         pool_collection: &OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>>,
-        index: usize,
     ) -> Result<PoolConnection<DbType>> {
         ensure!(
             Self::shard_num_range().contains(&shard_id),
             "shard_id is out of range."
         );
-        let mut pools: Vec<_> = pool_collection.get().unwrap()[shard_id as usize]
+        let pools: Vec<_> = pool_collection.get().unwrap()[shard_id as usize]
             .read()
             .await
             .values()
@@ -779,23 +691,17 @@ impl DbConn {
             len != 0,
             "There are no readable database connections.(code:11)"
         );
-        let index = index % len;
-        if len < 4 {
-            pools.extend(pools.clone());
+        let mut indexes = Vec::with_capacity(len);
+        for i in 0..len {
+            indexes.push(i);
         }
-        if len < 2 {
-            pools.extend(pools.clone());
-        }
-        let len = pools.len();
+        use rand::seq::SliceRandom;
+        use rand::thread_rng;
+        indexes.shuffle(&mut thread_rng());
         let mut join = JoinSet::new();
-        for (i, (pool, _)) in pools.into_iter().enumerate() {
-            let i = if i >= index {
-                i - index
-            } else {
-                i + len - index
-            };
+        for (i, (pool, _)) in std::iter::zip(indexes, pools) {
             join.spawn(async move {
-                tokio::time::sleep(Duration::from_millis(10 * i as u64)).await;
+                tokio::time::sleep(Duration::from_millis(20 * i as u64)).await;
                 // spawn to prevent processing interruptions until a newly acquired connection enters the pool
                 tokio::spawn(async move { pool.acquire().await }).await
             });
@@ -808,24 +714,15 @@ impl DbConn {
         anyhow::bail!("There are no readable database connections.(code:12)")
     }
 
-    async fn __acquire_replica(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
-        Self::acquire_reader(
-            shard_id,
-            &REPLICA,
-            NEXT_REPLICA.fetch_add(1, Ordering::SeqCst),
-        )
-        .await
-    }
-
-    async fn _acquire_replica(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
-        if let Ok(conn) = Self::__acquire_replica(shard_id).await {
+    async fn _acquire_reader(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
+        if let Ok(conn) = Self::acquire_from_pool(shard_id, &READER).await {
             Ok(conn)
         } else {
             let now = SystemTime::now();
             if let Err(e) = connect(false, true, false, Some(shard_id)).await {
                 log::warn!("{}", e);
             }
-            if let Ok(conn) = Self::__acquire_replica(shard_id).await {
+            if let Ok(conn) = Self::acquire_from_pool(shard_id, &READER).await {
                 Ok(conn)
             } else {
                 if let Some(time) = Duration::from_secs(crate::ACQUIRE_CONNECTION_WAIT_TIME)
@@ -834,17 +731,17 @@ impl DbConn {
                     tokio::time::sleep(time).await;
                 }
                 connect(false, true, false, Some(shard_id)).await?;
-                Self::__acquire_replica(shard_id).await
+                Self::acquire_from_pool(shard_id, &READER).await
             }
         }
     }
 
-    pub async fn acquire_replica(&self) -> Result<PoolConnection<DbType>> {
-        Self::_acquire_replica(self.shard_id).await
+    pub async fn acquire_reader(&self) -> Result<PoolConnection<DbType>> {
+        Self::_acquire_reader(self.shard_id).await
     }
 
-    async fn acquire_replica_tx(shard_id: ShardId) -> Result<sqlx::Transaction<'static, DbType>> {
-        let conn = Self::_acquire_replica(shard_id).await?;
+    async fn acquire_reader_tx(shard_id: ShardId) -> Result<sqlx::Transaction<'static, DbType>> {
+        let conn = Self::_acquire_reader(shard_id).await?;
         Ok(
             Transaction::begin(sqlx::pool::maybe::MaybePoolConnection::PoolConnection(conn))
                 .await?,
@@ -853,7 +750,7 @@ impl DbConn {
     @%- if !config.force_disable_cache %@
 
     async fn __acquire_cache(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
-        Self::acquire_reader(shard_id, &CACHE, NEXT_CACHE.fetch_add(1, Ordering::SeqCst)).await
+        Self::acquire_from_pool(shard_id, &CACHE).await
     }
 
     async fn _acquire_cache(shard_id: ShardId) -> Result<PoolConnection<DbType>> {
@@ -887,11 +784,11 @@ impl DbConn {
     }
     @%- endif %@
 
-    pub async fn get_replica_conn(&mut self) -> Result<&mut PoolConnection<DbType>> {
+    pub async fn get_reader(&mut self) -> Result<&mut PoolConnection<DbType>> {
         let conn = if self.conn.contains_key(&self.shard_id) {
             None
         } else {
-            Some(self.acquire_replica().await?)
+            Some(self.acquire_reader().await?)
         };
         Ok(self
             .conn
@@ -950,7 +847,7 @@ impl DbConn {
         match self.tx.entry(self.shard_id) {
             Entry::Occupied(tx) => Ok(tx.into_mut()),
             Entry::Vacant(v) => {
-                let mut tx = Self::_acquire_source_tx(self.shard_id).await?;
+                let mut tx = Self::_acquire_writer_tx(self.shard_id).await?;
                 set_tx_isolation(&mut tx).await?;
                 for s in 0..self.save_point.len() {
                     let sql = format!("SAVEPOINT s{}", s);
@@ -1102,7 +999,7 @@ impl DbConn {
 
     pub async fn begin_read_tx(&mut self) -> Result<()> {
         if self.read_tx.is_empty() {
-            let mut tx = Self::acquire_replica_tx(self.shard_id).await?;
+            let mut tx = Self::acquire_reader_tx(self.shard_id).await?;
             set_read_tx_isolation(&mut tx).await?;
             self.read_tx.insert(self.shard_id, tx);
         }
@@ -1119,7 +1016,7 @@ impl DbConn {
         match self.read_tx.entry(self.shard_id) {
             Entry::Occupied(tx) => Ok(tx.into_mut()),
             Entry::Vacant(v) => {
-                let mut tx = Self::acquire_replica_tx(self.shard_id).await?;
+                let mut tx = Self::acquire_reader_tx(self.shard_id).await?;
                 set_read_tx_isolation(&mut tx).await?;
                 Ok(v.insert(tx))
             }
@@ -1172,6 +1069,21 @@ impl DbConn {
         self.cache_tx.clear();
     }
     @%- endif %@
+
+    pub fn reset_tx(&mut self) {
+        self.save_point.clear();
+        self.has_tx = false;
+        self.tx.clear();
+        self.lock_list.clear();
+        self.cache_internal_op_list.clear();
+        self.cache_op_list.clear();
+        self.callback_list.clear();
+        self.has_read_tx = 0;
+        self.read_tx.clear();
+        @%- if !config.force_disable_cache %@
+        self.cache_tx.clear();
+        @%- endif %@
+    }
     @%- if config.use_sequence %@
 
     pub async fn sequence(&mut self, num: u64) -> Result<u64> {
@@ -1182,7 +1094,7 @@ impl DbConn {
             let fetch_num = (num / base + 1) * base;
             let sql = "UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;";
             let query = sqlx::query(sql).bind(fetch_num).bind(ID_OF_SEQUENCE);
-            let result = query.execute(self.acquire_source().await?.as_mut()).await?;
+            let result = query.execute(self.acquire_writer().await?.as_mut()).await?;
             let ceiling = result.last_insert_id();
             let ret = ceiling - fetch_num + 1;
             *cur = (ret + num - 1, ceiling);
@@ -1204,16 +1116,16 @@ impl DbConn {
     }
     @%- if !config.force_disable_cache %@
 
-    async fn ___inc_cache_sync(mut source: PoolConnection<DbType>) -> Result<u64> {
+    async fn ___inc_cache_sync(mut pool: PoolConnection<DbType>) -> Result<u64> {
         let sql = "UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;";
         let query = sqlx::query(sql).bind(1).bind(ID_OF_CACHE_SYNC);
-        let result = query.execute(source.as_mut()).await?;
+        let result = query.execute(pool.as_mut()).await?;
         Ok(result.last_insert_id())
     }
 
     async fn __inc_cache_sync(shard_id: ShardId) -> Result<u64> {
-        let source = Self::_acquire_source(shard_id).await?;
-        Self::___inc_cache_sync(source).await
+        let writer = Self::_acquire_writer(shard_id).await?;
+        Self::___inc_cache_sync(writer).await
     }
 
     async fn _inc_cache_sync(shard_id: ShardId) -> u64 {
@@ -1311,7 +1223,7 @@ impl DbConn {
     /// Obtain a lock during a transaction
     pub async fn lock(&mut self, key: &str, time: i32) -> Result<()> {
         let hash = senax_common::hash64(key);
-        let mut conn = self.acquire_source().await?;
+        let mut conn = self.acquire_writer().await?;
         let result: (Option<i64>,) = sqlx::query_as("SELECT GET_LOCK(?, ?)")
             .bind(hash)
             .bind(time)
@@ -1445,7 +1357,7 @@ async fn check_if_writable(options: &DbConnectOptions) -> Result<bool> {
     let mut conn = DbConnection::connect_with(options).await?;
     let conn = conn.acquire().await?;
     let row: (i8,) = sqlx::query_as(CHECK_SQL).fetch_one(conn).await?;
-    Ok(row.0 == 0)
+    Ok(row.0 == CHECK_SQL_WRITABLE_RESULT)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1485,7 +1397,12 @@ async fn check_connection(
                 } else {
                     options
                 };
-                let options = options.log_statements(LevelFilter::Trace);
+                let options = options
+                    .log_statements(LevelFilter::Trace)
+                    .set_names(false)
+                    .pipes_as_concat(false)
+                    .no_engine_subsitution(false)
+                    .timezone(None);
                 list.push((addr, options));
             }
             Ok(list)
@@ -1572,7 +1489,7 @@ async fn check_connection(
                                 pools.insert(addr, (old.0, writable));
                                 continue;
                             }
-                            let pool = replica_connect_with(pool_option.clone(), options).await;
+                            let pool = reader_connect_with(pool_option.clone(), options).await;
                             let conn = match pool {
                                 Ok(conn) => conn,
                                 Err(e) => {
@@ -1590,6 +1507,7 @@ async fn check_connection(
         });
         let mut result = Vec::new();
         let mut timeout = false;
+        // At least one connection is required, so tokio::time::timeout cannot be used.
         let sleep = tokio::time::sleep(Duration::from_millis(500));
         tokio::pin!(sleep);
         loop {
@@ -1618,7 +1536,7 @@ async fn check_connection(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn reset_source_pool(
+async fn reset_writer_pool(
     s_url: &str,
     s_user: &Option<String>,
     s_pw: &Option<String>,
@@ -1686,15 +1604,15 @@ async fn reset_source_pool(
                         return Ok(());
                     }
                 }
-                let new_pool = source_connect_with(pool_option, options).await?;
+                let new_pool = writer_connect_with(pool_option, options).await?;
                 let pool = &mut pool_collection.write().await[idx];
                 @%- if !config.force_disable_cache %@
                 #[cfg(not(feature = "cache_update_only"))]
                 if pool.is_some() {
                     let new_pool = new_pool.clone();
                     tokio::spawn(async move {
-                        if let Ok(source) = new_pool.acquire().await {
-                            let sync = DbConn::___inc_cache_sync(source).await.unwrap_or_default();
+                        if let Ok(pool) = new_pool.acquire().await {
+                            let sync = DbConn::___inc_cache_sync(pool).await.unwrap_or_default();
                             models::common::_clear_cache(idx as ShardId, sync, false).await;
                         }
                     });
@@ -1713,21 +1631,40 @@ async fn reset_source_pool(
     Ok(())
 }
 
-async fn source_connect_with(
+async fn writer_connect_with(
     pool_option: sqlx::pool::PoolOptions<connection::DbType>,
     options: DbConnectOptions,
 ) -> Result<DbPool> {
     Ok(pool_option
         .after_connect(|conn, _meta| {
             Box::pin(async move {
-                if let Some(iso) = TX_ISOLATION {
-                    conn.execute(&*format!(
-                        "SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));SET SESSION TRANSACTION ISOLATION LEVEL {};",
-                        iso
-                    ))
-                    .await?;
+                let sql = if let Some(iso) = TX_ISOLATION {
+                    format!(
+                        "{};SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES,PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;SET SESSION TRANSACTION ISOLATION LEVEL {};",
+                        CHECK_SQL,
+                        iso,
+                    )
                 } else {
-                    conn.execute("SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));").await?;
+                    format!(
+                        "{};SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES,PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;",
+                        CHECK_SQL,
+                    )
+                };
+                let mut res = conn.fetch_many(&*sql);
+                use ::futures::TryStreamExt;
+                let mut first = true;
+                let mut writable = false;
+                while let Some(res) = res.try_next().await? {
+                    if first {
+                        first = false;
+                        if let sqlx::Either::Right(res) = res {
+                            let i:i8 = res.try_get(0)?;
+                            writable = i == CHECK_SQL_WRITABLE_RESULT;
+                        }
+                    }
+                }
+                if !writable {
+                    return Err(sqlx::Error::Protocol("There are no writable database connections.(code:4)".to_string()));
                 }
                 Ok(())
             })
@@ -1737,7 +1674,7 @@ async fn source_connect_with(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn reset_replica_pool(
+async fn reset_reader_pool(
     r_url: &str,
     r_user: &Option<String>,
     r_pw: &Option<String>,
@@ -1822,24 +1759,26 @@ async fn reset_replica_pool(
                     }
                 }
             }
-            let new_addrs: FxHashSet<_> = c.iter().map(|v| v.0).collect();
-            let old_addrs: FxHashSet<_> = {
-                let pools = pool_collection.get().unwrap()[idx].read().await;
-                pools.keys().cloned().collect()
-            };
-            for (addr, options, writable) in c {
-                if old_addrs.contains(&addr) {
-                    let mut pools = pool_collection.get().unwrap()[idx].write().await;
-                    pools.entry(addr).and_modify(|(_, w)| *w = writable);
-                } else {
-                    let pool = replica_connect_with(pool_option.clone(), options).await?;
-                    let mut pools = pool_collection.get().unwrap()[idx].write().await;
-                    pools.insert(addr, (pool, writable));
+            if !c.is_empty() {
+                let new_addrs: FxHashSet<_> = c.iter().map(|v| v.0).collect();
+                let old_addrs: FxHashSet<_> = {
+                    let pools = pool_collection.get().unwrap()[idx].read().await;
+                    pools.keys().cloned().collect()
+                };
+                for (addr, options, writable) in c {
+                    if old_addrs.contains(&addr) {
+                        let mut pools = pool_collection.get().unwrap()[idx].write().await;
+                        pools.entry(addr).and_modify(|(_, w)| *w = writable);
+                    } else {
+                        let pool = reader_connect_with(pool_option.clone(), options).await?;
+                        let mut pools = pool_collection.get().unwrap()[idx].write().await;
+                        pools.insert(addr, (pool, writable));
+                    }
                 }
+                let mut pools = pool_collection.get().unwrap()[idx].write().await;
+                let has_not_writable = pools.iter().any(|(_, v)| !v.1);
+                pools.retain(|k, v| new_addrs.contains(k) && (!has_not_writable || !v.1));
             }
-            let mut pools = pool_collection.get().unwrap()[idx].write().await;
-            let has_not_writable = pools.iter().any(|(_, v)| !v.1);
-            pools.retain(|k, v| new_addrs.contains(k) && (!has_not_writable || !v.1));
             Ok(())
         });
     }
@@ -1851,7 +1790,7 @@ async fn reset_replica_pool(
     Ok(())
 }
 
-async fn replica_connect_with(
+async fn reader_connect_with(
     pool_option: sqlx::pool::PoolOptions<connection::DbType>,
     options: DbConnectOptions,
 ) -> Result<DbPool> {
@@ -1860,12 +1799,12 @@ async fn replica_connect_with(
             Box::pin(async move {
                 if let Some(iso) = READ_TX_ISOLATION {
                     conn.execute(&*format!(
-                        "SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));SET SESSION TRANSACTION ISOLATION LEVEL {}, READ ONLY;",
+                        "SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES,PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;SET SESSION TRANSACTION ISOLATION LEVEL {}, READ ONLY;",
                         iso
                     ))
                     .await?;
                 } else {
-                    conn.execute("SET sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES'));").await?;
+                    conn.execute("SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES,PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;SET SESSION TRANSACTION READ ONLY;").await?;
                 }
                 Ok(())
             })
@@ -1898,6 +1837,34 @@ pub(crate) fn _is_retryable_error<T>(result: Result<T>, table: &str) -> bool {
         }
     }
     false
+}
+
+fn env_u32(etcd: &FxHashMap<String, String>, name: &str, default: &str) -> Result<u32> {
+    let v = etcd.get(name).cloned();
+    let v = v.unwrap_or_else(|| env::var(name).unwrap_or_else(|_| default.to_owned()));
+    v.parse().with_context(|| format!("{} parse error", name))
+}
+fn env_opt_str(etcd: &FxHashMap<String, String>, name: &str) -> Option<String> {
+    let v = etcd.get(name).cloned();
+    v.or_else(|| env::var(name).ok())
+}
+fn env_urls(etcd: &FxHashMap<String, String>, name: &str) -> Result<Option<String>> {
+    let mut urls = etcd.get(name).cloned();
+    if urls.is_none() && !etcd.is_empty() {
+        let prefix = format!("{}/", name);
+        let mut values = BTreeMap::new();
+        for (k, v) in etcd {
+            if k.starts_with(&prefix) {
+                let i: usize = k.trim_start_matches(&prefix).parse()?;
+                values.insert(i, v);
+            }
+        }
+        if !values.is_empty() {
+            let vec: Vec<_> = values.values().map(|v| v.to_string()).collect();
+            urls = Some(vec.join(" "));
+        }
+    }
+    Ok(urls.or_else(|| env::var(name).ok()))
 }
 
 async fn set_tx_isolation(_tx: &mut Transaction<'_, DbType>) -> Result<()> {

@@ -44,6 +44,9 @@ impl @{ db|pascal }@Repositories for @{ db|pascal }@RepositoriesImpl {
     fn should_retry(&self, err: &anyhow::Error) -> bool {
         DbConn::is_retryable_error(err)
     }
+    async fn reset_tx(&self) {
+        self._conn.lock().await.reset_tx()
+    }
     // Do not modify below this line. (RepoStart)
     // Do not modify up to this line. (RepoEnd)
 }
@@ -58,6 +61,9 @@ impl @{ db|pascal }@Queries for @{ db|pascal }@RepositoriesImpl {
     }
     fn should_retry(&self, err: &anyhow::Error) -> bool {
         DbConn::is_retryable_error(err)
+    }
+    async fn reset_tx(&self) {
+        self._conn.lock().await.reset_tx()
     }
     // Do not modify below this line. (QueriesStart)
     // Do not modify up to this line. (QueriesEnd)

@@ -77,6 +77,7 @@ macro_rules! gql_@{ db|snake }@_find {
             }
             Err(e) => {
                 if $repo.@{ db|snake }@_query().should_retry(&e) {
+                    $repo.@{ db|snake }@_query().reset_tx().await;
                     let obj = $f$p
                         .await
                         .map_err(|e| GqlError::server_error($gql_ctx, e))?;
@@ -93,15 +94,14 @@ macro_rules! gql_@{ db|snake }@_find {
 #[macro_export]
 macro_rules! gql_@{ db|snake }@_selector {
     ( $f:ident $p:tt, $repo:expr, $gql_ctx:expr ) => {
-        match $f$p
-        .await
-        {
+        match $f$p.await {
             Ok(result) => Ok(result),
             Err(e) => {
                 if $repo.@{ db|snake }@_query().should_retry(&e) {
+                    $repo.@{ db|snake }@_query().reset_tx().await;
                     let result = $f$p
-                    .await
-                    .map_err(|e| GqlError::server_error($gql_ctx, e))?;
+                        .await
+                        .map_err(|e| GqlError::server_error($gql_ctx, e))?;
                     Ok(result)
                 } else {
                     Err(GqlError::server_error($gql_ctx, e))
@@ -118,6 +118,7 @@ macro_rules! gql_@{ db|snake }@_count {
             Ok(count) => Ok(count),
             Err(e) => {
                 if $repo.@{ db|snake }@_query().should_retry(&e) {
+                    $repo.@{ db|snake }@_query().reset_tx().await;
                     let count = $f$p
                         .await
                         .map_err(|e| GqlError::server_error($gql_ctx, e))?;
