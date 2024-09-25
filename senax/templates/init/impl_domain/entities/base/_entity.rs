@@ -104,9 +104,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     }", "") }@
 @{- parent.relations_one_uncached(true)|fmt_rel_join("
     fn {rel_name}(&self) -> Option<Box<dyn _model_::{class_mod_var}::{class}>> {
-        if self.{rel_name}.is_none() {
-            return None;
-        }
+        self.{rel_name}.as_ref()?;
         _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>)
     }", "") }@
 @{- parent.relations_many_cache(true)|fmt_rel_join("
@@ -123,17 +121,13 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
 @{- parent.relations_belonging_cache(true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> Option<Box<dyn _model_::{class_mod_var}::{class}Cache>> {
-        if self.{rel_name}.is_none() {
-            return None;
-        }
+        self.{rel_name}.as_ref()?;
         _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}Cache>)
     }", "") }@
 @{- parent.relations_belonging_uncached(true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> Option<Box<dyn _model_::{class_mod_var}::{class}>> {
-        if self.{rel_name}.is_none() {
-            return None;
-        }
+        self.{rel_name}.as_ref()?;
         _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>)
     }", "") }@
 }
@@ -146,9 +140,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
 @{- parent.relations_one_and_belonging(true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> Option<&dyn _model_::{class_mod_var}::{class}> {
-        if self.{rel_name}.is_none() {
-            return None;
-        }
+        self.{rel_name}.as_ref()?;
         _Getter_::_{raw_rel_name}(self).map(|v| v as &dyn _model_::{class_mod_var}::{class})
     }", "") }@
 @{- parent.relations_many(true)|fmt_rel_join("
@@ -271,9 +263,7 @@ impl @{ pascal_name }@Cache for _@{ pascal_name }@Cache {
     }", "") }@
 @{- def.relations_one_uncached(true)|fmt_rel_join("
     fn {rel_name}(&self) -> Option<Box<dyn _model_::{class_mod_var}::{class}>> {
-        if self.{rel_name}.is_none() {
-            return None;
-        }
+        self.{rel_name}.as_ref()?;
         _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>)
     }", "") }@
 @{- def.relations_many_cache(true)|fmt_rel_join("
@@ -290,17 +280,13 @@ impl @{ pascal_name }@Cache for _@{ pascal_name }@Cache {
 @{- def.relations_belonging_cache(true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> Option<Box<dyn _model_::{class_mod_var}::{class}Cache>> {
-        if self.{rel_name}.is_none() {
-            return None;
-        }
+        self.{rel_name}.as_ref()?;
         _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}Cache>)
     }", "") }@
 @{- def.relations_belonging_uncached(true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> Option<Box<dyn _model_::{class_mod_var}::{class}>> {
-        if self.{rel_name}.is_none() {
-            return None;
-        }
+        self.{rel_name}.as_ref()?;
         _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>)
     }", "") }@
 }
@@ -314,9 +300,7 @@ impl @{ pascal_name }@ for _@{ pascal_name }@ {
 @{- def.relations_one_and_belonging(true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> Option<&dyn _model_::{class_mod_var}::{class}> {
-        if self.{rel_name}.is_none() {
-            return None;
-        }
+        self.{rel_name}.as_ref()?;
         _Getter_::_{raw_rel_name}(self).map(|v| v as &dyn _model_::{class_mod_var}::{class})
     }", "") }@
 @{- def.relations_many(true)|fmt_rel_join("

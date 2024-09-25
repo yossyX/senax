@@ -704,7 +704,7 @@ pub struct AccessorNullJson<'a, I: Serialize + DeserializeOwned> {
 }
 impl<'a, I: Serialize + DeserializeOwned> AccessorNullJson<'a, I> {
     pub fn get(&self) -> Option<I> {
-        self.val.as_ref().map(|v| v._to_value()).flatten()
+        self.val.as_ref().and_then(|v| v._to_value())
     }
     pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;

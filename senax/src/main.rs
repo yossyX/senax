@@ -36,6 +36,7 @@ pub(crate) mod ddl {
 }
 mod actix_generator;
 mod api_generator;
+#[cfg(feature = "config")]
 mod config_server;
 mod db_generator;
 mod init_generator;
@@ -248,9 +249,9 @@ async fn exec(cli: Cli) -> Result<()> {
             use lambda_web::{is_running_on_lambda, run_actix_on_lambda};
             if let Some(backup) = backup.clone() {
                 ensure!(backup.is_dir(), "Specify a directory for backup");
-                config_server::BACKUP.set(backup).unwrap();
+                common::BACKUP.set(backup).unwrap();
             }
-            config_server::READ_ONLY.store(*read_only, std::sync::atomic::Ordering::SeqCst);
+            common::READ_ONLY.store(*read_only, std::sync::atomic::Ordering::SeqCst);
             let port = port.unwrap_or(DEFAULT_CONFIG_PORT);
             let url = format!("http://localhost:{port}");
             use std::io::Write;
@@ -328,7 +329,7 @@ async fn exec(cli: Cli) -> Result<()> {
         }
         Commands::ReflectMigrationChanges => {
             for db in crate::db_generator::list()? {
-                config_server::reflect_migration_changes(&db)?;
+                common::reflect_migration_changes(&db)?;
             }
         }
         Commands::GenSeed { db, description } => {
