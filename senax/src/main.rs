@@ -202,7 +202,7 @@ enum Commands {
     StreamId,
 }
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     if let Some(ref cwd) = cli.cwd {
@@ -245,48 +245,7 @@ async fn exec(cli: Cli) -> Result<()> {
             backup,
             read_only,
         } => {
-            use actix_web::{web, App, HttpServer};
-            use lambda_web::{is_running_on_lambda, run_actix_on_lambda};
-            if let Some(backup) = backup.clone() {
-                ensure!(backup.is_dir(), "Specify a directory for backup");
-                common::BACKUP.set(backup).unwrap();
-            }
-            common::READ_ONLY.store(*read_only, std::sync::atomic::Ordering::SeqCst);
-            let port = port.unwrap_or(DEFAULT_CONFIG_PORT);
-            let url = format!("http://localhost:{port}");
-            use std::io::Write;
-            use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
-            let mut stdout = StandardStream::stdout(ColorChoice::Auto);
-            stdout.set_color(ColorSpec::new().set_fg(Some(Color::Blue)))?;
-            write!(&mut stdout, "{url}")?;
-            stdout.reset()?;
-            writeln!(&mut stdout)?;
-            if *open {
-                let _ = webbrowser::open(&url);
-            }
-
-            let factory = move || {
-                App::new()
-                    .service(
-                        web::scope("/api")
-                            .app_data(
-                                web::JsonConfig::default()
-                                    .error_handler(config_server::json_error_handler),
-                            )
-                            .configure(config_server::api),
-                    )
-                    .configure(config_server::init)
-            };
-            if is_running_on_lambda() {
-                run_actix_on_lambda(factory)
-                    .await
-                    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-            } else {
-                HttpServer::new(factory)
-                    .bind(("0.0.0.0", port))?
-                    .run()
-                    .await?;
-            }
+            config_server::start(*port, *open, backup, *read_only).await?;
         }
         Commands::NewActix { name, db, force } => {
             let db_list = db.split(',').map(|v| v.trim()).collect();

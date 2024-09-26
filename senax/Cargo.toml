@@ -13,10 +13,9 @@ readme = "../README.md"
 
 [features]
 default = ["config"]
-config = []
+config = ["axum", "axum-aws-lambda", "tower", "tower-http", "lambda_http", "flate2", "http", "httpdate"]
 
 [dependencies]
-actix-web = "4"
 anyhow = "1.0"
 askama = "=0.12.0"
 chrono = { version = "0.4.35", features = ["serde"] }
@@ -33,7 +32,6 @@ glob = "0.3.1"
 includedir = "0.6.0"
 indexmap = { version = "1.9.1", features = ["serde-1"] }
 Inflector = "=0.11.4"
-lambda-web = { version = "0.2.0", features=["actix4"] }
 lazy_static = "1.4.0"
 mime_guess = "2.0.4"
 nom = "7"
@@ -63,6 +61,15 @@ thread_local = "1.1.7"
 tokio = { version = "1", features = ["full"] }
 validator = { version = "0.16", features = ["derive", "unic"] }
 webbrowser = "0.8.10"
+
+axum = { version = "0.7", optional = true }
+axum-aws-lambda = { version = "0.8", optional = true }
+tower = { version = "0.4", features = ["util"], optional = true }
+tower-http = { version = "0.5", features = ["compression-full", "cors", "trace"], optional = true }
+lambda_http = { version = "0.13", optional = true }
+flate2 = { version = "1.0", optional = true }
+http = { version = "1.1", optional = true }
+httpdate = { version = "1.0", optional = true }
 
 [build-dependencies]
 includedir_codegen = "0.6.0"

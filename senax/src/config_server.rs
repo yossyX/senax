@@ -1,17 +1,34 @@
-use actix_web::http::header::{self, ContentEncoding};
-use actix_web::{delete, get, post, put, web, HttpResponse, Responder, Result};
-use actix_web::{error, HttpRequest};
+use anyhow::{ensure, Result};
+use axum::extract::Path as AxumPath;
+use axum::http::header::{
+    ACCEPT, ACCEPT_ENCODING, AUTHORIZATION, CONTENT_ENCODING, CONTENT_TYPE, ORIGIN,
+};
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::IntoResponse;
+use axum::response::Response;
+use axum::routing::delete;
+use axum::routing::put;
+use axum::{
+    routing::{get, post},
+    Json, Router,
+};
 use chrono::Local;
 use derive_more::Display;
+use http::header::{IF_MODIFIED_SINCE, LAST_MODIFIED};
+use httpdate::HttpDate;
 use includedir::Compression;
 use indexmap::IndexMap;
-use mime_guess::Mime;
+use mime_guess::MimeGuess;
+use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::atomic::Ordering;
+use std::time::SystemTime;
+use tower_http::{compression::CompressionLayer, cors::CorsLayer};
 use validator::Validate;
 
 use crate::api_generator::schema::{
@@ -24,95 +41,197 @@ use crate::common::{
 use crate::schema::{self, ConfigDef, ConfigJson, FieldDef, ModelDef, ModelJson, ValueObjectJson};
 use crate::{API_SCHEMA_PATH, SCHEMA_PATH};
 
-pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(files);
+pub async fn start(
+    port: Option<u16>,
+    open: bool,
+    backup: &Option<PathBuf>,
+    read_only: bool,
+) -> anyhow::Result<()> {
+    if let Some(backup) = backup.clone() {
+        ensure!(backup.is_dir(), "Specify a directory for backup");
+        crate::common::BACKUP.set(backup).unwrap();
+    }
+    crate::common::READ_ONLY.store(read_only, std::sync::atomic::Ordering::SeqCst);
+    let port = port.unwrap_or(crate::DEFAULT_CONFIG_PORT);
+    let url = format!("http://localhost:{port}");
+    use std::io::Write;
+    use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+    let mut stdout = StandardStream::stdout(ColorChoice::Auto);
+    stdout.set_color(ColorSpec::new().set_fg(Some(Color::Blue)))?;
+    write!(&mut stdout, "{url}")?;
+    stdout.reset()?;
+    writeln!(&mut stdout)?;
+    if open {
+        let _ = webbrowser::open(&url);
+    }
+
+    let cors_layer = CorsLayer::new()
+        .allow_headers([ACCEPT, ACCEPT_ENCODING, AUTHORIZATION, CONTENT_TYPE, ORIGIN])
+        .allow_methods(tower_http::cors::Any)
+        .allow_origin(tower_http::cors::Any);
+    let compression_layer: CompressionLayer = CompressionLayer::new()
+        .br(true)
+        .deflate(true)
+        .gzip(true)
+        .zstd(true);
+
+    let app = Router::new()
+        .route("/", get(root_handler))
+        .nest("/api", api_routes())
+        .route("/*path", get(file_handler))
+        .layer(cors_layer)
+        .layer(compression_layer);
+
+    if std::env::var("AWS_LAMBDA_RUNTIME_API").is_ok() {
+        let app = tower::ServiceBuilder::new()
+            .layer(axum_aws_lambda::LambdaLayer::default())
+            .service(app);
+        lambda_http::run(app).await.unwrap();
+    } else {
+        let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
+    }
+    Ok(())
 }
 
-pub fn api(cfg: &mut web::ServiceConfig) {
-    cfg.service(get_db)
-        .service(get_db_config)
-        .service(save_db_config)
-        .service(get_config_schema)
-        .service(get_model_schema)
-        .service(get_vo_schema)
-        .service(get_api_config_schema)
-        .service(get_api_db_schema)
-        .service(get_api_schema)
-        .service(get_model_names)
-        .service(get_models)
-        .service(create_model)
-        .service(save_model)
-        .service(delete_model)
-        .service(save_models)
-        .service(get_simple_vo)
-        .service(save_simple_vo_list)
-        .service(create_simple_vo)
-        .service(save_simple_vo)
-        .service(delete_simple_vo)
-        .service(get_api_server)
-        .service(get_api_server_db)
-        .service(get_api_server_config)
-        .service(save_api_server_config)
-        .service(get_api_server_db_config)
-        .service(save_api_server_db_config)
-        .service(clean_api_server_models)
-        .service(get_api_server_models)
-        .service(save_api_server_models)
-        .service(create_api_server_model)
-        .service(update_api_server_model)
-        .service(delete_api_server_model)
-        .service(build_exec)
-        .service(build_result)
-        .service(git_exec)
-        .service(git_result);
+pub fn api_routes() -> Router {
+    Router::new()
+        .route("/db", get(get_db))
+        .route("/db/:db", get(get_db_config))
+        .route("/db/:db", post(save_db_config))
+        .route("/config_schema", get(get_config_schema))
+        .route("/model_schema", get(get_model_schema))
+        .route("/vo_schema/simple", get(get_vo_schema))
+        .route("/api_config_schema", get(get_api_config_schema))
+        .route("/api_db_schema", get(get_api_db_schema))
+        .route("/api_schema", get(get_api_schema))
+        .route("/model_names/:db", get(get_model_names))
+        .route("/models/:db/:group", get(get_models))
+        .route("/models/:db/:group", post(create_model))
+        .route("/models/:db/:group/:model", put(save_model))
+        .route("/models/:db/:group/:model", delete(delete_model))
+        .route("/models/:db/:group", put(save_models))
+        .route("/vo/simple", get(get_simple_vo))
+        .route("/vo/simple", put(save_simple_vo_list))
+        .route("/vo/simple", post(create_simple_vo))
+        .route("/vo/simple/:vo", put(save_simple_vo))
+        .route("/vo/simple/:vo", delete(delete_simple_vo))
+        .route("/api_server", get(get_api_server))
+        .route("/api_server/:server/_db", get(get_api_server_db))
+        .route("/api_server/:server/_config", get(get_api_server_config))
+        .route("/api_server/:server/_config", post(save_api_server_config))
+        .route(
+            "/api_server/:server/:db/_config",
+            get(get_api_server_db_config),
+        )
+        .route(
+            "/api_server/:server/:db/_config",
+            post(save_api_server_db_config),
+        )
+        .route(
+            "/clean_api_server/:server/:db/:group",
+            get(clean_api_server_models),
+        )
+        .route("/api_server/:server/:db/:group", get(get_api_server_models))
+        .route(
+            "/api_server/:server/:db/:group",
+            put(save_api_server_models),
+        )
+        .route(
+            "/api_server/:server/:db/:group",
+            post(create_api_server_model),
+        )
+        .route(
+            "/api_server/:server/:db/:group/:model",
+            put(update_api_server_model),
+        )
+        .route(
+            "/api_server/:server/:db/:group/:model",
+            delete(delete_api_server_model),
+        )
+        .route("/build/exec", post(build_exec))
+        .route("/build/result", get(build_result))
+        .route("/git/exec/:cmd", post(git_exec))
+        .route("/git/result", get(git_result))
 }
 
-#[get("/{filename:.*}")]
-async fn files(req: HttpRequest) -> impl Responder {
-    let mut path = req.match_info().query("filename").to_string();
+async fn root_handler(headers: HeaderMap) -> impl IntoResponse {
+    if let Ok(tpl) = crate::CONFIG_APP.get_raw("config-app/dist/index.html") {
+        file_response(tpl, mime_guess::from_path("index.html"), &headers)
+    } else {
+        panic!("index.html not found")
+    }
+}
+async fn file_handler(
+    AxumPath(mut path): AxumPath<String>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
     if path.is_empty() || path.ends_with('/') {
         path.push_str("index.html");
     }
     if let Ok(tpl) = crate::CONFIG_APP.get_raw(&format!("config-app/dist/{}", path)) {
-        file_response(tpl, mime_guess::from_path(path).first())
+        file_response(tpl, mime_guess::from_path(path), &headers)
     } else if let Ok(tpl) = crate::CONFIG_APP.get_raw("config-app/dist/index.html") {
-        file_response(tpl, mime_guess::from_path("index.html").first())
+        file_response(tpl, mime_guess::from_path("index.html"), &headers)
     } else {
-        HttpResponse::NotFound().body("not found")
+        panic!("index.html not found")
     }
 }
+fn file_response(
+    tpl: (Compression, Cow<'static, [u8]>),
+    mime: MimeGuess,
+    req_headers: &HeaderMap,
+) -> impl IntoResponse {
+    static TIME: Lazy<HttpDate> = Lazy::new(|| HttpDate::from(SystemTime::now()));
 
-fn file_response(tpl: (Compression, Cow<'static, [u8]>), mime: Option<Mime>) -> HttpResponse {
-    if let Some(mime) = mime {
-        match tpl.0 {
-            Compression::None => HttpResponse::Ok()
-                .insert_header(header::ContentType(mime))
-                .body(tpl.1.into_owned()),
-            Compression::Gzip => HttpResponse::Ok()
-                .insert_header(header::ContentType(mime))
-                .insert_header(ContentEncoding::Gzip)
-                .body(tpl.1.into_owned()),
-        }
-    } else {
-        match tpl.0 {
-            Compression::None => HttpResponse::Ok().body(tpl.1.into_owned()),
-            Compression::Gzip => HttpResponse::Ok()
-                .insert_header(ContentEncoding::Gzip)
-                .body(tpl.1.into_owned()),
+    let is_gzip_request = req_headers
+        .get(&ACCEPT_ENCODING)
+        .map(|v| {
+            v.to_str()
+                .map(|v| v.split(',').map(|v| v.trim()).any(|v| v.eq("gzip")))
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+    let mut res_headers = HeaderMap::new();
+    if let Some(mime) = mime.first() {
+        res_headers.insert(CONTENT_TYPE, mime.essence_str().parse().unwrap());
+    }
+
+    if let Some(time) = req_headers.get(&IF_MODIFIED_SINCE) {
+        if let Ok(Ok(t)) = time.to_str().map(HttpDate::from_str) {
+            if t.eq(&TIME) {
+                return (StatusCode::NOT_MODIFIED, res_headers, Vec::new().into());
+            }
         }
     }
+
+    res_headers.insert(LAST_MODIFIED, TIME.to_string().parse().unwrap());
+    match tpl.0 {
+        Compression::None => {}
+        Compression::Gzip => {
+            if is_gzip_request {
+                res_headers.insert(CONTENT_ENCODING, "gzip".parse().unwrap());
+            } else {
+                use std::io::Read;
+                let mut dec = flate2::read::GzDecoder::new(tpl.1.as_ref());
+                let mut vec = Vec::new();
+                dec.read_to_end(&mut vec).unwrap();
+                return (StatusCode::OK, res_headers, vec.into());
+            }
+        }
+    }
+    (StatusCode::OK, res_headers, tpl.1)
 }
 
-#[get("/db")]
-async fn get_db() -> impl Responder {
+async fn get_db() -> impl IntoResponse {
     let result = crate::db_generator::list();
     json_response(result)
 }
 
-#[get("/db/{db}")]
-async fn get_db_config(db: web::Path<String>) -> impl Responder {
+async fn get_db_config(AxumPath(db): AxumPath<String>) -> impl IntoResponse {
     let result = async move {
-        let db_name = &*db;
+        let db_name = &db;
         crate::common::check_ascii_name(db_name);
         let path = Path::new(SCHEMA_PATH).join(format!("{db_name}.yml"));
         let config: ConfigDef = parse_yml_file(&path)?;
@@ -123,10 +242,12 @@ async fn get_db_config(db: web::Path<String>) -> impl Responder {
     json_response(result)
 }
 
-#[post("/db/{db}")]
-async fn save_db_config(db: web::Path<String>, data: web::Json<ConfigJson>) -> impl Responder {
+async fn save_db_config(
+    AxumPath(db): AxumPath<String>,
+    Json(data): Json<ConfigJson>,
+) -> impl IntoResponse {
     let result = async move {
-        let db = &*db;
+        let db = &db;
         crate::common::check_ascii_name(db);
         if !READ_ONLY.load(Ordering::SeqCst) {
             let path = Path::new(SCHEMA_PATH).join(format!("{db}.yml"));
@@ -160,7 +281,7 @@ async fn save_db_config(db: web::Path<String>, data: web::Json<ConfigJson>) -> i
                 }
             }
 
-            let config: ConfigDef = data.0.into();
+            let config: ConfigDef = data.into();
             let mut buf =
                 "# yaml-language-server: $schema=../senax-schema.json#definitions/ConfigDef\n\n"
                     .to_string();
@@ -173,8 +294,7 @@ async fn save_db_config(db: web::Path<String>, data: web::Json<ConfigJson>) -> i
     json_response(result)
 }
 
-#[get("/config_schema")]
-async fn get_config_schema() -> impl Responder {
+async fn get_config_schema() -> impl IntoResponse {
     let result = async move {
         let schema = schema::json_schema::json_config_schema()?;
         Ok(schema)
@@ -183,8 +303,7 @@ async fn get_config_schema() -> impl Responder {
     json_response(result)
 }
 
-#[get("/model_schema")]
-async fn get_model_schema() -> impl Responder {
+async fn get_model_schema() -> impl IntoResponse {
     let result = async move {
         let schema = schema::json_schema::json_model_schema()?;
         Ok(schema)
@@ -193,8 +312,7 @@ async fn get_model_schema() -> impl Responder {
     json_response(result)
 }
 
-#[get("/vo_schema/simple")]
-async fn get_vo_schema() -> impl Responder {
+async fn get_vo_schema() -> impl IntoResponse {
     let result = async move {
         let schema = schema::json_schema::json_simple_vo_schema()?;
         Ok(schema)
@@ -203,8 +321,7 @@ async fn get_vo_schema() -> impl Responder {
     json_response(result)
 }
 
-#[get("/api_config_schema")]
-async fn get_api_config_schema() -> impl Responder {
+async fn get_api_config_schema() -> impl IntoResponse {
     let result = async move {
         let schema = schema::json_schema::json_api_config_schema()?;
         Ok(schema)
@@ -213,8 +330,7 @@ async fn get_api_config_schema() -> impl Responder {
     json_response(result)
 }
 
-#[get("/api_db_schema")]
-async fn get_api_db_schema() -> impl Responder {
+async fn get_api_db_schema() -> impl IntoResponse {
     let result = async move {
         let schema = schema::json_schema::json_api_db_schema()?;
         Ok(schema)
@@ -223,8 +339,7 @@ async fn get_api_db_schema() -> impl Responder {
     json_response(result)
 }
 
-#[get("/api_schema")]
-async fn get_api_schema() -> impl Responder {
+async fn get_api_schema() -> impl IntoResponse {
     let result = async move {
         let schema = schema::json_schema::json_api_schema()?;
         Ok(schema)
@@ -233,10 +348,9 @@ async fn get_api_schema() -> impl Responder {
     json_response(result)
 }
 
-#[get("/model_names/{db}")]
-async fn get_model_names(db: web::Path<String>) -> impl Responder {
+async fn get_model_names(AxumPath(db): AxumPath<String>) -> impl IntoResponse {
     let result = async move {
-        let db_name = &*db;
+        let db_name = &db;
         crate::common::check_ascii_name(db_name);
         let path = Path::new(SCHEMA_PATH).join(format!("{db_name}.yml"));
         let config: ConfigDef = parse_yml_file(&path)?;
@@ -254,8 +368,7 @@ async fn get_model_names(db: web::Path<String>) -> impl Responder {
     json_response(result)
 }
 
-#[get("/models/{db}/{group}")]
-async fn get_models(path: web::Path<(String, String)>) -> impl Responder {
+async fn get_models(AxumPath(path): AxumPath<(String, String)>) -> impl IntoResponse {
     let result = async move {
         let models: Vec<_> = read_group_yml(&path.0, &path.1)?
             .into_iter()
@@ -271,16 +384,15 @@ async fn get_models(path: web::Path<(String, String)>) -> impl Responder {
     json_response(result)
 }
 
-#[post("/models/{db}/{group}")]
 async fn create_model(
-    path: web::Path<(String, String)>,
-    data: web::Json<ModelJson>,
-) -> impl Responder {
+    AxumPath(path): AxumPath<(String, String)>,
+    Json(data): Json<ModelJson>,
+) -> impl IntoResponse {
     let result = async move {
         let mut models = read_group_yml(&path.0, &path.1)?;
         anyhow::ensure!(!models.contains_key(&data.name), "Duplicate names.");
         let name = data.name.clone();
-        let model: ModelDef = data.0.try_into()?;
+        let model: ModelDef = data.try_into()?;
         models.insert(name, model);
         write_group_yml(&path.0, &path.1, &models)?;
         Ok(true)
@@ -289,15 +401,14 @@ async fn create_model(
     json_response(result)
 }
 
-#[put("/models/{db}/{group}/{model}")]
 async fn save_model(
-    path: web::Path<(String, String, String)>,
-    data: web::Json<ModelJson>,
-) -> impl Responder {
+    AxumPath(path): AxumPath<(String, String, String)>,
+    Json(data): Json<ModelJson>,
+) -> impl IntoResponse {
     let result = async move {
         let mut models = read_group_yml(&path.0, &path.1)?;
         let name = data.name.clone();
-        let model: ModelDef = data.0.try_into()?;
+        let model: ModelDef = data.try_into()?;
         if !path.2.eq(&name) {
             anyhow::ensure!(!models.contains_key(&name), "Duplicate names.");
             models.insert(name, model);
@@ -312,8 +423,7 @@ async fn save_model(
     json_response(result)
 }
 
-#[delete("/models/{db}/{group}/{model}")]
-async fn delete_model(path: web::Path<(String, String, String)>) -> impl Responder {
+async fn delete_model(AxumPath(path): AxumPath<(String, String, String)>) -> impl IntoResponse {
     let result = async move {
         let mut models = read_group_yml(&path.0, &path.1)?;
         models.remove(&path.2);
@@ -324,14 +434,13 @@ async fn delete_model(path: web::Path<(String, String, String)>) -> impl Respond
     json_response(result)
 }
 
-#[put("/models/{db}/{group}")]
 async fn save_models(
-    path: web::Path<(String, String)>,
-    data: web::Json<Vec<ModelJson>>,
-) -> impl Responder {
+    AxumPath(path): AxumPath<(String, String)>,
+    Json(data): Json<Vec<ModelJson>>,
+) -> impl IntoResponse {
     let result = async move {
         let mut models: IndexMap<String, ModelDef> = IndexMap::new();
-        for v in data.0 {
+        for v in data {
             let name = v.name.clone();
             let model: ModelDef = v.try_into()?;
             models.insert(name, model);
@@ -343,8 +452,7 @@ async fn save_models(
     json_response(result)
 }
 
-#[get("/vo/simple")]
-async fn get_simple_vo() -> impl Responder {
+async fn get_simple_vo() -> impl IntoResponse {
     let result = async move {
         let vo_list: Vec<_> = read_simple_vo_yml()?
             .into_iter()
@@ -360,11 +468,10 @@ async fn get_simple_vo() -> impl Responder {
     json_response(result)
 }
 
-#[put("/vo/simple")]
-async fn save_simple_vo_list(data: web::Json<Vec<ValueObjectJson>>) -> impl Responder {
+async fn save_simple_vo_list(Json(data): Json<Vec<ValueObjectJson>>) -> impl IntoResponse {
     let result = async move {
         let mut vo_map: IndexMap<String, FieldDef> = IndexMap::new();
-        for v in data.0 {
+        for v in data {
             let name = v.name.clone();
             let vo: FieldDef = v.into();
             vo_map.insert(name, vo);
@@ -376,13 +483,12 @@ async fn save_simple_vo_list(data: web::Json<Vec<ValueObjectJson>>) -> impl Resp
     json_response(result)
 }
 
-#[post("/vo/simple")]
-async fn create_simple_vo(data: web::Json<ValueObjectJson>) -> impl Responder {
+async fn create_simple_vo(Json(data): Json<ValueObjectJson>) -> impl IntoResponse {
     let result = async move {
         let mut vo_list = read_simple_vo_yml()?;
         anyhow::ensure!(!vo_list.contains_key(&data.name), "Duplicate names.");
         let name = data.name.clone();
-        let vo: FieldDef = data.0.into();
+        let vo: FieldDef = data.into();
         vo_list.insert(name, vo);
         write_simple_vo_yml(&vo_list)?;
         Ok(true)
@@ -391,19 +497,18 @@ async fn create_simple_vo(data: web::Json<ValueObjectJson>) -> impl Responder {
     json_response(result)
 }
 
-#[put("/vo/simple/{vo}")]
 async fn save_simple_vo(
-    path: web::Path<String>,
-    data: web::Json<ValueObjectJson>,
-) -> impl Responder {
+    AxumPath(path): AxumPath<String>,
+    Json(data): Json<ValueObjectJson>,
+) -> impl IntoResponse {
     let result = async move {
         let mut vo_list = read_simple_vo_yml()?;
         let name = data.name.clone();
-        let vo: FieldDef = data.0.into();
-        if !name.eq(&*path) {
+        let vo: FieldDef = data.into();
+        if !name.eq(&path) {
             anyhow::ensure!(!vo_list.contains_key(&name), "Duplicate names.");
             vo_list.insert(name, vo);
-            vo_list.swap_remove(&*path);
+            vo_list.swap_remove(&path);
         } else {
             vo_list.insert(name, vo);
         }
@@ -414,11 +519,10 @@ async fn save_simple_vo(
     json_response(result)
 }
 
-#[delete("/vo/simple/{vo}")]
-async fn delete_simple_vo(path: web::Path<String>) -> impl Responder {
+async fn delete_simple_vo(AxumPath(path): AxumPath<String>) -> impl IntoResponse {
     let result = async move {
         let mut vo_list = read_simple_vo_yml()?;
-        vo_list.remove(&*path);
+        vo_list.remove(&path);
         write_simple_vo_yml(&vo_list)?;
         Ok(true)
     }
@@ -426,8 +530,7 @@ async fn delete_simple_vo(path: web::Path<String>) -> impl Responder {
     json_response(result)
 }
 
-#[get("/api_server")]
-async fn get_api_server() -> impl Responder {
+async fn get_api_server() -> impl IntoResponse {
     let result = async move {
         let mut list = Vec::new();
         for entry in fs::read_dir(Path::new("."))? {
@@ -442,10 +545,10 @@ async fn get_api_server() -> impl Responder {
     .await;
     json_response(result)
 }
-#[get("/api_server/{server}/_db")]
-async fn get_api_server_db(path: web::Path<String>) -> impl Responder {
+
+async fn get_api_server_db(AxumPath(path): AxumPath<String>) -> impl IntoResponse {
     let result = async move {
-        let server = sanitize_filename::sanitize(&*path);
+        let server = sanitize_filename::sanitize(&path);
         let mut list = Vec::new();
         for entry in fs::read_dir(Path::new(&server).join(API_SCHEMA_PATH))? {
             let entry = entry?;
@@ -460,10 +563,9 @@ async fn get_api_server_db(path: web::Path<String>) -> impl Responder {
     json_response(result)
 }
 
-#[get("/api_server/{server}/_config")]
-async fn get_api_server_config(path: web::Path<String>) -> impl Responder {
+async fn get_api_server_config(AxumPath(path): AxumPath<String>) -> impl IntoResponse {
     let result = async move {
-        let server = sanitize_filename::sanitize(&*path);
+        let server = sanitize_filename::sanitize(&path);
         let path = Path::new(&server).join(API_SCHEMA_PATH).join("_config.yml");
         let config: ApiConfigDef = parse_yml_file(&path)?;
         let config: ApiConfigJson = config.into();
@@ -473,13 +575,12 @@ async fn get_api_server_config(path: web::Path<String>) -> impl Responder {
     json_response(result)
 }
 
-#[post("/api_server/{server}/_config")]
 async fn save_api_server_config(
-    path: web::Path<String>,
-    data: web::Json<ApiConfigJson>,
-) -> impl Responder {
+    AxumPath(path): AxumPath<String>,
+    Json(data): Json<ApiConfigJson>,
+) -> impl IntoResponse {
     let result = async move {
-        let server = sanitize_filename::sanitize(&*path);
+        let server = sanitize_filename::sanitize(&path);
         if !READ_ONLY.load(Ordering::SeqCst) {
             let path = Path::new(&server)
             .join(API_SCHEMA_PATH)
@@ -491,7 +592,7 @@ async fn save_api_server_config(
                     fs::write(dir, content)?;
                 }
             }
-            let config: ApiConfigDef = data.0.into();
+            let config: ApiConfigDef = data.into();
             let mut buf =
                 "# yaml-language-server: $schema=../../senax-schema.json#definitions/ApiConfigDef\n\n"
                     .to_string();
@@ -504,8 +605,7 @@ async fn save_api_server_config(
     json_response(result)
 }
 
-#[get("/api_server/{server}/{db}/_config")]
-async fn get_api_server_db_config(path: web::Path<(String, String)>) -> impl Responder {
+async fn get_api_server_db_config(AxumPath(path): AxumPath<(String, String)>) -> impl IntoResponse {
     let result = async move {
         let server = sanitize_filename::sanitize(&path.0);
         let db = sanitize_filename::sanitize(&path.1);
@@ -522,11 +622,10 @@ async fn get_api_server_db_config(path: web::Path<(String, String)>) -> impl Res
     json_response(result)
 }
 
-#[post("/api_server/{server}/{db}/_config")]
 async fn save_api_server_db_config(
-    path: web::Path<(String, String)>,
-    data: web::Json<ApiDbJson>,
-) -> impl Responder {
+    AxumPath(path): AxumPath<(String, String)>,
+    Json(data): Json<ApiDbJson>,
+) -> impl IntoResponse {
     let result = async move {
         let server = sanitize_filename::sanitize(&path.0);
         let db = sanitize_filename::sanitize(&path.1);
@@ -561,7 +660,7 @@ async fn save_api_server_db_config(
                     }
                 }
             }
-            let config: ApiDbDef = data.0.into();
+            let config: ApiDbDef = data.into();
             let mut buf =
                 "# yaml-language-server: $schema=../../senax-schema.json#definitions/ApiDbDef\n\n"
                     .to_string();
@@ -574,8 +673,9 @@ async fn save_api_server_db_config(
     json_response(result)
 }
 
-#[get("/clean_api_server/{server}/{db}/{group}")]
-async fn clean_api_server_models(path: web::Path<(String, String, String)>) -> impl Responder {
+async fn clean_api_server_models(
+    AxumPath(path): AxumPath<(String, String, String)>,
+) -> impl IntoResponse {
     let result = async move {
         let models: HashMap<_, _> = read_group_yml(&path.1, &path.2)?
             .into_iter()
@@ -605,8 +705,9 @@ async fn clean_api_server_models(path: web::Path<(String, String, String)>) -> i
     json_response(result)
 }
 
-#[get("/api_server/{server}/{db}/{group}")]
-async fn get_api_server_models(path: web::Path<(String, String, String)>) -> impl Responder {
+async fn get_api_server_models(
+    AxumPath(path): AxumPath<(String, String, String)>,
+) -> impl IntoResponse {
     let result = async move {
         let list: Vec<_> = read_api_yml(&path.0, &path.1, &path.2)?
             .into_iter()
@@ -622,14 +723,13 @@ async fn get_api_server_models(path: web::Path<(String, String, String)>) -> imp
     json_response(result)
 }
 
-#[put("/api_server/{server}/{db}/{group}")]
 async fn save_api_server_models(
-    path: web::Path<(String, String, String)>,
-    data: web::Json<Vec<ApiModelJson>>,
-) -> impl Responder {
+    AxumPath(path): AxumPath<(String, String, String)>,
+    Json(data): Json<Vec<ApiModelJson>>,
+) -> impl IntoResponse {
     let result = async move {
         let mut map: IndexMap<String, Option<ApiModelDef>> = IndexMap::new();
-        for v in data.0 {
+        for v in data {
             let name = v.name.clone();
             let api: ApiModelDef = v.try_into()?;
             if api == ApiModelDef::default() {
@@ -645,17 +745,16 @@ async fn save_api_server_models(
     json_response(result)
 }
 
-#[post("/api_server/{server}/{db}/{group}")]
 async fn create_api_server_model(
-    path: web::Path<(String, String, String)>,
-    data: web::Json<ApiModelJson>,
-) -> impl Responder {
+    AxumPath(path): AxumPath<(String, String, String)>,
+    Json(data): Json<ApiModelJson>,
+) -> impl IntoResponse {
     let result = async move {
         data.validate()?;
         let mut map = read_api_yml(&path.0, &path.1, &path.2)?;
         anyhow::ensure!(!map.contains_key(&data.name), "Duplicate names.");
         let name = data.name.clone();
-        let api: ApiModelDef = data.0.try_into()?;
+        let api: ApiModelDef = data.try_into()?;
         if api == ApiModelDef::default() {
             map.insert(name, None);
         } else {
@@ -668,16 +767,15 @@ async fn create_api_server_model(
     json_response(result)
 }
 
-#[put("/api_server/{server}/{db}/{group}/{model}")]
 async fn update_api_server_model(
-    path: web::Path<(String, String, String, String)>,
-    data: web::Json<ApiModelJson>,
-) -> impl Responder {
+    AxumPath(path): AxumPath<(String, String, String, String)>,
+    Json(data): Json<ApiModelJson>,
+) -> impl IntoResponse {
     let result = async move {
         data.validate()?;
         let mut map = read_api_yml(&path.0, &path.1, &path.2)?;
         let name = data.name.clone();
-        let api: ApiModelDef = data.0.try_into()?;
+        let api: ApiModelDef = data.try_into()?;
         anyhow::ensure!(name.eq(&path.3), "Illegal name.");
         if api == ApiModelDef::default() {
             map.insert(name, None);
@@ -691,10 +789,9 @@ async fn update_api_server_model(
     json_response(result)
 }
 
-#[delete("/api_server/{server}/{db}/{group}/{model}")]
 async fn delete_api_server_model(
-    path: web::Path<(String, String, String, String)>,
-) -> impl Responder {
+    AxumPath(path): AxumPath<(String, String, String, String)>,
+) -> impl IntoResponse {
     let result = async move {
         let mut map = read_api_yml(&path.0, &path.1, &path.2)?;
         map.remove(&path.3);
@@ -705,8 +802,7 @@ async fn delete_api_server_model(
     json_response(result)
 }
 
-#[post("/build/exec")]
-async fn build_exec() -> impl Responder {
+async fn build_exec() -> impl IntoResponse {
     let result = async move {
         use tokio::process::Command;
         let shell_command = "sh -e build.sh > build_result.txt 2>&1";
@@ -720,8 +816,7 @@ async fn build_exec() -> impl Responder {
     json_response(result)
 }
 
-#[get("/build/result")]
-async fn build_result() -> impl Responder {
+async fn build_result() -> impl IntoResponse {
     let result = async move {
         let path = Path::new("build_result.txt");
         let mut result = HashMap::new();
@@ -739,14 +834,13 @@ struct GitInfo {
     msg: Option<String>,
 }
 
-#[post("/git/exec/{cmd}")]
-async fn git_exec(cmd: web::Path<String>, data: web::Json<GitInfo>) -> impl Responder {
+async fn git_exec(AxumPath(cmd): AxumPath<String>, Json(data): Json<GitInfo>) -> impl IntoResponse {
     let result = async move {
         use tokio::process::Command;
         let shell_command = format!(
             "sh -e git_proc.sh {} {}> git_result.txt 2>&1",
             shell_escape::escape(cmd.as_str().into()),
-            shell_escape::escape(data.into_inner().msg.unwrap_or_default().into())
+            shell_escape::escape(data.msg.unwrap_or_default().into())
         );
         let mut child = Command::new("sh").arg("-c").arg(shell_command).spawn()?;
         tokio::spawn(async move {
@@ -758,8 +852,7 @@ async fn git_exec(cmd: web::Path<String>, data: web::Json<GitInfo>) -> impl Resp
     json_response(result)
 }
 
-#[get("/git/result")]
-async fn git_result() -> impl Responder {
+async fn git_result() -> impl IntoResponse {
     let result = async move {
         let path = Path::new("git_result.txt");
         let mut result = HashMap::new();
@@ -790,9 +883,9 @@ pub struct NotFound {
 }
 impl NotFound {
     #[allow(dead_code)]
-    pub fn new(http_req: &HttpRequest) -> NotFound {
+    pub fn new(parts: http::request::Parts) -> NotFound {
         NotFound {
-            path: http_req.path().to_string(),
+            path: parts.uri.path().to_string(),
         }
     }
 }
@@ -803,46 +896,27 @@ impl std::fmt::Display for NotFound {
 }
 impl std::error::Error for NotFound {}
 
-pub fn json_response<T: Serialize>(r: Result<T, anyhow::Error>) -> impl Responder {
+pub fn json_response<T: Serialize>(
+    r: Result<T, anyhow::Error>,
+) -> Result<Response, (StatusCode, Response)> {
     match r {
-        Ok(data) => {
-            let mut writer = Vec::with_capacity(65536);
-            match serde_json::to_writer(&mut writer, &data) {
-                Ok(_) => {
-                    let response = unsafe { String::from_utf8_unchecked(writer) };
-                    HttpResponse::Ok()
-                        .content_type("application/json")
-                        .body(response)
-                }
-                Err(err) => error_response(err.into()),
-            }
-        }
-        Err(err) => error_response(err),
+        Ok(data) => Ok(Json(data).into_response()),
+        Err(err) => Err(error_response(err)),
     }
 }
 
-pub fn json_error_handler(err: error::JsonPayloadError, _req: &HttpRequest) -> error::Error {
-    use actix_web::error::JsonPayloadError;
-
-    let detail = err.to_string();
-    let resp = match &err {
-        JsonPayloadError::ContentType => HttpResponse::UnsupportedMediaType().body(detail),
-        JsonPayloadError::Deserialize(json_err) if json_err.is_data() => {
-            HttpResponse::UnprocessableEntity().json(BadRequest::new(detail))
-        }
-        _ => HttpResponse::BadRequest().body(detail),
-    };
-    error::InternalError::from_response(err, resp).into()
-}
-
-fn error_response(err: anyhow::Error) -> HttpResponse {
+fn error_response(err: anyhow::Error) -> (StatusCode, Response) {
+    println!("{}", err);
     if let Some(e) = err.downcast_ref::<validator::ValidationErrors>() {
-        HttpResponse::BadRequest().json(e)
+        (StatusCode::BAD_REQUEST, Json(e).into_response())
     } else if let Some(e) = err.downcast_ref::<BadRequest>() {
-        HttpResponse::BadRequest().json(e)
+        (StatusCode::BAD_REQUEST, Json(e).into_response())
     } else if err.downcast_ref::<NotFound>().is_some() {
-        HttpResponse::NotFound().body("not found")
+        (StatusCode::NOT_FOUND, "not found".into_response())
     } else {
-        HttpResponse::InternalServerError().body(err.to_string())
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            err.to_string().into_response(),
+        )
     }
 }
