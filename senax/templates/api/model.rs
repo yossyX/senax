@@ -175,6 +175,19 @@ async fn _count_@{ selector }@(
 @%- endfor %@
 @%- endfor %@
 
+async fn delete(
+    repo: &RepositoriesImpl,
+    auth: &AuthInfo,
+    primary: _domain_::@{ mod_name|pascal }@Primary,
+) -> anyhow::Result<()> {
+    let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+    let mut query = @{ mod_name }@_repo.find(primary.into());
+    query = query.filter(deletable_filter(auth)?);
+    let obj = query.query_for_update().await?;
+    _domain_::delete(repo, obj).await?;
+    Ok(())
+}
+
 pub struct GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@;
 #[async_graphql::Object]
 impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
@@ -474,6 +487,26 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(ResObj::try_from_(&*obj, auth)?)
     }
+    @%- if api_def.use_delete_by_pk %@
+
+    #[graphql(guard = "delete_guard()")]
+    async fn delete_by_pk(
+        &self,
+        gql_ctx: &async_graphql::Context<'_>,
+        @%- if camel_case %@
+        @{- def.primaries()|fmt_join("
+        {var}: {inner},", "") }@
+        @%- else %@
+        @{- def.primaries()|fmt_join("
+        #[graphql(name = \"{raw_var}\")] {var}: {inner},", "") }@
+        @%- endif %@
+    ) -> async_graphql::Result<bool> {
+        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let auth: &AuthInfo = gql_ctx.data()?;
+        delete(repo, auth, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into()).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
+        Ok(true)
+    }
+    @%- endif %@
 
     #[graphql(guard = "delete_guard()")]
     async fn delete(
@@ -483,17 +516,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-        let mut query = @{ mod_name }@_repo.find(id.into());
-        query = query.filter(deletable_filter(auth)?);
-        let obj = query
-            .query_for_update()
-            .await
-            .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-        _domain_::delete(repo, obj)
-            .await
-            .map_err(|e| GqlError::server_error(gql_ctx, e))?;
+        delete(repo, auth, (&_id).try_into()?).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(true)
     }
     @%- for (selector, selector_def) in def.selectors %@

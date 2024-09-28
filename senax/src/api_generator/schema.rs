@@ -472,6 +472,9 @@ pub struct ApiModelDef {
     /// ### 主キーでのfindを使用
     #[serde(default, skip_serializing_if = "is_false")]
     pub use_find_by_pk: bool,
+    /// ### 主キーでのdeleteを使用
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub use_delete_by_pk: bool,
     /// ### 登録、更新、削除を使用しない
     #[serde(default, skip_serializing_if = "is_false")]
     pub disable_mutation: bool,
@@ -528,6 +531,9 @@ pub struct ApiModelJson {
     /// ### 主キーでのfindを使用
     #[serde(default, skip_serializing_if = "is_false")]
     pub use_find_by_pk: bool,
+    /// ### 主キーでのdeleteを使用
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub use_delete_by_pk: bool,
     /// ### 登録、更新、削除を使用しない
     #[serde(default, skip_serializing_if = "is_false")]
     pub disable_mutation: bool,
@@ -586,6 +592,7 @@ impl From<ApiModelDef> for ApiModelJson {
             name: String::new(),
             disable_auto_fields: value.disable_auto_fields,
             use_find_by_pk: value.use_find_by_pk,
+            use_delete_by_pk: value.use_delete_by_pk,
             disable_mutation: value.disable_mutation,
             use_import: value.use_import,
             readable_roles: value.readable_roles,
@@ -632,6 +639,7 @@ impl TryFrom<ApiModelJson> for ApiModelDef {
         Ok(Self {
             disable_auto_fields: value.disable_auto_fields,
             use_find_by_pk: value.use_find_by_pk,
+            use_delete_by_pk: value.use_delete_by_pk,
             disable_mutation: value.disable_mutation,
             use_import: value.use_import,
             readable_roles: value.readable_roles,

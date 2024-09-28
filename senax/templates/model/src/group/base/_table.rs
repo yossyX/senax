@@ -5197,10 +5197,6 @@ impl Updater for _@{ pascal_name }@Updater {
     fn mark_for_delete(&mut self) {
         self._do_delete = true;
     }
-    fn mark_for_delete_and_return_self(mut self) -> Self {
-        self._do_delete = true;
-        self
-    }
     fn unmark_for_delete(&mut self) {
         self._do_delete = false;
     }

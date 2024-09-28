@@ -187,6 +187,7 @@ function EditApi() {
               />
               <AutoField name="disable_auto_fields" {...formData} />
               <AutoField name="use_find_by_pk" {...formData} />
+              <AutoField name="use_delete_by_pk" {...formData} />
               <AutoField name="disable_mutation" {...formData} />
               <AutoField name="use_import" {...formData} />
               <AutoField
