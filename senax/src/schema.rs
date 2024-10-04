@@ -449,6 +449,19 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
         for (cur_model_name, def) in defs.iter() {
             {
                 let mut model = def.borrow_mut();
+                for (rel_name, rel_def) in model.belongs_to_outer_db.clone().iter() {
+                    let local_ids = rel_def.get_local_id(rel_name);
+                    if local_ids.len() == 1 {
+                        let col_name = &local_ids[0];
+                        if let Some(column_def) = model.merged_fields.get_mut(col_name) {
+                            column_def.outer_db_rel = Some((rel_name.clone(), rel_def.clone()));
+                            column_def.main_primary = false;
+                            column_def.id_class = None;
+                            column_def.enum_class = None;
+                            column_def.value_object = None;
+                        }
+                    }
+                }
                 for (rel_name, rel_def) in model.merged_relations.clone().iter() {
                     if rel_def.is_type_of_belongs_to() {
                         let local_ids = rel_def.get_local_id(rel_name);

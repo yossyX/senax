@@ -292,6 +292,22 @@ function EditModel() {
                 )}
               />
               <AutoField
+                name="belongs_to_outer_db"
+                {...formData}
+                hidden={!detail}
+                columns={[
+                  { field: "name", editable: true },
+                  { field: "db", editable: true },
+                  { field: "group", editable: true },
+                  { field: "model", editable: true },
+                  { field: "local", editable: true },
+                ]}
+                dialog={BelongsToOuterDb}
+                resolver={yupResolver(
+                  createYupSchema(definitions.BelongsToOuterDbJson, definitions),
+                )}
+              />
+              <AutoField
                 name="has_one"
                 {...formData}
                 columns={[
@@ -412,7 +428,7 @@ function Field({ formData, definitions }: any) {
             name="length"
             {...formData}
             hidden={
-              !["varchar", "text", "varbinary", "binary", "blob"].includes(type)
+              !["char", "varchar", "text", "varbinary", "binary", "blob"].includes(type)
             }
           />
           <AutoField name="max" {...formData} hidden={!NUMBER.includes(type)} />
@@ -420,7 +436,7 @@ function Field({ formData, definitions }: any) {
           <AutoField
             name="collation"
             {...formData}
-            hidden={!["varchar", "text"].includes(type)}
+            hidden={!["char", "varchar", "text"].includes(type)}
           />
           <AutoField
             name="precision"
@@ -517,6 +533,42 @@ function BelongsTo({ formData }: any) {
         <AutoField name="disable_index" {...formData} />
         <AutoField name="on_delete" {...formData} />
         <AutoField name="on_update" {...formData} />
+      </SpaceBetween>
+    </>
+  );
+}
+
+function BelongsToOuterDb({ formData }: any) {
+  const model = useWatch({
+    control: formData.form.control,
+    name: "model",
+  });
+  if (formData.form.getValues("name") === undefined) {
+    if (model !== undefined) {
+      formData.form.setValue("name", model, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }
+  return (
+    <>
+      <SpaceBetween direction="vertical" size="xs">
+        <AutoField name="name" {...formData} />
+        <AutoField name="label" {...formData} />
+        <AutoField name="comment" {...formData} textarea />
+        <AutoField name="db" {...formData} />
+        <AutoField name="group" {...formData} />
+        <AutoField name="model" {...formData} />
+        <AutoField
+          name="local"
+          {...formData}
+          autocomplete={formData.additionalData.modelData?.fields?.map(
+            (v: any) => v.name,
+          )}
+        />
+        <AutoField name="with_trashed" {...formData} />
+        <AutoField name="disable_index" {...formData} />
       </SpaceBetween>
     </>
   );
@@ -806,7 +858,7 @@ function Filter({ formData, definitions }: any) {
     group,
     modelData:
       formData.additionalData.selfGroup == group &&
-      formData.additionalData.selfModel.name == name
+        formData.additionalData.selfModel.name == name
         ? formData.additionalData.selfModel
         : foreign,
   };

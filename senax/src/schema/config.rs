@@ -2,6 +2,7 @@ use compact_str::CompactString;
 use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use strum_macros::{AsRefStr, EnumString};
 
 use super::{ModelDef, AGGREGATION_TYPE, CREATED_AT, DELETED, DELETED_AT, UPDATED_AT, VERSION};
@@ -508,6 +509,18 @@ impl ConfigDef {
         match self.db {
             DbType::Mysql => 4 * 1024 * 1024 * 1024 - 1,
         }
+    }
+    pub fn outer_db(&self) -> HashSet<String> {
+        let mut v = HashSet::new();
+        let groups = super::GROUPS.read().unwrap().as_ref().unwrap().clone();
+        for (_, models) in groups {
+            for (_, model) in models {
+                for (_, belongs) in &model.belongs_to_outer_db {
+                    v.insert(belongs.db.to_string());
+                }
+            }
+        }
+        v
     }
 }
 

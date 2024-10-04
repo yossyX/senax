@@ -8,9 +8,11 @@ use ::fxhash::FxHashMap;
 use ::log::error;
 use ::senax_common::ShardId;
 use ::serde::{Deserialize, Serialize};
+use ::std::collections::BTreeMap;
 use ::std::path::Path;
 use ::std::sync::Arc;
-use ::tokio::sync::RwLock;
+use ::tokio::sync::{Mutex, RwLock, Semaphore};
+
 
 #[allow(dead_code)]
 pub(crate) const USE_FAST_CACHE: bool = @{ config.use_fast_cache() }@;
@@ -162,6 +164,16 @@ where
 }
 
 pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Result<()> {
+    static MIGRATE_LOCK: Mutex<BTreeMap<String, Arc<Semaphore>>> =
+        Mutex::const_new(BTreeMap::new());
+    let _lock = {
+        let mut lock = MIGRATE_LOCK.lock().await;
+        lock.entry(DbConn::get_host_name(shard_id).await?)
+            .or_insert_with(|| Arc::new(Semaphore::new(1)))
+            .clone()
+            .acquire_owned()
+            .await?
+    };
     let conn = DbConn::_new(shard_id);
     let mut writer = conn.acquire_writer().await?;
     @%- if config.collation.is_some() %@

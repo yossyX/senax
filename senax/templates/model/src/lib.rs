@@ -21,20 +21,25 @@ use tokio::{
     time::{sleep, Duration},
 };
 
+#[rustfmt::skip]
 mod accessor;
 @%- if !config.force_disable_cache %@
+#[rustfmt::skip]
 pub mod cache;
 @%- endif %@
+#[rustfmt::skip]
 pub mod connection;
 @%- if !config.excluded_from_domain %@
 #[allow(clippy::module_inception)]
 pub mod impl_domain;
 @%- endif %@
+#[rustfmt::skip]
 pub mod misc;
-pub mod seeder;
-
+#[rustfmt::skip]
 #[allow(clippy::module_inception)]
 pub mod models;
+#[rustfmt::skip]
+pub mod seeder;
 
 pub(crate) use models::{CacheMsg, CacheOp};
 

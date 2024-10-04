@@ -362,6 +362,45 @@ pub async fn generate(
                         );
                     }
                 }
+                for (_model, name, rel) in def.outer_db_relation_constraint() {
+                    let local_id = rel.get_local_id(name);
+                    let local_cols: Vec<_> = local_id
+                        .iter()
+                        .map(|local_id| {
+                            let local_col_name =
+                                if let Some(local_col) = def.merged_fields.get(local_id) {
+                                    local_col.get_col_name(local_id).to_string()
+                                } else {
+                                    local_id.clone()
+                                };
+                            column::Column {
+                                name: local_col_name,
+                                query: None,
+                                len: None,
+                            }
+                        })
+                        .collect();
+                    let index_name = format!("IDX_FK_{}", &name);
+                    let mut cols = local_cols.clone();
+                    if config.add_soft_delete_column_to_relation_index {
+                        if let Some(col) = def.soft_delete_col() {
+                            cols.push(column::Column {
+                                name: col.to_string(),
+                                query: None,
+                                len: None,
+                            });
+                        }
+                    }
+                    let check = cols.iter().fold(String::new(), |mut output, v| {
+                        let _ = write!(output, "{},", v.name);
+                        output
+                    });
+                    if !config.disable_relation_index && !idx_check.contains(&check) {
+                        table
+                            .indexes
+                            .insert(index_name.clone(), TableKey::Key(index_name, cols));
+                    }
+                }
                 new_tables.insert(table_name, table);
             }
         }

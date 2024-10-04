@@ -49,6 +49,7 @@ const ID_OF_CACHE_SYNC: u32 = 2;
 static DB_URL: RwLock<String> = RwLock::const_new(String::new());
 static DB_USER: RwLock<Option<String>> = RwLock::const_new(None);
 static DB_PASSWORD: RwLock<Option<String>> = RwLock::const_new(None);
+static REAL_DB_NAME: OnceCell<Vec<String>> = OnceCell::new();
 static REPLICA_DB_URL: RwLock<String> = RwLock::const_new(String::new());
 static REPLICA_DB_USER: RwLock<Option<String>> = RwLock::const_new(None);
 static REPLICA_DB_PASSWORD: RwLock<Option<String>> = RwLock::const_new(None);
@@ -124,6 +125,12 @@ async fn config(etcd: &FxHashMap<String, String>, test_mode: bool) -> Result<()>
     }
     if SHARD_NUM.get().is_none() {
         let s_url = DB_URL.read().await.to_owned();
+        let mut v = Vec::new();
+        for source in split_shard!(s_url) {
+            let url = url::Url::parse(source)?;
+            v.push(format!("\"{}\".", url.path().trim_matches('/')));
+        }
+        let _ = REAL_DB_NAME.set(v);
         let r_url = REPLICA_DB_URL.read().await.to_owned();
         let source_len = split_shard!(s_url).count();
         ensure!(
@@ -526,6 +533,9 @@ pub struct DbConn {
     wo_tx: usize,
     has_read_tx: usize,
     lock_list: Vec<DbLock>,
+    @%- for db in config.outer_db() %@
+    pub(crate) _@{ db }@_db: ::db_@{ db }@::connection::DbConn,
+    @%- endfor %@
 }
 
 impl Clone for DbConn {
@@ -551,11 +561,11 @@ impl DbConn {
         DbConn::__new(ctx_no, SystemTime::now(), shard_id)
     }
 
-    fn __new(ctx_no: u64, time: SystemTime, shard_id: ShardId) -> DbConn {
+    pub fn __new(ctx_no: u64, time: SystemTime, shard_id: ShardId) -> DbConn {
         DbConn {
             ctx_no,
             time,
-            shard_id,
+            shard_id: shard_id % (Self::shard_num() as ShardId),
             @%- if !config.force_disable_cache %@
             cache_sync: 0,
             @%- endif %@
@@ -574,12 +584,34 @@ impl DbConn {
             wo_tx: 0,
             has_read_tx: 0,
             lock_list: Vec::new(),
+            @%- for db in config.outer_db() %@
+            _@{ db }@_db: ::db_@{ db }@::connection::DbConn::__new(ctx_no, time, shard_id),
+            @%- endfor %@
         }
     }
 
     pub fn ctx_no(&self) -> u64 {
         self.ctx_no
     }
+
+    pub fn real_db_name(shard_id: ShardId) -> &'static str {
+        &REAL_DB_NAME.get().unwrap()[shard_id as usize % DbConn::shard_num()]
+    }
+
+    pub async fn get_host_name(shard_id: ShardId) -> Result<String> {
+        let s_url = DB_URL.read().await;
+        let url = split_shard!(s_url)
+            .nth(shard_id as usize)
+            .ok_or_else(|| anyhow::anyhow!("shard_id is out of range."))?;
+        let url = url::Url::parse(url)?;
+        Ok(url.host_str().unwrap().to_string())
+    }
+    @%- for db in config.outer_db() %@
+
+    pub fn _@{ db }@_db(&mut self) -> &mut ::db_@{ db }@::connection::DbConn {
+        &mut self._@{ db }@_db
+    }
+    @%- endfor %@
 
     pub fn set_time(&mut self, time: SystemTime) {
         self.time = time;
@@ -798,16 +830,25 @@ impl DbConn {
 
     pub fn release_conn(&mut self) {
         self.conn.clear();
+        @%- for db in config.outer_db() %@
+        self._@{ db }@_db.release_conn();
+        @%- endfor %@
     }
 
     pub async fn begin_without_transaction(&mut self) -> Result<()> {
         self.wo_tx += 1;
+        @%- for db in config.outer_db() %@
+        self._@{ db }@_db.begin_without_transaction().await?;
+        @%- endfor %@
         Ok(())
     }
 
     pub async fn end_of_without_transaction(&mut self) -> Result<()> {
         ensure!(self.wo_tx > 0, "No without transaction is active.");
         self.wo_tx -= 1;
+        @%- for db in config.outer_db() %@
+        self._@{ db }@_db.end_of_without_transaction().await?;
+        @%- endfor %@
         Ok(())
     }
 
@@ -825,6 +866,9 @@ impl DbConn {
                 callback_post: self.callback_list.len(),
             });
         }
+        @%- for db in config.outer_db() %@
+        self._@{ db }@_db.begin().await?;
+        @%- endfor %@
         Ok(())
     }
 
@@ -912,6 +956,9 @@ impl DbConn {
 
     pub async fn commit(&mut self) -> Result<()> {
         ensure!(self.has_tx(), "No transaction is active.");
+        @%- for db in config.outer_db() %@
+        self._@{ db }@_db.commit().await?;
+        @%- endfor %@
         if let Some(_save_point) = self.save_point.pop() {
             for (_shard_id, tx) in self.tx.iter_mut() {
                 let sql = format!("RELEASE SAVEPOINT s{}", self.save_point.len());
@@ -975,6 +1022,9 @@ impl DbConn {
 
     pub async fn rollback(&mut self) -> Result<()> {
         ensure!(self.has_tx(), "No transaction is active.");
+        @%- for db in config.outer_db() %@
+        self._@{ db }@_db.rollback().await?;
+        @%- endfor %@
         if let Some(save_point) = self.save_point.pop() {
             self.cache_internal_op_list
                 .truncate(save_point.cache_internal_op_pos);
@@ -1004,6 +1054,9 @@ impl DbConn {
             self.read_tx.insert(self.shard_id, tx);
         }
         self.has_read_tx += 1;
+        @%- for db in config.outer_db() %@
+        self._@{ db }@_db.begin_read_tx().await?;
+        @%- endfor %@
         Ok(())
     }
 
@@ -1025,6 +1078,9 @@ impl DbConn {
 
     pub fn release_read_tx(&mut self) -> Result<()> {
         ensure!(self.has_read_tx > 0, "No read transaction is active.");
+        @%- for db in config.outer_db() %@
+        self._@{ db }@_db.release_read_tx()?;
+        @%- endfor %@
         self.has_read_tx -= 1;
         if self.has_read_tx == 0 {
             self.read_tx.clear();
@@ -1083,6 +1139,9 @@ impl DbConn {
         @%- if !config.force_disable_cache %@
         self.cache_tx.clear();
         @%- endif %@
+        @%- for db in config.outer_db() %@
+        self._@{ db }@_db.reset_tx();
+        @%- endfor %@
     }
     @%- if config.use_sequence %@
 

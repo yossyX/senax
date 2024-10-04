@@ -54,6 +54,9 @@ use crate::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
 #[allow(unused_imports)]
 use domain::value_objects;
 pub use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name|to_var_name }@::{join, Joiner_};
+@%- for (name, rel_def) in def.belongs_to_outer_db %@
+use domain::models::@{ rel_def.db|to_var_name }@::@{ rel_def.get_group_mod_var() }@ as join_@{ rel_def.get_group_mod_name() }@;
+@%- endfor %@
 @%- endif %@
 @%- for mod_name in def.relation_mods() %@
 use crate::models::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
@@ -62,6 +65,9 @@ use domain::models::@{ db|snake|to_var_name }@::@{ mod_name[0]|to_var_name }@::@
 @%- else %@
 use crate::models::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- endif %@
+@%- endfor %@
+@%- for (name, rel_def) in def.belongs_to_outer_db %@
+use db_@{ rel_def.db }@::models::@{ rel_def.get_base_group_mod_var() }@ as rel_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 const USE_CACHE: bool = @{ def.use_cache() }@;
 const USE_ALL_ROWS_CACHE: bool = @{ def.use_all_rows_cache() }@;
@@ -1833,6 +1839,7 @@ pub@{ visibility }@ struct _@{ pascal_name }@ {
 @{ def.relations_one(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 @{ def.relations_many(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Vec<rel_{class_mod}::{class}>>,\n", "") -}@
 @{ def.relations_belonging(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_belonging_outer_db()|fmt_rel_outer_db_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr, strum_macros::EnumIter, strum_macros::EnumProperty)]
@@ -1862,6 +1869,7 @@ pub@{ visibility }@ struct _@{ pascal_name }@Cache {
 @{ def.relations_many_uncached(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Vec<rel_{class_mod}::{class}>>,\n", "") -}@
 @{ def.relations_belonging_cache(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}Cache>>>,\n", "") -}@
 @{ def.relations_belonging_uncached(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_belonging_outer_db()|fmt_rel_outer_db_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1991,6 +1999,7 @@ pub@{ visibility }@ struct _@{ pascal_name }@Updater {
 @{ def.relations_one(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Vec<rel_{class_mod}::{class}Updater>>,\n", "") -}@
 @{ def.relations_many(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Vec<rel_{class_mod}::{class}Updater>>,\n", "") -}@
 @{ def.relations_belonging(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_belonging_outer_db()|fmt_rel_outer_db_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 type _Updater_ = _@{ pascal_name }@Updater;
 @%- if !config.excluded_from_domain %@
@@ -2012,6 +2021,7 @@ impl From<domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name 
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -2066,6 +2076,8 @@ pub@{ visibility }@ trait _@{ pascal_name }@Getter: Send + Sync + 'static {
 ", "") -}@
 @{ def.relations_many(false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> &Vec<rel_{class_mod}::{class}>;
 ", "") -}@
+@{ def.relations_belonging_outer_db()|fmt_rel_outer_db_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}>;
+", "") -}@
 }
 
 @%- for (model, rel_name, rel) in def.relations_belonging(false) %@
@@ -2095,6 +2107,38 @@ impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
 @%- if !config.force_disable_cache %@
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
     fn primary(&self) -> Option<rel_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+    }
+}
+@%- endif %@
+@%- endfor %@
+@%- for (model, rel_name, rel) in def.relations_belonging_outer_db() %@
+struct RelCol@{ rel_name|pascal }@;
+impl RelCol@{ rel_name|pascal }@ {
+    fn cols() -> &'static str {
+        r#"@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@"#
+    }
+    fn cols_with_idx(idx: usize) -> String {
+        format!(r#"@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("_t{}.{col_esc}", ", ") }@"#, @{ rel.get_local_cols(rel_name, def)|fmt_join("idx", ", ") }@)
+    }
+}
+
+trait RelPk@{ rel_name|pascal }@ {
+    fn primary(&self) -> Option<rel_@{ rel.db }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary>;
+}
+impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
+    fn primary(&self) -> Option<rel_@{ rel.db }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+    }
+}
+impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
+    fn primary(&self) -> Option<rel_@{ rel.db }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+    }
+}
+@%- if !config.force_disable_cache %@
+impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
+    fn primary(&self) -> Option<rel_@{ rel.db }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
     }
 }
@@ -2515,12 +2559,18 @@ pub@{ visibility }@ trait _@{ pascal_name }@Joiner {
             if joiner.{rel_name}.is_some() {
                 self.join_{raw_rel_name}(conn, joiner.{rel_name}).await?;
             }", "") }@
+            @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+            if joiner.{rel_name}.is_some() {
+                self.join_{raw_rel_name}(conn, joiner.{rel_name}).await?;
+            }", "") }@
         }
         Ok(())
     }
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()>;", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()>;", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()>;", "") }@
 }
 
@@ -2535,6 +2585,24 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
             let mut obj = rel_{class_mod}::{class}::find_optional{with_trashed}(conn, id, None).await?;
             if let Some(mut obj) = obj {
                 rel_{class_mod}::{class}Joiner::join(&mut obj, conn, joiner).await?;
+                self.{rel_name} = Some(Some(Box::new(obj)));
+            } else {
+                self.{rel_name} = Some(None);
+            }
+        } else {
+            self.{rel_name} = Some(None);
+        }
+        Ok(())
+    }", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        if self.{rel_name}.is_some() {
+            return Ok(());
+        }
+        if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
+            let mut obj = rel_{class_mod}::{class}::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, None).await?;
+            if let Some(mut obj) = obj {
+                rel_{class_mod}::{class}Joiner::join(&mut obj, &mut conn._{raw_db}_db, joiner).await?;
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
                 self.{rel_name} = Some(None);
@@ -2588,6 +2656,24 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
             let mut obj = rel_{class_mod}::{class}::find_optional{with_trashed}(conn, id, None).await?;
             if let Some(mut obj) = obj {
                 rel_{class_mod}::{class}Joiner::join(&mut obj, conn, joiner).await?;
+                self.{rel_name} = Some(Some(Box::new(obj)));
+            } else {
+                self.{rel_name} = Some(None);
+            }
+        } else {
+            self.{rel_name} = Some(None);
+        }
+        Ok(())
+    }", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        if self.{rel_name}.is_some() {
+            return Ok(());
+        }
+        if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
+            let mut obj = rel_{class_mod}::{class}::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, None).await?;
+            if let Some(mut obj) = obj {
+                rel_{class_mod}::{class}Joiner::join(&mut obj, &mut conn._{raw_db}_db, joiner).await?;
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
                 self.{rel_name} = Some(None);
@@ -2692,6 +2778,24 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         }
         Ok(())
     }", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        if self.{rel_name}.is_some() {
+            return Ok(());
+        }
+        if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
+            let mut obj = rel_{class_mod}::{class}::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, None).await?;
+            if let Some(mut obj) = obj {
+                rel_{class_mod}::{class}Joiner::join(&mut obj, &mut conn._{raw_db}_db, joiner).await?;
+                self.{rel_name} = Some(Some(Box::new(obj)));
+            } else {
+                self.{rel_name} = Some(None);
+            }
+        } else {
+            self.{rel_name} = Some(None);
+        }
+        Ok(())
+    }", "") }@
 @{- def.relations_one_cache(false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if !matches!(joiner.as_ref().map(|v| v.has_some()), Some(true)) {
@@ -2765,8 +2869,24 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = rel_{class_mod}::{class}::find_many{with_trashed}(conn, ids.iter()).await?;
+        let mut list = rel_{class_mod}::{class}::find_many{with_trashed}(conn, ids.iter(), None).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let map = rel_{class_mod}::{class}::list_to_map(list);
+        for val in self.iter_mut() {
+            if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
+                val.{rel_name} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            } else {
+                val.{rel_name} = Some(None);
+            }
+        }
+        Ok(())
+    }", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
+        if ids.is_empty() { return Ok(()); }
+        let mut list = rel_{class_mod}::{class}::find_many{with_trashed}(&mut conn._{raw_db}_db, ids.iter(), None).await?;
+        rel_{class_mod}::{class}Joiner::join(&mut list, &mut conn._{raw_db}_db, joiner).await?;
         let map = rel_{class_mod}::{class}::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2849,8 +2969,24 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = rel_{class_mod}::{class}::find_many{with_trashed}(conn, ids.iter()).await?;
+        let mut list = rel_{class_mod}::{class}::find_many{with_trashed}(conn, ids.iter(), None).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let map = rel_{class_mod}::{class}::list_to_map(list);
+        for val in self.iter_mut() {
+            if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
+                val.{rel_name} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            } else {
+                val.{rel_name} = Some(None);
+            }
+        }
+        Ok(())
+    }", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
+        if ids.is_empty() { return Ok(()); }
+        let mut list = rel_{class_mod}::{class}::find_many{with_trashed}(&mut conn._{raw_db}_db, ids.iter(), None).await?;
+        rel_{class_mod}::{class}Joiner::join(&mut list, &mut conn._{raw_db}_db, joiner).await?;
         let map = rel_{class_mod}::{class}::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -3114,7 +3250,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = rel_{class_mod}::{class}::find_many{with_trashed}(conn, ids.iter()).await?;
+        let mut list = rel_{class_mod}::{class}::find_many{with_trashed}(conn, ids.iter(), None).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let map = rel_{class_mod}::{class}::list_to_map(list);
         for val in self.iter_mut() {
@@ -3195,7 +3331,7 @@ impl BindTr for ColOne_ {
             _ => "?",
         }
     }
-    fn query_as_bind<T>(
+    fn bind_to_query_as<T>(
         self,
         query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments> {
@@ -3208,7 +3344,7 @@ impl BindTr for ColOne_ {
             _ => unreachable!(),
         }
     }
-    fn query_bind(
+    fn bind_to_query(
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
@@ -3242,7 +3378,7 @@ impl BindTr for ColKey_ {
             _ => unreachable!(),
         }
     }
-    fn query_as_bind<T>(
+    fn bind_to_query_as<T>(
         self,
         query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments> {
@@ -3253,7 +3389,7 @@ impl BindTr for ColKey_ {
             _ => unreachable!(),
         }
     }
-    fn query_bind(
+    fn bind_to_query(
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
@@ -3325,7 +3461,7 @@ impl BindTr for ColMany_ {
             _ => unreachable!(),
         }
     }
-    fn query_as_bind<T>(
+    fn bind_to_query_as<T>(
         self,
         mut query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments> {
@@ -3339,7 +3475,7 @@ impl BindTr for ColMany_ {
             _ => unreachable!(),
         }
     }
-    fn query_bind(
+    fn bind_to_query(
         self,
         mut query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
@@ -3373,7 +3509,7 @@ impl BindTr for ColJson_ {
             _ => unreachable!(),
         }
     }
-    fn query_as_bind<T>(
+    fn bind_to_query_as<T>(
         self,
         query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments> {
@@ -3384,7 +3520,7 @@ impl BindTr for ColJson_ {
             _ => unreachable!(),
         }
     }
-    fn query_bind(
+    fn bind_to_query(
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
@@ -3416,7 +3552,7 @@ impl BindTr for ColJsonArray_ {
             _ => unreachable!(),
         }
     }
-    fn query_as_bind<T>(
+    fn bind_to_query_as<T>(
         self,
         query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments> {
@@ -3427,7 +3563,7 @@ impl BindTr for ColJsonArray_ {
             _ => unreachable!(),
         }
     }
-    fn query_bind(
+    fn bind_to_query(
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
@@ -3483,7 +3619,7 @@ impl BindTr for ColGeo_ {
             _ => unreachable!(),
         }
     }
-    fn query_as_bind<T>(
+    fn bind_to_query_as<T>(
         self,
         query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments> {
@@ -3494,7 +3630,7 @@ impl BindTr for ColGeo_ {
             _ => unreachable!(),
         }
     }
-    fn query_bind(
+    fn bind_to_query(
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
@@ -3526,7 +3662,7 @@ impl BindTr for ColGeoDistance_ {
             _ => unreachable!(),
         }
     }
-    fn query_as_bind<T>(
+    fn bind_to_query_as<T>(
         self,
         query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments> {
@@ -3537,7 +3673,7 @@ impl BindTr for ColGeoDistance_ {
             _ => unreachable!(),
         }
     }
-    fn query_bind(
+    fn bind_to_query(
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
@@ -3563,83 +3699,24 @@ pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_
 impl ColRelTr for ColRel_ {
     #[allow(unused_mut)]
     #[allow(clippy::ptr_arg)]
-    fn write_rel(&self, buf: &mut String, idx: usize, without_key: bool) {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() > 0 %@
+    fn write_rel(&self, buf: &mut String, idx: usize, without_key: bool, shard_id: ShardId) {
+@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db().len() > 0 %@
         match self {
 @{- def.relations_belonging(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
-                if without_key {
-                    write!(buf, r#\"SELECT {} FROM {table} as _t{} WHERE \"#, rel_{class_mod}::Primary::cols(), idx + 1).unwrap();
-                } else {
-                    write!(buf, r#\"SELECT /*+ NO_SEMIJOIN() */ * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, rel_{class_mod}::Primary::cols_with_paren(), RelCol{rel_name_pascal}::cols_with_idx(idx)).unwrap();
-                }
-                let mut trash_mode = TrashMode::Not;
-                if let Some(filter) = c {
-                    filter.write(buf, idx + 1, &mut trash_mode);
-                }
-                if trash_mode == TrashMode::Not {
-                    buf.push_str(rel_{class_mod}::NOT_TRASHED_SQL)
-                } else if trash_mode == TrashMode::Only {
-                    buf.push_str(rel_{class_mod}::ONLY_TRASHED_SQL)
-                } else {
-                    buf.push_str(rel_{class_mod}::TRASHED_SQL)
-                }
-                if buf.ends_with(\" AND \") {
-                    buf.truncate(buf.len() - \" AND \".len());
-                }
-                if without_key && buf.ends_with(\" WHERE \") {
-                    buf.truncate(buf.len() - \" WHERE \".len());
-                }
+                rel_{class_mod}::write_belonging_rel(buf, c, RelCol{rel_name_pascal}::cols_with_idx(idx), idx, without_key, shard_id, false);
+            }", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+            ColRel_::{rel_name}(c) => {
+                rel_{class_mod}::write_belonging_rel(buf, c, RelCol{rel_name_pascal}::cols_with_idx(idx), idx, without_key, shard_id, true);
             }", "") }@
 @{- def.relations_one(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
-                if without_key {
-                    write!(buf, r#\"SELECT {} FROM {table} as _t{} WHERE \"#, RelCol{rel_name_pascal}::cols(), idx + 1).unwrap();
-                } else {
-                    write!(buf, r#\"SELECT /*+ NO_SEMIJOIN() */ * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren()).unwrap();
-                }
-                let mut trash_mode = TrashMode::Not;
-                if let Some(filter) = c {
-                    filter.write(buf, idx + 1, &mut trash_mode);
-                }
-                if trash_mode == TrashMode::Not {
-                    buf.push_str(rel_{class_mod}::NOT_TRASHED_SQL)
-                } else if trash_mode == TrashMode::Only {
-                    buf.push_str(rel_{class_mod}::ONLY_TRASHED_SQL)
-                } else {
-                    buf.push_str(rel_{class_mod}::TRASHED_SQL)
-                }
-                if buf.ends_with(\" AND \") {
-                    buf.truncate(buf.len() - \" AND \".len());
-                }
-                if without_key && buf.ends_with(\" WHERE \") {
-                    buf.truncate(buf.len() - \" WHERE \".len());
-                }
+                rel_{class_mod}::write_having_rel(buf, c, RelCol{rel_name_pascal}::cols(), Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren(), idx, without_key, shard_id);
             }", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
-                if without_key {
-                    write!(buf, r#\"SELECT {} FROM {table} as _t{} WHERE \"#, RelCol{rel_name_pascal}::cols(), idx + 1).unwrap();
-                } else {
-                    write!(buf, r#\"SELECT /*+ NO_SEMIJOIN() */ * FROM {table} as _t{} WHERE {}={} AND \"#, idx + 1, Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren()).unwrap();
-                }
-                let mut trash_mode = TrashMode::Not;
-                if let Some(filter) = c {
-                    filter.write(buf, idx + 1, &mut trash_mode);
-                }
-                if trash_mode == TrashMode::Not {
-                    buf.push_str(rel_{class_mod}::NOT_TRASHED_SQL)
-                } else if trash_mode == TrashMode::Only {
-                    buf.push_str(rel_{class_mod}::ONLY_TRASHED_SQL)
-                } else {
-                    buf.push_str(rel_{class_mod}::TRASHED_SQL)
-                }
-                if buf.ends_with(\" AND \") {
-                    buf.truncate(buf.len() - \" AND \".len());
-                }
-                if without_key && buf.ends_with(\" WHERE \") {
-                    buf.truncate(buf.len() - \" WHERE \".len());
-                }
+                rel_{class_mod}::write_having_rel(buf, c, RelCol{rel_name_pascal}::cols(), Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren(), idx, without_key, shard_id);
             }", "") }@
         };
 @%- endif %@
@@ -3647,9 +3724,13 @@ impl ColRelTr for ColRel_ {
     #[allow(unused_mut)]
     #[allow(clippy::ptr_arg)]
     fn write_key(&self, buf: &mut String) {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() > 0 %@
+@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db().len() > 0 %@
         match self {
 @{- def.relations_belonging(false)|fmt_rel_join("
+            ColRel_::{rel_name}(c) => {
+                buf.push_str(RelCol{rel_name_pascal}::cols());
+            }", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(c) => {
                 buf.push_str(RelCol{rel_name_pascal}::cols());
             }", "") }@
@@ -3664,59 +3745,122 @@ impl ColRelTr for ColRel_ {
         };
 @%- endif %@
     }
-    fn query_as_bind<T>(
+    fn bind_to_query_as<T>(
         self,
         query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments> {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() > 0 %@
+@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db().len() > 0 %@
         match self {
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
-                if let Some(filter) = c {
-                    filter.query_as_bind(query)
-                } else {
-                    query
-                }
+                rel_{class_mod}::bind_for_rel_query_as(c, query)
+            }", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+            ColRel_::{rel_name}(c) => {
+                rel_{class_mod}::bind_for_rel_query_as(c, query)
             }", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
-                if let Some(filter) = c {
-                    filter.query_as_bind(query)
-                } else {
-                    query
-                }
+                rel_{class_mod}::bind_for_rel_query_as(c, query)
             }", "") }@
         }
 @%- else %@
         query
 @%- endif %@
     }
-    fn query_bind(
+    fn bind_to_query(
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() > 0 %@
+@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db().len() > 0 %@
         match self {
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
-                if let Some(filter) = c {
-                    filter.query_bind(query)
-                } else {
-                    query
-                }
+                rel_{class_mod}::bind_for_rel_query(c, query)
+            }", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+            ColRel_::{rel_name}(c) => {
+                rel_{class_mod}::bind_for_rel_query(c, query)
             }", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
-                if let Some(filter) = c {
-                    filter.query_bind(query)
-                } else {
-                    query
-                }
+                rel_{class_mod}::bind_for_rel_query(c, query)
             }", "") }@
         }
 @%- else %@
         query
 @%- endif %@
+    }
+}
+
+pub fn write_belonging_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols: String, idx: usize, without_key: bool, shard_id: ShardId, is_outer: bool) {
+    let db = if is_outer {
+        DbConn::real_db_name(shard_id)
+    } else {
+        ""
+    };
+    if without_key {
+        write!(buf, r#"SELECT {} FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, Primary::cols(), idx + 1).unwrap();
+    } else {
+        write!(buf, r#"SELECT /*+ NO_SEMIJOIN() */ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, Primary::cols_with_paren(), cols).unwrap();
+    }
+    let mut trash_mode = TrashMode::Not;
+    if let Some(filter) = filter {
+        filter.write(buf, idx + 1, &mut trash_mode, shard_id);
+    }
+    if trash_mode == TrashMode::Not {
+        buf.push_str(NOT_TRASHED_SQL)
+    } else if trash_mode == TrashMode::Only {
+        buf.push_str(ONLY_TRASHED_SQL)
+    } else {
+        buf.push_str(TRASHED_SQL)
+    }
+    if buf.ends_with(" AND ") {
+        buf.truncate(buf.len() - " AND ".len());
+    }
+    if without_key && buf.ends_with(" WHERE ") {
+        buf.truncate(buf.len() - " WHERE ".len());
+    }
+}
+
+pub fn write_having_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols1: &str, cols2: String, cols3: &str, idx: usize, without_key: bool, shard_id: ShardId) {
+    if without_key {
+        write!(buf, r#"SELECT {} FROM @{ table_name|db_esc }@ as _t{} WHERE "#, cols1, idx + 1).unwrap();
+    } else {
+        write!(buf, r#"SELECT /*+ NO_SEMIJOIN() */ * FROM @{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, cols2, cols3).unwrap();
+    }
+    let mut trash_mode = TrashMode::Not;
+    if let Some(filter) = filter {
+        filter.write(buf, idx + 1, &mut trash_mode, shard_id);
+    }
+    if trash_mode == TrashMode::Not {
+        buf.push_str(NOT_TRASHED_SQL)
+    } else if trash_mode == TrashMode::Only {
+        buf.push_str(ONLY_TRASHED_SQL)
+    } else {
+        buf.push_str(TRASHED_SQL)
+    }
+    if buf.ends_with(" AND ") {
+        buf.truncate(buf.len() - " AND ".len());
+    }
+    if without_key && buf.ends_with(" WHERE ") {
+        buf.truncate(buf.len() - " WHERE ".len());
+    }
+}
+
+pub fn bind_for_rel_query_as<T>(filter: Option<Box<Filter_>>, query: QueryAs<'_, DbType, T, DbArguments>) -> QueryAs<'_, DbType, T, DbArguments> {
+    if let Some(filter) = filter {
+        filter.bind_to_query_as(query)
+    } else {
+        query
+    }
+}
+
+pub fn bind_for_rel_query(filter: Option<Box<Filter_>>, query: Query<'_, DbType, DbArguments>) -> Query<'_, DbType, DbArguments> {
+    if let Some(filter) = filter {
+        filter.bind_to_query(query)
+    } else {
+        query
     }
 }
 @%- if config.excluded_from_domain %@
@@ -4175,7 +4319,7 @@ impl QueryBuilder {
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
     {
-        let sql = self._sql(T::_sql_cols(), false);
+        let sql = self._sql(T::_sql_cols(), false, conn.shard_id());
         let mut query = sqlx::query_as::<_, T>(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         query = self._bind(query);
@@ -4183,7 +4327,7 @@ impl QueryBuilder {
         Ok(result)
     }
 
-    fn _sql(&self, sql_cols: &str, for_update: bool) -> String {
+    fn _sql(&self, sql_cols: &str, for_update: bool, shard_id: ShardId) -> String {
         let mut sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             sql_cols,
@@ -4192,7 +4336,8 @@ impl QueryBuilder {
                 self.trash_mode,
                 TRASHED_SQL,
                 NOT_TRASHED_SQL,
-                ONLY_TRASHED_SQL
+                ONLY_TRASHED_SQL,
+                shard_id,
             ),
             &self.raw_query,
             Order_::write_order(&self.order),
@@ -4216,7 +4361,7 @@ impl QueryBuilder {
     fn _bind<T>(self, mut query: QueryAs<DbType, T, DbArguments>) -> QueryAs<DbType, T, DbArguments> {
         if let Some(c) = self.filter {
             debug!("filter: {:?}", &c);
-            query = c.query_as_bind(query);
+            query = c.bind_to_query_as(query);
         }
         for value in self.bind.into_iter() {
             debug!("bind: {:?}", &value);
@@ -4246,7 +4391,7 @@ impl QueryBuilder {
             + Unpin
             + 'static,
     {
-        let sql = self._sql(T::_sql_cols(), false);
+        let sql = self._sql(T::_sql_cols(), false, conn.shard_id());
         let (tx, rx) = mpsc::channel(1000);
         let mut executor = conn.acquire_reader().await?;
         let ctx_no = conn.ctx_no();
@@ -4273,7 +4418,7 @@ impl QueryBuilder {
     async fn _select_from_cache(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         let mut sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
-            Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL),
+            Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id()),
             &self.raw_query,
             Order_::write_order(&self.order),
         );
@@ -4303,7 +4448,7 @@ impl QueryBuilder {
     @%- if !def.disable_update() %@
 
     pub@{ visibility }@ async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
-        let sql = self._sql(Data::_sql_cols(), !conn.wo_tx());
+        let sql = self._sql(Data::_sql_cols(), !conn.wo_tx(), conn.shard_id());
         let mut query = sqlx::query_as::<_, Data>(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let joiner = self.joiner.take();
@@ -4421,7 +4566,8 @@ impl QueryBuilder {
                 self.trash_mode,
                 TRASHED_SQL,
                 NOT_TRASHED_SQL,
-                ONLY_TRASHED_SQL
+                ONLY_TRASHED_SQL,
+                conn.shard_id(),
             ),
             &self.raw_query,
             Order_::write_order(&self.order)
@@ -4438,7 +4584,7 @@ impl QueryBuilder {
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "update_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "{}", &obj);
         debug!("{:?}", &obj);
         if let Some(c) = self.filter {
-            query = c.query_bind(query);
+            query = c.bind_to_query(query);
         }
         for value in self.bind.into_iter() {
             debug!("bind: {:?}", &value);
@@ -4494,7 +4640,8 @@ impl QueryBuilder {
                 self.trash_mode,
                 TRASHED_SQL,
                 NOT_TRASHED_SQL,
-                ONLY_TRASHED_SQL
+                ONLY_TRASHED_SQL,
+                conn.shard_id(),
             ),
             &self.raw_query,
             Order_::write_order(&self.order)
@@ -4506,7 +4653,7 @@ impl QueryBuilder {
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "delete_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "");
         if let Some(c) = self.filter {
-            query = c.query_bind(query);
+            query = c.bind_to_query(query);
         }
         for value in self.bind.into_iter() {
             debug!("bind: {:?}", &value);
@@ -4536,7 +4683,7 @@ impl QueryBuilder {
         @%- else %@
         let mut sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
-            Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL),
+            Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id()),
             &self.raw_query,
             Order_::write_order(&self.order),
         );
@@ -4599,7 +4746,7 @@ where
             }
             let mut sql = chunk
                 .iter()
-                .map(|v| format!("({})", v._sql(T::_sql_cols(), for_update)))
+                .map(|v| format!("({})", v._sql(T::_sql_cols(), for_update, conn.shard_id())))
                 .collect::<Vec<_>>()
                 .join(" UNION ALL ");
             let mut query = sqlx::query_as::<_, T>(&sql);
@@ -4613,7 +4760,7 @@ where
     } else {
         let mut sql = list
             .iter()
-            .map(|v| format!("({})", v._sql(T::_sql_cols(), for_update)))
+            .map(|v| format!("({})", v._sql(T::_sql_cols(), for_update, conn.shard_id())))
             .collect::<Vec<_>>()
             .join(" UNION ");
         write!(sql, " {}", Order_::write_order(&order))?;
@@ -4729,6 +4876,7 @@ impl @{ id_name }@ {
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 @%- endif %@
@@ -4976,6 +5124,10 @@ impl _@{ pascal_name }@Getter for _@{ pascal_name }@ {
     fn _{raw_rel_name}(&self) -> &Vec<rel_{class_mod}::{class}> {
         self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\")
     }", "") }@
+    @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}> {
+        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| &**b)
+    }", "") }@
 }
 
 @%- for parent in def.parents() %@
@@ -5095,6 +5247,10 @@ impl _@{ pascal_name }@Cache {
         self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| *b.clone())
     }", "") }@
     @{- def.relations_belonging_uncached(false)|fmt_rel_join("
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Option<rel_{class_mod}::{class}> {
+        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| *b.clone())
+    }", "") }@
+    @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Option<rel_{class_mod}::{class}> {
         self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| *b.clone())
     }", "") }@
@@ -5275,6 +5431,10 @@ impl _@{ pascal_name }@Updater {
     fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}> {
         self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| &**b)
     }", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}> {
+        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| &**b)
+    }", "") }@
     pub(crate) fn __validate(&self) -> Result<()> {
         self._data.validate()?;
 @{- def.relations_one_and_many(false)|fmt_rel_join("
@@ -5397,6 +5557,7 @@ impl From<Data> for _@{ pascal_name }@ {
             _inner,
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -5413,6 +5574,7 @@ impl From<Data> for _@{ pascal_name }@Updater {
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -5428,6 +5590,7 @@ impl From<Arc<CacheWrapper>> for _@{ pascal_name }@Cache {
 @{- def.relations_many_uncached(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging_uncached(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -5472,6 +5635,10 @@ impl Serialize for _@{ pascal_name }@ {
         if self.{rel_name}.is_some() {
             len += 1;
         }", "") }@
+        @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+        if self.{rel_name}.is_some() {
+            len += 1;
+        }", "") }@
         let mut state = serializer.serialize_struct("@{ pascal_name }@", len)?;
         @{- def.serializable()|fmt_join("
         state.serialize_field(\"{var}\", &(self._inner.{var}{convert_serialize}))?;", "") }@
@@ -5480,6 +5647,10 @@ impl Serialize for _@{ pascal_name }@ {
             state.serialize_field(\"{rel_name}\", &self.{rel_name})?;
         }", "") }@
         @{- def.relations_many(false)|fmt_rel_join("
+        if self.{rel_name}.is_some() {
+            state.serialize_field(\"{rel_name}\", &self.{rel_name})?;
+        }", "") }@
+        @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
         if self.{rel_name}.is_some() {
             state.serialize_field(\"{rel_name}\", &self.{rel_name})?;
         }", "") }@
@@ -5524,6 +5695,7 @@ impl _@{ pascal_name }@ {
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 
@@ -5547,6 +5719,7 @@ impl _@{ pascal_name }@ {
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 @%- for parent in def.downcast_aggregation() %@
@@ -5561,6 +5734,7 @@ impl _@{ pascal_name }@ {
                 },
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("\n                {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n                {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n                {rel_name}: None,", "") }@
             })
         } else {
             None
@@ -5578,6 +5752,7 @@ impl _@{ pascal_name }@ {
             },
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 @%- endfor %@
@@ -5620,7 +5795,8 @@ impl _@{ pascal_name }@ {
                 TrashMode::Not,
                 TRASHED_SQL,
                 NOT_TRASHED_SQL,
-                ONLY_TRASHED_SQL
+                ONLY_TRASHED_SQL,
+                conn.shard_id(),
             ),
             Order_::write_order(&order)
         );
@@ -5630,7 +5806,7 @@ impl _@{ pascal_name }@ {
         let mut query = sqlx::query_as::<_, CacheData>(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
-            query = c.query_as_bind(query);
+            query = c.bind_to_query_as(query);
         }
         let result = crate::misc::fetch!(conn, query, fetch_all);
         let time = MSec::now();
@@ -5678,7 +5854,8 @@ impl _@{ pascal_name }@ {
                 TrashMode::Not,
                 TRASHED_SQL,
                 NOT_TRASHED_SQL,
-                ONLY_TRASHED_SQL
+                ONLY_TRASHED_SQL,
+                conn.shard_id(),
             ),
             Order_::write_order(&order)
         );
@@ -5725,7 +5902,8 @@ impl _@{ pascal_name }@ {
     async fn __find_many(
         conn: &mut DbConn,
         ids: &[InnerPrimary],
-        with_trashed: bool,
+        trash_mode: TrashMode,
+        filter: Option<Filter_>,
     ) -> Result<Vec<Data>> {
         if ids.is_empty() {
             return Ok(Vec::new());
@@ -5746,87 +5924,37 @@ impl _@{ pascal_name }@ {
                 })
                 .collect();
             @%- else %@
-            let mut v = Self::___find_many(conn, ids, with_trashed).await?;
+            let mut v = Self::___find_many(conn, ids, trash_mode, filter.clone()).await?;
             @%- endif %@
             list.append(&mut v);
         }
         Ok(list)
     }
-@% if def.not_optimized_tuple() %@
-    fn check_id(id: impl std::fmt::Display) -> Result<String> {
-        let id = id.to_string();
-        for c in id.as_bytes().iter() {
-            if *c == '\\' as u32 as u8
-                || *c == '\'' as u32 as u8
-                || *c == '"' as u32 as u8
-                || *c < '!' as u32 as u8
-                || *c > '~' as u32 as u8
-            {
-                return Err(anyhow!("invalid id!"));
-            }
-        }
-        Ok(id)
-    }
-
-    async fn ___find_many<T>(conn: &mut DbConn, ids: &[InnerPrimary], with_trashed: bool) -> Result<Vec<T>>
-    where
-        T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
-    {
-        use futures::TryStreamExt;
-        use sqlx::Executor;
-        let mut sql = String::new();
-        for id in ids {
-            write!(sql, 
-                r#"SELECT {} FROM @{ table_name|db_esc }@ WHERE {}@{ def.primaries()|fmt_join("{col_esc}='{}'", " AND ") }@;"#,
-                T::_sql_cols(),
-                if with_trashed { TRASHED_SQL } else { NOT_TRASHED_SQL },
-                @{ def.primaries()|fmt_join("check_id(id.{index})?", ", ") }@
-            )?;
-        }
-        let mut list = Vec::new();
-        if conn.has_tx() {
-            let mut stream = conn.get_tx().await?.as_mut().fetch_many(&*sql);
-            while let Some(result) = stream.try_next().await? {
-                if let Some(row) = result.right() {
-                    list.push(T::from_row(&row)?);
-                }
-            }
-        } else if conn.has_read_tx() {
-            let mut stream = conn.get_read_tx().await?.fetch_many(&*sql);
-            while let Some(result) = stream.try_next().await? {
-                if let Some(row) = result.right() {
-                    list.push(T::from_row(&row)?);
-                }
-            }
-        } else {
-            let replica = conn.get_reader().await?;
-            let mut stream = replica.fetch_many(&*sql);
-            while let Some(result) = stream.try_next().await? {
-                if let Some(row) = result.right() {
-                    list.push(T::from_row(&row)?);
-                }
-            }
-        };
-        Ok(list)
-    }
-@%- else %@
     #[allow(clippy::needless_borrow)]
-    async fn ___find_many<T>(conn: &mut DbConn, ids: &[InnerPrimary], with_trashed: bool) -> Result<Vec<T>>
+    async fn ___find_many<T>(conn: &mut DbConn, ids: &[InnerPrimary], trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Vec<T>>
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
     {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
+        let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
+        if filter_str.is_empty() {
+            filter_str = "WHERE".to_string();
+        } else {
+            filter_str.push_str(" AND ");
+        }
         let q = "@{ def.primaries()|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
         let sql = format!(
-            r#"SELECT {} FROM @{ table_name|db_esc }@ WHERE {}@{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({});"#,
+            r#"SELECT {} FROM @{ table_name|db_esc }@ {filter_str} @{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({});"#,
             T::_sql_cols(),
-            if with_trashed { TRASHED_SQL } else { NOT_TRASHED_SQL },
             &q[0..q.len() - 1]
         );
         let mut query = sqlx::query_as::<_, T>(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        if let Some(c) = filter {
+            query = c.bind_to_query_as(query);
+        }
         for id in ids {
             @{- def.primaries()|fmt_join("
             query = query.bind(id.{index}{bind_as});", "") }@
@@ -5834,7 +5962,6 @@ impl _@{ pascal_name }@ {
         let result = crate::misc::fetch!(conn, query, fetch_all);
         Ok(result)
     }
-@%- endif %@
 @%- if def.use_cache() %@
 
     #[cfg(not(feature="cache_update_only"))]
@@ -5861,7 +5988,7 @@ impl _@{ pascal_name }@ {
                 })
                 .collect();
             @%- else %@
-            let mut v = Self::___find_many(conn, ids, true).await?;
+            let mut v = Self::___find_many(conn, ids, TrashMode::With, None).await?;
             @%- endif %@
             result.append(&mut v);
         }
@@ -5962,23 +6089,23 @@ impl _@{ pascal_name }@ {
         map
     }
 
-    pub@{ visibility }@ async fn find_many<I, T>(conn: &mut DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@>>
+    pub@{ visibility }@ async fn find_many<I, T>(conn: &mut DbConn, ids: I, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        Ok(Self::__find_many(conn, &ids, false).await?.into_iter().map(|v| v.into()).collect())
+        Ok(Self::__find_many(conn, &ids, TrashMode::Not, filter).await?.into_iter().map(|v| v.into()).collect())
     }
     @%- if def.is_soft_delete() %@
 
-    pub@{ visibility }@ async fn find_many_with_trashed<I, T>(conn: &mut DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@>>
+    pub@{ visibility }@ async fn find_many_with_trashed<I, T>(conn: &mut DbConn, ids: I, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        Ok(Self::__find_many(conn, &ids, true).await?.into_iter().map(|v| v.into()).collect())
+        Ok(Self::__find_many(conn, &ids, TrashMode::With, filter).await?.into_iter().map(|v| v.into()).collect())
     }
     @%- endif %@
     @%- if def.use_cache() %@
@@ -6220,7 +6347,7 @@ impl _@{ pascal_name }@ {
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
     {
-        let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL);
+        let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
         if filter_str.is_empty() {
             filter_str = "WHERE".to_string();
         } else {
@@ -6230,7 +6357,7 @@ impl _@{ pascal_name }@ {
         let mut query = sqlx::query_as::<_, T>(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
-            query = c.query_as_bind(query);
+            query = c.bind_to_query_as(query);
         }
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
@@ -6283,25 +6410,6 @@ impl _@{ pascal_name }@ {
         let mut result = Self::__find_many_from_cache(conn, [id]).await?;
         Ok(result.pop())
     }
-    @%- else %@
-    @%- if !config.force_disable_cache %@
-
-    // pub(crate) async fn find_optional_from_cache<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
-    // where
-    //     T: Into<Primary>,
-    // {
-    //     unimplemented!("@{ table_name }@ does not support caching.")
-    // }
-    // @%- if def.is_soft_delete() %@
-
-    // pub@{ visibility }@ async fn find_optional_from_cache_with_trashed<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
-    // where
-    //     T: Into<Primary>,
-    // {
-    //     unimplemented!("@{ table_name }@ does not support caching.")
-    // }
-    @%- endif %@
-    @%- endif %@
     @%- endif %@
     @%- if !def.disable_update() %@
 
@@ -6331,7 +6439,7 @@ impl _@{ pascal_name }@ {
 
     #[allow(clippy::needless_borrow)]
     async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Option<Data>> {
-        let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL);
+        let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
         if filter_str.is_empty() {
             filter_str = "WHERE".to_string();
         } else {
@@ -6341,7 +6449,7 @@ impl _@{ pascal_name }@ {
         let mut query = sqlx::query_as::<_, Data>(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
-            query = c.query_as_bind(query);
+            query = c.bind_to_query_as(query);
         }
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
@@ -6352,24 +6460,24 @@ impl _@{ pascal_name }@ {
         }
     }
 
-    pub@{ visibility }@ async fn find_many_for_update<I, T>(conn: &mut DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Updater>>
+    pub@{ visibility }@ async fn find_many_for_update<I, T>(conn: &mut DbConn, ids: I, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
-        Self::__find_many_for_update(conn, ids, false).await
+        Self::__find_many_for_update(conn, ids, TrashMode::Not, filter).await
     }
 
-    pub@{ visibility }@ async fn find_many_for_update_with_trashed<I, T>(conn: &mut DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Updater>>
+    pub@{ visibility }@ async fn find_many_for_update_with_trashed<I, T>(conn: &mut DbConn, ids: I, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
-        Self::__find_many_for_update(conn, ids, true).await
+        Self::__find_many_for_update(conn, ids, TrashMode::With, filter).await
     }
 
     #[allow(clippy::needless_borrow)]
-    async fn __find_many_for_update<I, T>(conn: &mut DbConn, ids: I, with_trashed: bool) -> Result<Vec<_@{ pascal_name }@Updater>>
+    async fn __find_many_for_update<I, T>(conn: &mut DbConn, ids: I, trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
@@ -6379,17 +6487,25 @@ impl _@{ pascal_name }@ {
             return Ok(Vec::new());
         }
         let mut list: Vec<_Updater_> = Vec::with_capacity(ids.len());
+        let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
+        if filter_str.is_empty() {
+            filter_str = "WHERE".to_string();
+        } else {
+            filter_str.push_str(" AND ");
+        }
         let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
         for ids in id_chunks {
             let q = "@{ def.primaries()|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
             let sql = format!(
-                r#"SELECT {} FROM @{ table_name|db_esc }@ WHERE {}@{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({}) FOR UPDATE;"#,
+                r#"SELECT {} FROM @{ table_name|db_esc }@ {filter_str} @{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({}) FOR UPDATE;"#,
                 Data::_sql_cols(),
-                if with_trashed { TRASHED_SQL } else { NOT_TRASHED_SQL },
                 &q[0..q.len() - 1],
             );
             let mut query = sqlx::query_as::<_, Data>(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+            if let Some(c) = filter.clone() {
+                query = c.bind_to_query_as(query);
+            }
             for id in ids {
                 @{- def.primaries()|fmt_join("
                 query = query.bind(id.{index}{bind_as});", "") }@
@@ -6584,7 +6700,7 @@ impl _@{ pascal_name }@ {
         } else {
             r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields()|fmt_join("{placeholder}", ",") }@)"#
         };
-        let query = query_bind(sql, &obj._data);
+        let query = bind_to_query(sql, &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await?
@@ -6737,7 +6853,7 @@ impl _@{ pascal_name }@ {
         let sql = format!(r#"INSERT INTO @{ table_name|db_esc }@ 
             (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) 
             VALUES (@{ def.all_fields()|fmt_join("{placeholder}", ",") }@) ON DUPLICATE KEY UPDATE {}"#, &vec.join(","));
-        let query = query_bind(&sql, &obj._data);
+        let query = bind_to_query(&sql, &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let query = Self::bind_non_primaries(&obj, query, &sql);
         let result = if conn.wo_tx() {
@@ -6844,7 +6960,7 @@ impl _@{ pascal_name }@ {
                 || obj._op.{var} == Op::Add || obj._op.{var} == Op::Sub", "", "") }@;
             if has_add {
                 for ids in ids.chunks(IN_CONDITION_LIMIT) {
-                    Self::find_many_for_update(conn, ids.iter()).await?.into_iter()
+                    Self::find_many_for_update(conn, ids.iter(), None).await?.into_iter()
                         .for_each(|v| {
                             let mut data = v._data;
                             @{- def.non_primaries_addable()|fmt_join_cache_or_not("
@@ -6917,7 +7033,7 @@ impl _@{ pascal_name }@ {
         obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
         let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) 
             VALUES (@{ def.all_fields()|fmt_join("{placeholder}", ",") }@)"#;
-        let query = query_bind(sql, &obj._data);
+        let query = bind_to_query(sql, &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await?
@@ -7975,7 +8091,7 @@ impl _@{ pascal_name }@ {
 }
 
 #[allow(clippy::needless_borrow)]
-fn query_bind<'a>(sql: &'a str, data: &'a Data) -> Query<'a, DbType, DbArguments> {
+fn bind_to_query<'a>(sql: &'a str, data: &'a Data) -> Query<'a, DbType, DbArguments> {
     let mut query = sqlx::query(sql);
     @{- def.all_fields()|fmt_join("
     query = query.bind(data.{var}{bind_as});", "") }@
@@ -7999,6 +8115,7 @@ impl _@{ pascal_name }@Factory {
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: self.{rel_name}.map(|v| vec![v.create()]),", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: self.{rel_name}.map(|v| v.into_iter().map(|v| v.create()).collect()),", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -8012,6 +8129,8 @@ impl From<_@{ pascal_name }@Updater> for _@{ pascal_name }@ {
         to.{rel_name} = from.{rel_name}.map(|v| v.into_iter().map(|v| v.into()).collect());", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name};", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+        to.{rel_name} = from.{rel_name};", "") }@
         to
     }
 }
@@ -8023,6 +8142,8 @@ impl From<Box<_@{ pascal_name }@Updater>> for Box<_@{ pascal_name }@> {
 @{- def.relations_many(false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name}.map(|v| v.into_iter().map(|v| v.into()).collect());", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("
+        to.{rel_name} = from.{rel_name};", "") }@
+@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
         to.{rel_name} = from.{rel_name};", "") }@
         Box::new(to)
     }

@@ -17,12 +17,7 @@ use crate::api_generator::schema::{ApiFieldDef, ApiRelationDef};
 use crate::common::{hash, if_then_else, to_plural, yaml_value_to_str};
 use crate::schema::_to_var_name;
 
-use super::{
-    AutoGeneration, BelongsToDef, BelongsToJson, ConfigDef, DataType, FieldDef,
-    FieldDefOrSubsetType, FieldJson, HasManyDef, HasManyJson, HasOneDef, HasOneJson, IndexDef,
-    IndexJson, IndexType, ReferenceOption, RelDef, SelectorDef, SelectorJson, SoftDelete,
-    Timestampable, CONFIG,
-};
+use super::*;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -304,6 +299,10 @@ pub struct ModelDef {
     /// 他のモデルのIDを参照している場合は設定必須
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub belongs_to: IndexMap<String, Option<BelongsToDef>>,
+    /// ### belongs_to_outer_db リレーション
+    /// 他のDBのモデルを参照するbelongs_to
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub belongs_to_outer_db: IndexMap<String, BelongsToOuterDbDef>,
     /// ### has_one リレーション
     /// 同時に取得する、または検索条件に含まれる場合に設定が必要
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
@@ -415,7 +414,8 @@ pub struct ModelJson {
     #[serde(rename = "abstract")]
     pub abstract_mode: bool,
     /// ### 継承モード
-    pub inheritance: InheritanceJson,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inheritance: Option<InheritanceJson>,
     /// ### ストレージエンジン
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine: Option<String>,
@@ -426,7 +426,8 @@ pub struct ModelJson {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collation: Option<String>,
     /// ### 機能追加
-    pub act_as: ActAsJson,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub act_as: Option<ActAsJson>,
     /// ### ER図のリレーションを非表示
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub hide_er_relations: bool,
@@ -441,6 +442,10 @@ pub struct ModelJson {
     /// 他のモデルのIDを参照している場合は設定必須
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub belongs_to: Vec<BelongsToJson>,
+    /// ### belongs_to_outer_db リレーション
+    /// 他のDBのモデルを参照するbelongs_to
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub belongs_to_outer_db: Vec<BelongsToOuterDbJson>,
     /// ### has_one リレーション
     /// 同時に取得する、または検索条件に含まれる場合に設定が必要
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -490,11 +495,11 @@ impl From<ModelDef> for ModelJson {
             disable_insert_cache_propagation: value.disable_insert_cache_propagation,
             use_on_delete_fn: value.use_on_delete_fn,
             abstract_mode: value.abstract_mode,
-            inheritance: value.inheritance.map(|v| v.into()).unwrap_or_default(),
+            inheritance: value.inheritance.map(|v| v.into()),
             engine: value.engine,
             // character_set: value.character_set,
             collation: value.collation,
-            act_as: value.act_as.map(|v| v.into()).unwrap_or_default(),
+            act_as: value.act_as.map(|v| v.into()),
             hide_er_relations: value.hide_er_relations,
             model_id: value.model_id,
             fields: value
@@ -529,6 +534,15 @@ impl From<ModelDef> for ModelJson {
                 .into_iter()
                 .map(|(k, v)| {
                     let mut v: BelongsToJson = v.unwrap_or_default().into();
+                    v.name = k;
+                    v
+                })
+                .collect(),
+            belongs_to_outer_db: value
+                .belongs_to_outer_db
+                .into_iter()
+                .map(|(k, v)| {
+                    let mut v: BelongsToOuterDbJson = v.into();
                     v.name = k;
                     v
                 })
@@ -597,11 +611,15 @@ impl TryFrom<ModelJson> for ModelDef {
             disable_insert_cache_propagation: value.disable_insert_cache_propagation,
             use_on_delete_fn: value.use_on_delete_fn,
             abstract_mode: value.abstract_mode,
-            inheritance: value.inheritance.try_into()?,
+            inheritance: value
+                .inheritance
+                .map(|v| v.try_into())
+                .transpose()?
+                .flatten(),
             engine: value.engine,
             // character_set: value.character_set,
             collation: value.collation,
-            act_as: value.act_as.try_into()?,
+            act_as: value.act_as.map(|v| v.try_into()).transpose()?.flatten(),
             hide_er_relations: value.hide_er_relations,
             model_id: value.model_id,
             fields: value
@@ -611,6 +629,28 @@ impl TryFrom<ModelJson> for ModelDef {
                     let name = v.name.clone();
                     let v: FieldDef = v.into();
                     (name, FieldDefOrSubsetType::Exact(v))
+                })
+                .collect(),
+            belongs_to: value
+                .belongs_to
+                .into_iter()
+                .map(|v| {
+                    let name = v.name.clone();
+                    let v: BelongsToDef = v.into();
+                    if v == BelongsToDef::default() {
+                        (name, None)
+                    } else {
+                        (name, Some(v))
+                    }
+                })
+                .collect(),
+            belongs_to_outer_db: value
+                .belongs_to_outer_db
+                .into_iter()
+                .map(|v| {
+                    let name = v.name.clone();
+                    let v: BelongsToOuterDbDef = v.into();
+                    (name, v)
                 })
                 .collect(),
             has_one: value
@@ -633,19 +673,6 @@ impl TryFrom<ModelJson> for ModelDef {
                     let name = v.name.clone();
                     let v: HasManyDef = v.into();
                     if v == HasManyDef::default() {
-                        (name, None)
-                    } else {
-                        (name, Some(v))
-                    }
-                })
-                .collect(),
-            belongs_to: value
-                .belongs_to
-                .into_iter()
-                .map(|v| {
-                    let name = v.name.clone();
-                    let v: BelongsToDef = v.into();
-                    if v == BelongsToDef::default() {
                         (name, None)
                     } else {
                         (name, Some(v))
@@ -1636,6 +1663,13 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
+    pub fn relations_belonging_outer_db(&self) -> Vec<(&ModelDef, &String, &BelongsToOuterDbDef)> {
+        self.belongs_to_outer_db
+            .iter()
+            // .filter(|v| ApiRelationDef::has(v.0))
+            .map(|v| (self, v.0, v.1))
+            .collect()
+    }
     pub fn relations_one_and_many(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
@@ -1784,6 +1818,13 @@ impl ModelDef {
         self.merged_relations
             .iter()
             .filter(|v| v.1.is_type_of_belongs_to() && !v.1.disable_index)
+            .map(|v| (self, v.0, v.1))
+            .collect()
+    }
+    pub fn outer_db_relation_constraint(&self) -> Vec<(&ModelDef, &String, &BelongsToOuterDbDef)> {
+        self.belongs_to_outer_db
+            .iter()
+            .filter(|v| !v.1.disable_index)
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1995,16 +2036,5 @@ impl ModelDef {
         }
         ids.insert(hash);
         hash
-    }
-
-    pub fn not_optimized_tuple(&self) -> bool {
-        false
-        // let conf = CONFIG.read().unwrap().as_ref().unwrap();
-        // let engine = self.engine.as_ref().or(conf.engine.as_ref());
-        // conf.db == DbType::MariaDb
-        //     && (engine.is_none()
-        //         || engine
-        //             .map(|v| v.eq_ignore_ascii_case("InnoDB"))
-        //             .unwrap_or_default())
     }
 }

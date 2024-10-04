@@ -35,7 +35,10 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
 
     let file_path = model_dir.join("Cargo.toml");
     if force || !file_path.exists() {
-        let tpl = template::CargoTemplate { db };
+        let tpl = template::CargoTemplate {
+            db,
+            config: &config,
+        };
         fs_write(file_path, tpl.render()?)?;
     }
 
