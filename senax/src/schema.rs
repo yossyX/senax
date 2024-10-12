@@ -167,7 +167,6 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 col.auto_gen = true;
                 col.exclude_from_cache = Some(config.disable_timestamp_cache);
                 col.is_timestamp = true;
-                col.hidden = Some(true);
                 def.fields
                     .insert(ConfigDef::created_at().to_string(), col.into());
             }
@@ -183,7 +182,6 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 col.auto_gen = true;
                 col.exclude_from_cache = Some(config.disable_timestamp_cache);
                 col.is_timestamp = true;
-                col.hidden = Some(true);
                 def.fields
                     .insert(ConfigDef::updated_at().to_string(), col.into());
             }
@@ -197,7 +195,6 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                             col.label.clone_from(&config.label_of_deleted_at);
                             col.time_zone = config.timestamp_time_zone;
                             col.auto_gen = true;
-                            col.is_timestamp = true;
                             col.hidden = Some(true);
                             def.fields
                                 .insert(ConfigDef::deleted_at().to_string(), col.into());
@@ -210,7 +207,6 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                             )?;
                             col.label.clone_from(&config.label_of_deleted);
                             col.auto_gen = true;
-                            col.is_timestamp = true;
                             col.hidden = Some(true);
                             def.fields
                                 .insert(ConfigDef::deleted().to_string(), col.into());
@@ -223,7 +219,6 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                             )?;
                             col.label.clone_from(&config.label_of_deleted);
                             col.auto_gen = true;
-                            col.is_timestamp = true;
                             col.hidden = Some(true);
                             def.fields
                                 .insert(ConfigDef::deleted().to_string(), col.into());
@@ -561,21 +556,24 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         }
                         if rel_def.in_cache {
                             let ref_model = get_model(&rel_def.model, cur_group_name, &groups);
-                            // let rel_id = rel_def.get_foreign_id(&def.borrow());
-                            let rel_hash = crate::common::rel_hash(format!(
-                                "{}::{}::{}",
-                                &cur_group_name, &cur_model_name, rel_name
-                            ));
-                            ref_model.borrow_mut().cache_owners.push((
-                                format!(
-                                    "{}::_base::_{}",
-                                    &_to_var_name(cur_group_name),
-                                    &cur_model_name.to_case(Case::Snake)
-                                ),
-                                cur_model_name.to_string(),
-                                rel_name.to_string(),
-                                rel_hash,
-                            ));
+                            let mut ref_model = ref_model.borrow_mut();
+                            if ref_model.use_cache() {
+                                // let rel_id = rel_def.get_foreign_id(&def.borrow());
+                                let rel_hash = crate::common::rel_hash(format!(
+                                    "{}::{}::{}",
+                                    &cur_group_name, &cur_model_name, rel_name
+                                ));
+                                ref_model.cache_owners.push((
+                                    format!(
+                                        "{}::_base::_{}",
+                                        &_to_var_name(cur_group_name),
+                                        &cur_model_name.to_case(Case::Snake)
+                                    ),
+                                    cur_model_name.to_string(),
+                                    rel_name.to_string(),
+                                    rel_hash,
+                                ));
+                            }
                         }
                     }
                 }

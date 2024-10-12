@@ -935,7 +935,7 @@ impl ApiModelDef {
                 .merged_fields
                 .iter()
                 .filter(|(_k, v)| {
-                    !v.hidden.unwrap_or_default() || (v.is_timestamp && !config.hide_timestamp())
+                    !v.hidden.unwrap_or_default() && (!v.is_timestamp || !config.hide_timestamp())
                 })
                 .map(|(k, _)| ((*k).clone(), None))
                 .collect();
@@ -1007,7 +1007,7 @@ impl ApiRelationDef {
             true
         }
     }
-    pub fn fields(&self, model: &ModelDef) -> anyhow::Result<Fields> {
+    pub fn fields(&self, model: &ModelDef, rel_id: &[String]) -> anyhow::Result<Fields> {
         for (k, _) in &self.fields {
             anyhow::ensure!(
                 model.merged_fields.contains_key(k),
@@ -1022,7 +1022,9 @@ impl ApiRelationDef {
             let mut fields: IndexMap<_, _> = model
                 .merged_fields
                 .iter()
-                .filter(|(_k, v)| !v.hidden.unwrap_or_default())
+                .filter(|(k, v)| {
+                    !v.hidden.unwrap_or_default() && !v.is_timestamp && !rel_id.contains(*k)
+                })
                 .map(|(k, _)| ((*k).clone(), None))
                 .collect();
             for (name, column) in &self.fields {

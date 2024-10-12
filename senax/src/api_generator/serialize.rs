@@ -271,7 +271,7 @@ fn make_model(
 
     let mut all_fields = Vec::new();
     let mut all_relations = Vec::new();
-    all_fields.append(&mut fields(def, &[], 0, config.camel_case()));
+    all_fields.append(&mut fields(def, 0, config.camel_case()));
 
     let relations = make_relation(
         def,
@@ -347,7 +347,7 @@ fn make_model(
                 })
             })
             .collect(),
-        fields: fields(def, &[], 0, config.camel_case()),
+        fields: fields(def, 0, config.camel_case()),
         relations,
         all_fields,
         all_relations,
@@ -386,9 +386,9 @@ fn make_relation(
     for (_model, rel_name, rel) in def.relations_one(false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
-        ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model)?);
         let rel_id = &rel.get_foreign_id(def);
+        ApiRelationDef::push(api_relation.relations(&rel_model)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, &rel_id)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
         let index = all_relations.len();
         all_fields.push(Field {
@@ -414,7 +414,7 @@ fn make_relation(
             on_insert_formula: None,
             on_update_formula: None,
         });
-        all_fields.append(&mut fields(&rel_model, rel_id, indent + 1, camel_case));
+        all_fields.append(&mut fields(&rel_model, indent + 1, camel_case));
         let _relations = make_relation(
             &rel_model,
             indent + 1,
@@ -433,7 +433,7 @@ fn make_relation(
             no_read: no_read || api_relation.visibility == Some(RelationVisibility::WriteOnly),
             no_update: no_update || api_relation.visibility == Some(RelationVisibility::ReadOnly),
             replace: api_relation.use_replace,
-            fields: fields(&rel_model, rel_id, 0, camel_case),
+            fields: fields(&rel_model, 0, camel_case),
             relations: _relations,
         });
         relations.push(relation.clone());
@@ -444,9 +444,9 @@ fn make_relation(
     for (_model, rel_name, rel) in def.relations_many(false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
-        ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model)?);
         let rel_id = &rel.get_foreign_id(def);
+        ApiRelationDef::push(api_relation.relations(&rel_model)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, &rel_id)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
         let index = all_relations.len();
         all_fields.push(Field {
@@ -472,7 +472,7 @@ fn make_relation(
             on_insert_formula: None,
             on_update_formula: None,
         });
-        all_fields.append(&mut fields(&rel_model, rel_id, indent + 1, camel_case));
+        all_fields.append(&mut fields(&rel_model, indent + 1, camel_case));
         let _relations = make_relation(
             &rel_model,
             indent + 1,
@@ -491,7 +491,7 @@ fn make_relation(
             no_read: no_read || api_relation.visibility == Some(RelationVisibility::WriteOnly),
             no_update: no_update || api_relation.visibility == Some(RelationVisibility::ReadOnly),
             replace: false,
-            fields: fields(&rel_model, rel_id, 0, camel_case),
+            fields: fields(&rel_model, 0, camel_case),
             relations: _relations,
         });
         relations.push(relation.clone());
@@ -503,7 +503,7 @@ fn make_relation(
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, &[])?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
         let index = all_relations.len();
         all_fields.push(Field {
@@ -529,7 +529,7 @@ fn make_relation(
             on_insert_formula: None,
             on_update_formula: None,
         });
-        all_fields.append(&mut fields(&rel_model, &[], indent + 1, camel_case));
+        all_fields.append(&mut fields(&rel_model, indent + 1, camel_case));
         let _relations = make_relation(
             &rel_model,
             indent + 1,
@@ -548,7 +548,7 @@ fn make_relation(
             no_read: false,
             no_update: true,
             replace: false,
-            fields: fields(&rel_model, &[], 0, camel_case),
+            fields: fields(&rel_model, 0, camel_case),
             relations: _relations,
         });
         relations.push(relation.clone());
@@ -559,12 +559,12 @@ fn make_relation(
     Ok(relations)
 }
 
-fn fields(def: &Arc<ModelDef>, rel_id: &[String], indent: usize, camel_case: bool) -> Vec<Field> {
+fn fields(def: &Arc<ModelDef>, indent: usize, camel_case: bool) -> Vec<Field> {
     let mut fields = Vec::new();
     for (name, field) in def
         .merged_fields
         .iter()
-        .filter(|(k, v)| !v.exclude_from_cache() && ApiFieldDef::has(k) && !rel_id.contains(*k))
+        .filter(|(k, _v)| ApiFieldDef::has(k))
     {
         let response: HashMap<_, _> = def.for_api_response().into_iter().collect();
         let request: HashMap<_, _> = def.for_api_request().into_iter().collect();

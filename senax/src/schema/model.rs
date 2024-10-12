@@ -1395,12 +1395,6 @@ impl ModelDef {
             })
             .collect()
     }
-    pub fn for_api_response_except(&self, except: &[String]) -> Vec<(&String, &FieldDef)> {
-        self.for_api_response()
-            .into_iter()
-            .filter(|(k, _v)| !except.contains(*k))
-            .collect()
-    }
     pub fn for_api_request(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
@@ -1585,7 +1579,7 @@ impl ModelDef {
     pub fn relations_in_cache(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| v.1.in_cache && !v.1.is_type_of_belongs_to())
+            .filter(|v| v.1.in_cache() && !v.1.is_type_of_belongs_to())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1657,7 +1651,7 @@ impl ModelDef {
         self.merged_relations
             .iter()
             .filter(|v| (!self_only || !v.1.in_abstract))
-            .filter(|v| v.1.is_type_of_has_one() && v.1.in_cache)
+            .filter(|v| v.1.is_type_of_has_one() && v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1665,7 +1659,7 @@ impl ModelDef {
         self.merged_relations
             .iter()
             .filter(|v| (!self_only || !v.1.in_abstract))
-            .filter(|v| v.1.is_type_of_has_one() && !v.1.in_cache)
+            .filter(|v| v.1.is_type_of_has_one() && !v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1704,21 +1698,21 @@ impl ModelDef {
         self.merged_relations
             .iter()
             .filter(|v| (!self_only || !v.1.in_abstract))
-            .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache)
+            .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
     pub fn relations_many_cache_without_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache && v.1.limit.is_none())
+            .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache() && v.1.limit.is_none())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
     pub fn relations_many_cache_with_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache && v.1.limit.is_some())
+            .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache() && v.1.limit.is_some())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1726,21 +1720,21 @@ impl ModelDef {
         self.merged_relations
             .iter()
             .filter(|v| (!self_only || !v.1.in_abstract))
-            .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache)
+            .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
     pub fn relations_many_uncached_without_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache && v.1.limit.is_none())
+            .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache() && v.1.limit.is_none())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
     pub fn relations_many_uncached_with_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache && v.1.limit.is_some())
+            .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache() && v.1.limit.is_some())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
