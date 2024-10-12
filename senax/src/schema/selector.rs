@@ -271,6 +271,7 @@ impl FilterDef {
                 let unwrap_arc = if t.id_class.is_none()
                     && t.enum_class.is_none()
                     && t.rel.is_none()
+                    && t.outer_db_rel.is_none()
                     && t.is_arc()
                 {
                     ".as_ref()"
@@ -866,6 +867,7 @@ impl OrderDef {
             let unwrap_arc = if t.id_class.is_none()
                 && t.enum_class.is_none()
                 && t.rel.is_none()
+                && t.outer_db_rel.is_none()
                 && t.is_arc()
             {
                 ".as_ref()"

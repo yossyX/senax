@@ -13,6 +13,7 @@ pub mod filters;
 #[template(path = "model/_Cargo.toml", escape = "none")]
 pub struct CargoTemplate<'a> {
     pub db: &'a str,
+    pub config: &'a ConfigDef,
 }
 
 #[derive(Template)]

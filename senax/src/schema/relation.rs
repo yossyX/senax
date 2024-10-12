@@ -479,6 +479,167 @@ impl BelongsToDef {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
+/// ### belongs_toリレーション定義
+pub struct BelongsToOuterDbDef {
+    /// ### 論理名
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// ### コメント
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// ### 結合先のデータベース
+    pub db: String,
+    /// ### 結合先のグループ
+    pub group: String,
+    /// ### 結合先のモデル
+    pub model: String,
+    /// ### 結合するローカルのフィールド名
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local: Option<StringOrArray>,
+    /// ### リレーション先が論理削除されていても取得する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub with_trashed: bool,
+    /// ### リレーションのインデックスを設定しない
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_index: bool,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
+/// ### belongs_toリレーション定義
+pub struct BelongsToOuterDbJson {
+    /// ### リレーション名
+    /// 単数形
+    #[schemars(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$"))]
+    pub name: String,
+    /// ### 論理名
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// ### コメント
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    /// ### 結合先のデータベース
+    pub db: String,
+    /// ### 結合先のグループ
+    pub group: String,
+    /// ### 結合先のモデル
+    pub model: String,
+    /// ### 結合するローカルのフィールド名
+    /// 複数の場合はカンマ区切り
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local: Option<String>,
+    /// ### リレーション先が論理削除されていても取得する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub with_trashed: bool,
+    /// ### リレーションのインデックスを設定しない
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_index: bool,
+}
+
+impl From<BelongsToOuterDbDef> for BelongsToOuterDbJson {
+    fn from(value: BelongsToOuterDbDef) -> Self {
+        Self {
+            name: Default::default(),
+            label: value.label,
+            comment: value.comment,
+            db: value.db,
+            group: value.group,
+            model: value.model,
+            local: value.local.map(|v| v.to_vec().join(", ")),
+            with_trashed: value.with_trashed,
+            disable_index: value.disable_index,
+        }
+    }
+}
+
+impl From<BelongsToOuterDbJson> for BelongsToOuterDbDef {
+    fn from(value: BelongsToOuterDbJson) -> Self {
+        Self {
+            label: value.label,
+            comment: value.comment,
+            db: value.db,
+            group: value.group,
+            model: value.model,
+            local: value.local.and_then(|v| {
+                StringOrArray::from_vec(v.split(',').map(|v| v.trim().to_string()).collect())
+            }),
+            with_trashed: value.with_trashed,
+            disable_index: value.disable_index,
+        }
+    }
+}
+impl BelongsToOuterDbDef {
+    pub fn get_foreign_class_name(&self) -> String {
+        if domain_mode() {
+            self.get_foreign_model_name().1.to_case(Case::Pascal)
+        } else {
+            format!("_{}", self.get_foreign_model_name().1.to_case(Case::Pascal))
+        }
+    }
+    pub fn get_id_name(&self) -> String {
+        to_id_name(&self.model)
+    }
+    pub fn get_group_var(&self) -> String {
+        _to_var_name(&self.get_group_name())
+    }
+    pub fn get_mod_name(&self) -> String {
+        self.get_foreign_model_name().0
+    }
+    pub fn get_group_mod_name(&self) -> String {
+        format!(
+            "{}_{}_{}",
+            self.db,
+            self.get_group_name(),
+            self.get_mod_name()
+        )
+    }
+    pub fn get_group_mod_var(&self) -> String {
+        format!(
+            "{}::{}",
+            _to_var_name(&self.get_group_name()),
+            _to_var_name(&self.get_mod_name())
+        )
+    }
+    pub fn get_base_group_mod_var(&self) -> String {
+        format!(
+            "{}::_base::_{}",
+            _to_var_name(&self.get_group_name()),
+            &self.get_mod_name()
+        )
+    }
+    pub fn get_local_id(&self, name: &str) -> Vec<String> {
+        match self.local {
+            None => vec![format!("{}_id", name)],
+            Some(StringOrArray::One(ref local)) => vec![local.to_owned()],
+            Some(StringOrArray::Many(ref local)) => local.to_owned(),
+        }
+    }
+    pub fn get_local_cols<'a>(
+        &self,
+        name: &'a str,
+        model: &'a ModelDef,
+    ) -> Vec<(&'a String, &'a FieldDef)> {
+        let ids = self.get_local_id(name);
+        let mut result = Vec::new();
+        for id in &ids {
+            if let Some(v) = model.merged_fields.get_key_value(id) {
+                result.push(v);
+            }
+        }
+        result
+    }
+
+    pub fn get_foreign_model_name(&self) -> (String, String) {
+        (self.model.to_case(Case::Snake), self.model.to_string())
+    }
+
+    pub fn get_group_name(&self) -> String {
+        self.group.to_string()
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Serialize, Clone, Default)]
 pub struct RelDef {
     pub in_abstract: bool,

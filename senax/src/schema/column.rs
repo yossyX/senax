@@ -434,6 +434,8 @@ pub struct FieldDef {
     #[serde(skip)]
     pub rel: Option<(String, super::RelDef)>,
     #[serde(skip)]
+    pub outer_db_rel: Option<(String, super::BelongsToOuterDbDef)>,
+    #[serde(skip)]
     pub auto_gen: bool,
     #[serde(skip)]
     pub is_timestamp: bool,
@@ -775,6 +777,7 @@ impl From<FieldJson> for FieldDef {
             id_class: Default::default(),
             enum_class: Default::default(),
             rel: Default::default(),
+            outer_db_rel: Default::default(),
             auto_gen: Default::default(),
             is_timestamp: Default::default(),
             in_abstract: Default::default(),
@@ -849,6 +852,7 @@ impl From<ValueObjectJson> for FieldDef {
             id_class: Default::default(),
             enum_class: Default::default(),
             rel: Default::default(),
+            outer_db_rel: Default::default(),
             main_primary: Default::default(),
             auto_gen: Default::default(),
             is_timestamp: Default::default(),
@@ -894,6 +898,7 @@ impl FieldDef {
         self.id_class = org.id_class;
         self.enum_class = org.enum_class;
         self.rel = org.rel;
+        self.outer_db_rel = org.outer_db_rel;
         self.main_primary = org.main_primary;
         self.auto_gen = org.auto_gen;
         self.in_abstract = org.in_abstract;
@@ -1651,6 +1656,17 @@ impl FieldDef {
                 return format!("rel_{}::{}", mod_name, name);
             }
         }
+        if let Some(ref rel) = self.outer_db_rel {
+            let (_rel_name, def) = rel;
+            let name = def.get_id_name();
+            if domain_mode() {
+                let mod_name = def.get_group_mod_var();
+                return format!("_{}_model_::{}::{}", def.db, mod_name, name);
+            } else {
+                let mod_name = def.get_group_mod_name();
+                return format!("rel_{}::{}", mod_name, name);
+            }
+        }
         let type_str = match self.data_type {
             DataType::TinyInt if self.signed => "i8",
             DataType::TinyInt => "u8",
@@ -1702,6 +1718,7 @@ impl FieldDef {
     pub fn get_filter_eq(&self, index: Option<usize>, _ref: bool) -> String {
         let as_ref = if self.id_class.is_none()
             && self.rel.is_none()
+            && self.outer_db_rel.is_none()
             && self.value_object.is_none()
             && self.is_arc()
         {
@@ -1724,6 +1741,7 @@ impl FieldDef {
     pub fn get_filter_cmp(&self, index: Option<usize>) -> String {
         let as_ref = if self.id_class.is_none()
             && self.rel.is_none()
+            && self.outer_db_rel.is_none()
             && self.value_object.is_none()
             && self.is_arc()
         {
@@ -1806,6 +1824,11 @@ impl FieldDef {
                 let name = def.get_id_name();
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)
+            } else if let Some(ref rel) = self.outer_db_rel {
+                let (_rel_name, def) = rel;
+                let name = def.get_id_name();
+                let mod_name = def.get_group_mod_name();
+                format!("rel_{}::{}", mod_name, name)
             } else {
                 typ
             };
@@ -1826,7 +1849,11 @@ impl FieldDef {
     }
 
     pub fn convert_domain_factory(&self) -> &str {
-        if self.id_class.is_some() || self.enum_class.is_some() || self.rel.is_some() {
+        if self.id_class.is_some()
+            || self.enum_class.is_some()
+            || self.rel.is_some()
+            || self.outer_db_rel.is_some()
+        {
             return "";
         }
         match self.data_type {
@@ -1852,9 +1879,8 @@ impl FieldDef {
             if let Some(ref _class) = self.enum_class {
                 return "".to_string();
             }
-            id_str = if let Some(ref _class) = self.id_class {
-                ".inner()"
-            } else if let Some(ref _rel) = self.rel {
+            id_str = if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some()
+            {
                 ".inner()"
             } else {
                 ""
@@ -1909,7 +1935,11 @@ impl FieldDef {
     pub fn convert_from_entity(&self) -> String {
         let id_str = if self.enum_class.is_some() {
             ".into()"
-        } else if self.id_class.is_some() || self.rel.is_some() || self.value_object.is_some() {
+        } else if self.id_class.is_some()
+            || self.rel.is_some()
+            || self.outer_db_rel.is_some()
+            || self.value_object.is_some()
+        {
             ".inner()"
         } else {
             ""
@@ -2101,7 +2131,7 @@ impl FieldDef {
         if self.enum_class.is_some() {
             return "";
         }
-        if self.id_class.is_some() || self.rel.is_some() {
+        if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
             if !self.not_null {
                 return match self.data_type {
                     DataType::Char | DataType::Varchar => {
@@ -2237,7 +2267,7 @@ impl FieldDef {
         if self.enum_class.is_some() {
             return format!("input.{var}");
         }
-        if self.id_class.is_some() || self.rel.is_some() {
+        if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
             if !self.not_null {
                 return format!("input.{var}.map(|v| v.into())");
             } else {
@@ -2276,6 +2306,16 @@ impl FieldDef {
             if domain_mode() {
                 let mod_name = def.get_group_mod_var();
                 format!("_model_::{}::{}", mod_name, name)
+            } else {
+                let mod_name = def.get_group_mod_name();
+                format!("rel_{}::{}", mod_name, name)
+            }
+        } else if let Some(ref rel) = self.outer_db_rel {
+            let (_rel_name, def) = rel;
+            let name = def.get_id_name();
+            if domain_mode() {
+                let mod_name = def.get_group_mod_var();
+                format!("_{}_model_::{}::{}", def.db, mod_name, name)
             } else {
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)
@@ -2348,6 +2388,17 @@ impl FieldDef {
                 return format!("&rel_{}::{}", mod_name, name);
             }
         }
+        if let Some(ref rel) = self.outer_db_rel {
+            let (_rel_name, def) = rel;
+            let name = def.get_id_name();
+            if domain_mode() {
+                let mod_name = def.get_group_mod_var();
+                return format!("&_{}_model_::{}::{}", def.db, mod_name, name);
+            } else {
+                let mod_name = def.get_group_mod_name();
+                return format!("&rel_{}::{}", mod_name, name);
+            }
+        }
         let json_class = self.json_class.as_ref().map(|v| format!("&{}", v));
         let typ = match self.data_type {
             DataType::TinyInt if self.signed => "i8",
@@ -2410,6 +2461,16 @@ impl FieldDef {
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)
             }
+        } else if let Some(ref rel) = self.outer_db_rel {
+            let (_rel_name, def) = rel;
+            let name = def.get_id_name();
+            if domain_mode() {
+                let mod_name = def.get_group_mod_var();
+                format!("_{}_model_::{}::{}", def.db, mod_name, name)
+            } else {
+                let mod_name = def.get_group_mod_name();
+                format!("rel_{}::{}", mod_name, name)
+            }
         } else {
             let typ = match self.data_type {
                 DataType::TinyInt if self.signed => "i8",
@@ -2467,7 +2528,13 @@ impl FieldDef {
     }
     pub fn convert_outer_prefix(&self) -> &'static str {
         match self.data_type {
-            _ if self.id_class.is_some() || self.enum_class.is_some() || self.rel.is_some() => "",
+            _ if self.id_class.is_some()
+                || self.enum_class.is_some()
+                || self.rel.is_some()
+                || self.outer_db_rel.is_some() =>
+            {
+                ""
+            }
             _ if !self.not_null => "",
             DataType::Char | DataType::Varchar | DataType::Text => "&",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "&",
@@ -2477,7 +2544,11 @@ impl FieldDef {
         }
     }
     pub fn convert_outer_type(&self) -> &'static str {
-        if self.id_class.is_some() || self.enum_class.is_some() || self.rel.is_some() {
+        if self.id_class.is_some()
+            || self.enum_class.is_some()
+            || self.rel.is_some()
+            || self.outer_db_rel.is_some()
+        {
             return if self.not_null {
                 ".into()"
             } else {
@@ -2529,7 +2600,7 @@ impl FieldDef {
     pub fn convert_domain_outer_prefix(&self) -> &'static str {
         match self.data_type {
             _ if self.enum_class.is_some() => "",
-            _ if self.id_class.is_some() || self.rel.is_some() => "",
+            _ if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() => "",
             _ if self.value_object.is_some() => "",
             _ if !self.not_null => "",
             DataType::Char | DataType::Varchar | DataType::Text => "&",
@@ -2551,14 +2622,14 @@ impl FieldDef {
                 };
             }
         }
-        if inner && (self.id_class.is_some() || self.rel.is_some()) {
+        if inner && (self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some()) {
             return if self.not_null {
                 ".inner()"
             } else {
                 ".map(|v| v.inner())"
             };
         }
-        if self.id_class.is_some() || self.rel.is_some() {
+        if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
             return if self.not_null {
                 ".inner().into()"
             } else {
@@ -2643,7 +2714,7 @@ impl FieldDef {
                 ".map(|v| v.into())"
             };
         }
-        if self.id_class.is_some() || self.rel.is_some() {
+        if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
             return if self.not_null {
                 ".inner().into()"
             } else {
@@ -2709,7 +2780,7 @@ impl FieldDef {
                 format!("{var}{clone}.map(|v| v.into())")
             };
         }
-        if self.id_class.is_some() || self.rel.is_some() {
+        if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
             return match self.data_type {
                 DataType::Char | DataType::Varchar | DataType::Text if !self.not_null => {
                     format!("{var}.as_ref().map(|v| v.clone().into())")
@@ -2834,6 +2905,11 @@ impl FieldDef {
             let name = def.get_id_name();
             let mod_name = def.get_group_mod_name();
             format!("rel_{}::{}", mod_name, name)
+        } else if let Some(ref rel) = self.outer_db_rel {
+            let (_rel_name, def) = rel;
+            let name = def.get_id_name();
+            let mod_name = def.get_group_mod_name();
+            format!("rel_{}::{}", mod_name, name)
         } else {
             match self.data_type {
                 DataType::TinyInt if self.signed => "i8",
@@ -2887,7 +2963,11 @@ impl FieldDef {
             || self.data_type == DataType::Int
             || self.data_type == DataType::BigInt;
         let is_float = self.data_type == DataType::Float || self.data_type == DataType::Double;
-        if self.id_class.is_some() || self.enum_class.is_some() || self.rel.is_some() {
+        if self.id_class.is_some()
+            || self.enum_class.is_some()
+            || self.rel.is_some()
+            || self.outer_db_rel.is_some()
+        {
             is_num = false;
         }
         is_num || is_float
@@ -2923,7 +3003,11 @@ impl FieldDef {
             } else {
                 format!("{}Primary", if_then_else!(null, "Null", ""))
             }
-        } else if self.id_class.is_some() || self.enum_class.is_some() || self.rel.is_some() {
+        } else if self.id_class.is_some()
+            || self.enum_class.is_some()
+            || self.rel.is_some()
+            || self.outer_db_rel.is_some()
+        {
             if with_type {
                 format!(
                     "{}Null{}<{}, {}>",
@@ -3020,11 +3104,11 @@ impl FieldDef {
         }
     }
     pub fn convert_inner_type(&self) -> String {
-        let id_str = if let Some(ref _class) = self.id_class {
-            ".get()"
-        } else if let Some(ref _class) = self.enum_class {
-            ".get()"
-        } else if let Some(ref _rel) = self.rel {
+        let id_str = if self.id_class.is_some()
+            || self.enum_class.is_some()
+            || self.rel.is_some()
+            || self.outer_db_rel.is_some()
+        {
             ".get()"
         } else {
             ""
@@ -3094,6 +3178,7 @@ impl FieldDef {
         }
         if self.id_class.is_some()
             || self.rel.is_some()
+            || self.outer_db_rel.is_some()
             || (self.value_object.is_some() && !excluded_from_domain)
         {
             let s = if excluded_from_domain {
@@ -3465,11 +3550,12 @@ impl FieldDef {
         if self.enum_values.is_some() {
             return "";
         }
-        let copyable = if self.id_class.is_some() || self.rel.is_some() {
-            self.is_copyable()
-        } else {
-            true
-        };
+        let copyable =
+            if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
+                self.is_copyable()
+            } else {
+                true
+            };
         if copyable {
             ""
         } else {

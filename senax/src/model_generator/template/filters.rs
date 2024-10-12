@@ -418,7 +418,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         .replace("{mod_name}", &rel.get_mod_name())
         .replace("{mod_var}", &_to_var_name(&rel.get_mod_name()))
         .replace("{local_table}", &model.table_name())
-        .replace("{table}", &_to_db_col(&rel.get_foreign_table_name(), true))
+        // .replace("{table}", &_to_db_col(&rel.get_foreign_table_name(), true))
         .replace("{raw_table}", &rel.get_foreign_table_name())
         .replace("{index}", &index.to_string())
         .replace(
@@ -460,6 +460,101 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         .replace("{id_name}", &to_id_name(&model.name))
         .replace("{with_trashed}", with_trashed)
         .replace("{soft_delete_filter}", &soft_delete_filter)
+        .replace("{local_keys}", &local_keys)
+}
+
+pub fn fmt_rel_outer_db_join(
+    v: Vec<(&ModelDef, &String, &BelongsToOuterDbDef)>,
+    f: &str,
+    sep: &str,
+) -> ::askama::Result<String> {
+    let mut index = -1;
+    Ok(v.iter()
+        .map(|(model, name, rel)| {
+            index += 1;
+            _fmt_rel_outer_db(f, rel, name, model, index)
+        })
+        .collect::<Vec<_>>()
+        .join(sep))
+}
+
+fn _fmt_rel_outer_db(
+    f: &str,
+    rel: &&BelongsToOuterDbDef,
+    name: &&String,
+    model: &&ModelDef,
+    index: i32,
+) -> String {
+    let mut local_keys: Vec<_> = rel
+        .get_local_cols(name, model)
+        .iter()
+        .map(|(k, v)| {
+            let name = _to_var_name(k);
+            if v.not_null {
+                format!("self.{name}()")
+            } else {
+                format!("self.{name}()?")
+            }
+        })
+        .collect();
+    let local_keys = if local_keys.len() == 1 {
+        local_keys.pop().unwrap()
+    } else {
+        format!("({})", local_keys.join(", "))
+    };
+    let with_trashed = if rel.with_trashed {
+        "_with_trashed"
+    } else {
+        ""
+    };
+    let rel_hash =
+        crate::common::rel_hash(format!("{}::{}::{}", &model.group_name, &model.name, name));
+    f.replace("{rel_name}", &_to_var_name(name))
+        .replace("{raw_rel_name}", name)
+        .replace("{raw_db}", &rel.db)
+        .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
+        .replace("{rel_name_camel}", &name.to_case(Case::Camel))
+        .replace("{rel_hash}", &rel_hash.to_string())
+        .replace("{class}", &rel.get_foreign_class_name())
+        .replace("{class_mod}", &rel.get_group_mod_name())
+        .replace("{group_var}", &rel.get_group_var())
+        .replace("{class_mod_var}", &rel.get_group_mod_var())
+        .replace("{base_class_mod_var}", &rel.get_base_group_mod_var())
+        .replace("{mod_name}", &rel.get_mod_name())
+        .replace("{mod_var}", &_to_var_name(&rel.get_mod_name()))
+        .replace("{local_table}", &model.table_name())
+        .replace("{index}", &index.to_string())
+        .replace(
+            "{label}",
+            &label4(if_then_else!(
+                SHOW_LABEL.load(Ordering::Relaxed),
+                &rel.label,
+                &None
+            ))
+            .unwrap(),
+        )
+        .replace(
+            "{label_wo_hash}",
+            &label4_wo_hash(if_then_else!(
+                SHOW_LABEL.load(Ordering::Relaxed),
+                &rel.label,
+                &None
+            ))
+            .unwrap(),
+        )
+        .replace(
+            "{comment}",
+            &comment4(if_then_else!(
+                SHOW_COMMNET.load(Ordering::Relaxed),
+                &rel.comment,
+                &None
+            ))
+            .unwrap(),
+        )
+        .replace("{pascal_name}", &model.name.to_case(Case::Pascal))
+        .replace("{id_name}", &to_id_name(&model.name))
+        .replace("{with_trashed}", with_trashed)
+        // .replace("{soft_delete_filter}", &soft_delete_filter)
         .replace("{local_keys}", &local_keys)
 }
 

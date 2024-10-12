@@ -51,9 +51,6 @@ function AutoField(props: Props) {
     console.error(`${name} is not in the properties.`);
     return <></>;
   }
-  if (props.hidden) {
-    return <></>;
-  }
   const label = property.title || name;
   const definition = getDefinition(name, property, definitions);
   const type = Array.isArray(definition.type)
@@ -82,6 +79,10 @@ function AutoField(props: Props) {
       : definition.items;
 
     if (items.type === "object") {
+      console.dir(form.getValues(name))
+      if (props.hidden && (form.getValues(name) === undefined || form.getValues(name)?.length == 0)) {
+        return <></>;
+      }
       return (
         <AutoObjectArray
           name={name}
@@ -103,6 +104,9 @@ function AutoField(props: Props) {
         />
       );
     } else if (props.options) {
+      if (props.hidden && (form.getValues(name) === undefined || form.getValues(name)?.length == 0)) {
+        return <></>;
+      }
       return (
         <AutoMultiSelect
           name={name}
@@ -120,6 +124,9 @@ function AutoField(props: Props) {
       throw new Error("unsupported");
     }
   } else if (type == "object") {
+    if (props.hidden && form.getValues(name) === undefined) {
+      return <></>;
+    }
     return (
       <AutoObject
         name={name}
@@ -134,6 +141,9 @@ function AutoField(props: Props) {
     );
   } else if (definition.enum) {
     if (props.formType === "radio") {
+      if (props.hidden && !form.getValues(name)) {
+        return <></>;
+      }
       return (
         <AutoRadio
           name={name}
@@ -146,6 +156,9 @@ function AutoField(props: Props) {
         />
       );
     } else {
+      if (props.hidden && !form.getValues(name)) {
+        return <></>;
+      }
       return (
         <AutoSelect
           name={name}
@@ -161,6 +174,9 @@ function AutoField(props: Props) {
       );
     }
   } else if (type == "boolean" && definition.nullable) {
+    if (props.hidden && (form.getValues(name) === undefined || form.getValues(name) === null || form.getValues(name) === "")) {
+      return <></>;
+    }
     return (
       <AutoRadio
         name={name}
@@ -177,6 +193,9 @@ function AutoField(props: Props) {
       />
     );
   } else if (type == "boolean") {
+    if (props.hidden && !form.getValues(name)) {
+      return <></>;
+    }
     return (
       <AutoCheckbox
         name={name}
@@ -189,6 +208,9 @@ function AutoField(props: Props) {
       />
     );
   } else if (type == "integer") {
+    if (props.hidden && (form.getValues(name) === undefined || form.getValues(name) === null)) {
+      return <></>;
+    }
     return (
       <Controller
         name={`${path}${name}`}
@@ -222,6 +244,9 @@ function AutoField(props: Props) {
       />
     );
   } else if (props.autocomplete || property.autocomplete) {
+    if (props.hidden && !form.getValues(name)) {
+      return <></>;
+    }
     return (
       <Controller
         name={name}
@@ -259,6 +284,9 @@ function AutoField(props: Props) {
       />
     );
   } else if (props.textarea) {
+    if (props.hidden && !form.getValues(name)) {
+      return <></>;
+    }
     return (
       <Controller
         name={`${path}${name}`}
@@ -292,6 +320,9 @@ function AutoField(props: Props) {
       />
     );
   } else if (props.codeEditor) {
+    if (props.hidden && !form.getValues(name)) {
+      return <></>;
+    }
     return (
       <AutoCodeEditor
         name={name}
@@ -302,6 +333,9 @@ function AutoField(props: Props) {
         label={label}
       />
     );
+  }
+  if (props.hidden && !form.getValues(name)) {
+    return <></>;
   }
   return (
     <Controller
