@@ -625,6 +625,11 @@ impl RelDef {
         let (group_name, _) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
         group_name.to_string()
     }
+
+    pub fn in_cache(&self) -> bool {
+        let target_model = self.get_foreign_model();
+        target_model.use_cache() && self.in_cache
+    }
 }
 
 fn get_model(group_name: Option<&str>, stem_name: &str) -> Arc<ModelDef> {

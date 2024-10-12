@@ -17,7 +17,7 @@ pub struct ResObj@{ rel_name|pascal }@ {
     #[graphql(name = "_id")]
     pub _id: async_graphql::ID,
 @%- if camel_case %@
-@{- def.for_api_response_except(rel_id)|fmt_join("
+@{- def.for_api_response()|fmt_join("
 {label_wo_hash}    pub {var}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
@@ -28,7 +28,7 @@ pub struct ResObj@{ rel_name|pascal }@ {
     pub _{raw_rel_name}_id: Option<async_graphql::ID>,
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @%- else %@
-@{- def.for_api_response_except(rel_id)|fmt_join("
+@{- def.for_api_response()|fmt_join("
 {label_wo_hash}    #[graphql(name = \"{raw_var}\")]
     pub {var}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
@@ -49,7 +49,7 @@ impl From<&dyn _domain_::@{ pascal_name }@> for ResObj@{ rel_name|pascal }@ {
     fn from(v: &dyn _domain_::@{ pascal_name }@) -> Self {
         Self {
             _id: v.into(),
-            @{- def.for_api_response_except(rel_id)|fmt_join("
+            @{- def.for_api_response()|fmt_join("
             {var}: v.{var}(){to_res_api_type},", "") }@
             @{- def.relations_one_for_api_response()|fmt_rel_join("
             {rel_name}: v.{rel_name}().map(|v| v.into()),", "") }@
@@ -66,7 +66,7 @@ impl From<&dyn _domain_::@{ pascal_name }@Cache> for ResObj@{ rel_name|pascal }@
     fn from(v: &dyn _domain_::@{ pascal_name }@Cache) -> Self {
         Self {
             _id: v.into(),
-            @{- def.for_api_response_except(rel_id)|fmt_join("
+            @{- def.for_api_response()|fmt_join("
             {var}: v.{var}(){to_res_api_type},", "") }@
             @{- def.relations_one_for_api_response()|fmt_rel_join("
             {rel_name}: v.{rel_name}().map(|v| (&*v).into()),", "") }@

@@ -549,7 +549,7 @@ fn write_model_file(
         group.to_case(Case::Pascal),
         mod_name.to_case(Case::Pascal)
     );
-    let mut gql_fields = make_gql_fields(def, None, config.camel_case());
+    let mut gql_fields = make_gql_fields(def, config.camel_case());
     let mut buf = template::BaseModelTemplate {
         db,
         group,
@@ -624,21 +624,15 @@ fn write_model_file(
     Ok(api_def)
 }
 
-fn make_gql_fields(def: &ModelDef, rel_id: Option<&[String]>, camel_case: bool) -> Vec<String> {
+fn make_gql_fields(def: &ModelDef, camel_case: bool) -> Vec<String> {
     let mut gql_fields = vec!["_id".to_string()];
     let conv_case = if camel_case {
         |v: &str| v.to_case(Case::Camel)
     } else {
         |v: &str| v.to_string()
     };
-    if let Some(rel_id) = rel_id {
-        for (name, col) in def.for_api_response_except(rel_id) {
-            gql_fields.push(format!("{}{}", conv_case(name), col.gql_type()));
-        }
-    } else {
-        for (name, col) in def.for_api_response() {
-            gql_fields.push(format!("{}{}", conv_case(name), col.gql_type()));
-        }
+    for (name, col) in def.for_api_response() {
+        gql_fields.push(format!("{}{}", conv_case(name), col.gql_type()));
     }
     gql_fields
 }
@@ -733,10 +727,10 @@ fn write_relation(
     for (_model, rel_name, rel) in def.relations_one(false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
-        ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model)?);
-        let pascal_name = &rel_model.name.to_case(Case::Pascal);
         let rel_id = &rel.get_foreign_id(def);
+        ApiRelationDef::push(api_relation.relations(&rel_model)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, &rel_id)?);
+        let pascal_name = &rel_model.name.to_case(Case::Pascal);
         let graphql_name = &format!("{}{}", graphql_name, rel_name.to_case(Case::Pascal));
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
         relation_buf.push_str(
@@ -759,7 +753,7 @@ fn write_relation(
             .render()?
             .replace('\n', "\n    "),
         );
-        let mut rel_fields = make_gql_fields(&rel_model, Some(rel_id), camel_case);
+        let mut rel_fields = make_gql_fields(&rel_model, camel_case);
         write_relation(
             &rel_model,
             &mut relation_buf,
@@ -782,10 +776,10 @@ fn write_relation(
     for (_model, rel_name, rel) in def.relations_many(false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
-        ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model)?);
-        let pascal_name = &rel_model.name.to_case(Case::Pascal);
         let rel_id = &rel.get_foreign_id(def);
+        ApiRelationDef::push(api_relation.relations(&rel_model)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, &rel_id)?);
+        let pascal_name = &rel_model.name.to_case(Case::Pascal);
         let graphql_name = &format!("{}{}", graphql_name, rel_name.to_case(Case::Pascal));
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
         relation_buf.push_str(
@@ -808,7 +802,7 @@ fn write_relation(
             .render()?
             .replace('\n', "\n    "),
         );
-        let mut rel_fields = make_gql_fields(&rel_model, Some(rel_id), camel_case);
+        let mut rel_fields = make_gql_fields(&rel_model, camel_case);
         write_relation(
             &rel_model,
             &mut relation_buf,
@@ -832,7 +826,7 @@ fn write_relation(
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, &[])?);
         let pascal_name = &rel_model.name.to_case(Case::Pascal);
         let graphql_name = &format!("{}{}", graphql_name, rel_name.to_case(Case::Pascal));
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
@@ -849,7 +843,7 @@ fn write_relation(
             .render()?
             .replace('\n', "\n    "),
         );
-        let mut rel_fields = make_gql_fields(&rel_model, None, camel_case);
+        let mut rel_fields = make_gql_fields(&rel_model, camel_case);
         write_relation(
             &rel_model,
             &mut relation_buf,

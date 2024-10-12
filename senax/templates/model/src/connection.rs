@@ -508,14 +508,11 @@ pub struct DbConn {
     ctx_no: u64,
     time: SystemTime,
     shard_id: ShardId,
-    @%- if !config.force_disable_cache %@
-    cache_sync: u64,
-    @%- endif %@
     tx: FxHashMap<ShardId, sqlx::Transaction<'static, DbType>>,
     save_point: Vec<SavePoint>,
     read_tx: FxHashMap<ShardId, sqlx::Transaction<'static, DbType>>,
     @%- if !config.force_disable_cache %@
-    cache_tx: FxHashMap<ShardId, sqlx::Transaction<'static, DbType>>,
+    cache_tx: FxHashMap<ShardId, (u64, sqlx::Transaction<'static, DbType>)>,
     @%- endif %@
     conn: FxHashMap<ShardId, PoolConnection<DbType>>,
     cache_internal_op_list: Vec<(ShardId, CacheOp)>,
@@ -556,9 +553,6 @@ impl DbConn {
             ctx_no,
             time,
             shard_id,
-            @%- if !config.force_disable_cache %@
-            cache_sync: 0,
-            @%- endif %@
             tx: FxHashMap::default(),
             save_point: Vec::new(),
             read_tx: FxHashMap::default(),
@@ -609,7 +603,7 @@ impl DbConn {
     /// Cache transaction synchronization
     #[allow(dead_code)]
     pub(crate) fn cache_sync(&self) -> u64 {
-        self.cache_sync
+        self.cache_tx.get(&self.shard_id).map(|v| v.0).unwrap_or_default()
     }
 
     pub fn set_clear_all_cache(&mut self) {
@@ -998,21 +992,16 @@ impl DbConn {
     }
 
     pub async fn begin_read_tx(&mut self) -> Result<()> {
-        if self.read_tx.is_empty() {
-            let mut tx = Self::acquire_reader_tx(self.shard_id).await?;
-            set_read_tx_isolation(&mut tx).await?;
-            self.read_tx.insert(self.shard_id, tx);
-        }
         self.has_read_tx += 1;
         Ok(())
     }
 
     pub fn has_read_tx(&self) -> bool {
-        !self.read_tx.is_empty()
+        self.has_read_tx > 0
     }
 
     pub async fn get_read_tx(&mut self) -> Result<&mut sqlx::Transaction<'static, DbType>> {
-        ensure!(!self.read_tx.is_empty(), "No transaction is active");
+        ensure!(self.has_read_tx(), "No transaction is active");
         match self.read_tx.entry(self.shard_id) {
             Entry::Occupied(tx) => Ok(tx.into_mut()),
             Entry::Vacant(v) => {
@@ -1024,7 +1013,7 @@ impl DbConn {
     }
 
     pub fn release_read_tx(&mut self) -> Result<()> {
-        ensure!(self.has_read_tx > 0, "No read transaction is active.");
+        ensure!(self.has_read_tx(), "No read transaction is active.");
         self.has_read_tx -= 1;
         if self.has_read_tx == 0 {
             self.read_tx.clear();
@@ -1040,8 +1029,7 @@ impl DbConn {
             set_read_tx_isolation(&mut tx).await?;
             let sql = "SELECT seq FROM _sequence where id = 2";
             let sync: (u64,) = sqlx::query_as(sql).fetch_one(tx.as_mut()).await?;
-            self.cache_sync = sync.0;
-            self.cache_tx.insert(self.shard_id, tx);
+            self.cache_tx.insert(self.shard_id, (sync.0, tx));
         }
         Ok(())
     }
@@ -1055,11 +1043,13 @@ impl DbConn {
     pub(crate) async fn get_cache_tx(&mut self) -> Result<&mut sqlx::Transaction<'static, DbType>> {
         ensure!(!self.cache_tx.is_empty(), "No transaction is active");
         match self.cache_tx.entry(self.shard_id) {
-            Entry::Occupied(tx) => Ok(tx.into_mut()),
+            Entry::Occupied(tx) => Ok(&mut tx.into_mut().1),
             Entry::Vacant(v) => {
                 let mut tx = Self::acquire_cache_tx(self.shard_id).await?;
                 set_read_tx_isolation(&mut tx).await?;
-                Ok(v.insert(tx))
+                let sql = "SELECT seq FROM _sequence where id = 2";
+                let sync: (u64,) = sqlx::query_as(sql).fetch_one(tx.as_mut()).await?;
+                Ok(&mut v.insert((sync.0, tx)).1)
             }
         }
     }
