@@ -1185,12 +1185,6 @@ impl FieldDef {
                     &format!("UUID_TO_BIN(\"{}\")", self.get_col_name(name))
                 )
             }
-            DataType::Json => {
-                format!(
-                    "    #[sql(query = {:?})]\n",
-                    &format!("JSON_UNQUOTE(\"{}\")", self.get_col_name(name))
-                )
-            }
             DataType::Point => {
                 format!(
                     "    #[sql(query = {:?})]\n",
@@ -1209,10 +1203,7 @@ impl FieldDef {
             DataType::Geometry => {
                 format!(
                     "    #[sql(query = {:?})]\n",
-                    &format!(
-                        "JSON_UNQUOTE(ST_AsGeoJSON(\"{}\"))",
-                        self.get_col_name(name)
-                    )
+                    &format!("ST_AsGeoJSON(\"{}\")", self.get_col_name(name))
                 )
             }
             _ => {
@@ -1233,9 +1224,6 @@ impl FieldDef {
             DataType::Uuid => {
                 format!("UUID_TO_BIN(\"{}\")", name)
             }
-            DataType::Json => {
-                format!("JSON_UNQUOTE(\"{}\")", name)
-            }
             DataType::Point => {
                 format!("ST_AsBinary(\"{}\")", name)
             }
@@ -1243,7 +1231,7 @@ impl FieldDef {
                 format!("ST_AsBinary(\"{}\", 'axis-order=lat-long')", name)
             }
             DataType::Geometry => {
-                format!("JSON_UNQUOTE(ST_AsGeoJSON(\"{}\"))", name)
+                format!("ST_AsGeoJSON(\"{}\")", name)
             }
             _ => {
                 format!("\"{}\"", name)
@@ -1466,6 +1454,9 @@ impl FieldDef {
                 validators
                     .push("custom = \"crate::validator::validate_unsigned_decimal\"".to_string());
             }
+            DataType::Json | DataType::Geometry if self.json_class.is_none() => {
+                validators.push("custom = \"crate::validator::validate_json_object\"".to_string());
+            }
             _ => {}
         }
         if !validators.is_empty() {
@@ -1608,6 +1599,7 @@ impl FieldDef {
             DataType::DbSet => "str",
             DataType::Point => "senax_common::types::point::Point",
             DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
+            DataType::Geometry if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
             DataType::Geometry => "serde_json::Value",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
@@ -1701,6 +1693,7 @@ impl FieldDef {
             DataType::Point => "senax_common::types::point::Point",
             DataType::GeoPoint if is_domain => "domain::models::GeoPoint",
             DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
+            DataType::Geometry if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
             DataType::Geometry => "serde_json::Value",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
@@ -1808,6 +1801,7 @@ impl FieldDef {
             DataType::DbSet => "String",
             DataType::Point => "senax_common::types::point::Point",
             DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
+            DataType::Geometry if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
             DataType::Geometry => "serde_json::Value",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
@@ -2024,6 +2018,7 @@ impl FieldDef {
             DataType::DbSet => "String",
             DataType::Point => "domain::models::Point",
             DataType::GeoPoint => "domain::models::GeoPoint",
+            DataType::Geometry if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
             DataType::Geometry => "serde_json::Value",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
@@ -2357,6 +2352,9 @@ impl FieldDef {
                 DataType::Point => "senax_common::types::point::Point",
                 DataType::GeoPoint if is_domain => "domain::models::GeoPoint",
                 DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
+                DataType::Geometry if self.json_class.is_some() => {
+                    self.json_class.as_ref().unwrap()
+                }
                 DataType::Geometry => "serde_json::Value",
                 DataType::ValueObject => unimplemented!(),
                 DataType::AutoFk => unimplemented!(),
@@ -2432,6 +2430,7 @@ impl FieldDef {
             DataType::DbSet => "&str",
             DataType::Point => "senax_common::types::point::Point",
             DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
+            DataType::Geometry if json_class.is_some() => json_class.as_ref().unwrap(),
             DataType::Geometry => "&serde_json::Value",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
@@ -2513,6 +2512,9 @@ impl FieldDef {
                 DataType::Point => "senax_common::types::point::Point",
                 DataType::GeoPoint if is_domain => "domain::models::GeoPoint",
                 DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
+                DataType::Geometry if self.json_class.is_some() => {
+                    self.json_class.as_ref().unwrap()
+                }
                 DataType::Geometry => "serde_json::Value",
                 DataType::ValueObject => unimplemented!(),
                 DataType::AutoFk => unimplemented!(),
@@ -2948,7 +2950,10 @@ impl FieldDef {
                 DataType::DbSet => "",
                 DataType::Point => "senax_common::types::point::Point",
                 DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
-                DataType::Geometry => "Value",
+                DataType::Geometry if self.json_class.is_some() => {
+                    self.json_class.as_ref().unwrap()
+                }
+                DataType::Geometry => "serde_json::Value",
                 DataType::ValueObject => unimplemented!(),
                 DataType::AutoFk => unimplemented!(),
                 DataType::UnSupported => unimplemented!(),
@@ -3280,12 +3285,12 @@ impl FieldDef {
         }
         if self.data_type == DataType::Json || self.data_type == DataType::Geometry {
             if self.not_null {
-                return format!("row.try_get::<&str, _>({index})?.try_into().map_err(|e| sqlx::Error::ColumnDecode {{
+                return format!("row.try_get::<serde_json::Value, _>({index})?.try_into().map_err(|e| sqlx::Error::ColumnDecode {{
                 index: {name:?}.to_string(),
                 source: e,
             }})?",);
             } else {
-                return format!("row.try_get::<Option<&str>, _>({index})?.map(|v| v.try_into()).transpose().map_err(|e| sqlx::Error::ColumnDecode {{
+                return format!("row.try_get::<Option<serde_json::Value>, _>({index})?.map(|v| v.try_into()).transpose().map_err(|e| sqlx::Error::ColumnDecode {{
                 index: {name:?}.to_string(),
                 source: e,
             }})?",);

@@ -390,7 +390,7 @@ fn make_relation(
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, &rel_id)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
         let index = all_relations.len();
         all_fields.push(Field {
@@ -448,7 +448,7 @@ fn make_relation(
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, &rel_id)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
         let index = all_relations.len();
         all_fields.push(Field {

@@ -8,6 +8,7 @@ pub fn validate_varchar(value: &str) -> Result<(), validator::ValidationError> {
     }
     Ok(())
 }
+
 #[allow(dead_code)]
 pub fn validate_array_of_varchar(values: &[String]) -> Result<(), validator::ValidationError> {
     for value in values {
@@ -15,6 +16,7 @@ pub fn validate_array_of_varchar(values: &[String]) -> Result<(), validator::Val
     }
     Ok(())
 }
+
 #[allow(dead_code)]
 pub fn validate_text(value: &str) -> Result<(), validator::ValidationError> {
     for c in value.chars() {
@@ -26,6 +28,7 @@ pub fn validate_text(value: &str) -> Result<(), validator::ValidationError> {
     }
     Ok(())
 }
+
 #[allow(dead_code)]
 pub(crate) fn validate_unsigned_decimal(
     value: &rust_decimal::Decimal,
@@ -37,3 +40,13 @@ pub(crate) fn validate_unsigned_decimal(
     }
     Ok(())
 }
+
+#[allow(dead_code)]
+pub(crate) fn validate_json_object(value: &serde_json::Value) -> Result<(), validator::ValidationError>
+{
+    if !value.is_object() {
+        return Err(validator::ValidationError::new("object"));
+    }
+    Ok(())
+}
+@{-"\n"}@

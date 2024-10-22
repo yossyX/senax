@@ -757,14 +757,11 @@ pub mod option_arc_bytes {
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Default, PartialEq)]
 pub(crate) struct JsonBlob(std::sync::Arc<Vec<u8>>);
-impl TryFrom<&str> for JsonBlob {
+impl TryFrom<serde_json::Value> for JsonBlob {
     type Error = Box<dyn std::error::Error + Send + Sync>;
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if value.is_empty() {
-            return Ok(Default::default());
-        }
-        let _: Value = serde_json::from_str(value)?;
-        Ok(Self(zstd::stream::encode_all(value.as_bytes(), 3)?.into()))
+    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
+        let v = serde_json::to_string(&value)?;
+        Ok(Self(zstd::stream::encode_all(v.as_bytes(), 3)?.into()))
     }
 }
 impl From<&JsonBlob> for String {

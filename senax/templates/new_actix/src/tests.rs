@@ -42,3 +42,4 @@ async fn test() {
     // let resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;
     // assert_eq!(resp["data"]....., "");
 }
+@{-"\n"}@

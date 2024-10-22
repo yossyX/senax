@@ -27,6 +27,7 @@ use crate::{DbConn, DELAYED_DB_DIR};
 #[allow(clippy::enum_variant_names)]
 #[allow(clippy::collapsible_if)]
 #[allow(clippy::assigning_clones)]
+#[allow(clippy::too_many_arguments)]
 pub mod _base {
 @%- for name in mod_names %@
     pub mod _@{ name }@;
