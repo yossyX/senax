@@ -1,4 +1,3 @@
-
 #[allow(dead_code)]
 pub fn validate_varchar(value: &str) -> Result<(), validator::ValidationError> {
     for c in value.chars() {
@@ -42,9 +41,10 @@ pub(crate) fn validate_unsigned_decimal(
 }
 
 #[allow(dead_code)]
-pub(crate) fn validate_json_object(value: &serde_json::Value) -> Result<(), validator::ValidationError>
-{
-    if !value.is_object() {
+pub(crate) fn validate_json_object(
+    value: &serde_json::Value,
+) -> Result<(), validator::ValidationError> {
+    if !value.is_object() && !value.is_array() && !value.is_null() {
         return Err(validator::ValidationError::new("object"));
     }
     Ok(())
