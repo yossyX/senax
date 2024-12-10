@@ -763,7 +763,13 @@ pub struct OrderDef {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub fields: IndexMap<String, ()>,
     /// ### ソート方向
-    pub direction: FilterSortDirection,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub direction: Option<FilterSortDirection>,
+    /// ### SQL直接記述
+    /// ASCとDESCの組み合わせや、JOINが必要なソートはORDER BYに続くSQLを記述してください。
+    /// カーソルは使用できません。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub direct_sql: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, JsonSchema)]
@@ -786,7 +792,11 @@ pub struct OrderJson {
     /// カーソルを使用する場合は順序を厳密にするため最後に主キーを登録してください
     pub fields: Vec<OrderFieldJson>,
     /// ### ソート方向
-    pub direction: FilterSortDirection,
+    pub direction: Option<FilterSortDirection>,
+    /// ### SQL直接記述
+    /// ASCとDESCの組み合わせや、JOINが必要なソートはORDER BYに続くSQLを記述してください。
+    /// カーソルは使用できません。
+    pub direct_sql: Option<String>,
 }
 
 impl From<OrderDef> for OrderJson {
@@ -799,6 +809,7 @@ impl From<OrderDef> for OrderJson {
                 .map(|(k, _)| OrderFieldJson { name: k })
                 .collect(),
             direction: value.direction,
+            direct_sql: value.direct_sql,
         }
     }
 }
@@ -808,12 +819,16 @@ impl From<OrderJson> for OrderDef {
         Self {
             fields: value.fields.into_iter().map(|v| (v.name, ())).collect(),
             direction: value.direction,
+            direct_sql: value.direct_sql,
         }
     }
 }
 
 impl OrderDef {
     pub fn type_str(&self, model: &ModelDef) -> String {
+        if let Some(_direct_sql) = &self.direct_sql {
+            return "()".to_string();
+        }
         let mut v = Vec::new();
         for (field, _) in &self.fields {
             let t = model.merged_fields.get(field).unwrap_or_else(|| {
@@ -830,6 +845,9 @@ impl OrderDef {
         format!("({})", &v.join(", "))
     }
     pub fn field_tuple(&self, model: &ModelDef) -> String {
+        if let Some(_direct_sql) = &self.direct_sql {
+            return "()".to_string();
+        }
         let mut v = Vec::new();
         for (field, _) in &self.fields {
             let t = model.merged_fields.get(field).unwrap_or_else(|| {
@@ -848,6 +866,13 @@ impl OrderDef {
         format!("({})", &v.join(", "))
     }
     pub fn emu_str(&self, model: &ModelDef) -> String {
+        if let Some(_direct_sql) = &self.direct_sql {
+            return "
+                        _ => {
+                            return true;
+                        }"
+            .to_string();
+        }
         let mut cmp = String::new();
         let mut null_chk_vec = Vec::new();
         for (idx, (field, _)) in (&self.fields).into_iter().enumerate() {
@@ -899,16 +924,16 @@ impl OrderDef {
                             }}"
             ));
         }
-        if self.direction == FilterSortDirection::Asc {
+        if self.direction == Some(FilterSortDirection::Desc) {
             format!(
                 "
                         models::Cursor::After(f) => {{{n_chk}
-                            if {cmp} != std::cmp::Ordering::Greater {{
+                            if {cmp} != std::cmp::Ordering::Less {{
                                 return false;
                             }}
                         }}
                         models::Cursor::Before(f) => {{{n_chk}
-                            if {cmp} != std::cmp::Ordering::Less {{
+                            if {cmp} != std::cmp::Ordering::Greater {{
                                 return false;
                             }}
                         }}"
@@ -917,12 +942,12 @@ impl OrderDef {
             format!(
                 "
                         models::Cursor::After(f) => {{{n_chk}
-                            if {cmp} != std::cmp::Ordering::Less {{
+                            if {cmp} != std::cmp::Ordering::Greater {{
                                 return false;
                             }}
                         }}
                         models::Cursor::Before(f) => {{{n_chk}
-                            if {cmp} != std::cmp::Ordering::Greater {{
+                            if {cmp} != std::cmp::Ordering::Less {{
                                 return false;
                             }}
                         }}"
@@ -930,6 +955,11 @@ impl OrderDef {
         }
     }
     pub fn db_str(&self) -> String {
+        if let Some(_direct_sql) = &self.direct_sql {
+            return "
+                        _ => {}"
+                .to_string();
+        }
         let mut cols = Vec::new();
         for (field, _) in &self.fields {
             cols.push(field.clone());
@@ -939,24 +969,24 @@ impl OrderDef {
         } else {
             cols.join(", ")
         };
-        if self.direction == FilterSortDirection::Asc {
+        if self.direction == Some(FilterSortDirection::Desc) {
             format!(
                 "
                         models::Cursor::After(f) => {{
-                            fltr = fltr.and(filter!({cols} > f));
+                            fltr = fltr.and(filter!({cols} < f));
                         }}
                         models::Cursor::Before(f) => {{
-                            fltr = fltr.and(filter!({cols} < f));
+                            fltr = fltr.and(filter!({cols} > f));
                         }}"
             )
         } else {
             format!(
                 "
                         models::Cursor::After(f) => {{
-                            fltr = fltr.and(filter!({cols} < f));
+                            fltr = fltr.and(filter!({cols} > f));
                         }}
                         models::Cursor::Before(f) => {{
-                            fltr = fltr.and(filter!({cols} > f));
+                            fltr = fltr.and(filter!({cols} < f));
                         }}"
             )
         }
@@ -1228,14 +1258,18 @@ impl SelectorDef {
     }
     pub fn emu_order(&self, name: &str) -> String {
         let order = self.orders.get(name).unwrap();
+        if order.direct_sql.is_some() {
+            return "{}".to_string();
+        }
         let mut result = String::new();
         for (field, _) in &order.fields {
             let f = _to_var_name(field);
             let s = match order.direction {
-                FilterSortDirection::Asc => format!("a.{}().cmp(&b.{}())", f, f),
-                FilterSortDirection::Desc => format!("b.{}().cmp(&a.{}())", f, f),
+                Some(FilterSortDirection::Desc) => format!("b.{}().cmp(&a.{}())", f, f),
+                _ => format!("a.{}().cmp(&b.{}())", f, f),
             };
             if result.is_empty() {
+                result.push_str("{ list.sort_by(|a, b| {");
                 result.push_str(&s);
             } else {
                 result.push_str(".then_with(|| ");
@@ -1243,27 +1277,31 @@ impl SelectorDef {
                 result.push(')');
             }
         }
+        result.push_str("}) }");
         result
     }
     pub fn db_order(&self, name: &str, reverse: bool) -> String {
         let order = self.orders.get(name).unwrap();
+        if let Some(direct_sql) = &order.direct_sql {
+            return format!("raw_order_by({:?})", direct_sql);
+        }
         let mut result = Vec::new();
         for (field, _) in &order.fields {
             let f = _to_var_name(field);
             if !reverse {
                 let s = match order.direction {
-                    FilterSortDirection::Asc => format!("{f} ASC"),
-                    FilterSortDirection::Desc => format!("{f} DESC"),
+                    Some(FilterSortDirection::Desc) => format!("{f} DESC"),
+                    _ => format!("{f} ASC"),
                 };
                 result.push(s);
             } else {
                 let s = match order.direction {
-                    FilterSortDirection::Asc => format!("{f} DESC"),
-                    FilterSortDirection::Desc => format!("{f} ASC"),
+                    Some(FilterSortDirection::Desc) => format!("{f} ASC"),
+                    _ => format!("{f} DESC"),
                 };
                 result.push(s);
             }
         }
-        result.join(", ")
+        format!("order_by(order!({}))", result.join(", "))
     }
 }

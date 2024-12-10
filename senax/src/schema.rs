@@ -365,7 +365,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     bail!("Selectors requires ORDERS.:{}", model_name);
                 }
                 for (name, order) in &mut selector.orders {
-                    if order.fields.is_empty() {
+                    if order.direct_sql.is_none() && order.fields.is_empty() {
                         order.fields.insert(name.clone(), ());
                     }
                 }

@@ -60,7 +60,9 @@ pub struct Filter {
 #[derive(Debug, Serialize, Clone)]
 pub struct Order {
     pub fields: Vec<String>,
-    pub direction: FilterSortDirection,
+    pub direction: Option<FilterSortDirection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub direct_sql: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -341,6 +343,7 @@ fn make_model(
                                             .map(|(m, _)| m.to_string())
                                             .collect(),
                                         direction: v.direction,
+                                        direct_sql: v.direct_sql.clone(),
                                     },
                                 )
                             })

@@ -100,7 +100,7 @@ where
     Self: Sized,
 {
     fn write(&self, buf: &mut String);
-    fn write_order(order: &Option<Vec<Self>>) -> String;
+    fn write_order(order: &Option<Vec<Self>>, raw_order: &Option<String>) -> String;
 }
 
 #[rustfmt::skip]
@@ -539,7 +539,10 @@ macro_rules! order {
                 }
             };
         }
-        fn write_order(order: &Option<Vec<Order_>>) -> String {
+        fn write_order(order: &Option<Vec<Order_>>, raw_order: &Option<String>) -> String {
+            if let Some(raw_order) = raw_order {
+                return format!("ORDER BY {}", raw_order);
+            }
             match order {
                 Some(ref v) if !v.is_empty() => {
                     let mut s = String::with_capacity(100);

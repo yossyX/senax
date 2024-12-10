@@ -4242,6 +4242,7 @@ pub@{ visibility }@ use join_@{ fetch_macro_name }@ as join;
 pub@{ visibility }@ struct QueryBuilder {
     filter: Option<Filter_>,
     order: Option<Vec<Order_>>,
+    raw_order: Option<String>,
     limit: Option<usize>,
     offset: Option<usize>,
     skip_locked: bool,
@@ -4257,7 +4258,19 @@ impl QueryBuilder {
         self
     }
     pub@{ visibility }@ fn order_by(mut self, order: Vec<Order_>) -> Self {
-        self.order = Some(order);
+        if order.is_empty() {
+            self.order = None;
+        } else {
+            self.order = Some(order);
+        }
+        self
+    }
+    pub@{ visibility }@ fn raw_order_by(mut self, order: &str) -> Self {
+        if order.is_empty() {
+            self.raw_order = None;
+        } else {
+            self.raw_order = Some(order.to_string());
+        }
         self
     }
     pub@{ visibility }@ fn limit(mut self, limit: usize) -> Self {
@@ -4340,7 +4353,7 @@ impl QueryBuilder {
                 shard_id,
             ),
             &self.raw_query,
-            Order_::write_order(&self.order),
+            Order_::write_order(&self.order, &self.raw_order),
         );
         if let Some(limit) = self.limit {
             write!(sql, " limit {}", limit).unwrap();
@@ -4420,7 +4433,7 @@ impl QueryBuilder {
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id()),
             &self.raw_query,
-            Order_::write_order(&self.order),
+            Order_::write_order(&self.order, &self.raw_order),
         );
         if let Some(limit) = self.limit {
             write!(sql, " limit {}", limit)?;
@@ -4570,7 +4583,7 @@ impl QueryBuilder {
                 conn.shard_id(),
             ),
             &self.raw_query,
-            Order_::write_order(&self.order)
+            Order_::write_order(&self.order, &self.raw_order)
         );
         if let Some(limit) = self.limit {
             write!(sql, " limit {}", limit)?;
@@ -4644,7 +4657,7 @@ impl QueryBuilder {
                 conn.shard_id(),
             ),
             &self.raw_query,
-            Order_::write_order(&self.order)
+            Order_::write_order(&self.order, &self.raw_order)
         );
         if let Some(limit) = self.limit {
             write!(sql, " limit {}", limit)?;
@@ -4685,7 +4698,7 @@ impl QueryBuilder {
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id()),
             &self.raw_query,
-            Order_::write_order(&self.order),
+            Order_::write_order(&self.order, &self.raw_order),
         );
         if let Some(limit) = self.limit {
             write!(sql, " limit {}", limit)?;
@@ -4763,7 +4776,7 @@ where
             .map(|v| format!("({})", v._sql(T::_sql_cols(), for_update, conn.shard_id())))
             .collect::<Vec<_>>()
             .join(" UNION ");
-        write!(sql, " {}", Order_::write_order(&order))?;
+        write!(sql, " {}", Order_::write_order(&order, &None))?;
         if let Some(limit) = limit {
             write!(sql, " limit {}", limit)?;
         }
@@ -5794,7 +5807,7 @@ impl _@{ pascal_name }@ {
                 ONLY_TRASHED_SQL,
                 conn.shard_id(),
             ),
-            Order_::write_order(&order)
+            Order_::write_order(&order, &None)
         );
         if let Some(limit) = limit {
             write!(sql, " limit {}", limit)?;
@@ -5853,7 +5866,7 @@ impl _@{ pascal_name }@ {
                 ONLY_TRASHED_SQL,
                 conn.shard_id(),
             ),
-            Order_::write_order(&order)
+            Order_::write_order(&order, &None)
         );
         let mut query = sqlx::query_as::<_, CacheData>(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());

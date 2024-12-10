@@ -922,6 +922,7 @@ function Order({ formData, definitions }: any) {
           )}
         />
         <AutoField name="direction" {...formData} />
+        <AutoField name="direct_sql" {...formData} textarea />
       </SpaceBetween>
     </>
   );

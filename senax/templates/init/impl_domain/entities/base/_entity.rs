@@ -732,9 +732,9 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                     @%- for (order, fields) in selector_def.orders %@
                     _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
                         if !self.reverse {
-                            query = query.order_by(order!(@{ selector_def.db_order(order, false) }@));
+                            query = query.@{ selector_def.db_order(order, false) }@;
                         } else {
-                            query = query.order_by(order!(@{ selector_def.db_order(order, true) }@));
+                            query = query.@{ selector_def.db_order(order, true) }@;
                         }
                     }
                     @%- endfor %@

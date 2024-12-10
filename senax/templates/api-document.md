@@ -172,6 +172,7 @@ SOBO-WEBの業務DBの GraphQL API 定義を記載する。
             <th class="name">名前</th>
             <th class="name">フィールド</th>
             <th class="">方向</th>
+            <th class="">SQL</th>
         </tr>
     </thead>
     {%- for name, def in selector_def.orders %}
@@ -179,7 +180,8 @@ SOBO-WEBの業務DBの GraphQL API 定義を記載する。
         <td class="no center">{{loop.index}}</td>
         <td class="name">{{name | upper_snake}}</td>
         <td class="name">{{def.fields | join(sep=", ")}}</td>
-        <td class="name">{% if def.direction == "asc" %}昇順{% endif %}{% if def.direction == "desc" %}降順{% endif %}</td>
+        <td class="name">{% if def.direct_sql is undefined %}{% if def.direction == "desc" %}降順{% else %}昇順{% endif %}{% endif %}</td>
+        <td class="name">{{def | get(key="direct_sql", default="") | escape}}</td>
     </tr>
     {%- endfor %}
 </table>

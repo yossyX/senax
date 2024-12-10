@@ -824,11 +824,15 @@ impl @{ pascal_name }@Query@{ selector|pascal }@Order {
         match self {
             @%- for (order, order_def) in selector_def.orders %@
             @{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
+                @%- if order_def.direct_sql.is_some() %@
+                Ok(String::new())
+                @%- else %@
                 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
                 let v = @{ order_def.field_tuple(def) }@;
                 let mut buf = Vec::new();
                 ciborium::into_writer(&v, &mut buf)?;
                 Ok(URL_SAFE_NO_PAD.encode(buf))
+                @%- endif %@
             }
             @%- endfor %@
         }
@@ -845,9 +849,13 @@ pub enum @{ pascal_name }@Query@{ selector|pascal }@Cursor {
 #[allow(unused_parens)]
 impl @{ pascal_name }@Query@{ selector|pascal }@Cursor {
     @%- for (order, order_def) in selector_def.orders %@
-    pub fn @{ order }@_from_str(v: &str) -> anyhow::Result<@{ order_def.type_str(def) }@> {
+    pub fn @{ order }@_from_str(_v: &str) -> anyhow::Result<@{ order_def.type_str(def) }@> {
+        @%- if order_def.direct_sql.is_some() %@
+        Ok(())
+        @%- else %@
         use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-        Ok(ciborium::from_reader(URL_SAFE_NO_PAD.decode(v)?.as_slice())?)
+        Ok(ciborium::from_reader(URL_SAFE_NO_PAD.decode(_v)?.as_slice())?)
+        @%- endif %@
     }
     @%- endfor %@
 }
@@ -1809,13 +1817,11 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
                         @{ def.soft_delete_tpl2("true","self.with_trashed || v.deleted_at.is_none()","self.with_trashed || !v.deleted","self.with_trashed || v.deleted == 0")}@
                     })
                     .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>).collect();
-                list.sort_by(|a, b| {
-                    match self.order.unwrap_or_default() {
-                        @%- for (order, fields) in selector_def.orders %@
-                        @{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => @{ selector_def.emu_order(order) }@,
-                        @%- endfor %@
-                    }
-                });
+                match self.order.unwrap_or_default() {
+                    @%- for (order, fields) in selector_def.orders %@
+                    @{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => @{ selector_def.emu_order(order) }@,
+                    @%- endfor %@
+                }
                 if self.reverse {
                     list.reverse();
                 }
