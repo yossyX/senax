@@ -91,6 +91,9 @@ pub struct ConfigDef {
     /// ### シーケンスを使用する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_sequence: bool,
+    /// ### FORCE INDEXの自動付与を無効化する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_force_index_on_limit: bool,
     /// ### 更新トランザクション分離レベル
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tx_isolation: Option<Isolation>,
@@ -242,6 +245,9 @@ pub struct ConfigJson {
     /// ### シーケンスを使用する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_sequence: bool,
+    /// ### FORCE INDEXの自動付与を無効化する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_force_index_on_limit: bool,
     /// ### 更新トランザクション分離レベル
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tx_isolation: Option<Isolation>,
@@ -339,6 +345,7 @@ impl From<ConfigDef> for ConfigJson {
             use_upsert_delayed: value.use_upsert_delayed,
             disable_update: value.disable_update,
             use_sequence: value.use_sequence,
+            disable_force_index_on_limit: value.disable_force_index_on_limit,
             tx_isolation: value.tx_isolation,
             read_tx_isolation: value.read_tx_isolation,
             engine: value.engine,
@@ -404,6 +411,7 @@ impl From<ConfigJson> for ConfigDef {
             use_upsert_delayed: value.use_upsert_delayed,
             disable_update: value.disable_update,
             use_sequence: value.use_sequence,
+            disable_force_index_on_limit: value.disable_force_index_on_limit,
             tx_isolation: value.tx_isolation,
             read_tx_isolation: value.read_tx_isolation,
             engine: value.engine,

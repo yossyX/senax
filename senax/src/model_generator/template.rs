@@ -105,6 +105,7 @@ pub struct GroupBaseTableTemplate<'a> {
     pub id_name: &'a str,
     pub table_name: &'a str,
     pub def: &'a Arc<ModelDef>,
+    pub force_index: String,
     pub config: &'a ConfigDef,
     pub version_col: CompactString,
     pub visibility: &'a str,

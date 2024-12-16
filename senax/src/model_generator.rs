@@ -334,6 +334,19 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
 
                 let file_path = model_group_base_dir.join(format!("_{}.rs", mod_name));
                 remove_files.remove(file_path.as_os_str());
+                let force_index = if config.disable_force_index_on_limit {
+                    String::new()
+                } else {
+                    let (_table_name, table_def) =
+                        crate::migration_generator::make_table_def(def, &config)?;
+                    let indexes: Vec<_> = table_def
+                        .indexes
+                        .keys()
+                        .map(|v| template::filters::_to_db_col(v, true))
+                        .collect();
+                    let indexes_esc = indexes.join(",");
+                    format!(" FORCE INDEX({indexes_esc})")
+                };
                 let tpl = template::GroupBaseTableTemplate {
                     db,
                     group_name,
@@ -343,6 +356,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     id_name: &to_id_name(model_name),
                     table_name: &table_name,
                     def,
+                    force_index,
                     config: &config,
                     version_col: schema::ConfigDef::version(),
                     visibility,
@@ -878,7 +892,7 @@ pub fn check_version(db: &str) -> Result<()> {
         let ver = caps.get(1).unwrap().as_str();
         let req = semver::VersionReq::parse(ver)?;
         let version = semver::Version::parse(crate::VERSION)?;
-        ensure!(req.matches(&version), "Use the {} version of Senax.", ver);
+        ensure!(req.matches(&version), "Use {} version of Senax.", ver);
     }
     Ok(())
 }

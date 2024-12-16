@@ -33,374 +33,8 @@ pub async fn generate(
     for (_group_name, defs) in &groups {
         MODELS.write().unwrap().replace(defs.clone());
         for (_model_name, def) in defs {
-            let default_collation = if def.collation.is_some() {
-                def.collation.clone()
-            } else {
-                config.collation.clone()
-            };
-            let table_name = def.table_name();
             if def.has_table() {
-                let mut table = Table {
-                    name: table_name.clone(),
-                    old_name: def._name.clone(),
-                    engine: def.engine.clone().or_else(|| config.engine.clone()),
-                    // character_set: def.character_set.clone(),
-                    collation: def.collation.clone(),
-                    skip_ddl: def.skip_ddl.unwrap_or_default(),
-                    ..Default::default()
-                };
-                let old_soft_delete = def._soft_delete.as_ref().and_then(|v| {
-                    let v: Vec<_> = v.split(',').collect();
-                    if let [col, typ] = v[..] {
-                        Some((col.to_string(), SoftDelete::from_str(typ).unwrap()))
-                    } else {
-                        None
-                    }
-                });
-                let soft_delete = def
-                    .soft_delete()
-                    .map(|typ| (def.soft_delete_col().unwrap().to_string(), typ));
-                if old_soft_delete != soft_delete {
-                    table.old_soft_delete = old_soft_delete;
-                }
-                for (col_name, col) in &def.merged_fields {
-                    let mut constraint = Constraint {
-                        not_null: col.not_null,
-                        // character_set: col.character_set.clone()
-                        default_collation: default_collation.clone(),
-                        collation: col.collation.clone(),
-                        default_value: Default::default(),
-                        auto_increment: col.auto == Some(AutoGeneration::AutoIncrement),
-                        // primary_key: col.primary
-                        primary_key: Default::default(),
-                        unique: Default::default(),
-                        srid: col.srid,
-                    };
-                    let sql_type = match col.data_type {
-                        schema::DataType::TinyInt if col.signed => SqlType::Tinyint,
-                        schema::DataType::TinyInt => SqlType::UnsignedTinyint,
-                        schema::DataType::SmallInt if col.signed => SqlType::Smallint,
-                        schema::DataType::SmallInt => SqlType::UnsignedSmallint,
-                        schema::DataType::Int if col.signed => SqlType::Int,
-                        schema::DataType::Int => SqlType::UnsignedInt,
-                        schema::DataType::BigInt if col.signed => SqlType::Bigint,
-                        schema::DataType::BigInt => SqlType::UnsignedBigint,
-                        schema::DataType::Float => SqlType::Float,
-                        schema::DataType::Double => SqlType::Double,
-                        schema::DataType::Char => SqlType::Char(
-                            col.length
-                                .with_context(|| format!("length is required: {:?}", col_name))?,
-                        ),
-                        schema::DataType::Varchar => {
-                            SqlType::Varchar(col.length.unwrap_or(schema::DEFAULT_VARCHAR_LENGTH))
-                        }
-                        schema::DataType::Boolean => SqlType::Tinyint,
-                        schema::DataType::Text
-                            if col.length.unwrap_or(65536) * UTF8_BYTE_LEN < 256 =>
-                        {
-                            SqlType::Tinytext
-                        }
-                        schema::DataType::Text
-                            if col.length.unwrap_or(65536) * UTF8_BYTE_LEN < 65536 =>
-                        {
-                            SqlType::Text
-                        }
-                        schema::DataType::Text => SqlType::Longtext,
-                        schema::DataType::Uuid => SqlType::Char(schema::UUID_LENGTH),
-                        schema::DataType::BinaryUuid => SqlType::Binary(schema::BINARY_UUID_LENGTH),
-                        schema::DataType::Binary => SqlType::Binary(
-                            col.length
-                                .with_context(|| format!("length is required: {:?}", col_name))?
-                                .try_into()?,
-                        ),
-                        schema::DataType::Varbinary => SqlType::Varbinary(
-                            col.length
-                                .unwrap_or(schema::DEFAULT_VARCHAR_LENGTH)
-                                .try_into()?,
-                        ),
-                        schema::DataType::Blob if col.length.unwrap_or(65536) < 256 => {
-                            SqlType::Tinyblob
-                        }
-                        schema::DataType::Blob if col.length.unwrap_or(65536) < 65536 => {
-                            SqlType::Blob
-                        }
-                        schema::DataType::Blob => SqlType::Longblob,
-                        schema::DataType::Timestamp => {
-                            SqlType::Timestamp(col.precision.unwrap_or(0))
-                        }
-                        schema::DataType::DateTime => SqlType::DateTime(col.precision.unwrap_or(0)),
-                        schema::DataType::Date => SqlType::Date,
-                        schema::DataType::Time => SqlType::Time,
-                        schema::DataType::Decimal => SqlType::Decimal(
-                            col.precision.unwrap_or(schema::DEFAULT_PRECISION),
-                            col.scale.unwrap_or(schema::DEFAULT_SCALE),
-                        ),
-                        schema::DataType::ArrayInt => SqlType::Json,
-                        schema::DataType::ArrayString => SqlType::Json,
-                        schema::DataType::Json => SqlType::Json,
-                        schema::DataType::DbEnum => SqlType::Enum(
-                            col.enum_values
-                                .as_ref()
-                                .unwrap_or(&Vec::new())
-                                .iter()
-                                .map(|v| Literal::String(v.name.clone()))
-                                .collect(),
-                        ),
-                        schema::DataType::DbSet => SqlType::Set(
-                            col.enum_values
-                                .as_ref()
-                                .unwrap_or(&Vec::new())
-                                .iter()
-                                .map(|v| Literal::String(v.name.clone()))
-                                .collect(),
-                        ),
-                        schema::DataType::Point => SqlType::Point,
-                        schema::DataType::GeoPoint => SqlType::Point,
-                        schema::DataType::Geometry => SqlType::Geometry,
-                        schema::DataType::ValueObject => unimplemented!(),
-                        schema::DataType::AutoFk => unimplemented!(),
-                        schema::DataType::UnSupported => unimplemented!(),
-                    };
-                    let alt_type = if col.data_type == schema::DataType::Uuid {
-                        SqlType::Varchar(schema::UUID_LENGTH)
-                    } else if col.data_type == schema::DataType::BinaryUuid {
-                        SqlType::Varbinary(schema::BINARY_UUID_LENGTH)
-                    } else {
-                        sql_type.clone()
-                    };
-                    if col.data_type == schema::DataType::Uuid && constraint.collation.is_none() {
-                        constraint.collation = Some("ascii_general_ci".to_string());
-                    }
-                    let mut sql_comment = col.sql_comment.clone();
-                    if sql_comment.is_none() && config.use_label_as_sql_comment {
-                        sql_comment.clone_from(&col.label);
-                    }
-                    let default = col.default.clone();
-                    table.columns.insert(
-                        col.get_col_name(col_name).to_string(),
-                        Column {
-                            old_name: col._name.clone(),
-                            sql_type: sql_type.clone(),
-                            alt_type,
-                            constraint,
-                            default: default
-                                .as_ref()
-                                .map(|v| ddl::table::parse_default_value(v, &sql_type))
-                                .transpose()
-                                .with_context(|| {
-                                    format!("default value parse error: {:?}", default)
-                                })?,
-                            comment: sql_comment,
-                        },
-                    );
-                }
-                let cols: Vec<column::Column> = def
-                    .primaries()
-                    .iter()
-                    .map(|(n, c)| column::Column {
-                        name: c.get_col_name(n).to_string(),
-                        query: None,
-                        len: None,
-                    })
-                    .collect();
-                if !cols.is_empty() {
-                    table.primary = Some(TableKey::PrimaryKey(cols));
-                }
-                let mut idx_check = HashSet::new();
-                for (index_name, index) in &def.merged_indexes {
-                    let fields = if !index.fields.is_empty() {
-                        index.fields.clone()
-                    } else {
-                        let mut fields = IndexMap::new();
-                        fields.insert(index_name.clone(), None);
-                        fields
-                    };
-                    let cols: Vec<column::Column> = fields
-                        .iter()
-                        .map(|(n, c)| {
-                            let col = def
-                                .merged_fields
-                                .get(n)
-                                .unwrap_or_else(|| error_exit!("{} is not in columns", n));
-                            let name = col.get_col_name(n).to_string();
-                            let len = c.as_ref().and_then(|c| c.length);
-                            let query = if let Some(Some(query)) = c.as_ref().map(|c| &c.query) {
-                                Some(query.clone())
-                            } else if col.data_type == schema::DataType::ArrayInt {
-                                Some(format!("CAST(\"{}\" AS UNSIGNED ARRAY)", name))
-                            } else if col.data_type == schema::DataType::ArrayString {
-                                Some(format!(
-                                    "CAST(\"{}\" AS CHAR({}) ARRAY)",
-                                    name,
-                                    len.unwrap_or(255)
-                                ))
-                            } else {
-                                None
-                            };
-                            if !col.not_null && index.index_type == Some(schema::IndexType::Spatial)
-                            {
-                                error_exit!("All parts of a SPATIAL index must be NOT NULL: {}", n)
-                            }
-                            column::Column { name, query, len }
-                        })
-                        .collect();
-                    let query = cols
-                        .iter()
-                        .filter_map(|v| v.query.clone())
-                        .collect::<Vec<_>>()
-                        .join(",");
-                    let mut index_name = index_name.to_owned();
-                    if !query.is_empty() {
-                        let digest = Sha256::digest(query).iter().take(4).fold(
-                            String::new(),
-                            |mut output, x| {
-                                let _ = write!(output, "{:02X}", x);
-                                output
-                            },
-                        );
-                        index_name.push('_');
-                        index_name.push_str(&digest);
-                    }
-                    if index.index_type == Some(schema::IndexType::Unique) {
-                        let mut check = String::new();
-                        for col in &cols {
-                            check.push_str(&format!("{},", col.name));
-                            idx_check.insert(check.clone());
-                        }
-                        let index_name = format!("UQ_{}", index_name);
-                        table
-                            .indexes
-                            .insert(index_name.clone(), TableKey::UniqueKey(index_name, cols));
-                    } else if index.index_type == Some(schema::IndexType::Fulltext) {
-                        let index_name = format!("FT_{}", index_name);
-                        table.indexes.insert(
-                            index_name.clone(),
-                            TableKey::FulltextKey(
-                                index_name,
-                                cols,
-                                index.parser.map(|v| v.to_string()),
-                            ),
-                        );
-                    } else if index.index_type == Some(schema::IndexType::Spatial) {
-                        let index_name = format!("SP_{}", index_name);
-                        table
-                            .indexes
-                            .insert(index_name.clone(), TableKey::SpatialKey(index_name, cols));
-                    } else {
-                        let mut check = String::new();
-                        for col in &cols {
-                            check.push_str(&format!("{},", col.name));
-                            idx_check.insert(check.clone());
-                        }
-                        let index_name = format!("IDX_{}", index_name);
-                        table
-                            .indexes
-                            .insert(index_name.clone(), TableKey::Key(index_name, cols));
-                    }
-                }
-                for (_model, name, rel) in def.relation_constraint() {
-                    let local_id = rel.get_local_id(name);
-                    let foreign_table = rel.get_foreign_table_name();
-                    let key_name = format!("FK_{}_{}_{}", &table_name, name, foreign_table);
-                    let local_cols: Vec<_> = local_id
-                        .iter()
-                        .map(|local_id| {
-                            let local_col_name =
-                                if let Some(local_col) = def.merged_fields.get(local_id) {
-                                    local_col.get_col_name(local_id).to_string()
-                                } else {
-                                    local_id.clone()
-                                };
-                            column::Column {
-                                name: local_col_name,
-                                query: None,
-                                len: None,
-                            }
-                        })
-                        .collect();
-                    let foreign = rel.get_foreign_model();
-                    let foreign_primaries = foreign
-                        .primaries()
-                        .iter()
-                        .map(|(n, c)| column::Column {
-                            name: c.get_col_name(n).to_string(),
-                            query: None,
-                            len: None,
-                        })
-                        .collect();
-                    let index_name = format!("IDX_FK_{}", &name);
-                    let mut cols = local_cols.clone();
-                    if config.add_soft_delete_column_to_relation_index {
-                        if let Some(col) = def.soft_delete_col() {
-                            cols.push(column::Column {
-                                name: col.to_string(),
-                                query: None,
-                                len: None,
-                            });
-                        }
-                    }
-                    let check = cols.iter().fold(String::new(), |mut output, v| {
-                        let _ = write!(output, "{},", v.name);
-                        output
-                    });
-                    if !config.disable_relation_index && !idx_check.contains(&check) {
-                        table
-                            .indexes
-                            .insert(index_name.clone(), TableKey::Key(index_name, cols));
-                    }
-                    if !def.ignore_foreign_key() {
-                        table.constraints.insert(
-                            key_name.clone(),
-                            TableKey::Constraint(
-                                key_name,
-                                local_cols,
-                                foreign_table,
-                                foreign_primaries,
-                                ref_op(&rel.on_delete),
-                                ref_op(&rel.on_update),
-                            ),
-                        );
-                    }
-                }
-                for (_model, name, rel) in def.outer_db_relation_constraint() {
-                    let local_id = rel.get_local_id(name);
-                    let local_cols: Vec<_> = local_id
-                        .iter()
-                        .map(|local_id| {
-                            let local_col_name =
-                                if let Some(local_col) = def.merged_fields.get(local_id) {
-                                    local_col.get_col_name(local_id).to_string()
-                                } else {
-                                    local_id.clone()
-                                };
-                            column::Column {
-                                name: local_col_name,
-                                query: None,
-                                len: None,
-                            }
-                        })
-                        .collect();
-                    let index_name = format!("IDX_FK_{}", &name);
-                    let mut cols = local_cols.clone();
-                    if config.add_soft_delete_column_to_relation_index {
-                        if let Some(col) = def.soft_delete_col() {
-                            cols.push(column::Column {
-                                name: col.to_string(),
-                                query: None,
-                                len: None,
-                            });
-                        }
-                    }
-                    let check = cols.iter().fold(String::new(), |mut output, v| {
-                        let _ = write!(output, "{},", v.name);
-                        output
-                    });
-                    if !config.disable_relation_index && !idx_check.contains(&check) {
-                        table
-                            .indexes
-                            .insert(index_name.clone(), TableKey::Key(index_name, cols));
-                    }
-                }
+                let (table_name, table) = make_table_def(def, &config)?;
                 new_tables.insert(table_name, table);
             }
         }
@@ -442,6 +76,362 @@ pub async fn generate(
         println!("{}", &ddl);
     }
     Ok(())
+}
+
+pub fn make_table_def(
+    def: &std::sync::Arc<schema::ModelDef>,
+    config: &schema::ConfigDef,
+) -> Result<(String, Table)> {
+    let default_collation = if def.collation.is_some() {
+        def.collation.clone()
+    } else {
+        config.collation.clone()
+    };
+    let table_name = def.table_name();
+    let mut table = Table {
+        name: table_name.clone(),
+        old_name: def._name.clone(),
+        engine: def.engine.clone().or_else(|| config.engine.clone()),
+        // character_set: def.character_set.clone(),
+        collation: def.collation.clone(),
+        skip_ddl: def.skip_ddl.unwrap_or_default(),
+        ..Default::default()
+    };
+    let old_soft_delete = def._soft_delete.as_ref().and_then(|v| {
+        let v: Vec<_> = v.split(',').collect();
+        if let [col, typ] = v[..] {
+            Some((col.to_string(), SoftDelete::from_str(typ).unwrap()))
+        } else {
+            None
+        }
+    });
+    let soft_delete = def
+        .soft_delete()
+        .map(|typ| (def.soft_delete_col().unwrap().to_string(), typ));
+    if old_soft_delete != soft_delete {
+        table.old_soft_delete = old_soft_delete;
+    }
+    for (col_name, col) in &def.merged_fields {
+        let mut constraint = Constraint {
+            not_null: col.not_null,
+            // character_set: col.character_set.clone()
+            default_collation: default_collation.clone(),
+            collation: col.collation.clone(),
+            default_value: Default::default(),
+            auto_increment: col.auto == Some(AutoGeneration::AutoIncrement),
+            // primary_key: col.primary
+            primary_key: Default::default(),
+            unique: Default::default(),
+            srid: col.srid,
+        };
+        let sql_type = match col.data_type {
+            schema::DataType::TinyInt if col.signed => SqlType::Tinyint,
+            schema::DataType::TinyInt => SqlType::UnsignedTinyint,
+            schema::DataType::SmallInt if col.signed => SqlType::Smallint,
+            schema::DataType::SmallInt => SqlType::UnsignedSmallint,
+            schema::DataType::Int if col.signed => SqlType::Int,
+            schema::DataType::Int => SqlType::UnsignedInt,
+            schema::DataType::BigInt if col.signed => SqlType::Bigint,
+            schema::DataType::BigInt => SqlType::UnsignedBigint,
+            schema::DataType::Float => SqlType::Float,
+            schema::DataType::Double => SqlType::Double,
+            schema::DataType::Char => SqlType::Char(
+                col.length
+                    .with_context(|| format!("length is required: {:?}", col_name))?,
+            ),
+            schema::DataType::Varchar => {
+                SqlType::Varchar(col.length.unwrap_or(schema::DEFAULT_VARCHAR_LENGTH))
+            }
+            schema::DataType::Boolean => SqlType::Tinyint,
+            schema::DataType::Text if col.length.unwrap_or(65536) * UTF8_BYTE_LEN < 256 => {
+                SqlType::Tinytext
+            }
+            schema::DataType::Text if col.length.unwrap_or(65536) * UTF8_BYTE_LEN < 65536 => {
+                SqlType::Text
+            }
+            schema::DataType::Text => SqlType::Longtext,
+            schema::DataType::Uuid => SqlType::Char(schema::UUID_LENGTH),
+            schema::DataType::BinaryUuid => SqlType::Binary(schema::BINARY_UUID_LENGTH),
+            schema::DataType::Binary => SqlType::Binary(
+                col.length
+                    .with_context(|| format!("length is required: {:?}", col_name))?
+                    .try_into()?,
+            ),
+            schema::DataType::Varbinary => SqlType::Varbinary(
+                col.length
+                    .unwrap_or(schema::DEFAULT_VARCHAR_LENGTH)
+                    .try_into()?,
+            ),
+            schema::DataType::Blob if col.length.unwrap_or(65536) < 256 => SqlType::Tinyblob,
+            schema::DataType::Blob if col.length.unwrap_or(65536) < 65536 => SqlType::Blob,
+            schema::DataType::Blob => SqlType::Longblob,
+            schema::DataType::Timestamp => SqlType::Timestamp(col.precision.unwrap_or(0)),
+            schema::DataType::DateTime => SqlType::DateTime(col.precision.unwrap_or(0)),
+            schema::DataType::Date => SqlType::Date,
+            schema::DataType::Time => SqlType::Time,
+            schema::DataType::Decimal => SqlType::Decimal(
+                col.precision.unwrap_or(schema::DEFAULT_PRECISION),
+                col.scale.unwrap_or(schema::DEFAULT_SCALE),
+            ),
+            schema::DataType::ArrayInt => SqlType::Json,
+            schema::DataType::ArrayString => SqlType::Json,
+            schema::DataType::Json => SqlType::Json,
+            schema::DataType::DbEnum => SqlType::Enum(
+                col.enum_values
+                    .as_ref()
+                    .unwrap_or(&Vec::new())
+                    .iter()
+                    .map(|v| Literal::String(v.name.clone()))
+                    .collect(),
+            ),
+            schema::DataType::DbSet => SqlType::Set(
+                col.enum_values
+                    .as_ref()
+                    .unwrap_or(&Vec::new())
+                    .iter()
+                    .map(|v| Literal::String(v.name.clone()))
+                    .collect(),
+            ),
+            schema::DataType::Point => SqlType::Point,
+            schema::DataType::GeoPoint => SqlType::Point,
+            schema::DataType::Geometry => SqlType::Geometry,
+            schema::DataType::ValueObject => unimplemented!(),
+            schema::DataType::AutoFk => unimplemented!(),
+            schema::DataType::UnSupported => unimplemented!(),
+        };
+        let alt_type = if col.data_type == schema::DataType::Uuid {
+            SqlType::Varchar(schema::UUID_LENGTH)
+        } else if col.data_type == schema::DataType::BinaryUuid {
+            SqlType::Varbinary(schema::BINARY_UUID_LENGTH)
+        } else {
+            sql_type.clone()
+        };
+        if col.data_type == schema::DataType::Uuid && constraint.collation.is_none() {
+            constraint.collation = Some("ascii_general_ci".to_string());
+        }
+        let mut sql_comment = col.sql_comment.clone();
+        if sql_comment.is_none() && config.use_label_as_sql_comment {
+            sql_comment.clone_from(&col.label);
+        }
+        let default = col.default.clone();
+        table.columns.insert(
+            col.get_col_name(col_name).to_string(),
+            Column {
+                old_name: col._name.clone(),
+                sql_type: sql_type.clone(),
+                alt_type,
+                constraint,
+                default: default
+                    .as_ref()
+                    .map(|v| ddl::table::parse_default_value(v, &sql_type))
+                    .transpose()
+                    .with_context(|| format!("default value parse error: {:?}", default))?,
+                comment: sql_comment,
+            },
+        );
+    }
+    let cols: Vec<column::Column> = def
+        .primaries()
+        .iter()
+        .map(|(n, c)| column::Column {
+            name: c.get_col_name(n).to_string(),
+            query: None,
+            len: None,
+        })
+        .collect();
+    if !cols.is_empty() {
+        table.primary = Some(TableKey::PrimaryKey(cols));
+    }
+    let mut idx_check = HashSet::new();
+    for (index_name, index) in &def.merged_indexes {
+        let fields = if !index.fields.is_empty() {
+            index.fields.clone()
+        } else {
+            let mut fields = IndexMap::new();
+            fields.insert(index_name.clone(), None);
+            fields
+        };
+        let cols: Vec<column::Column> = fields
+            .iter()
+            .map(|(n, c)| {
+                let col = def
+                    .merged_fields
+                    .get(n)
+                    .unwrap_or_else(|| error_exit!("{} is not in columns", n));
+                let name = col.get_col_name(n).to_string();
+                let len = c.as_ref().and_then(|c| c.length);
+                let query = if let Some(Some(query)) = c.as_ref().map(|c| &c.query) {
+                    Some(query.clone())
+                } else if col.data_type == schema::DataType::ArrayInt {
+                    Some(format!("CAST(\"{}\" AS UNSIGNED ARRAY)", name))
+                } else if col.data_type == schema::DataType::ArrayString {
+                    Some(format!(
+                        "CAST(\"{}\" AS CHAR({}) ARRAY)",
+                        name,
+                        len.unwrap_or(255)
+                    ))
+                } else {
+                    None
+                };
+                if !col.not_null && index.index_type == Some(schema::IndexType::Spatial) {
+                    error_exit!("All parts of a SPATIAL index must be NOT NULL: {}", n)
+                }
+                column::Column { name, query, len }
+            })
+            .collect();
+        let query = cols
+            .iter()
+            .filter_map(|v| v.query.clone())
+            .collect::<Vec<_>>()
+            .join(",");
+        let mut index_name = index_name.to_owned();
+        if !query.is_empty() {
+            let digest =
+                Sha256::digest(query)
+                    .iter()
+                    .take(4)
+                    .fold(String::new(), |mut output, x| {
+                        let _ = write!(output, "{:02X}", x);
+                        output
+                    });
+            index_name.push('_');
+            index_name.push_str(&digest);
+        }
+        if index.index_type == Some(schema::IndexType::Unique) {
+            let mut check = String::new();
+            for col in &cols {
+                check.push_str(&format!("{},", col.name));
+                idx_check.insert(check.clone());
+            }
+            let index_name = format!("UQ_{}", index_name);
+            table
+                .indexes
+                .insert(index_name.clone(), TableKey::UniqueKey(index_name, cols));
+        } else if index.index_type == Some(schema::IndexType::Fulltext) {
+            let index_name = format!("FT_{}", index_name);
+            table.indexes.insert(
+                index_name.clone(),
+                TableKey::FulltextKey(index_name, cols, index.parser.map(|v| v.to_string())),
+            );
+        } else if index.index_type == Some(schema::IndexType::Spatial) {
+            let index_name = format!("SP_{}", index_name);
+            table
+                .indexes
+                .insert(index_name.clone(), TableKey::SpatialKey(index_name, cols));
+        } else {
+            let mut check = String::new();
+            for col in &cols {
+                check.push_str(&format!("{},", col.name));
+                idx_check.insert(check.clone());
+            }
+            let index_name = format!("IDX_{}", index_name);
+            table
+                .indexes
+                .insert(index_name.clone(), TableKey::Key(index_name, cols));
+        }
+    }
+    for (_model, name, rel) in def.relation_constraint() {
+        let local_id = rel.get_local_id(name);
+        let foreign_table = rel.get_foreign_table_name();
+        let key_name = format!("FK_{}_{}_{}", &table_name, name, foreign_table);
+        let local_cols: Vec<_> = local_id
+            .iter()
+            .map(|local_id| {
+                let local_col_name = if let Some(local_col) = def.merged_fields.get(local_id) {
+                    local_col.get_col_name(local_id).to_string()
+                } else {
+                    local_id.clone()
+                };
+                column::Column {
+                    name: local_col_name,
+                    query: None,
+                    len: None,
+                }
+            })
+            .collect();
+        let foreign = rel.get_foreign_model();
+        let foreign_primaries = foreign
+            .primaries()
+            .iter()
+            .map(|(n, c)| column::Column {
+                name: c.get_col_name(n).to_string(),
+                query: None,
+                len: None,
+            })
+            .collect();
+        let index_name = format!("IDX_FK_{}", &name);
+        let mut cols = local_cols.clone();
+        if config.add_soft_delete_column_to_relation_index {
+            if let Some(col) = def.soft_delete_col() {
+                cols.push(column::Column {
+                    name: col.to_string(),
+                    query: None,
+                    len: None,
+                });
+            }
+        }
+        let check = cols.iter().fold(String::new(), |mut output, v| {
+            let _ = write!(output, "{},", v.name);
+            output
+        });
+        if !config.disable_relation_index && !idx_check.contains(&check) {
+            table
+                .indexes
+                .insert(index_name.clone(), TableKey::Key(index_name, cols));
+        }
+        if !def.ignore_foreign_key() {
+            table.constraints.insert(
+                key_name.clone(),
+                TableKey::Constraint(
+                    key_name,
+                    local_cols,
+                    foreign_table,
+                    foreign_primaries,
+                    ref_op(&rel.on_delete),
+                    ref_op(&rel.on_update),
+                ),
+            );
+        }
+    }
+    for (_model, name, rel) in def.outer_db_relation_constraint() {
+        let local_id = rel.get_local_id(name);
+        let local_cols: Vec<_> = local_id
+            .iter()
+            .map(|local_id| {
+                let local_col_name = if let Some(local_col) = def.merged_fields.get(local_id) {
+                    local_col.get_col_name(local_id).to_string()
+                } else {
+                    local_id.clone()
+                };
+                column::Column {
+                    name: local_col_name,
+                    query: None,
+                    len: None,
+                }
+            })
+            .collect();
+        let index_name = format!("IDX_FK_{}", &name);
+        let mut cols = local_cols.clone();
+        if config.add_soft_delete_column_to_relation_index {
+            if let Some(col) = def.soft_delete_col() {
+                cols.push(column::Column {
+                    name: col.to_string(),
+                    query: None,
+                    len: None,
+                });
+            }
+        }
+        let check = cols.iter().fold(String::new(), |mut output, v| {
+            let _ = write!(output, "{},", v.name);
+            output
+        });
+        if !config.disable_relation_index && !idx_check.contains(&check) {
+            table
+                .indexes
+                .insert(index_name.clone(), TableKey::Key(index_name, cols));
+        }
+    }
+    Ok((table_name, table))
 }
 
 fn ref_op(r: &Option<schema::ReferenceOption>) -> Option<ReferenceOption> {

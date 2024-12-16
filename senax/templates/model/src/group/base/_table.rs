@@ -4342,8 +4342,13 @@ impl QueryBuilder {
 
     fn _sql(&self, sql_cols: &str, for_update: bool, shard_id: ShardId) -> String {
         let mut sql = format!(
-            r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
+            r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
             sql_cols,
+            if self.limit.is_some() && self.raw_order.is_none() {
+                r#"@{ force_index }@"#
+            } else {
+                ""
+            },
             Filter_::write_where(
                 &self.filter,
                 self.trash_mode,
@@ -4430,7 +4435,12 @@ impl QueryBuilder {
     #[cfg(not(feature="cache_update_only"))]
     async fn _select_from_cache(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         let mut sql = format!(
-            r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
+            r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
+            if self.limit.is_some() && self.raw_order.is_none() {
+                r#"@{ force_index }@"#
+            } else {
+                ""
+            },
             Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id()),
             &self.raw_query,
             Order_::write_order(&self.order, &self.raw_order),
@@ -4572,8 +4582,13 @@ impl QueryBuilder {
         assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "
         assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         let mut sql = format!(
-            r#"UPDATE @{ table_name|db_esc }@ as _t1 SET {} {} {} {}"#,
+            r#"UPDATE @{ table_name|db_esc }@ as _t1{} SET {} {} {} {}"#,
             &vec.join(","),
+            if self.limit.is_some() && self.raw_order.is_none() {
+                r#"@{ force_index }@"#
+            } else {
+                ""
+            },
             Filter_::write_where(
                 &self.filter,
                 self.trash_mode,
@@ -4647,7 +4662,12 @@ impl QueryBuilder {
     pub@{ visibility }@ async fn force_delete(self, conn: &mut DbConn) -> Result<u64> {
         @%- if def.on_delete_list.is_empty() %@
         let mut sql = format!(
-            r#"DELETE FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
+            r#"DELETE FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
+            if self.limit.is_some() && self.raw_order.is_none() {
+                r#"@{ force_index }@"#
+            } else {
+                ""
+            },
             Filter_::write_where(
                 &self.filter,
                 self.trash_mode,
@@ -4695,7 +4715,12 @@ impl QueryBuilder {
         Ok(result.rows_affected())
         @%- else %@
         let mut sql = format!(
-            r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
+            r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
+            if self.limit.is_some() && self.raw_order.is_none() {
+                r#"@{ force_index }@"#
+            } else {
+                ""
+            },
             Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id()),
             &self.raw_query,
             Order_::write_order(&self.order, &self.raw_order),
@@ -5797,8 +5822,13 @@ impl _@{ pascal_name }@ {
         let mut conn = DbConn::_new_with_ctx(ctx_no, shard_id);
         conn.begin_cache_tx().await?;
         let mut sql = format!(
-            r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {} {}"#,
+            r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1{} {} {}"#,
             CacheData::_sql_cols(),
+            if limit.is_some() {
+                r#"@{ force_index }@"#
+            } else {
+                ""
+            },
             Filter_::write_where(
                 &filter,
                 TrashMode::Not,
