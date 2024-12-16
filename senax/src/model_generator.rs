@@ -345,7 +345,11 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         .map(|v| template::filters::_to_db_col(v, true))
                         .collect();
                     let indexes_esc = indexes.join(",");
-                    format!(" FORCE INDEX({indexes_esc})")
+                    if indexes_esc.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" FORCE INDEX({indexes_esc})")
+                    }
                 };
                 let tpl = template::GroupBaseTableTemplate {
                     db,
