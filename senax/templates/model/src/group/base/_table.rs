@@ -4583,12 +4583,12 @@ impl QueryBuilder {
         assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         let mut sql = format!(
             r#"UPDATE @{ table_name|db_esc }@ as _t1{} SET {} {} {} {}"#,
-            &vec.join(","),
             if self.limit.is_some() && self.raw_order.is_none() {
                 r#"@{ force_index }@"#
             } else {
                 ""
             },
+            &vec.join(","),
             Filter_::write_where(
                 &self.filter,
                 self.trash_mode,
