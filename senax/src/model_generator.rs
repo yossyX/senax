@@ -339,15 +339,16 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 } else {
                     let (_table_name, table_def) =
                         crate::migration_generator::make_table_def(def, &config)?;
-                    let indexes: Vec<_> = table_def
+                    let mut indexes: Vec<_> = table_def
                         .indexes
                         .keys()
                         .map(|v| template::filters::_to_db_col(v, true))
                         .collect();
-                    let indexes_esc = indexes.join(",");
-                    if indexes_esc.is_empty() {
+                    if indexes.is_empty() {
                         String::new()
                     } else {
+                        indexes.push(template::filters::_to_db_col("PRIMARY", true));
+                        let indexes_esc = indexes.join(",");
                         format!(" FORCE INDEX({indexes_esc})")
                     }
                 };
