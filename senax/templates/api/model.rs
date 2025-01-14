@@ -1,4 +1,6 @@
 #[allow(unused_imports)]
+use actix_web::post;
+#[allow(unused_imports)]
 use anyhow::Context as _;
 #[allow(unused_imports)]
 use async_graphql::types::connection as graphql_conn;
@@ -822,7 +824,6 @@ pub struct @{ selector|pascal }@Request {
     ndjson: Option<bool>,
 }
 
-use actix_web::post;
 #[utoipa::path(
     responses(
         (status = 200, body = Vec<ResObj>)
