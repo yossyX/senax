@@ -72,18 +72,27 @@ pub fn generate(
     let file_path = src_path.join("auto_api.rs");
     let mut content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
-    let reg = Regex::new(&format!(r"pub mod {};", &db.to_case(Case::Snake)))?;
+    let db_var_name = _to_var_name(&db.to_case(Case::Snake));
+    let reg = Regex::new(&format!(r"pub mod {};", db_var_name))?;
     if !reg.is_match(&content) {
         content = content.replace(
             "// Do not modify this line. (ApiDbMod)",
             &format!(
                 "pub mod {};\n// Do not modify this line. (ApiDbMod)",
-                &db.to_case(Case::Snake)
+                db_var_name
+            ),
+        );
+        content = content.replace(
+            "// Do not modify this line. (ApiRouteConfig)",
+            &format!(
+                "cfg.service(scope(\"/{}\").configure({}::route_config));\n    // Do not modify this line. (ApiRouteConfig)",
+                &db,
+                db_var_name,
             ),
         );
         content = content.replace(
             "    // Do not modify this line. (ApiJsonSchema)",
-            &format!("    {}::gen_json_schema(&dir.join(\"{}\"))?;\n    // Do not modify this line. (ApiJsonSchema)", _to_var_name(&db.to_case(Case::Snake)), &db.to_case(Case::Snake)),
+            &format!("    {}::gen_json_schema(&dir.join(\"{}\"))?;\n    // Do not modify this line. (ApiJsonSchema)", db_var_name, &db.to_case(Case::Snake)),
         );
         let tpl = QueryRootTemplate {
             db,
@@ -402,6 +411,14 @@ fn write_db_file(
             "\n    // Do not modify this line. (GqlMutation)",
             &tpl.render()?,
         );
+        content = content.replace(
+            "// Do not modify this line. (ApiRouteConfig)",
+            &format!(
+                "cfg.service(scope(\"/{}\").configure({}::route_config));\n    // Do not modify this line. (ApiRouteConfig)",
+                &group,
+                _to_var_name(&group.to_case(Case::Snake)),
+            ),
+        );
     }
     let tpl = template::DbJsonSchemaTemplate { add_groups };
     let content = content.replace(
@@ -451,7 +468,7 @@ fn write_group_file(
     });
     let all = all.iter().cloned().collect::<Vec<_>>().join(",");
     let tpl = template::GroupModTemplate { all, add_models };
-    let content = re.replace(&content, tpl.render()?);
+    let mut content = re.replace(&content, tpl.render()?).to_string();
     let tpl = template::GroupImplTemplate {
         db,
         group,
@@ -459,7 +476,7 @@ fn write_group_file(
         mode: "Query",
         camel_case,
     };
-    let content = content.replace(
+    content = content.replace(
         "\n    // Do not modify this line. (GqlQuery)",
         &tpl.render()?,
     );
@@ -470,12 +487,22 @@ fn write_group_file(
         mode: "Mutation",
         camel_case,
     };
-    let content = content.replace(
+    content = content.replace(
         "\n    // Do not modify this line. (GqlMutation)",
         &tpl.render()?,
     );
+    for model in add_models.iter() {
+        content = content.replace(
+            "// Do not modify this line. (ApiRouteConfig)",
+            &format!(
+                "cfg.service(scope(\"/{}\").configure({}::_route_config));\n    // Do not modify this line. (ApiRouteConfig)",
+                &model,
+                _to_var_name(&model.to_case(Case::Snake)),
+            ),
+        );
+    }
     let tpl = template::GroupJsonSchemaTemplate { add_models };
-    let content = content.replace(
+    content = content.replace(
         "\n    // Do not modify this line. (JsonSchema)",
         &tpl.render()?,
     );
@@ -557,14 +584,10 @@ fn write_model_file(
         model_name,
         graphql_name,
         pascal_name,
+        config,
         def,
         camel_case: config.camel_case(),
         api_def: &api_def,
-        query_guard: api_def.query_guard(config, group),
-        create_guard: api_def.create_guard(config, group),
-        import_guard: api_def.import_guard(config, group),
-        update_guard: api_def.update_guard(config, group),
-        delete_guard: api_def.delete_guard(config, group),
     }
     .render()?;
     write_relation(

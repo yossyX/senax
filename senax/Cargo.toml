@@ -62,7 +62,7 @@ tokio = { version = "1", features = ["full"] }
 validator = { version = "0.16", features = ["derive", "unic"] }
 webbrowser = "0.8.10"
 
-axum = { version = "0.7", optional = true }
+axum = { version = "0.7.7", optional = true }
 axum-aws-lambda = { version = "0.8", optional = true }
 tower = { version = "0.4", features = ["util"], optional = true }
 tower-http = { version = "0.5", features = ["compression-full", "cors", "trace"], optional = true }

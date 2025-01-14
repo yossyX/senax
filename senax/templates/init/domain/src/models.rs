@@ -31,7 +31,7 @@ macro_rules! get_emu_repo {
 // Do not modify this line. (UseRepo)
 
 pub trait Check_<T: ?Sized> {
-    fn check(&self, obj: &T) -> bool;
+    fn check(&self, obj: &T) -> anyhow::Result<bool>;
 }
 
 #[cfg_attr(any(feature = "mock", test), mockall::automock)]
@@ -92,6 +92,8 @@ pub trait MarkForDelete {
 #[display(fmt = "{},{}", x, y)]
 #[derive(async_graphql::SimpleObject, async_graphql::InputObject)]
 #[graphql(input_name = "PointInput")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = PointInput)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
@@ -129,6 +131,8 @@ impl ToPoint for (f64, f64) {
 #[display(fmt = "{},{}", lat, lng)]
 #[derive(async_graphql::SimpleObject, async_graphql::InputObject)]
 #[graphql(input_name = "GeoPointInput")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = GeoPointInput)]
 pub struct GeoPoint {
     pub lat: f64,
     pub lng: f64,
@@ -173,6 +177,8 @@ impl ToGeoPoint for (f64, f64) {
     schemars::JsonSchema,
     async_graphql::Enum,
 )]
+#[derive(utoipa::ToSchema)]
+#[schema(as = GeometryFilterType)]
 pub enum GeometryFilterType {
     Within,
     Intersects,
@@ -194,6 +200,8 @@ pub enum GeometryFilterType {
     async_graphql::InputObject,
 )]
 #[graphql(input_name = "GeometryFilterInput")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = GeometryFilterInput)]
 #[serde(deny_unknown_fields)]
 pub struct GeometryFilter {
     pub r#type: GeometryFilterType,
@@ -213,6 +221,8 @@ pub struct GeometryFilter {
     async_graphql::InputObject,
 )]
 #[graphql(input_name = "ArrayIntFilterInput")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = ArrayIntFilterInput)]
 #[serde(deny_unknown_fields)]
 pub struct ArrayIntFilter {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -234,6 +244,8 @@ pub struct ArrayIntFilter {
     async_graphql::InputObject,
 )]
 #[graphql(input_name = "ArrayStringFilterInput")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = ArrayStringFilterInput)]
 #[serde(deny_unknown_fields)]
 pub struct ArrayStringFilter {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -255,6 +267,8 @@ pub struct ArrayStringFilter {
     async_graphql::InputObject,
 )]
 #[graphql(input_name = "JsonValueFilterInput")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = JsonValueFilterInput)]
 #[serde(deny_unknown_fields)]
 pub struct JsonValueFilter {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -284,6 +298,8 @@ pub struct JsonValueFilter {
     async_graphql::InputObject,
 )]
 #[graphql(input_name = "JsonValueWithPathFilterInput")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = JsonValueWithPathFilterInput)]
 #[serde(deny_unknown_fields)]
 pub struct JsonValueWithPathFilter {
     pub path: String,
@@ -320,6 +336,8 @@ pub enum Cursor<T> {
     async_graphql::InputObject,
 )]
 #[graphql(input_name = "ImportOption")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = ImportOption)]
 #[serde(deny_unknown_fields)]
 pub struct ImportOption {
     pub replace: Option<bool>,

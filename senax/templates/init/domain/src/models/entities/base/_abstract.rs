@@ -18,6 +18,8 @@ pub mod consts {
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 #[graphql(name="@{ db|pascal }@@{ group_name|pascal }@@{ mod_name|pascal }@@{ name|pascal }@")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ mod_name|pascal }@@{ name|pascal }@)]
 pub enum @{ name|to_pascal_name }@ {
 @% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@@{ row.value_str() }@,
 @% endfor -%@
@@ -54,6 +56,8 @@ impl From<@{ name|to_pascal_name }@> for @{ column_def.get_inner_type(true, true
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 #[graphql(name="@{ db|pascal }@@{ group_name|pascal }@@{ mod_name|pascal }@@{ name|pascal }@")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ mod_name|pascal }@@{ name|pascal }@)]
 pub enum @{ name|to_pascal_name }@ {
 @% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@,
 @% endfor -%@
@@ -117,10 +121,10 @@ pub trait @{ pascal_name }@UpdaterBase: @{ pascal_name }@Common + crate::models:
 @{- def.non_primaries_wo_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&mut self) -> Option<&mut dyn _model_::{class_mod_var}::{class}Updater>;
+{label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>>;
 {label}{comment}    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>);", "") }@
 @{- def.relations_many(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&mut self) -> Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> + '_>;
+{label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> + '_>>;
 {label}{comment}    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>>;
 {label}{comment}    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>);
 {label}{comment}    fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>);", "") }@

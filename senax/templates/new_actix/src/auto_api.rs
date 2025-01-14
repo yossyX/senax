@@ -8,6 +8,8 @@ use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
 use domain::models::Repositories;
 use regex::Regex;
 use std::collections::BTreeMap;
+#[allow(unused_imports)]
+use utoipa_actix_web::scope;
 use validator::ValidationErrors;
 
 pub use db_session::models::session::session::{_SessionStore, SESSION_ROLE};
@@ -22,12 +24,16 @@ use crate::db::RepositoriesImpl;
 pub type QuerySchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
 pub const LIMIT_COMPLEXITY: usize = 1000;
+pub const USE_SINGLE_TRANSACTION_FOR_STREAM: bool = false;
 
 #[derive(Debug, thiserror::Error)]
 #[allow(dead_code)]
 pub enum GqlError {
     #[error("Not Found")]
     NotFound,
+
+    #[error("Unauthorized")]
+    Unauthorized,
 
     #[error("Forbidden")]
     Forbidden,
@@ -96,6 +102,7 @@ impl ErrorExtensions for GqlError {
     fn extend(&self) -> Error {
         Error::new(format!("{}", self)).extend_with(|_err, e| match self {
             GqlError::NotFound => e.set("code", "NOT_FOUND"),
+            GqlError::Unauthorized => e.set("code", "UNAUTHORIZED"),
             GqlError::Forbidden => e.set("code", "FORBIDDEN"),
             GqlError::ValidationError(reason) => e.set(
                 "validation",
@@ -123,7 +130,8 @@ struct RoleGuard(Role);
 impl async_graphql::Guard for RoleGuard {
     async fn check(&self, _gql_ctx: &async_graphql::Context<'_>) -> async_graphql::Result<()> {
         let auth: &AuthInfo = _gql_ctx.data()?;
-        if auth.role == self.0 {
+        let role = claims.role().ok_or_else(|| GqlError::Unauthorized.extend())?;
+        if role == self.0 {
             return Ok(());
         }
         Err("Forbidden".into())
@@ -186,6 +194,10 @@ impl MutationRoot {
         gql_ctx.insert_http_header("Set-Cookie", cookie.to_string());
         Ok(jwt)
     }
+}
+
+pub fn route_config(cfg: &mut utoipa_actix_web::service_config::ServiceConfig) {
+    // Do not modify this line. (ApiRouteConfig)
 }
 
 pub async fn graphql(

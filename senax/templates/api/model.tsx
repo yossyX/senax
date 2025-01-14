@@ -26,6 +26,16 @@ export const Count@{ selector|pascal }@@{ pascal_name }@Query = graphql(`query c
 @%- endfor %@
 @%- endfor %@
 @%- if !api_def.disable_mutation %@
+@#-
+@%- if !def.disable_update() %@
+@%- if api_def.use_find_by_pk %@
+
+export const FindForUpdateByPk@{ pascal_name }@Query = graphql(`mutation find_for_update_by_pk_@{ db }@_@{ group }@_@{ mod_name }@(@{ def.primaries()|fmt_join("${var}:{gql_type}", ",") }@){@{ db_case }@{@{ group_case }@{@{ model_case }@{findForUpdateByPk(@{ def.primaries()|fmt_join("{var}: ${var}", ",") }@){...@{ db|pascal }@@{ group|pascal }@@{ pascal_name }@}}}}}`);
+@%- endif %@
+
+export const FindForUpdate@{ pascal_name }@Query = graphql(`mutation find_for_update_@{ db }@_@{ group }@_@{ mod_name }@($_id:ID!){@{ db_case }@{@{ group_case }@{@{ model_case }@{findForUpdate(_id: $_id){...@{ db|pascal }@@{ group|pascal }@@{ pascal_name }@}}}}}`);
+@%- endif %@
+#@
 
 export const Create@{ pascal_name }@Query = graphql(`mutation create_@{ db }@_@{ group }@_@{ mod_name }@($data:Req@{ db|pascal }@@{ group|pascal }@@{ pascal_name }@!){@{ db_case }@{@{ group_case }@{@{ model_case }@{create(data:$data){...@{ db|pascal }@@{ group|pascal }@@{ pascal_name }@}}}}}`);
 @%- if !def.disable_update() %@

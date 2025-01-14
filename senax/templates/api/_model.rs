@@ -3,30 +3,58 @@
 use domain::models::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ mod_name|to_var_name }@::{self as _domain_, @{ pascal_name }@Updater as _, @{ pascal_name }@UpdaterBase as _};
 
 fn query_guard() -> impl async_graphql::Guard {
-    @{ query_guard }@
+    @{ api_def.readable_roles(config, group)|to_gql_guard }@
 }
 @%- if !api_def.disable_mutation %@
 
 fn create_guard() -> impl async_graphql::Guard {
-    @{ create_guard }@
+    @{ api_def.creatable_roles(config, group)|to_gql_guard }@
 }
 @%- if !def.disable_update() %@
 @%- if api_def.use_import %@
 
 fn import_guard() -> impl async_graphql::Guard {
-    @{ import_guard }@
+    @{ api_def.importable_roles(config, group)|to_gql_guard }@
 }
 @%- endif %@
 
 fn update_guard() -> impl async_graphql::Guard {
-    @{ update_guard }@
+    @{ api_def.updatable_roles(config, group)|to_gql_guard }@
 }
 
 fn delete_guard() -> impl async_graphql::Guard {
-    @{ delete_guard }@
+    @{ api_def.deletable_roles(config, group)|to_gql_guard }@
 }
 @%- endif %@
 @%- endif %@
+
+fn api_query_guard(auth: &AuthInfo) -> Option<bool> {
+    auth.has_role(&[@{ api_def.readable_roles(config, group)|to_api_guard }@])
+}
+@#-
+@%- if !api_def.disable_mutation %@
+
+fn api_create_guard(auth: &AuthInfo) -> Option<bool> {
+    auth.has_role(&[@{ api_def.creatable_roles(config, group)|to_api_guard }@])
+}
+@%- if !def.disable_update() %@
+@%- if api_def.use_import %@
+
+fn api_import_guard(auth: &AuthInfo) -> Option<bool> {
+    auth.has_role(&[@{ api_def.importable_roles(config, group)|to_api_guard }@])
+}
+@%- endif %@
+
+fn api_update_guard(auth: &AuthInfo) -> Option<bool> {
+    auth.has_role(&[@{ api_def.updatable_roles(config, group)|to_api_guard }@])
+}
+
+fn api_delete_guard(auth: &AuthInfo) -> Option<bool> {
+    auth.has_role(&[@{ api_def.deletable_roles(config, group)|to_api_guard }@])
+}
+@%- endif %@
+@%- endif %@
+#@
 
 #[allow(unused_variables)]
 pub fn readable_filter(auth: &AuthInfo) -> anyhow::Result<_domain_::Filter_> {
@@ -45,23 +73,14 @@ pub fn deletable_filter(auth: &AuthInfo) -> anyhow::Result<_domain_::Filter_> {
 }
 @%- endif %@
 
-#[cfg(test)]
-#[test]
-fn test() -> anyhow::Result<()> {
-    let auth = AuthInfo::default();
-    readable_filter(&auth)?;
-    @%- if !api_def.disable_mutation %@
-    updatable_filter(&auth)?;
-    deletable_filter(&auth)?;
-    @%- endif %@
-    Ok(())
-}
-
 @{ def.label|label0 -}@
 #[derive(async_graphql::SimpleObject, Serialize)]
 #[graphql(name = "Res@{ graphql_name }@")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = Res@{ graphql_name }@)]
 pub struct ResObj {
     #[graphql(name = "_id")]
+    #[schema(value_type = String)]
     pub _id: async_graphql::ID,
 @%- if camel_case %@
 @{- def.for_api_response()|fmt_join("
@@ -72,6 +91,7 @@ pub struct ResObj {
 {label_wo_hash}    pub {rel_name}: Vec<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @{- def.relations_belonging_for_api_response()|fmt_rel_join("
     #[graphql(name = \"_{raw_rel_name}_id\")]
+    #[schema(value_type = Option<String>)]
     pub _{raw_rel_name}_id: Option<async_graphql::ID>,
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @%- else %@
@@ -86,41 +106,48 @@ pub struct ResObj {
     pub {rel_name}: Vec<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @{- def.relations_belonging_for_api_response()|fmt_rel_join("
     #[graphql(name = \"_{raw_rel_name}_id\")]
+    #[schema(value_type = Option<String>)]
     pub _{raw_rel_name}_id: Option<async_graphql::ID>,
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]
     pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @%- endif %@
+    #[graphql(name = "_cursor")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _cursor: Option<String>,
     @%- if !api_def.disable_mutation %@
     #[graphql(name = "_updatable")]
-    pub _updatable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _updatable: Option<bool>,
     #[graphql(name = "_deletable")]
-    pub _deletable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _deletable: Option<bool>,
     @%- endif %@
 }
 
 trait TryFrom_<T>: Sized {
-    fn try_from_(value: T, _auth: &AuthInfo) -> anyhow::Result<Self>;
+    fn try_from_(value: T, _auth: &AuthInfo, _cursor: Option<String>) -> anyhow::Result<Self>;
 }
 
 impl TryFrom_<&dyn _domain_::@{ pascal_name }@> for ResObj {
-    fn try_from_(v: &dyn _domain_::@{ pascal_name }@, _auth: &AuthInfo) -> anyhow::Result<Self> {
+    fn try_from_(v: &dyn _domain_::@{ pascal_name }@, _auth: &AuthInfo, _cursor: Option<String>) -> anyhow::Result<Self> {
         @%- if !api_def.disable_mutation %@
-        use domain::models::Check_;
+        use domain::models::Check_ as _;
         @%- endif %@
         Ok(Self {
             _id: v.into(),
             @{- def.for_api_response()|fmt_join("
             {var}: v.{var}(){to_res_api_type},", "") }@
             @{- def.relations_one_for_api_response()|fmt_rel_join("
-            {rel_name}: v.{rel_name}().map(|v| v.into()),", "") }@
+            {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| v.into()),", "") }@
             @{- def.relations_many_for_api_response()|fmt_rel_join("
-            {rel_name}: v.{rel_name}().map(|v| v.into()).collect(),", "") }@
+            {rel_name}: v.{rel_name}().map(|l| l.map(|v| v.into()).collect()).unwrap_or_default(),", "") }@
             @{- def.relations_belonging_for_api_response()|fmt_rel_join("
             _{raw_rel_name}_id: v._{raw_rel_name}_id().map(|v| v.into()),
-            {rel_name}: v.{rel_name}().map(|v| v.into()),", "") }@
+            {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| v.into()),", "") }@
+            _cursor,
             @%- if !api_def.disable_mutation %@
-            _updatable: updatable_filter(_auth)?.check(v),
-            _deletable: deletable_filter(_auth)?.check(v),
+            _updatable: updatable_filter(_auth).ok().and_then(|f| f.check(v).ok()),
+            _deletable: deletable_filter(_auth).ok().and_then(|f| f.check(v).ok()),
             @%- endif %@
         })
     }
@@ -128,24 +155,25 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@> for ResObj {
 @%- if def.use_all_rows_cache() || def.use_cache() %@
 
 impl TryFrom_<&dyn _domain_::@{ pascal_name }@Cache> for ResObj {
-    fn try_from_(v: &dyn _domain_::@{ pascal_name }@Cache, _auth: &AuthInfo) -> anyhow::Result<Self> {
+    fn try_from_(v: &dyn _domain_::@{ pascal_name }@Cache, _auth: &AuthInfo, _cursor: Option<String>) -> anyhow::Result<Self> {
         @%- if !api_def.disable_mutation %@
-        use domain::models::Check_;
+        use domain::models::Check_ as _;
         @%- endif %@
         Ok(Self {
             _id: v.into(),
             @{- def.for_api_response()|fmt_join("
             {var}: v.{var}(){to_res_api_type},", "") }@
             @{- def.relations_one_for_api_response()|fmt_rel_join("
-            {rel_name}: v.{rel_name}().map(|v| (&*v).into()),", "") }@
+            {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| (&*v).into()),", "") }@
             @{- def.relations_many_for_api_response()|fmt_rel_join("
-            {rel_name}: v.{rel_name}().iter().map(|v| (&**v).into()).collect(),", "") }@
+            {rel_name}: v.{rel_name}().map(|l| l.iter().map(|v| (&**v).into()).collect()).unwrap_or_default(),", "") }@
             @{- def.relations_belonging_for_api_response()|fmt_rel_join("
             _{raw_rel_name}_id: v._{raw_rel_name}_id().map(|v| v.into()),
-            {rel_name}: v.{rel_name}().map(|v| (&*v).into()),", "") }@
+            {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| (&*v).into()),", "") }@
+            _cursor,
             @%- if !api_def.disable_mutation %@
-            _updatable: updatable_filter(_auth)?.check(v),
-            _deletable: deletable_filter(_auth)?.check(v),
+            _updatable: updatable_filter(_auth).ok().and_then(|f| f.check(v).ok()),
+            _deletable: deletable_filter(_auth).ok().and_then(|f| f.check(v).ok()),
             @%- endif %@
         })
     }
@@ -184,6 +212,22 @@ fn joiner(_look_ahead: async_graphql::Lookahead<'_>, _auth: &AuthInfo) -> anyhow
     @%- endif %@
     Ok(joiner)
 }
+
+#[allow(unused_mut)]
+#[allow(dead_code)]
+#[allow(clippy::needless_update)]
+fn reader_joiner() -> Option<Box<_domain_::Joiner_>> {
+    let joiner = _domain_::Joiner_ {
+        @{- def.relations_one_for_api_response()|fmt_rel_join("
+        {rel_name}: _{raw_rel_name}::reader_joiner(),", "") }@
+        @{- def.relations_many_for_api_response()|fmt_rel_join("
+        {rel_name}: _{raw_rel_name}::reader_joiner(),", "") }@
+        @{- def.relations_belonging_for_api_response()|fmt_rel_join("
+        {rel_name}: _{raw_rel_name}::reader_joiner(),", "") }@
+        ..Default::default()
+    };
+    Some(Box::new(joiner))
+}
 @%- if !api_def.disable_mutation %@
 
 #[allow(unused_mut)]
@@ -209,9 +253,12 @@ fn updater_joiner() -> Option<Box<_domain_::Joiner_>> {
     schemars::JsonSchema,
 )]
 #[graphql(name = "Req@{ graphql_name }@")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = Req@{ graphql_name }@)]
 pub struct ReqObj {
     #[graphql(name = "_id")]
     #[schemars(skip)]
+    #[schema(value_type = Option<String>)]
     pub _id: Option<async_graphql::ID>,
 @%- if camel_case %@
 @{- def.auto_primary()|fmt_join("
@@ -254,9 +301,9 @@ impl From<&mut dyn _domain_::@{ pascal_name }@Updater> for ReqObj {
             @{- def.for_api_request()|fmt_join("
             {var}: v.{var}(){to_req_api_type},", "") }@
             @{- def.relations_one_for_api_request()|fmt_rel_join("
-            {rel_name}: (|| v.{rel_name}().map(|v| v.into()))(),", "") }@
+            {rel_name}: (|| v.{rel_name}().unwrap().map(|v| v.into()))(),", "") }@
             @{- def.relations_many_for_api_request()|fmt_rel_join("
-            {rel_name}: (|| Some(v.{rel_name}().iter_mut().map(|v| v.into()).collect()))(),", "") }@
+            {rel_name}: (|| Some(v.{rel_name}().unwrap().iter_mut().map(|v| v.into()).collect()))(),", "") }@
         }
     }
 }
@@ -306,7 +353,7 @@ fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: R
     }", "") }@
 @{- def.relations_one_for_api_request_with_replace_type(false)|fmt_rel_join("
     if let Some(input) = input.{rel_name} {
-        if let Some(updater) = updater.{rel_name}() {
+        if let Some(updater) = updater.{rel_name}().unwrap_or_default() {
             _{raw_rel_name}::update_updater(updater, input, repo, auth)?;
         } else {
             updater.set_{raw_rel_name}(_{raw_rel_name}::create_entity(input, repo, auth));
@@ -314,7 +361,7 @@ fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: R
     }", "") }@
 @{- def.relations_many_for_api_request()|fmt_rel_join("
     if let Some(data_list) = input.{rel_name} {
-        let list = updater.take_{raw_rel_name}().unwrap();
+        let list = updater.take_{raw_rel_name}().unwrap_or_default();
         updater.replace_{raw_rel_name}(_{raw_rel_name}::update_list(list, data_list, repo, auth)?);        
     }", "") }@
     Ok(())

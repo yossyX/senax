@@ -1,4 +1,3 @@
-use actix_web::http::header::TryIntoHeaderValue;
 use actix_web::web::{Bytes, BytesMut};
 use actix_web::{error, HttpRequest, HttpResponse, Responder};
 use futures::{Stream, StreamExt};
@@ -23,6 +22,9 @@ pub enum ApiError {
 
     #[error("Bad Request: {0}")]
     BadRequestJson(serde_json::Value),
+
+    #[error("Bad Request: {0}")]
+    ValidationError(validator::ValidationErrors),
 
     #[error("Internal Server Error")]
     InternalServerError(String),
@@ -49,83 +51,54 @@ pub fn json_response<T: Serialize>(r: Result<T, anyhow::Error>, ctx: &Ctx) -> im
 }
 
 #[allow(dead_code)]
+/// The response is returned as a stream in either JSON or NDJSON format.
+/// The end of an NDJSON file is marked by a newline.
+/// If the stream is interrupted due to an error, there will be no newline, allowing the error to be detected.
 pub fn json_stream_response<T: Serialize>(
-    r: Result<impl Stream<Item = T> + 'static, anyhow::Error>,
+    result: Result<impl Stream<Item = Result<T, anyhow::Error>> + 'static, anyhow::Error>,
     ctx: &Ctx,
+    ndjson: bool,
 ) -> impl Responder {
-    let result = {
-        r.map(|stream| {
-            let stream_tasks = async_stream::stream! {
-                futures::pin_mut!(stream);
-                let mut bytes = BytesMut::new();
-                bytes.extend_from_slice("[".as_bytes());
-                let mut first = true;
-                while let Some(v) = stream.next().await {
-                    if !first {
-                        bytes.extend_from_slice(",".as_bytes());
-                    }
-                    first = false;
-                    let mut writer = Vec::with_capacity(65536);
-                    match serde_json::to_writer(&mut writer, &v) {
-                        Ok(_) => {
-                            bytes.extend_from_slice(&writer);
-                            let byte = bytes.split().freeze();
-                            yield Ok::<Bytes, actix_web::http::Error>(byte)
-                        },
-                        Err(err) => error!("Tasks list stream error: {}", err)
-                    }
-                }
-                bytes.extend_from_slice("]".as_bytes());
-                let byte = bytes.split().freeze();
-                yield Ok::<Bytes, actix_web::http::Error>(byte);
-            };
-            Box::pin(stream_tasks)
-        })
+    let (c1, c2, c3, content_type) = if ndjson {
+        ("", "\n", "\n", "application/x-ndjson")
+    } else {
+        ("[", ",", "]", "application/json")
     };
-    stream_response(result, mime::APPLICATION_JSON, ctx)
-}
-
-#[allow(dead_code)]
-pub fn ndjson_stream_response<T: Serialize>(
-    r: Result<impl Stream<Item = T> + 'static, anyhow::Error>,
-    ctx: &Ctx,
-) -> impl Responder {
-    let result = {
-        r.map(|stream| {
-            let stream_tasks = async_stream::stream! {
-                futures::pin_mut!(stream);
-                let mut bytes = BytesMut::new();
-                while let Some(v) = stream.next().await {
-                    let mut writer = Vec::with_capacity(65536);
-                    match serde_json::to_writer(&mut writer, &v) {
-                        Ok(_) => {
-                            bytes.extend_from_slice(&writer);
-                            bytes.extend_from_slice("\n".as_bytes());
-                            let byte = bytes.split().freeze();
-                            yield Ok::<Bytes, actix_web::http::Error>(byte)
-                        },
-                        Err(err) => error!("Tasks list stream error: {}", err)
-                    }
-                }
-            };
-            Box::pin(stream_tasks)
-        })
-    };
-    stream_response(result, "application/x-ndjson", ctx)
-}
-
-pub fn stream_response<S, V>(
-    e: Result<S, anyhow::Error>,
-    content_type: V,
-    ctx: &Ctx,
-) -> impl Responder
-where
-    S: Stream<Item = Result<Bytes, actix_web::http::Error>> + 'static,
-    V: TryIntoHeaderValue,
-{
-    match e {
+    match result {
         Ok(stream) => {
-            info!(target:"response", ctx = ctx.ctx_no(); "stream");
+            let ctx_no = ctx.ctx_no();
+            let stream = Box::pin(async_stream::stream! {
+                futures::pin_mut!(stream);
+                let mut sep = "";
+                let mut line = 0;
+                yield Ok(Bytes::from_static(c1.as_bytes()));
+                while let Some(v) = stream.next().await {
+                    match v {
+                        Ok(v) => {
+                            match serde_json::to_string(&v) {
+                                Ok(json) => {
+                                    line += 1;
+                                    let mut bytes = BytesMut::with_capacity(json.len() + 1);
+                                    bytes.extend_from_slice(sep.as_bytes());
+                                    sep = c2;
+                                    bytes.extend_from_slice(json.as_bytes());
+                                    info!(target:"response", ctx = ctx_no, stream = line; "{}", json);
+                                    yield Ok::<Bytes, anyhow::Error>(bytes.freeze())
+                                },
+                                Err(err) => {
+                                    error!("stream error: {}", err);
+                                    return;
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            error!("stream error: {}", err);
+                            return;
+                        }
+                    }
+                }
+                yield Ok(Bytes::from_static(c3.as_bytes()));
+            });
             HttpResponse::Ok()
                 .content_type(content_type)
                 .streaming(stream)
@@ -172,6 +145,10 @@ fn error_response(err: anyhow::Error, ctx: &Ctx) -> HttpResponse {
             ApiError::BadRequestJson(value) => {
                 info!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", value);
                 HttpResponse::BadRequest().json(value)
+            }
+            ApiError::ValidationError(errors) => {
+                info!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", errors);
+                HttpResponse::BadRequest().json(errors)
             }
             ApiError::InternalServerError(err) => {
                 error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", err);

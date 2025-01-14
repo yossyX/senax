@@ -210,7 +210,7 @@ impl FilterDef {
                 filter_name
             ),
             FilterType::Exists if !self.relation_fields.is_empty() => format!(
-                "{}Query{}{}_{}Filter",
+                "{}Query{}{}_{}Selector",
                 pascal_name,
                 selector.to_case(Case::Pascal),
                 nested_name,
@@ -218,7 +218,7 @@ impl FilterDef {
             ),
             FilterType::Exists => "bool".to_string(),
             FilterType::EqAny if !self.relation_fields.is_empty() => format!(
-                "{}Query{}{}_{}Filter",
+                "{}Query{}{}_{}Selector",
                 pascal_name,
                 selector.to_case(Case::Pascal),
                 nested_name,
@@ -766,7 +766,8 @@ pub struct OrderDef {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub direction: Option<FilterSortDirection>,
     /// ### SQL直接記述
-    /// ASCとDESCの組み合わせや、JOINが必要なソートはORDER BYに続くSQLを記述してください。
+    /// ASCとDESCの組み合わせや、JOIN が必要なソートは ORDER BY に続くSQLを記述してください。
+    /// JOINする場合のメインテーブル名は _t1 です。
     /// カーソルは使用できません。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub direct_sql: Option<String>,
@@ -794,7 +795,8 @@ pub struct OrderJson {
     /// ### ソート方向
     pub direction: Option<FilterSortDirection>,
     /// ### SQL直接記述
-    /// ASCとDESCの組み合わせや、JOINが必要なソートはORDER BYに続くSQLを記述してください。
+    /// ASCとDESCの組み合わせや、JOIN が必要なソートは ORDER BY に続くSQLを記述してください。
+    /// JOINする場合のメインテーブル名は _t1 です。
     /// カーソルは使用できません。
     pub direct_sql: Option<String>,
 }
@@ -858,9 +860,17 @@ impl OrderDef {
                 )
             });
             if t.is_copyable() {
-                v.push(format!("obj.{}()", _to_var_name(field)));
+                if t.not_null {
+                    v.push(format!("_obj.{}()", _to_var_name(field)));
+                } else {
+                    v.push(format!("_obj.{}()?", _to_var_name(field)));
+                }
             } else {
-                v.push(format!("obj.{}().clone()", _to_var_name(field)));
+                if t.not_null {
+                    v.push(format!("_obj.{}().clone()", _to_var_name(field)));
+                } else {
+                    v.push(format!("_obj.{}().clone()?", _to_var_name(field)));
+                }
             }
         }
         format!("({})", &v.join(", "))
@@ -1012,7 +1022,6 @@ pub struct SelectorDef {
     pub filters: IndexMap<String, FilterDef>,
     /// ### ソート順序
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    #[schemars(length(min = 1))]
     pub orders: IndexMap<String, OrderDef>,
 }
 
@@ -1028,7 +1037,6 @@ pub struct SelectorJson {
     pub filters: Vec<FilterJson>,
     /// ### ソート順序
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[schemars(length(min = 1))]
     pub orders: Vec<OrderJson>,
 }
 

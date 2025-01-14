@@ -37,6 +37,8 @@ pub static SECRET: OnceCell<String> = OnceCell::new();
     derive_more::Display,
 )]
 #[graphql(name = "_Role")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = _Role)]
 #[allow(non_camel_case_types)]
 pub enum Role {
     // Do not modify below this line. (RoleStart)
@@ -75,8 +77,20 @@ impl AuthInfo {
         &self.username
     }
     #[allow(dead_code)]
-    pub fn role(&self) -> Role {
-        self.role
+    pub fn role(&self) -> Option<Role> {
+        if self.role == Role::_None {
+            None
+        } else {
+            Some(self.role)
+        }
+    }
+    #[allow(dead_code)]
+    pub fn has_role(&self, roles: &[Role]) -> Option<bool> {
+        if roles.is_empty() {
+            return Some(true);
+        }
+        let role = self.role()?;
+        Some(roles.iter().any(|v| *v == role))
     }
 }
 

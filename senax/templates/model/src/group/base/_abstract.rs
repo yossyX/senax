@@ -131,8 +131,8 @@ pub@{ visibility }@ trait _@{ pascal_name }@Getter: Send + Sync {
 @{- def.non_primaries()|fmt_join("
 {label}{comment}    fn _{raw_var}(&self) -> {outer};", "") -}@
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
-{label}{comment}    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}>;", "") -}@
+{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;", "") -}@
 @{- def.relations_many(false)|fmt_rel_join("
-{label}{comment}    fn _{raw_rel_name}(&self) -> &Vec<rel_{class_mod}::{class}>;", "") -}@
+{label}{comment}    fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>>;", "") -}@
 }
 @{-"\n"}@

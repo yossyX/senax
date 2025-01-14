@@ -38,8 +38,8 @@ impl @{ db|pascal }@Repositories for @{ db|pascal }@RepositoriesImpl {
     async fn end_of_without_transaction(&self) -> Result<()> {
         self._conn.lock().await.end_of_without_transaction().await
     }
-    async fn get_lock(&self, key: &str, time: i32) -> Result<()> {
-        self._conn.lock().await.lock(key, time).await
+    async fn get_lock(&self, key: &str, timeout_secs: i32) -> Result<()> {
+        self._conn.lock().await.lock(key, timeout_secs).await
     }
     fn should_retry(&self, err: &anyhow::Error) -> bool {
         DbConn::is_retryable_error(err)

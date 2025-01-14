@@ -5,10 +5,7 @@ use schemars::{
     JsonSchema,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::Write as _,
-    sync::{Mutex, RwLock},
-};
+use std::sync::{Mutex, RwLock};
 use validator::{Validate, ValidationError};
 
 pub static API_CONFIG: RwLock<Option<ApiConfigDef>> = RwLock::new(None);
@@ -32,6 +29,18 @@ pub struct ApiConfigDef {
     /// ### セレクタ取得数デフォルト上限
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selector_limit: Option<u64>,
+    /// ### GraphQLを無効化する(未実装)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disable_gql: Option<bool>,
+    /// ### JSON APIを使用する(未実装)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_json_api: Option<bool>,
+    /// ### ストリーミング取得APIを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_streaming_api: Option<bool>,
+    /// ### 外部に公開されるSelectorのパラメータ名
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_param_alias: Option<String>,
     /// ### 権限
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub roles: IndexMap<String, Option<ApiRoleDef>>,
@@ -59,6 +68,18 @@ pub struct ApiConfigJson {
     /// ### セレクタ取得数デフォルト上限
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selector_limit: Option<u64>,
+    /// ### GraphQLを無効化する(未実装)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disable_gql: Option<bool>,
+    /// ### JSON APIを使用する(未実装)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_json_api: Option<bool>,
+    /// ### ストリーミング取得APIを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_streaming_api: Option<bool>,
+    /// ### 外部に公開されるSelectorのパラメータ名
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_param_alias: Option<String>,
     /// ### 権限
     #[serde(default)]
     pub roles: Vec<ApiRoleJson>,
@@ -75,6 +96,10 @@ impl From<ApiConfigDef> for ApiConfigJson {
             with_comment: value.with_comment,
             hide_timestamp: value.hide_timestamp,
             selector_limit: value.selector_limit,
+            disable_gql: value.disable_gql,
+            use_json_api: value.use_json_api,
+            use_streaming_api: value.use_streaming_api,
+            selector_param_alias: value.selector_param_alias,
             roles: value
                 .roles
                 .into_iter()
@@ -97,6 +122,10 @@ impl From<ApiConfigJson> for ApiConfigDef {
             with_comment: value.with_comment,
             hide_timestamp: value.hide_timestamp,
             selector_limit: value.selector_limit,
+            disable_gql: value.disable_gql,
+            use_json_api: value.use_json_api,
+            use_streaming_api: value.use_streaming_api,
+            selector_param_alias: value.selector_param_alias,
             roles: value
                 .roles
                 .into_iter()
@@ -815,6 +844,13 @@ impl ApiModelDef {
         self.updatable_roles.retain(|v| roles.contains_key(v));
         self.deletable_roles.retain(|v| roles.contains_key(v));
     }
+    #[allow(dead_code)]
+    pub fn disable_gql(&self) -> bool {
+        API_CONFIG.read().unwrap().as_ref().unwrap().disable_gql.unwrap_or_default()
+    }
+    pub fn use_json_api(&self) -> bool {
+        API_CONFIG.read().unwrap().as_ref().unwrap().use_json_api.unwrap_or_default()
+    }
     pub fn readable_roles(&self, config: &ApiDbDef, group: &str) -> Vec<String> {
         if self.readable_roles.is_empty() {
             config
@@ -825,9 +861,6 @@ impl ApiModelDef {
         } else {
             self.readable_roles.clone()
         }
-    }
-    pub fn query_guard(&self, config: &ApiDbDef, group: &str) -> String {
-        Self::_to_guard(&self.readable_roles(config, group))
     }
     pub fn creatable_roles(&self, config: &ApiDbDef, group: &str) -> Vec<String> {
         if self.creatable_roles.is_empty() {
@@ -840,9 +873,6 @@ impl ApiModelDef {
             self.creatable_roles.clone()
         }
     }
-    pub fn create_guard(&self, config: &ApiDbDef, group: &str) -> String {
-        Self::_to_guard(&self.creatable_roles(config, group))
-    }
     pub fn importable_roles(&self, config: &ApiDbDef, group: &str) -> Vec<String> {
         if self.importable_roles.is_empty() {
             config
@@ -853,9 +883,6 @@ impl ApiModelDef {
         } else {
             self.importable_roles.clone()
         }
-    }
-    pub fn import_guard(&self, config: &ApiDbDef, group: &str) -> String {
-        Self::_to_guard(&self.importable_roles(config, group))
     }
     pub fn updatable_roles(&self, config: &ApiDbDef, group: &str) -> Vec<String> {
         if self.updatable_roles.is_empty() {
@@ -868,9 +895,6 @@ impl ApiModelDef {
             self.updatable_roles.clone()
         }
     }
-    pub fn update_guard(&self, config: &ApiDbDef, group: &str) -> String {
-        Self::_to_guard(&self.updatable_roles(config, group))
-    }
     pub fn deletable_roles(&self, config: &ApiDbDef, group: &str) -> Vec<String> {
         if self.deletable_roles.is_empty() {
             config
@@ -881,9 +905,6 @@ impl ApiModelDef {
         } else {
             self.deletable_roles.clone()
         }
-    }
-    pub fn delete_guard(&self, config: &ApiDbDef, group: &str) -> String {
-        Self::_to_guard(&self.deletable_roles(config, group))
     }
     pub fn readable_filter(&self) -> &str {
         self.readable_filter
@@ -909,21 +930,6 @@ impl ApiModelDef {
                 .unwrap_or("")
         } else {
             self.updatable_filter()
-        }
-    }
-    fn _to_guard(vec: &[String]) -> String {
-        let guard = vec.iter().fold(String::new(), |mut acc, v| {
-            if acc.is_empty() {
-                write!(&mut acc, "RoleGuard(Role::{v})").unwrap();
-            } else {
-                write!(&mut acc, "\n        .or(RoleGuard(Role::{v}))").unwrap();
-            }
-            acc
-        });
-        if !guard.is_empty() {
-            guard
-        } else {
-            "NoGuard".to_string()
         }
     }
 
@@ -1164,6 +1170,12 @@ pub struct ApiSelectorDef {
     /// ### 取得数上限
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<u64>,
+    /// ### ストリーミング取得APIを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_streaming_api: Option<bool>,
+    /// ### 外部に公開されるSelectorのパラメータ名
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_param_alias: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema, Validate)]
@@ -1189,6 +1201,12 @@ pub struct ApiSelectorJson {
     /// ### 取得数上限
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<u64>,
+    /// ### ストリーミング取得APIを使用する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_streaming_api: Option<bool>,
+    /// ### 外部に公開されるSelectorのパラメータ名
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector_param_alias: Option<String>,
 }
 impl From<ApiSelectorDef> for ApiSelectorJson {
     fn from(value: ApiSelectorDef) -> Self {
@@ -1206,6 +1224,8 @@ impl From<ApiSelectorDef> for ApiSelectorJson {
             use_for_update_by_operator: value.use_for_update_by_operator,
             use_for_delete: value.use_for_delete,
             limit: value.limit,
+            use_streaming_api: value.use_streaming_api,
+            selector_param_alias: value.selector_param_alias,
         }
     }
 }
@@ -1224,6 +1244,8 @@ impl From<ApiSelectorJson> for ApiSelectorDef {
             use_for_update_by_operator: value.use_for_update_by_operator,
             use_for_delete: value.use_for_delete,
             limit: value.limit,
+            use_streaming_api: value.use_streaming_api,
+            selector_param_alias: value.selector_param_alias,
         }
     }
 }
@@ -1261,6 +1283,26 @@ impl ApiSelectorDef {
         } else {
             ""
         }
+    }
+    pub fn use_streaming_api(&self) -> bool {
+        if let Some(use_streaming_api) = self.use_streaming_api {
+            return use_streaming_api;
+        }
+        let conf = API_CONFIG.read().unwrap();
+        if let Some(use_streaming_api) = conf.as_ref().unwrap().use_streaming_api {
+            return use_streaming_api;
+        }
+        false
+    }
+    pub fn selector_param_alias(&self) -> String {
+        if let Some(selector_param_alias) = &self.selector_param_alias {
+            return selector_param_alias.to_string();
+        }
+        let conf = API_CONFIG.read().unwrap();
+        if let Some(name) = &conf.as_ref().unwrap().selector_param_alias {
+            return name.to_string();
+        }
+        "selector".to_string()
     }
 }
 

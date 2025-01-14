@@ -5,6 +5,8 @@
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 #[graphql(name="Vo@{ pascal_name }@")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = Vo@{ pascal_name }@)]
 pub enum @{ pascal_name }@ {
 @% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name }@@{ row.value_str() }@,
 @% endfor -%@
@@ -36,6 +38,8 @@ impl From<@{ pascal_name }@> for @{ def.get_inner_type(true, true) }@ {
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 #[graphql(name="Vo@{ pascal_name }@")]
+#[derive(utoipa::ToSchema)]
+#[schema(as = Vo@{ pascal_name }@)]
 pub enum @{ pascal_name }@ {
 @% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name }@,
 @% endfor -%@
@@ -49,6 +53,8 @@ impl @{ pascal_name }@ {
 @% else -%@
 #[derive(serde::Deserialize, serde::Serialize, Default,@% if def.is_hashable() %@ Hash,@% endif %@ PartialEq, PartialOrd,@% if def.is_equivalence() %@ Eq, Ord,@% endif %@ Clone,@% if def.is_copyable() %@ Copy,@% endif %@ derive_more::Display, derive_more::From, derive_more::Into, Debug, schemars::JsonSchema)]
 #[serde(transparent)]
+#[derive(utoipa::ToSchema)]
+#[schema(as = Vo@{ pascal_name }@)]
 pub struct @{ pascal_name }@(@{ def.get_inner_type(false, true) }@);
 async_graphql::scalar!(@{ pascal_name }@, "Vo@{ pascal_name }@");
 impl @{ pascal_name }@ {

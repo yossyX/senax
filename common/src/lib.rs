@@ -29,6 +29,7 @@ pub trait SqlColumns {
     fn _sql_cols() -> &'static str;
 }
 
+// This may be deprecated.
 pub fn hash64(v: &str) -> String {
     use sha2::Digest;
     let mut hasher = sha2::Sha256::new();

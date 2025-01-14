@@ -1,8 +1,6 @@
 use anyhow::{ensure, Result};
 use axum::extract::Path as AxumPath;
-use axum::http::header::{
-    ACCEPT, ACCEPT_ENCODING, AUTHORIZATION, CONTENT_ENCODING, CONTENT_TYPE, ORIGIN,
-};
+use axum::http::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_TYPE};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use axum::response::Response;
@@ -28,7 +26,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
-use tower_http::{compression::CompressionLayer, cors::CorsLayer};
+use tower_http::compression::CompressionLayer;
 use validator::Validate;
 
 use crate::api_generator::schema::{
@@ -65,10 +63,6 @@ pub async fn start(
         let _ = webbrowser::open(&url);
     }
 
-    let cors_layer = CorsLayer::new()
-        .allow_headers([ACCEPT, ACCEPT_ENCODING, AUTHORIZATION, CONTENT_TYPE, ORIGIN])
-        .allow_methods(tower_http::cors::Any)
-        .allow_origin(tower_http::cors::Any);
     let compression_layer: CompressionLayer = CompressionLayer::new()
         .br(true)
         .deflate(true)
@@ -79,7 +73,6 @@ pub async fn start(
         .route("/", get(root_handler))
         .nest("/api", api_routes())
         .route("/*path", get(file_handler))
-        .layer(cors_layer)
         .layer(compression_layer);
 
     if std::env::var("AWS_LAMBDA_RUNTIME_API").is_ok() {
@@ -90,9 +83,35 @@ pub async fn start(
     } else {
         let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        axum::serve(listener, app).await.unwrap();
+        axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await.unwrap();
     }
+    writeln!(&mut stdout, "stop")?;
     Ok(())
+}
+
+async fn shutdown_signal() {
+    use tokio::signal;
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
 
 pub fn api_routes() -> Router {

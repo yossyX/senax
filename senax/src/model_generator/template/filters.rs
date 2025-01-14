@@ -746,3 +746,27 @@ pub fn replace1<S: AsRef<str>>(content: &str, r1: S) -> ::askama::Result<String>
 pub fn senax_version(_s: &str) -> ::askama::Result<String> {
     Ok(crate::VERSION.to_string())
 }
+
+pub fn to_gql_guard(vec: Vec<String>) -> ::askama::Result<String> {
+    use std::fmt::Write;
+    let guard = vec.iter().fold(String::new(), |mut acc, v| {
+        if acc.is_empty() {
+            write!(&mut acc, "RoleGuard(Role::{v})").unwrap();
+        } else {
+            write!(&mut acc, "\n        .or(RoleGuard(Role::{v}))").unwrap();
+        }
+        acc
+    });
+    if !guard.is_empty() {
+        Ok(guard)
+    } else {
+        Ok("NoGuard".to_string())
+    }
+}
+
+pub fn to_api_guard(v: Vec<String>) -> ::askama::Result<String> {
+    Ok(v.iter()
+        .map(|v| format!("Role::{v}"))
+        .collect::<Vec<_>>()
+        .join(", "))
+}

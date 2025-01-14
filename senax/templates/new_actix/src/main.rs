@@ -107,6 +107,8 @@ enum Command {
         #[clap(short, long)]
         test: bool,
     },
+    /// generate OpenApi schema
+    OpenApi,
     /// Check database tables
     Check {
         /// Use test environment
@@ -143,6 +145,26 @@ async fn main() -> Result<()> {
             .disable_suggestions()
             .finish()
     };
+
+    use utoipa_actix_web::{scope, AppExt};
+    use utoipa::OpenApi;
+    #[derive(OpenApi)]
+    #[openapi(info(title = "Api title"))]
+    struct Api;
+    let make_app = || {
+        App::new()
+            .into_utoipa_app()
+            .openapi(Api::openapi())
+            .service(scope("/api/data").configure(auto_api::route_config))
+            // .service(
+            //     web::scope("/api")
+            //         .app_data(
+            //             web::JsonConfig::default().error_handler(response::json_error_handler),
+            //         )
+            //         .configure(api::route_config),
+            // )
+    };
+
     if let Some(command) = arg.command {
         match command {
             Command::GqlSchema => {
@@ -182,6 +204,10 @@ async fn main() -> Result<()> {
                     db::migrate(test, clean || force_delete_all_db, ignore_missing).await?;
                 }
                 db::seed(test).await?;
+                return Ok(());
+            }
+            Command::OpenApi  => {
+                println!("{}", make_app().split_for_parts().1.to_pretty_json()?);
                 return Ok(());
             }
             Command::Check { test } => {
@@ -277,7 +303,7 @@ async fn main() -> Result<()> {
         .with_context(|| format!("{} required", SESSION_SECRET_KEY))?;
 
     let server = HttpServer::new(move || {
-        App::new()
+        make_app().into_app()
             .wrap(
                 middleware::Logger::new(
                     r#"%a "%r" %s %b "%{Referer}i" "%{User-Agent}i" %{ctx}xi %{username}xi %T"#,
@@ -309,14 +335,7 @@ async fn main() -> Result<()> {
                     .cookie_name(if cfg!(debug_assertions) { "sid".into() } else { "__Host-sid".into() })
                     .build(),
             )
-            .configure(routes::root::init)
-            // .service(
-            //     web::scope("/api")
-            //         .app_data(
-            //             web::JsonConfig::default().error_handler(response::json_error_handler),
-            //         )
-            //         .configure(api::init),
-            // )
+            .configure(routes::root::route_config)
             .service(
                 web::resource("/gql")
                     .guard(guard::Post())

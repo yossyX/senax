@@ -166,8 +166,8 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
         _Updater_::mut_{raw_var}(self).set(v{convert_domain_inner_type})
     }", "") }@
 @{- parent.relations_one(true)|fmt_rel_join("
-    fn {rel_name}(&mut self) -> Option<&dyn _model_::{class_mod_var}::{class}Updater> {
-        self.{rel_name}.as_ref().unwrap_or_else(|| panic!(\"{raw_rel_name} is not fetched.\")).into_iter().last().filter(|v| !v.will_be_deleted() && !v.has_been_deleted()).map(|v| v as &dyn _model_::{class_mod_var}::{class}Updater)
+    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>> {
+        Ok(self.{rel_name}.as_mut().context(\"{raw_rel_name} is not joined.\")?.iter_mut().last().filter(|v| !v.will_be_deleted() && !v.has_been_deleted()).map(|v| v as &mut dyn _model_::{class_mod_var}::{class}Updater))
     }
     fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>) {
         _Updater_::mut_{raw_rel_name}(self).set(
@@ -179,14 +179,15 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
         )
     }", "") }@
 @{- parent.relations_many(true)|fmt_rel_join("
-    fn {rel_name}(&mut self) -> Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> + '_> {
+    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> + '_>> {
         struct V<'a, T: crate::misc::Updater>(crate::accessor::AccessorHasMany<'a, T>);
         impl<T: crate::misc::Updater + _model_::{class_mod_var}::{class}Updater> domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> for V<'_, T> {
             fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut (dyn _model_::{class_mod_var}::{class}Updater + 'static)> + '_> {
                 Box::new(self.0.iter_mut().map(|v| v as &mut dyn _model_::{class_mod_var}::{class}Updater))
             }
         }
-        Box::new(V(_Updater_::mut_{raw_rel_name}(self)))
+        self.{rel_name}.as_ref().context(\"{raw_rel_name} is not joined.\")?;
+        Ok(Box::new(V(_Updater_::mut_{raw_rel_name}(self))))
     }
     fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>> {
         _Updater_::mut_{raw_rel_name}(self).take().map(|v| v.into_iter().map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}Updater>).collect())
@@ -261,42 +262,35 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@Updater {
 
 impl @{ pascal_name }@Cache for _@{ pascal_name }@Cache {
 @{- def.relations_one_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> Option<Box<dyn _model_::{class_mod_var}::{class}Cache>> {
-        _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}Cache>)
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>> {
+        Ok(_Cache_::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}Cache>))
     }", "") }@
 @{- def.relations_one_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> Option<Box<dyn _model_::{class_mod_var}::{class}>> {
-        self.{rel_name}.as_ref()?;
-        _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>)
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}>>> {
+        Ok(_Cache_::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>))
     }", "") }@
 @{- def.relations_many_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> Vec<Box<dyn _model_::{class_mod_var}::{class}Cache>> {
-        _Cache_::_{raw_rel_name}(self).into_iter().map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}Cache>).collect()
+    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_var}::{class}Cache>>> {
+        Ok(_Cache_::_{raw_rel_name}(self)?.into_iter().map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}Cache>).collect())
     }", "") }@
 @{- def.relations_many_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> Vec<Box<dyn _model_::{class_mod_var}::{class}>> {
-        if self.{rel_name}.is_none() {
-            return Vec::new();
-        }
-        _Cache_::_{raw_rel_name}(self).into_iter().map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>).collect()
+    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_var}::{class}>>> {
+        Ok(_Cache_::_{raw_rel_name}(self)?.into_iter().map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>).collect())
     }", "") }@
 @{- def.relations_belonging_cache(true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> Option<Box<dyn _model_::{class_mod_var}::{class}Cache>> {
-        self.{rel_name}.as_ref()?;
-        _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}Cache>)
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>> {
+        Ok(_Cache_::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}Cache>))
     }", "") }@
 @{- def.relations_belonging_uncached(true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> Option<Box<dyn _model_::{class_mod_var}::{class}>> {
-        self.{rel_name}.as_ref()?;
-        _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>)
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}>>> {
+        Ok(_Cache_::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>))
     }", "") }@
 @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> Option<Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>> {
-        self.{rel_name}.as_ref()?;
-        _Cache_::_{raw_rel_name}(self).map(|v| Box::new(v) as Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>)
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>>> {
+        Ok(_Cache_::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>))
     }", "") }@
 }
 @%- endif %@
@@ -308,23 +302,18 @@ impl @{ pascal_name }@ for _@{ pascal_name }@ {
     }", "") }@
 @{- def.relations_one_and_belonging(true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> Option<&dyn _model_::{class_mod_var}::{class}> {
-        self.{rel_name}.as_ref()?;
-        _Getter_::_{raw_rel_name}(self).map(|v| v as &dyn _model_::{class_mod_var}::{class})
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_var}::{class}>> {
+        Ok(_Getter_::_{raw_rel_name}(self)?.map(|v| v as &dyn _model_::{class_mod_var}::{class}))
     }", "") }@
 @{- def.relations_many(true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> Box<dyn Iterator<Item = &dyn _model_::{class_mod_var}::{class}> + '_> {
-        if self.{rel_name}.is_none() {
-            return Box::new(std::iter::empty::<&dyn _model_::{class_mod_var}::{class}>());
-        }
-        Box::new(_Getter_::_{raw_rel_name}(self).iter().map(|v| v as &dyn _model_::{class_mod_var}::{class}))
+    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_var}::{class}> + '_>> {
+        Ok(Box::new(_Getter_::_{raw_rel_name}(self)?.iter().map(|v| v as &dyn _model_::{class_mod_var}::{class})))
     }", "") }@
 @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> Option<&dyn _{raw_db}_model_::{class_mod_var}::{class}> {
-        self.{rel_name}.as_ref()?;
-        _Getter_::_{raw_rel_name}(self).map(|v| v as &dyn _{raw_db}_model_::{class_mod_var}::{class})
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{raw_db}_model_::{class_mod_var}::{class}>> {
+        Ok(_Getter_::_{raw_rel_name}(self)?.map(|v| v as &dyn _{raw_db}_model_::{class_mod_var}::{class}))
     }", "") }@
 }
 
@@ -339,8 +328,8 @@ impl @{ pascal_name }@UpdaterBase for _@{ pascal_name }@Updater {
         _Updater_::mut_{raw_var}(self).set(v{convert_domain_inner_type})
     }", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
-    fn {rel_name}(&mut self) -> Option<&mut dyn _model_::{class_mod_var}::{class}Updater> {
-        self.{rel_name}.as_mut().unwrap_or_else(|| panic!(\"{raw_rel_name} is not fetched.\")).iter_mut().last().filter(|v| !v.will_be_deleted() && !v.has_been_deleted()).map(|v| v as &mut dyn _model_::{class_mod_var}::{class}Updater)
+    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>> {
+        Ok(self.{rel_name}.as_mut().context(\"{raw_rel_name} is not joined.\")?.iter_mut().last().filter(|v| !v.will_be_deleted() && !v.has_been_deleted()).map(|v| v as &mut dyn _model_::{class_mod_var}::{class}Updater))
     }
     fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>) {
         _Updater_::mut_{raw_rel_name}(self).set(
@@ -352,14 +341,15 @@ impl @{ pascal_name }@UpdaterBase for _@{ pascal_name }@Updater {
         )
     }", "") }@
 @{- def.relations_many(true)|fmt_rel_join("
-    fn {rel_name}(&mut self) -> Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> + '_> {
+    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> + '_>> {
         struct V<'a, T: crate::misc::Updater>(crate::accessor::AccessorHasMany<'a, T>);
         impl<T: crate::misc::Updater + _model_::{class_mod_var}::{class}Updater> domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> for V<'_, T> {
             fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut (dyn _model_::{class_mod_var}::{class}Updater + 'static)> + '_> {
                 Box::new(self.0.iter_mut().map(|v| v as &mut dyn _model_::{class_mod_var}::{class}Updater))
             }
         }
-        Box::new(V(_Updater_::mut_{raw_rel_name}(self)))
+        self.{rel_name}.as_ref().context(\"{raw_rel_name} is not joined.\")?;
+        Ok(Box::new(V(_Updater_::mut_{raw_rel_name}(self))))
     }
     fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>> {
         _Updater_::mut_{raw_rel_name}(self).take().map(|v| v.into_iter().map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}Updater>).collect())
@@ -544,8 +534,8 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
     fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder> {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
-            filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
-            extra_filter: Option<Filter_>,
+            selector: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
+            filter: Option<Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -553,26 +543,24 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         }
         impl V {
             fn _query(
-                filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
-                extra_filter: Option<Filter_>,
+                selector: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
+                filter: Option<Filter_>,
                 @%- if def.is_soft_delete() %@
                 with_trashed: bool,
                 @%- endif %@
                 joiner: Option<Box<Joiner_>>,
             ) -> anyhow::Result<crate::models::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::QueryBuilder> {
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(filter) = filter {
-                    _filter_@{ selector }@(&filter)?
+                let mut fltr = if let Some(selector) = selector {
+                    _filter_@{ selector }@(&selector)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = extra_filter {
-                    query = query.join(Joiner_::merge(joiner, filter.joiner()));
+                if let Some(filter) = filter {
                     fltr = fltr.and(filter);
-                } else {
-                    query = query.join(joiner);
                 }
                 query = query.filter(fltr);
+                query = query.join(joiner);
                 @%- if def.is_soft_delete() %@
                 query = query.when(with_trashed, |v| v.with_trashed());
                 @%- endif %@
@@ -586,26 +574,26 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             async fn query_for_update(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let query = Self::_query(self.filter, self.extra_filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ self.joiner)?;
+                let query = Self::_query(self.selector, self.filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ self.joiner)?;
                 Ok(query.select_for_update(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@Updater>).collect())
             }
             async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let query = Self::_query(self.filter, self.extra_filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ self.joiner)?;
+                let query = Self::_query(self.selector, self.filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ self.joiner)?;
                 Ok(query.select(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>).collect())
             }
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let query = Self::_query(self.filter, self.extra_filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ None)?;
+                let query = Self::_query(self.selector, self.filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ None)?;
                 Ok(query.count(conn).await?)
             }
-            fn filter(mut self: Box<Self>, filter: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder> {
-                self.filter = Some(filter);
+            fn selector(mut self: Box<Self>, selector: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Selector) -> Box<dyn _Repository@{ selector|pascal }@Builder> {
+                self.selector = Some(selector);
                 self
             }
-            fn extra_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.extra_filter = Some(filter); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
             @%- if def.is_soft_delete() %@
             fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.with_trashed = mode; self  }
             @%- endif %@
@@ -616,8 +604,8 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         }
         Box::new(V {
             conn: self.0.clone(),
+            selector: None,
             filter: None,
-            extra_filter: None,
             @%- if def.is_soft_delete() %@
             with_trashed: false,
             @%- endif %@
@@ -630,7 +618,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
 @%- for filter_map in selector_def.nested_filters(selector, def) %@
 #[allow(unused_variables)]
 #[allow(unused_mut)]
-fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> anyhow::Result<crate::models::@{ filter_map.model_group()|snake|to_var_name }@::_base::_@{ filter_map.model_name()|snake }@::Filter_> {
+fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Selector) -> anyhow::Result<crate::models::@{ filter_map.model_group()|snake|to_var_name }@::_base::_@{ filter_map.model_name()|snake }@::Filter_> {
     #[allow(unused_imports)]
     @%- if config.excluded_from_domain %@
     use crate::models::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::filter;
@@ -681,8 +669,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
     fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder> {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
-            filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
-            extra_filter: Option<Filter_>,
+            selector: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
+            filter: Option<Filter_>,
             cursor: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Cursor>,
             order: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order>,
             reverse: bool,
@@ -693,7 +681,10 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
             @%- endif %@
             joiner: Option<Box<Joiner_>>,
         }
+        #[allow(unused_mut)]
+        #[allow(unused_variables)]
         fn _cursor(mut fltr: crate::models::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::Filter_, cursor: &@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> anyhow::Result<crate::models::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::Filter_> {
+            @%- if !selector_def.orders.is_empty() %@
             match cursor {
                 @%- for (cursor, cursor_def) in selector_def.orders %@
                 @{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ cursor|pascal }@(c) => {
@@ -703,6 +694,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 }
                 @%- endfor %@
             }
+            @%- endif %@
             Ok(fltr)
         }
         #[allow(unused_imports)]
@@ -713,21 +705,19 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(filter) = self.filter {
-                    _filter_@{ selector }@(&filter)?
+                let mut fltr = if let Some(selector) = self.selector {
+                    _filter_@{ selector }@(&selector)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = self.extra_filter {
-                    query = query.join(Joiner_::merge(self.joiner, filter.joiner()));
+                if let Some(filter) = self.filter {
                     fltr = fltr.and(filter);
-                } else {
-                    query = query.join(self.joiner);
                 }
                 if let Some(cursor) = self.cursor {
                     fltr = _cursor(fltr, &cursor)?;
                 }
                 query = query.filter(fltr);
+                query = query.join(self.joiner);
                 match self.order.unwrap_or_default() {
                     @%- for (order, fields) in selector_def.orders %@
                     _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
@@ -738,6 +728,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                         }
                     }
                     @%- endfor %@
+                    _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
                 }
                 query = query.when(self.limit > 0, |v| v.limit(self.limit));
                 query = query.when(self.offset > 0, |v| v.offset(self.offset));
@@ -746,16 +737,128 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 @%- endif %@
                 Ok(query.select@% if def.use_cache() %@_from_cache@% endif %@(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>).collect())
             }
+            async fn stream(self: Box<Self>, single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> + Send>>> {
+                let mut conn = self.conn.clone().lock_owned().await;
+                let conn = conn.deref_mut();
+                conn.begin_read_tx().await?;
+                let mut query = _@{ pascal_name }@::query();
+                let mut fltr = if let Some(selector) = self.selector {
+                    _filter_@{ selector }@(&selector)?
+                } else {
+                    filter!()
+                };
+                if let Some(filter) = self.filter {
+                    fltr = fltr.and(filter);
+                }
+                if let Some(cursor) = self.cursor {
+                    fltr = _cursor(fltr, &cursor)?;
+                }
+                query = query.filter(fltr.clone());
+                let joiner = self.joiner;
+                match self.order.unwrap_or_default() {
+                    @%- for (order, fields) in selector_def.orders %@
+                    _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
+                        if !self.reverse {
+                            query = query.@{ selector_def.db_order(order, false) }@;
+                        } else {
+                            query = query.@{ selector_def.db_order(order, true) }@;
+                        }
+                    }
+                    @%- endfor %@
+                    _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
+                }
+                query = query.when(self.limit > 0, |v| v.limit(self.limit));
+                query = query.when(self.offset > 0, |v| v.offset(self.offset));
+                @%- if def.is_soft_delete() %@
+                query = query.when(self.with_trashed, |v| v.with_trashed());
+                @%- endif %@
+                use crate::models::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::InnerPrimary as _InnerPrimary_;
+                let list: Vec<_InnerPrimary_> = query.select_for(conn).await?;
+                if !single_transaction {
+                    conn.release_read_tx()?;
+                }
+
+                let conn = self.conn;
+                use domain::models::Check_ as _;
+                use futures::StreamExt as _;
+                Ok(async_stream::stream! {
+                    let chunks = list.chunks(crate::STREAM_CHUNK_SIZE);
+                    let mut ret = None;
+                    let mut excluded = 0;
+                    for chunk in chunks {
+                        let pks: Vec<_InnerPrimary_> = chunk.to_vec();
+                        let joiner = joiner.clone();
+                        let mut conn_lock = conn.clone().lock_owned().await;
+                        let handle = tokio::spawn(async move {
+                            async fn func(conn: &mut crate::DbConn, pks: &Vec<_InnerPrimary_>, joiner: Option<Box<Joiner_>>) -> anyhow::Result<Vec<_@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>> {
+                                conn.begin_read_tx().await?;
+                                let mut list = _@{ pascal_name }@::find_many@% if def.use_cache() %@_from_cache@% endif %@@% if def.is_soft_delete() %@_with_trashed@% endif %@(conn, pks@% if !def.use_cache() %@, None@% endif %@).await?;
+                                list.join(conn, joiner).await?;
+                                conn.release_read_tx()?;
+                                let mut map: ahash::HashMap<_InnerPrimary_, _>  = list.into_iter().map(|v| ((&v).into(), v)).collect();
+                                let mut ret = vec![];
+                                for pk in pks {
+                                    if let Some(v) = map.remove(pk) {
+                                        ret.push(v);
+                                    }
+                                }
+                                Ok(ret)
+                            }
+                            let conn = conn_lock.deref_mut();
+                            match func(conn, &pks, joiner.clone()).await {
+                                Ok(r) => Ok(r),
+                                Err(e) => {
+                                    if crate::DbConn::is_retryable_error(&e) {
+                                        conn.reset_tx();
+                                        func(conn, &pks, joiner).await
+                                    } else {
+                                        Err(e)
+                                    }
+                                }
+                            }
+                        });
+                        if let Some(list) = ret.take() {
+                            for v in list {
+                                let v = Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>;
+                                if fltr.check(&*v).unwrap_or(true) {
+                                    yield Ok(v);
+                                } else {
+                                    excluded += 1;
+                                }
+                            }
+                        }
+                        ret = Some(handle.await??);
+                    }
+                    if let Some(list) = ret.take() {
+                        for v in list {
+                            let v = Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>;
+                            if fltr.check(&*v).unwrap_or(true) {
+                                yield Ok(v);
+                            } else {
+                                excluded += 1;
+                            }
+                        }
+                    }
+                    if excluded > 0 {
+                        log::info!("Objects updated while streaming have been excluded. This is usually not an issue, but if it occurs frequently, please review the process.: {}", excluded);
+                    }
+                    if single_transaction {
+                        let mut conn_lock = conn.clone().lock_owned().await;
+                        let conn = conn_lock.deref_mut();
+                        conn.release_read_tx()?;
+                    }
+                }.boxed())
+            }
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(filter) = self.filter {
-                    _filter_@{ selector }@(&filter)?
+                let mut fltr = if let Some(selector) = self.selector {
+                    _filter_@{ selector }@(&selector)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = self.extra_filter {
+                if let Some(filter) = self.filter {
                     fltr = fltr.and(filter);
                 }
                 if let Some(cursor) = self.cursor {
@@ -767,8 +870,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 @%- endif %@
                 Ok(query.count(conn).await?)
             }
-            fn filter(mut self: Box<Self>, filter: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
-            fn extra_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.extra_filter = Some(filter); self }
+            fn selector(mut self: Box<Self>, selector: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Selector) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.selector = Some(selector); self }
+            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
             fn cursor(mut self: Box<Self>, cursor: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.cursor = Some(cursor); self }
             fn order_by(mut self: Box<Self>, order: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.order = Some(order); self  }
             fn reverse(mut self: Box<Self>, mode: bool) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.reverse = mode; self  }
@@ -784,8 +887,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
         }
         Box::new(V {
             conn: self.0.clone(),
+            selector: None,
             filter: None,
-            extra_filter: None,
             cursor: None,
             order: None,
             reverse: false,
@@ -829,7 +932,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                     if let Some(filter) = self.filter {
                         _@{ pascal_name }@Joiner::join(&mut obj, conn, Joiner_::merge(self.joiner, filter.joiner())).await?;
                         use domain::models::Check_ as _;
-                        if filter.check(&obj as &dyn @{ pascal_name }@Cache) {
+                        if filter.check(&obj as &dyn @{ pascal_name }@Cache)? {
                             Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@Cache>))
                         } else {
                             Ok(None)

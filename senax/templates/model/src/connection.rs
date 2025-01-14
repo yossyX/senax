@@ -635,7 +635,10 @@ impl DbConn {
     /// Cache transaction synchronization
     #[allow(dead_code)]
     pub(crate) fn cache_sync(&self) -> u64 {
-        self.cache_tx.get(&self.shard_id).map(|v| v.0).unwrap_or_default()
+        self.cache_tx
+            .get(&self.shard_id)
+            .map(|v| v.0)
+            .unwrap_or_default()
     }
 
     pub fn set_clear_all_cache(&mut self) {
@@ -1270,16 +1273,36 @@ impl DbConn {
     @%- endif %@
 
     /// Obtain a lock during a transaction
-    pub async fn lock(&mut self, key: &str, time: i32) -> Result<()> {
-        let hash = senax_common::hash64(key);
+    /// Locks are released along with transaction commits or rollbacks.
+    /// A negative timeout value means infinite timeout.
+    pub async fn lock(&mut self, key: &str, timeout_secs: i32) -> Result<()> {
+        static LOCK_MAP: Mutex<BTreeMap<String, Arc<Semaphore>>> = Mutex::const_new(BTreeMap::new());
+        let lock = LOCK_MAP
+            .lock()
+            .await
+            .entry(key.to_string())
+            .or_insert_with(|| Arc::new(Semaphore::new(1)))
+            .clone()
+            .acquire_owned();
+        let (semaphore, timeout) = if timeout_secs >= 0 {
+            let start = std::time::Instant::now();
+            let semaphore =
+                tokio::time::timeout(Duration::from_secs(timeout_secs as u64), lock).await??;
+            (semaphore, timeout_secs - start.elapsed().as_secs() as i32)
+        } else {
+            (lock.await?, timeout_secs)
+        };
         let mut conn = self.acquire_writer().await?;
         let result: (Option<i64>,) = sqlx::query_as("SELECT GET_LOCK(?, ?)")
-            .bind(hash)
-            .bind(time)
+            .bind(key)
+            .bind(timeout)
             .fetch_one(conn.as_mut())
             .await?;
         if result.0 == Some(1) {
-            self.lock_list.push(DbLock { conn: Some(conn) });
+            self.lock_list.push(DbLock {
+                conn: Some(conn),
+                _semaphore: semaphore,
+            });
             Ok(())
         } else {
             Err(senax_common::err::LockFailed::new(key.to_string()).into())
@@ -1310,6 +1333,7 @@ impl DbConn {
 
 pub struct DbLock {
     conn: Option<PoolConnection<DbType>>,
+    _semaphore: tokio::sync::OwnedSemaphorePermit,
 }
 impl Drop for DbLock {
     fn drop(&mut self) {

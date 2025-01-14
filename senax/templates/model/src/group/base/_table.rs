@@ -1573,6 +1573,11 @@ impl sqlx::FromRow<'_, DbRow> for InnerPrimary {
         ))
     }
 }
+impl SqlColumns for InnerPrimary {
+    fn _sql_cols() -> &'static str {
+        r#"@{ def.primaries()|fmt_join("{col_query}", ", ") }@"#
+    }
+}
 
 #[derive(Hash, PartialEq, Eq, Deserialize, Serialize, Clone, Debug)]
 struct PrimaryHasher(InnerPrimary, ShardId);
@@ -2072,11 +2077,11 @@ impl fmt::Display for ForInsert {
 pub@{ visibility }@ trait _@{ pascal_name }@Getter: Send + Sync + 'static {
 @{ def.all_fields()|fmt_join("{label}{comment}    fn _{raw_var}(&self) -> {outer};
 ", "") -}@
-@{ def.relations_one_and_belonging(false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}>;
+@{ def.relations_one_and_belonging(false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
 ", "") -}@
-@{ def.relations_many(false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> &Vec<rel_{class_mod}::{class}>;
+@{ def.relations_many(false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>>;
 ", "") -}@
-@{ def.relations_belonging_outer_db()|fmt_rel_outer_db_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}>;
+@{ def.relations_belonging_outer_db()|fmt_rel_outer_db_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
 ", "") -}@
 }
 
@@ -5155,16 +5160,16 @@ impl _@{ pascal_name }@Getter for _@{ pascal_name }@ {
         {convert_outer_prefix}self._inner.{var}{clone_for_outer}{convert_outer}
     }", "") }@
     @{- def.relations_one_and_belonging(false)|fmt_rel_join("
-    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| &**b)
+    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
     @{- def.relations_many(false)|fmt_rel_join("
-    fn _{raw_rel_name}(&self) -> &Vec<rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\")
+    fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
+        self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")
     }", "") }@
     @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
-    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| &**b)
+    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
 }
 
@@ -5179,12 +5184,12 @@ impl crate::models::@{ parent.group_name|to_var_name }@::_base::_@{ parent.name 
         {convert_outer_prefix}self._inner.{var}{clone_for_outer}{convert_outer}
     }", "") }@
     @{- parent.relations_one_and_belonging(false)|fmt_rel_join("
-    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| &**b)
+    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
     @{- parent.relations_many(false)|fmt_rel_join("
-    fn _{raw_rel_name}(&self) -> &Vec<rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref()
+    fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref())
     }", "") }@
 }
 @%- endfor %@
@@ -5257,40 +5262,40 @@ impl _@{ pascal_name }@Cache {
         self._wrapper._{raw_var}()
     }", "") }@
     @{- def.relations_one_cache(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Option<rel_{class_mod}::{class}Cache> {
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}Cache>> {
         if let Some(v) = &self.{rel_name} {
-            v.as_ref().map(|v| (**v).clone())
+            Ok(v.as_ref().map(|v| (**v).clone()))
         } else {
-            self._wrapper._{raw_rel_name}().map(|v| v.clone().into())
+            Ok(self._wrapper._{raw_rel_name}().map(|v| v.clone().into()))
         }
     }", "") }@
     @{- def.relations_one_uncached(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Option<rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|v| (**v).clone())
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|v| (**v).clone()))
     }", "") }@
     @{- def.relations_many_cache(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Vec<rel_{class_mod}::{class}Cache> {
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Vec<rel_{class_mod}::{class}Cache>> {
         if let Some(v) = &self.{rel_name} {
-            v.to_vec()
+            Ok(v.to_vec())
         } else {
-            self._wrapper._{raw_rel_name}().iter().map(|v| v.clone().into()).collect()
+            Ok(self._wrapper._{raw_rel_name}().iter().map(|v| v.clone().into()).collect())
         }
     }", "") }@
     @{- def.relations_many_uncached(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Vec<rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").to_vec()
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Vec<rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.to_vec())
     }", "") }@
     @{- def.relations_belonging_cache(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Option<rel_{class_mod}::{class}Cache> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| *b.clone())
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}Cache>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
     }", "") }@
     @{- def.relations_belonging_uncached(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Option<rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| *b.clone())
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
     }", "") }@
     @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Option<rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| *b.clone())
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
     }", "") }@
     pub@{ visibility }@ async fn invalidate_cache<T>(conn: &DbConn, id: T) -> Result<()>
     where
@@ -5462,12 +5467,12 @@ impl _@{ pascal_name }@Updater {
         }
     }", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("
-    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| &**b)
+    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
 @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
-    fn _{raw_rel_name}(&self) -> Option<&rel_{class_mod}::{class}> {
-        self.{rel_name}.as_ref().expect(\"{rel_name} is not loaded\").as_ref().map(|b| &**b)
+    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
     pub(crate) fn __validate(&self) -> Result<()> {
         self._data.validate()?;
@@ -5704,9 +5709,13 @@ impl Serialize for _@{ pascal_name }@Cache {
         @{- def.serializable_cache()|fmt_join("
         state.serialize_field(\"{var}\", &(self._wrapper._inner.{var}{convert_serialize}))?;", "") }@
         @{- def.relations_one_cache(false)|fmt_rel_join("
-        state.serialize_field(\"{rel_name}\", &self._{raw_rel_name}())?;", "") }@
+        if let Ok(v) = &self._{raw_rel_name}() {
+            state.serialize_field(\"{rel_name}\", v)?;
+        }", "") }@
         @{- def.relations_many_cache(false)|fmt_rel_join("
-        state.serialize_field(\"{rel_name}\", &self._{raw_rel_name}())?;", "") }@
+        if let Ok(v) = &self._{raw_rel_name}() {
+            state.serialize_field(\"{rel_name}\", v)?;
+        }", "") }@
         @{- def.relations_belonging_cache(false)|fmt_rel_join("
         if self.{rel_name}.is_some() {
             state.serialize_field(\"{rel_name}\", &self.{rel_name})?;
@@ -6311,27 +6320,6 @@ impl _@{ pascal_name }@ {
         }
         Ok(list)
     }
-    @%- else %@
-    @%- if !config.force_disable_cache %@
-
-    // pub@{ visibility }@ async fn find_many_from_cache<I, T>(conn: &DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Cache>>
-    // where
-    //     I: IntoIterator<Item = T>,
-    //     T: Into<Primary>,
-    // {
-    //     unimplemented!("@{ table_name }@ does not support caching.")
-    // }
-    // @%- if def.is_soft_delete() %@
-
-    // pub@{ visibility }@ async fn find_many_from_cache_with_trashed<I, T>(conn: &DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Cache>>
-    // where
-    //     I: IntoIterator<Item = T>,
-    //     T: Into<Primary>,
-    // {
-    //     unimplemented!("@{ table_name }@ does not support caching.")
-    // }
-    @%- endif %@
-    @%- endif %@
     @%- endif %@
 
     pub@{ visibility }@ async fn find_optional<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@>>

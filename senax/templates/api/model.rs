@@ -1,4 +1,6 @@
 #[allow(unused_imports)]
+use anyhow::Context as _;
+#[allow(unused_imports)]
 use async_graphql::types::connection as graphql_conn;
 use async_graphql::ErrorExtensions as _;
 #[allow(unused_imports)]
@@ -35,145 +37,33 @@ async fn find(
     let @{ db|snake }@_query = repo.@{ db|snake }@_query();
     @{ db|snake }@_query.begin_read_tx().await?;
     let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-    let filter = readable_filter(auth)?;
-    let joiner = joiner(gql_ctx.look_ahead(), auth)?;
     let result = @{ mod_name }@_repo
         .find(primary.clone().into())
-        .join(joiner)
-        .filter(filter)
+        .join(joiner(gql_ctx.look_ahead(), auth)?)
+        .filter(readable_filter(auth)?)
         .query()
         .await;
     @{ db|snake }@_query.release_read_tx().await?;
     result
 }
-@%- for (selector, selector_def) in def.selectors %@
-@%- for api_selector_def in api_def.selector(selector) %@
+@#-
 
-#[rustfmt::skip]
-#[allow(clippy::too_many_arguments)]
-async fn _@{ selector }@(
+async fn find_for_update(
     gql_ctx: &async_graphql::Context<'_>,
     repo: &RepositoriesImpl,
     auth: &AuthInfo,
-    after: &Option<String>,
-    before: &Option<String>,
-    first: Option<usize>,
-    last: Option<usize>,
-    @%- if selector_def.filter_is_required() %@
-    filter: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
-    @%- else %@
-    filter: &Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
-    @%- endif %@
-    order: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order,
-    offset: Option<usize>,
-) -> anyhow::Result<(Vec<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>, bool, Option<usize>)> {
-    use domain::models::Cursor;
-    let @{ db|snake }@_query = repo.@{ db|snake }@_query();
-    @{ db|snake }@_query.begin_read_tx().await?;
+    primary: &_domain_::@{ pascal_name }@Primary,
+) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@>>> {
+    let @{ db|snake }@_query = repo.@{ db|snake }@_repository();
     let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-    let node = if gql_ctx.look_ahead().field("nodes").exists() {
-        gql_ctx.look_ahead().field("nodes")
-    } else {
-        gql_ctx.look_ahead().field("edges").field("node")
-    };
-    let joiner = joiner(node, auth)?;
-    let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(joiner);
-    @%- if selector_def.filter_is_required() %@
-    query = query.filter(filter.clone());
-    @%- else %@
-    if let Some(filter) = filter {
-        query = query.filter(filter.clone());
-    }
-    @%- endif %@
-    query = query.extra_filter(readable_filter(auth)?);
-    let mut previous = false;
-    @{- api_selector_def.limit_def() }@
-    let mut limit = @{ api_selector_def.limit_str() }@;
-    query = query.order_by(order);
-    if first.is_some() || after.is_some() {
-        previous = after.is_some();
-        match order {
-            @%- for (order, order_def) in selector_def.orders %@
-            _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
-                if let Some(after) = after {
-                    let c = _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
-                        after,
-                    )?;
-                    query = query.cursor(
-                        _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
-                            Cursor::After(c),
-                        ),
-                    );
-                }
-            }
-            @%- endfor %@
-        }
-        if first.is_some() {
-            limit = first@{ api_selector_def.check_limit() }@;
-        }
-    }
-    if last.is_some() || before.is_some() {
-        previous = before.is_some();
-        match order {
-            @%- for (order, order_def) in selector_def.orders %@
-            _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
-                if let Some(before) = before {
-                    let c = _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
-                        before,
-                    )?;
-                    query = query.cursor(
-                        _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
-                            Cursor::Before(c),
-                        ),
-                    )
-                    .reverse(true);
-                }
-            }
-            @%- endfor %@
-        }
-        if last.is_some() {
-            limit = last@{ api_selector_def.check_limit() }@;
-        }
-    }
-    if let Some(offset) = offset {
-        previous = previous || offset > 0;
-        query = query.offset(offset);
-    }
-    if let Some(limit) = limit {
-        query = query.limit(limit + 1);
-    }
-    let list = query.query().await?;
-    @{ db|snake }@_query.release_read_tx().await?;
-    Ok((list, previous, limit))
+    @{ mod_name }@_repo
+        .find(primary.clone().into())
+        .join(joiner(gql_ctx.look_ahead(), auth)?)
+        .filter(updatable_filter(auth)?)
+        .query()
+        .await
 }
-
-async fn _count_@{ selector }@(
-    repo: &RepositoriesImpl,
-    auth: &AuthInfo,
-    @%- if selector_def.filter_is_required() %@
-    filter: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
-    @%- else %@
-    filter: &Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
-    @%- endif %@
-) -> anyhow::Result<i64> {
-    let @{ db|snake }@_query = repo.@{ db|snake }@_query();
-    @{ db|snake }@_query.begin_read_tx().await?;
-    let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-    let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
-    @%- if selector_def.filter_is_required() %@
-    query = query.filter(filter.clone());
-    @%- else %@
-    if let Some(filter) = filter {
-        query = query.filter(filter.clone());
-    }
-    @%- endif %@
-    query = query.extra_filter(readable_filter(auth)?);
-    let count = query.count().await?;
-    @{ db|snake }@_query.release_read_tx().await?;
-    Ok(count)
-}
-@%- endfor %@
-@%- endfor %@
+#@
 
 async fn delete(
     repo: &RepositoriesImpl,
@@ -240,7 +130,7 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         @{ db|snake }@_query.release_read_tx().await?;
         Ok(list
             .iter()
-            .map(|v| ResObj::try_from_(v, auth)?)
+            .map(|v| ResObj::try_from_(v, auth, None)?)
             .collect())
     }
     @%- endif %@
@@ -278,6 +168,7 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     }
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
+    @%- let selector_name = api_selector_def.selector_param_alias() %@
 
     #[allow(clippy::too_many_arguments)]
     #[rustfmt::skip]
@@ -290,23 +181,123 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         @{ api_selector_def.limit_validator() }@first: Option<i32>,
         @{ api_selector_def.limit_validator() }@last: Option<i32>,
         @%- if selector_def.filter_is_required() %@
-        filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        @{ selector_name|to_var_name }@: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector,
         @%- else %@
-        filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        @{ selector_name|to_var_name }@: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
         @%- endif %@
         order: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Order>,
         offset: Option<usize>,
     ) -> async_graphql::Result<graphql_conn::Connection<String, ResObj>> {
         use graphql_conn::Edge;
         @%- if selector_def.filter_is_required() %@
-        filter.validate().map_err(|e| GqlError::ValidationError(e).extend())?;
+        @{ selector_name|to_var_name }@.validate().map_err(|e| GqlError::ValidationError(e).extend())?;
         @%- else %@
-        if let Some(filter) = &filter {
-            filter
+        if let Some(@{ selector_name|to_var_name }@) = &@{ selector_name|to_var_name }@ {
+            @{ selector_name|to_var_name }@
                 .validate()
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
         }
         @%- endif %@
+        
+        #[allow(unused_imports)]
+        async fn _fetch(
+            gql_ctx: &async_graphql::Context<'_>,
+            repo: &RepositoriesImpl,
+            auth: &AuthInfo,
+            after: &Option<String>,
+            before: &Option<String>,
+            first: Option<usize>,
+            last: Option<usize>,
+            @%- if selector_def.filter_is_required() %@
+            selector: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector,
+            @%- else %@
+            selector: &Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
+            @%- endif %@
+            order: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order,
+            offset: Option<usize>,
+        ) -> anyhow::Result<(Vec<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>, bool, Option<usize>)> {
+            use domain::models::Cursor;
+            let @{ db|snake }@_query = repo.@{ db|snake }@_query();
+            @{ db|snake }@_query.begin_read_tx().await?;
+            let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+            let node = if gql_ctx.look_ahead().field("nodes").exists() {
+                gql_ctx.look_ahead().field("nodes")
+            } else {
+                gql_ctx.look_ahead().field("edges").field("node")
+            };
+            let joiner = joiner(node, auth)?;
+            let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(joiner);
+            @%- if selector_def.filter_is_required() %@
+            query = query.selector(selector.clone());
+            @%- else %@
+            if let Some(selector) = selector {
+                query = query.selector(selector.clone());
+            }
+            @%- endif %@
+            query = query.filter(readable_filter(auth)?);
+            let mut previous = false;
+            @{- api_selector_def.limit_def() }@
+            let mut limit = @{ api_selector_def.limit_str() }@;
+            query = query.order_by(order);
+            if first.is_some() || after.is_some() {
+                previous = after.is_some();
+                match order {
+                    @%- for (order, order_def) in selector_def.orders %@
+                    _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
+                        if let Some(after) = after {
+                            let c = _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
+                                after,
+                            )?;
+                            query = query.cursor(
+                                _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
+                                    Cursor::After(c),
+                                ),
+                            );
+                        }
+                    }
+                    @%- endfor %@
+                    _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
+                }
+                if first.is_some() {
+                    limit = first@{ api_selector_def.check_limit() }@;
+                }
+            }
+            if last.is_some() || before.is_some() {
+                previous = before.is_some();
+                match order {
+                    @%- for (order, order_def) in selector_def.orders %@
+                    _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
+                        if let Some(before) = before {
+                            let c = _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
+                                before,
+                            )?;
+                            query = query.cursor(
+                                _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
+                                    Cursor::Before(c),
+                                ),
+                            )
+                            .reverse(true);
+                        }
+                    }
+                    @%- endfor %@
+                    _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
+                }
+                if last.is_some() {
+                    limit = last@{ api_selector_def.check_limit() }@;
+                }
+            }
+            if let Some(offset) = offset {
+                previous = previous || offset > 0;
+                query = query.offset(offset);
+            }
+            if let Some(limit) = limit {
+                query = query.limit(limit + 1);
+            }
+            let list = query.query().await?;
+            @{ db|snake }@_query.release_read_tx().await?;
+            Ok((list, previous, limit))
+        }
+
         graphql_conn::query(
             after,
             before,
@@ -317,8 +308,8 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                 let auth: &AuthInfo = gql_ctx.data()?;
                 let order = order.unwrap_or_default();
                 let (mut list, previous, limit) = crate::gql_@{ db|snake }@_selector!(
-                    _@{ selector }@(
-                        gql_ctx, &repo, auth, &after, &before, first, last, &filter, order, offset,
+                    _fetch(
+                        gql_ctx, &repo, auth, &after, &before, first, last, &@{ selector_name|to_var_name }@, order, offset,
                     ),
                     repo,
                     gql_ctx
@@ -333,9 +324,10 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                 let auth = auth.clone();
                 let connection = tokio::task::spawn_blocking(move || {
                     connection.edges.extend(list.into_iter().map(|obj| {
+                        let cursor = order.to_cursor(&obj);
                         Edge::new(
-                            order.to_cursor(&obj).unwrap(),
-                            ResObj::try_from_(&*obj, &auth).unwrap(),
+                            cursor.clone().unwrap_or_default(),
+                            ResObj::try_from_(&*obj, &auth, cursor).unwrap(),
                         )
                     }));
                     connection
@@ -352,23 +344,50 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         @%- if selector_def.filter_is_required() %@
-        filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        @{ selector_name|to_var_name }@: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector,
         @%- else %@
-        filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        @{ selector_name|to_var_name }@: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
         @%- endif %@
     ) -> async_graphql::Result<i64> {
         @%- if selector_def.filter_is_required() %@
-        filter.validate().map_err(|e| GqlError::ValidationError(e).extend())?;
+        @{ selector_name|to_var_name }@.validate().map_err(|e| GqlError::ValidationError(e).extend())?;
         @%- else %@
-        if let Some(filter) = &filter {
-            filter
+        if let Some(@{ selector_name|to_var_name }@) = &@{ selector_name|to_var_name }@ {
+            @{ selector_name|to_var_name }@
                 .validate()
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
         }
         @%- endif %@
         let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
-        crate::gql_@{ db|snake }@_count!(_count_@{ selector }@(&repo, auth, &filter), repo, gql_ctx)
+        
+        async fn _count(
+            repo: &RepositoriesImpl,
+            auth: &AuthInfo,
+            @%- if selector_def.filter_is_required() %@
+            selector: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector,
+            @%- else %@
+            selector: &Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
+            @%- endif %@
+        ) -> anyhow::Result<i64> {
+            let @{ db|snake }@_query = repo.@{ db|snake }@_query();
+            @{ db|snake }@_query.begin_read_tx().await?;
+            let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+            let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
+            @%- if selector_def.filter_is_required() %@
+            query = query.selector(selector.clone());
+            @%- else %@
+            if let Some(selector) = selector {
+                query = query.selector(selector.clone());
+            }
+            @%- endif %@
+            query = query.filter(readable_filter(auth)?);
+            let count = query.count().await?;
+            @{ db|snake }@_query.release_read_tx().await?;
+            Ok(count)
+        }
+
+        crate::gql_@{ db|snake }@_count!(_count(&repo, auth, &@{ selector_name|to_var_name }@), repo, gql_ctx)
     }
     @%- endfor %@
     @%- endfor %@
@@ -378,6 +397,43 @@ pub struct GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@;
 #[async_graphql::Object]
 impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     @%- if !api_def.disable_mutation %@
+    @#-
+    @%- if !def.disable_update() %@
+    @%- if api_def.use_find_by_pk %@
+
+    #[graphql(guard = "update_guard()")]
+    async fn find_for_update_by_pk(
+        &self,
+        gql_ctx: &async_graphql::Context<'_>,
+        @%- if camel_case %@
+        @{- def.primaries()|fmt_join("
+        {var}: {inner},", "") }@
+        @%- else %@
+        @{- def.primaries()|fmt_join("
+        #[graphql(name = \"{raw_var}\")] {var}: {inner},", "") }@
+        @%- endif %@
+    ) -> async_graphql::Result<ResObj> {
+        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let auth: &AuthInfo = gql_ctx.data()?;
+        let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
+        crate::gql_@{ db|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+    }
+    @%- endif %@
+
+    #[graphql(guard = "update_guard()")]
+    async fn find_for_update(
+        &self,
+        gql_ctx: &async_graphql::Context<'_>,
+        #[graphql(name = "_id")] _id: async_graphql::ID,
+    ) -> async_graphql::Result<ResObj> {
+        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let auth: &AuthInfo = gql_ctx.data()?;
+        let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
+        crate::gql_@{ db|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+    }
+    @%- endif %@
+    #@
+
     #[graphql(guard = "create_guard()")]
     async fn create(
         &self,
@@ -391,7 +447,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let obj = _domain_::create(repo, create_entity(data, repo, auth))
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-        Ok(ResObj::try_from_(&*obj, auth)?)
+        Ok(ResObj::try_from_(&*obj, auth, None)?)
     }
     @%- if !def.disable_update() %@
     @%- if api_def.use_import %@
@@ -485,7 +541,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let obj = _domain_::update(repo, obj, |obj| update_updater(&mut *obj, data, repo, auth))
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-        Ok(ResObj::try_from_(&*obj, auth)?)
+        Ok(ResObj::try_from_(&*obj, auth, None)?)
     }
     @%- if api_def.use_delete_by_pk %@
 
@@ -521,6 +577,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     }
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
+    @%- let selector_name = api_selector_def.selector_param_alias() %@
     @%- for (js_name, js_def) in api_selector_def.js_updater %@
 
     #[cfg(feature = "js_updater")]
@@ -529,18 +586,18 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         @%- if selector_def.filter_is_required() %@
-        filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        @{ selector_name|to_var_name }@: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector,
         @%- else %@
-        filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        @{ selector_name|to_var_name }@: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
         @%- endif %@
         value: serde_json::Value,
         #[graphql(default = false)] create_if_empty: bool,
     ) -> async_graphql::Result<Vec<ResObj>> {
         @%- if selector_def.filter_is_required() %@
-        filter.validate().map_err(|e| GqlError::ValidationError(e).extend())?;
+        @{ selector_name|to_var_name }@.validate().map_err(|e| GqlError::ValidationError(e).extend())?;
         @%- else %@
-        if let Some(filter) = &filter {
-            filter
+        if let Some(@{ selector_name|to_var_name }@) = &@{ selector_name|to_var_name }@ {
+            @{ selector_name|to_var_name }@
                 .validate()
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
         }
@@ -548,20 +605,20 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
         if create_if_empty {
             repo.@{ db|snake }@_repository()
-                .lock(&format!("@{ group }@.@{ mod_name }@.{}", serde_json::to_string(&filter)?), 10)
+                .lock(&format!("@{ group }@.@{ mod_name }@.{}", serde_json::to_string(&@{ selector_name|to_var_name }@)?), 10)
                 .await?;
         }
         let auth: &AuthInfo = gql_ctx.data()?;
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
-        query = query.filter(filter);
+        query = query.selector(@{ selector_name|to_var_name }@);
         @%- else %@
-        if let Some(filter) = filter {
-            query = query.filter(filter);
+        if let Some(@{ selector_name|to_var_name }@) = @{ selector_name|to_var_name }@ {
+            query = query.selector(@{ selector_name|to_var_name }@);
         }
         @%- endif %@
-        query = query.extra_filter(updatable_filter(auth)?);
+        query = query.filter(updatable_filter(auth)?);
         let mut updater_map: HashMap<async_graphql::ID, _> = query
             .query_for_update()
             .await
@@ -589,7 +646,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                     let obj = _domain_::create(repo, create_entity(data, repo, auth))
                         .await
                         .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-                    result.push(ResObj::try_from_(&*obj, auth)?);
+                    result.push(ResObj::try_from_(&*obj, auth, None)?);
                 }
             }
         } else {
@@ -607,7 +664,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                             })
                             .await
                             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-                        result.push(ResObj::try_from_(&*obj, auth)?);
+                        result.push(ResObj::try_from_(&*obj, auth, None)?);
                     }
                 }
             }
@@ -622,17 +679,17 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         @%- if selector_def.filter_is_required() %@
-        filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        @{ selector_name|to_var_name }@: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector,
         @%- else %@
-        filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        @{ selector_name|to_var_name }@: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
         @%- endif %@
         operator: serde_json::Value,
     ) -> async_graphql::Result<Vec<ResObj>> {
         @%- if selector_def.filter_is_required() %@
-        filter.validate().map_err(|e| GqlError::ValidationError(e).extend())?;
+        @{ selector_name|to_var_name }@.validate().map_err(|e| GqlError::ValidationError(e).extend())?;
         @%- else %@
-        if let Some(filter) = &filter {
-            filter
+        if let Some(@{ selector_name|to_var_name }@) = &@{ selector_name|to_var_name }@ {
+            @{ selector_name|to_var_name }@
                 .validate()
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
         }
@@ -643,13 +700,13 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
-        query = query.filter(filter);
+        query = query.selector(@{ selector_name|to_var_name }@);
         @%- else %@
-        if let Some(filter) = filter {
-            query = query.filter(filter);
+        if let Some(@{ selector_name|to_var_name }@) = @{ selector_name|to_var_name }@ {
+            query = query.selector(@{ selector_name|to_var_name }@);
         }
         @%- endif %@
-        query = query.extra_filter(updatable_filter(auth)?);
+        query = query.filter(updatable_filter(auth)?);
 
         let mut result = Vec::new();
         for mut obj in query
@@ -666,7 +723,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                 _domain_::update(repo, obj, |obj| update_updater(&mut *obj, data, repo, auth))
                     .await
                     .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-            result.push(ResObj::try_from_(&*obj, auth)?);
+            result.push(ResObj::try_from_(&*obj, auth, None)?);
         }
         Ok(result)
     }
@@ -678,16 +735,16 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         @%- if selector_def.filter_is_required() %@
-        filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        @{ selector_name|to_var_name }@: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector,
         @%- else %@
-        filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        @{ selector_name|to_var_name }@: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
         @%- endif %@
     ) -> async_graphql::Result<Vec<async_graphql::ID>> {
         @%- if selector_def.filter_is_required() %@
-        filter.validate().map_err(|e| GqlError::ValidationError(e).extend())?;
+        @{ selector_name|to_var_name }@.validate().map_err(|e| GqlError::ValidationError(e).extend())?;
         @%- else %@
-        if let Some(filter) = &filter {
-            filter
+        if let Some(@{ selector_name|to_var_name }@) = &@{ selector_name|to_var_name }@ {
+            @{ selector_name|to_var_name }@
                 .validate()
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
         }
@@ -697,13 +754,13 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
         @%- if selector_def.filter_is_required() %@
-        query = query.filter(filter);
+        query = query.selector(@{ selector_name|to_var_name }@);
         @%- else %@
-        if let Some(filter) = filter {
-            query = query.filter(filter);
+        if let Some(@{ selector_name|to_var_name }@) = @{ selector_name|to_var_name }@ {
+            query = query.selector(@{ selector_name|to_var_name }@);
         }
         @%- endif %@
-        query = query.extra_filter(deletable_filter(auth)?);
+        query = query.filter(deletable_filter(auth)?);
         let mut result = Vec::new();
         for obj in query
             .query_for_update()
@@ -727,4 +784,200 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
     }
     @%- endif %@
 }
+
+pub fn _route_config(_cfg: &mut utoipa_actix_web::service_config::ServiceConfig) {
+    @%- for (selector, selector_def) in def.selectors %@
+    @%- for api_selector_def in api_def.selector(selector) %@
+    @%- if api_selector_def.use_streaming_api() || api_def.use_json_api() %@
+    _cfg.service(@{ selector }@_handler);
+    @%- endif %@
+    @%- if api_def.use_json_api() %@
+    _cfg.service(count_@{ selector }@_handler);
+    @%- endif %@
+    @%- endfor %@
+    @%- endfor %@
+}
+@%- for (selector, selector_def) in def.selectors %@
+@%- for api_selector_def in api_def.selector(selector) %@
+@%- let selector_name = api_selector_def.selector_param_alias() %@
+@%- if api_selector_def.use_streaming_api() || api_def.use_json_api() %@
+
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct @{ selector|pascal }@Request {
+    @%- if selector_def.filter_is_required() %@
+    @{ selector_name|to_var_name }@: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector,
+    @%- else %@
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    @{ selector_name|to_var_name }@: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
+    @%- endif %@
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    order: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Order>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    offset: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    after: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ndjson: Option<bool>,
+}
+
+use actix_web::post;
+#[utoipa::path(
+    responses(
+        (status = 200, body = Vec<ResObj>)
+    )
+)]
+#[post("/@{ selector }@")]
+async fn @{ selector }@_handler(
+    data: actix_web::web::Json<@{ selector|pascal }@Request>,
+    http_req: actix_web::HttpRequest,
+) -> impl actix_web::Responder {
+    use crate::response::ApiError;
+    use anyhow::Result;
+    use futures::{Stream, StreamExt as _};
+    use std::pin::Pin;
+
+    async fn _fetch(
+        repo: &RepositoriesImpl,
+        auth: &AuthInfo,
+        data: &@{ selector|pascal }@Request,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> + Send>>>
+    {
+        let @{ db|snake }@_query = repo.@{ db|snake }@_query();
+        let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+
+        let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(reader_joiner());
+        @%- if selector_def.filter_is_required() %@
+        query = query.selector(data.@{ selector_name|to_var_name }@.clone());
+        @%- else %@
+        if let Some(selector) = &data.@{ selector_name|to_var_name }@ {
+            query = query.selector(selector.clone());
+        }
+        @%- endif %@
+        query = query.filter(readable_filter(auth)?);
+        if let Some(offset) = data.offset {
+            query = query.offset(offset);
+        }
+        if let Some(limit) = data.limit {
+            query = query.limit(limit);
+        }
+        let order = data.order.unwrap_or_default();
+        if let Some(_after) = &data.after {
+            match order {
+                @%- for (order, order_def) in selector_def.orders %@
+                _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
+                    let c = _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
+                        _after,
+                    )?;
+                    query = query.cursor(
+                        _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
+                            domain::models::Cursor::After(c),
+                        ),
+                    );
+                }
+                @%- endfor %@
+                _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
+            }
+        }
+        query = query.order_by(order);
+        use super::super::super::USE_SINGLE_TRANSACTION_FOR_STREAM;
+        query.stream(USE_SINGLE_TRANSACTION_FOR_STREAM).await
+    }
+
+    let ctx = crate::context::Ctx::get(&http_req);
+    let ndjson = data.ndjson.unwrap_or_default();
+    let result = async move {
+        let auth = AuthInfo::retrieve(&http_req).unwrap_or_default();
+        if !api_query_guard(&auth).ok_or(ApiError::Unauthorized)? {
+            anyhow::bail!(ApiError::Forbidden);
+        }
+        @%- if selector_def.filter_is_required() %@
+        data.@{ selector_name|to_var_name }@.validate().map_err(ApiError::ValidationError)?;
+        @%- else %@
+        if let Some(@{ selector_name|to_var_name }@) = &data.@{ selector_name|to_var_name }@ {
+            @{ selector_name|to_var_name }@
+                .validate()
+                .map_err(ApiError::ValidationError)?;
+        }
+        @%- endif %@
+        let repo = RepositoriesImpl::new_with_ctx(&ctx);
+        let stream = crate::api_@{ db|snake }@_selector!(_fetch(&repo, &auth, &data), repo);
+        let order = data.order.unwrap_or_default();
+        let stream = stream.map(move |obj| {
+            obj.and_then(|obj| ResObj::try_from_(&*obj, &auth, order.to_cursor(&obj)))
+        });
+        Ok::<_, anyhow::Error>(stream)
+    }
+    .await;
+    crate::response::json_stream_response(result, &ctx, ndjson)
+}
+@%- endif %@
+@%- if api_def.use_json_api() %@
+
+#[utoipa::path(
+    responses(
+        (status = 200, body = i64)
+    )
+)]
+#[post("/count_@{ selector }@")]
+async fn count_@{ selector }@_handler(
+    @%- if selector_def.filter_is_required() %@
+    @{ selector_name|to_var_name }@: actix_web::web::Json<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
+    @%- else %@
+    @{ selector_name|to_var_name }@: actix_web::web::Json<Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>>,
+    @%- endif %@
+    http_req: actix_web::HttpRequest,
+) -> impl actix_web::Responder {
+    use crate::response::ApiError;
+
+    async fn _count(
+        repo: &RepositoriesImpl,
+        auth: &AuthInfo,
+        @%- if selector_def.filter_is_required() %@
+        @{ selector_name|to_var_name }@: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector,
+        @%- else %@
+        @{ selector_name|to_var_name }@: &Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
+        @%- endif %@
+    ) -> anyhow::Result<i64> {
+        let @{ db|snake }@_query = repo.@{ db|snake }@_query();
+        let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+        let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
+        @%- if selector_def.filter_is_required() %@
+        query = query.selector(@{ selector_name|to_var_name }@.clone());
+        @%- else %@
+        if let Some(selector) = @{ selector_name|to_var_name }@ {
+            query = query.selector(selector.clone());
+        }
+        @%- endif %@
+        query = query.filter(readable_filter(auth)?);
+        let count = query.count().await?;
+        Ok(count)
+    }
+
+    let ctx = crate::context::Ctx::get(&http_req);
+    let @{ selector_name|to_var_name }@ = @{ selector_name|to_var_name }@.into_inner();
+    let result = async move {
+        let auth = AuthInfo::retrieve(&http_req).unwrap_or_default();
+        if !api_query_guard(&auth).ok_or(ApiError::Unauthorized)? {
+            anyhow::bail!(ApiError::Forbidden);
+        }
+        @%- if selector_def.filter_is_required() %@
+        @{ selector_name|to_var_name }@.validate().map_err(ApiError::ValidationError)?;
+        @%- else %@
+        if let Some(@{ selector_name|to_var_name }@) = &@{ selector_name|to_var_name }@ {
+            @{ selector_name|to_var_name }@
+                .validate()
+                .map_err(ApiError::ValidationError)?;
+        }
+        @%- endif %@
+        let repo = RepositoriesImpl::new_with_ctx(&ctx);
+        Ok(crate::api_@{ db|snake }@_selector!(_count(&repo, &auth, &@{ selector_name|to_var_name }@), repo))
+    }
+    .await;
+    crate::response::json_response(result, &ctx)
+}
+@%- endif %@
+@%- endfor %@
+@%- endfor %@
 @{-"\n"}@
