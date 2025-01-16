@@ -57,6 +57,7 @@ tokio.workspace = true
 tracing.workspace = true
 utoipa = { workspace = true, features = ["actix_extras"] }
 utoipa-actix-web = "0.1"
+utoipa-swagger-ui = { version = "8", features = ["actix-web"] }
 uuid.workspace = true
 v8 = { version = "0.79.2", optional = true }
 validator.workspace = true

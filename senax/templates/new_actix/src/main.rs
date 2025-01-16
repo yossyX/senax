@@ -146,8 +146,8 @@ async fn main() -> Result<()> {
             .finish()
     };
 
-    use utoipa_actix_web::{scope, AppExt};
     use utoipa::OpenApi;
+    use utoipa_actix_web::{scope, AppExt};
     #[derive(OpenApi)]
     #[openapi(info(title = "Api title"))]
     struct Api;
@@ -206,7 +206,7 @@ async fn main() -> Result<()> {
                 db::seed(test).await?;
                 return Ok(());
             }
-            Command::OpenApi  => {
+            Command::OpenApi => {
                 println!("{}", make_app().split_for_parts().1.to_pretty_json()?);
                 return Ok(());
             }
@@ -303,7 +303,7 @@ async fn main() -> Result<()> {
         .with_context(|| format!("{} required", SESSION_SECRET_KEY))?;
 
     let server = HttpServer::new(move || {
-        make_app().into_app()
+        let app = make_app().into_app()
             .wrap(
                 middleware::Logger::new(
                     r#"%a "%r" %s %b "%{Referer}i" "%{User-Agent}i" %{ctx}xi %{username}xi %T"#,
@@ -350,7 +350,15 @@ async fn main() -> Result<()> {
                     .guard(guard::Get())
                     .app_data(Data::new(schema.clone()))
                     .to(auto_api::graphiql),
-            )
+            );
+            if cfg!(debug_assertions) {
+                app.service(
+                    utoipa_swagger_ui::SwaggerUi::new("/swagger-ui/{_:.*}")
+                        .url("/api-docs/openapi.json", make_app().split_for_parts().1)
+                )
+            } else {
+                app
+            }
     })
     .listen(listeners.remove(&port).unwrap())?;
 
