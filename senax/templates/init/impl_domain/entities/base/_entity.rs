@@ -534,8 +534,8 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
     fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder> {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
-            selector: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
-            filter: Option<Filter_>,
+            selector_filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+            extra_filter: Option<Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -543,20 +543,20 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         }
         impl V {
             fn _query(
-                selector: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
-                filter: Option<Filter_>,
+                selector_filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+                extra_filter: Option<Filter_>,
                 @%- if def.is_soft_delete() %@
                 with_trashed: bool,
                 @%- endif %@
                 joiner: Option<Box<Joiner_>>,
             ) -> anyhow::Result<crate::models::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::QueryBuilder> {
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(selector) = selector {
-                    _filter_@{ selector }@(&selector)?
+                let mut fltr = if let Some(filter) = selector_filter {
+                    _filter_@{ selector }@(&filter)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = filter {
+                if let Some(filter) = extra_filter {
                     fltr = fltr.and(filter);
                 }
                 query = query.filter(fltr);
@@ -574,26 +574,26 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             async fn query_for_update(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let query = Self::_query(self.selector, self.filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ self.joiner)?;
+                let query = Self::_query(self.selector_filter, self.extra_filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ self.joiner)?;
                 Ok(query.select_for_update(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@Updater>).collect())
             }
             async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let query = Self::_query(self.selector, self.filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ self.joiner)?;
+                let query = Self::_query(self.selector_filter, self.extra_filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ self.joiner)?;
                 Ok(query.select(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>).collect())
             }
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let query = Self::_query(self.selector, self.filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ None)?;
+                let query = Self::_query(self.selector_filter, self.extra_filter,@% if def.is_soft_delete() %@ self.with_trashed,@% endif %@ None)?;
                 Ok(query.count(conn).await?)
             }
-            fn selector(mut self: Box<Self>, selector: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Selector) -> Box<dyn _Repository@{ selector|pascal }@Builder> {
-                self.selector = Some(selector);
+            fn selector_filter(mut self: Box<Self>, filter: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder> {
+                self.selector_filter = Some(filter);
                 self
             }
-            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
+            fn extra_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.extra_filter = Some(filter); self }
             @%- if def.is_soft_delete() %@
             fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.with_trashed = mode; self  }
             @%- endif %@
@@ -604,8 +604,8 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         }
         Box::new(V {
             conn: self.0.clone(),
-            selector: None,
-            filter: None,
+            selector_filter: None,
+            extra_filter: None,
             @%- if def.is_soft_delete() %@
             with_trashed: false,
             @%- endif %@
@@ -618,7 +618,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
 @%- for filter_map in selector_def.nested_filters(selector, def) %@
 #[allow(unused_variables)]
 #[allow(unused_mut)]
-fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Selector) -> anyhow::Result<crate::models::@{ filter_map.model_group()|snake|to_var_name }@::_base::_@{ filter_map.model_name()|snake }@::Filter_> {
+fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> anyhow::Result<crate::models::@{ filter_map.model_group()|snake|to_var_name }@::_base::_@{ filter_map.model_name()|snake }@::Filter_> {
     #[allow(unused_imports)]
     @%- if config.excluded_from_domain %@
     use crate::models::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::filter;
@@ -669,8 +669,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
     fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder> {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<crate::DbConn>>,
-            selector: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Selector>,
-            filter: Option<Filter_>,
+            selector_filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+            extra_filter: Option<Filter_>,
             cursor: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Cursor>,
             order: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order>,
             reverse: bool,
@@ -705,12 +705,12 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(selector) = self.selector {
-                    _filter_@{ selector }@(&selector)?
+                let mut fltr = if let Some(filter) = self.selector_filter {
+                    _filter_@{ selector }@(&filter)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = self.filter {
+                if let Some(filter) = self.extra_filter {
                     fltr = fltr.and(filter);
                 }
                 if let Some(cursor) = self.cursor {
@@ -742,12 +742,12 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 let conn = conn.deref_mut();
                 conn.begin_read_tx().await?;
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(selector) = self.selector {
-                    _filter_@{ selector }@(&selector)?
+                let mut fltr = if let Some(filter) = self.selector_filter {
+                    _filter_@{ selector }@(&filter)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = self.filter {
+                if let Some(filter) = self.extra_filter {
                     fltr = fltr.and(filter);
                 }
                 if let Some(cursor) = self.cursor {
@@ -853,12 +853,12 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 let mut query = _@{ pascal_name }@::query();
-                let mut fltr = if let Some(selector) = self.selector {
-                    _filter_@{ selector }@(&selector)?
+                let mut fltr = if let Some(filter) = self.selector_filter {
+                    _filter_@{ selector }@(&filter)?
                 } else {
                     filter!()
                 };
-                if let Some(filter) = self.filter {
+                if let Some(filter) = self.extra_filter {
                     fltr = fltr.and(filter);
                 }
                 if let Some(cursor) = self.cursor {
@@ -870,8 +870,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 @%- endif %@
                 Ok(query.count(conn).await?)
             }
-            fn selector(mut self: Box<Self>, selector: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Selector) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.selector = Some(selector); self }
-            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
+            fn selector_filter(mut self: Box<Self>, filter: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.selector_filter = Some(filter); self }
+            fn extra_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.extra_filter = Some(filter); self }
             fn cursor(mut self: Box<Self>, cursor: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.cursor = Some(cursor); self }
             fn order_by(mut self: Box<Self>, order: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.order = Some(order); self  }
             fn reverse(mut self: Box<Self>, mode: bool) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.reverse = mode; self  }
@@ -887,8 +887,8 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
         }
         Box::new(V {
             conn: self.0.clone(),
-            selector: None,
-            filter: None,
+            selector_filter: None,
+            extra_filter: None,
             cursor: None,
             order: None,
             reverse: false,

@@ -210,7 +210,7 @@ impl FilterDef {
                 filter_name
             ),
             FilterType::Exists if !self.relation_fields.is_empty() => format!(
-                "{}Query{}{}_{}Selector",
+                "{}Query{}{}_{}Filter",
                 pascal_name,
                 selector.to_case(Case::Pascal),
                 nested_name,
@@ -218,7 +218,7 @@ impl FilterDef {
             ),
             FilterType::Exists => "bool".to_string(),
             FilterType::EqAny if !self.relation_fields.is_empty() => format!(
-                "{}Query{}{}_{}Selector",
+                "{}Query{}{}_{}Filter",
                 pascal_name,
                 selector.to_case(Case::Pascal),
                 nested_name,

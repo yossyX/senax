@@ -29,18 +29,17 @@ pub struct ApiConfigDef {
     /// ### セレクタ取得数デフォルト上限
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selector_limit: Option<u64>,
-    /// ### GraphQLを無効化する(未実装)
+    /// ### GraphQLを無効化する
+    /// (未実装)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_gql: Option<bool>,
-    /// ### JSON APIを使用する(未実装)
+    /// ### JSON APIを使用する
+    /// (未実装)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_json_api: Option<bool>,
     /// ### ストリーミング取得APIを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_streaming_api: Option<bool>,
-    /// ### 外部に公開されるSelectorのパラメータ名
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub selector_param_alias: Option<String>,
     /// ### 権限
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub roles: IndexMap<String, Option<ApiRoleDef>>,
@@ -68,18 +67,17 @@ pub struct ApiConfigJson {
     /// ### セレクタ取得数デフォルト上限
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selector_limit: Option<u64>,
-    /// ### GraphQLを無効化する(未実装)
+    /// ### GraphQLを無効化する
+    /// (未実装)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_gql: Option<bool>,
-    /// ### JSON APIを使用する(未実装)
+    /// ### JSON APIを使用する
+    /// (未実装)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_json_api: Option<bool>,
     /// ### ストリーミング取得APIを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_streaming_api: Option<bool>,
-    /// ### 外部に公開されるSelectorのパラメータ名
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub selector_param_alias: Option<String>,
     /// ### 権限
     #[serde(default)]
     pub roles: Vec<ApiRoleJson>,
@@ -99,7 +97,6 @@ impl From<ApiConfigDef> for ApiConfigJson {
             disable_gql: value.disable_gql,
             use_json_api: value.use_json_api,
             use_streaming_api: value.use_streaming_api,
-            selector_param_alias: value.selector_param_alias,
             roles: value
                 .roles
                 .into_iter()
@@ -125,7 +122,6 @@ impl From<ApiConfigJson> for ApiConfigDef {
             disable_gql: value.disable_gql,
             use_json_api: value.use_json_api,
             use_streaming_api: value.use_streaming_api,
-            selector_param_alias: value.selector_param_alias,
             roles: value
                 .roles
                 .into_iter()
@@ -1173,9 +1169,6 @@ pub struct ApiSelectorDef {
     /// ### ストリーミング取得APIを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_streaming_api: Option<bool>,
-    /// ### 外部に公開されるSelectorのパラメータ名
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub selector_param_alias: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema, Validate)]
@@ -1204,9 +1197,6 @@ pub struct ApiSelectorJson {
     /// ### ストリーミング取得APIを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_streaming_api: Option<bool>,
-    /// ### 外部に公開されるSelectorのパラメータ名
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub selector_param_alias: Option<String>,
 }
 impl From<ApiSelectorDef> for ApiSelectorJson {
     fn from(value: ApiSelectorDef) -> Self {
@@ -1225,7 +1215,6 @@ impl From<ApiSelectorDef> for ApiSelectorJson {
             use_for_delete: value.use_for_delete,
             limit: value.limit,
             use_streaming_api: value.use_streaming_api,
-            selector_param_alias: value.selector_param_alias,
         }
     }
 }
@@ -1245,7 +1234,6 @@ impl From<ApiSelectorJson> for ApiSelectorDef {
             use_for_delete: value.use_for_delete,
             limit: value.limit,
             use_streaming_api: value.use_streaming_api,
-            selector_param_alias: value.selector_param_alias,
         }
     }
 }
@@ -1293,16 +1281,6 @@ impl ApiSelectorDef {
             return use_streaming_api;
         }
         false
-    }
-    pub fn selector_param_alias(&self) -> String {
-        if let Some(selector_param_alias) = &self.selector_param_alias {
-            return selector_param_alias.to_string();
-        }
-        let conf = API_CONFIG.read().unwrap();
-        if let Some(name) = &conf.as_ref().unwrap().selector_param_alias {
-            return name.to_string();
-        }
-        "selector".to_string()
     }
 }
 

@@ -39,7 +39,7 @@ pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Repository@{ selector|pa
 @%- endfor %@
 @%- for (selector, selector_def) in def.selectors %@
 #[rustfmt::skip]
-pub use super::_base::_@{ mod_name }@::{@{ pascal_name }@Query@{ selector|pascal }@Builder, @{ pascal_name }@Query@{ selector|pascal }@Cursor, @{ pascal_name }@Query@{ selector|pascal }@Selector, @{ pascal_name }@Query@{ selector|pascal }@Order};
+pub use super::_base::_@{ mod_name }@::{@{ pascal_name }@Query@{ selector|pascal }@Builder, @{ pascal_name }@Query@{ selector|pascal }@Cursor, @{ pascal_name }@Query@{ selector|pascal }@Filter, @{ pascal_name }@Query@{ selector|pascal }@Order};
 @%- endfor %@
 
 #[cfg(any(feature = "mock", test))]

@@ -78,11 +78,10 @@ impl AuthInfo {
     }
     #[allow(dead_code)]
     pub fn role(&self) -> Option<Role> {
-        if self.role == Role::_None {
-            None
-        } else {
-            Some(self.role)
-        }
+        // if self.role == Role::_None {
+        //     return None;
+        // }
+        Some(self.role)
     }
     #[allow(dead_code)]
     pub fn has_role(&self, roles: &[Role]) -> Option<bool> {

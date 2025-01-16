@@ -685,11 +685,11 @@ pub trait @{ pascal_name }@Repository@{ selector|pascal }@Builder: Send + Sync {
     async fn query_for_update(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn _Updater>>>;
     async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>>;
     async fn count(self: Box<Self>) -> anyhow::Result<i64>;
-    fn selector(self: Box<Self>, selector: @{ pascal_name }@Query@{ selector|pascal }@Selector) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
-    fn selector_in_json(self: Box<Self>, selector: serde_json::Value) -> anyhow::Result<Box<dyn _Repository@{ selector|pascal }@Builder>> {
-        Ok(self.selector(serde_json::from_value(selector)?))
+    fn selector_filter(self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
+    fn selector_filter_in_json(self: Box<Self>, filter: serde_json::Value) -> anyhow::Result<Box<dyn _Repository@{ selector|pascal }@Builder>> {
+        Ok(self.selector_filter(serde_json::from_value(filter)?))
     }
-    fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
+    fn extra_filter(self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
     @%- if def.is_soft_delete() %@
     fn with_trashed(self: Box<Self>, mode: bool) -> Box<dyn _Repository@{ selector|pascal }@Builder>;
     @%- endif %@
@@ -707,10 +707,10 @@ use validator::Validate as _;
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Default, validator::Validate, async_graphql::InputObject)]
 #[serde(deny_unknown_fields)]
 #[allow(non_camel_case_types)]
-#[graphql(name = "@{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Selector")]
+#[graphql(name = "@{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter")]
 #[derive(utoipa::ToSchema)]
-#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Selector)]
-pub struct @{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Selector {
+#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter)]
+pub struct @{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter {
     @%- for (filter, filter_def) in filter_map.filters %@
     #[graphql(name = "@{ filter }@")]
     @%- if !filter_def.required %@
@@ -725,12 +725,12 @@ pub struct @{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name 
     #[schema(no_recursion)]
     #[validate]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub _and: Option<Vec<@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Selector>>,
+    pub _and: Option<Vec<@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter>>,
     #[graphql(name = "_or")]
     #[schema(no_recursion)]
     #[validate]
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub _or: Option<Vec<@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Selector>>,
+    pub _or: Option<Vec<@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter>>,
 }
 @%- for (name, type_name) in filter_map.ranges(pascal_name, selector, filter_map.pascal_name) %@
 
@@ -836,6 +836,7 @@ pub enum @{ pascal_name }@Query@{ selector|pascal }@Order {
     @%- for (order, _) in selector_def.orders %@
     @{ order|pascal }@,
     @%- endfor %@
+    #[graphql(name = "_NONE")]
     _None,
 }
 
@@ -888,11 +889,11 @@ pub trait @{ pascal_name }@Query@{ selector|pascal }@Builder: Send + Sync {
     async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>>;
     async fn stream(self: Box<Self>, single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> + Send>>>;
     async fn count(self: Box<Self>) -> anyhow::Result<i64>;
-    fn selector(self: Box<Self>, selector: @{ pascal_name }@Query@{ selector|pascal }@Selector) -> Box<dyn _Query@{ selector|pascal }@Builder>;
-    fn selector_in_json(self: Box<Self>, selector: serde_json::Value) -> anyhow::Result<Box<dyn _Query@{ selector|pascal }@Builder>> {
-        Ok(self.selector(serde_json::from_value(selector)?))
+    fn selector_filter(self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder>;
+    fn selector_filter_in_json(self: Box<Self>, filter: serde_json::Value) -> anyhow::Result<Box<dyn _Query@{ selector|pascal }@Builder>> {
+        Ok(self.selector_filter(serde_json::from_value(filter)?))
     }
-    fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder>;
+    fn extra_filter(self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder>;
     fn cursor(self: Box<Self>, cursor: @{ pascal_name }@Query@{ selector|pascal }@Cursor) -> Box<dyn _Query@{ selector|pascal }@Builder>;
     fn order_by(self: Box<Self>, order: @{ pascal_name }@Query@{ selector|pascal }@Order) -> Box<dyn _Query@{ selector|pascal }@Builder>;
     fn reverse(self: Box<Self>, mode: bool) -> Box<dyn _Query@{ selector|pascal }@Builder>;
@@ -1677,8 +1678,8 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
         #[derive(Default)]
         struct V {
             _list: Vec<@{ pascal_name }@Entity>,
-            selector: Option<@{ pascal_name }@Query@{ selector|pascal }@Selector>,
-            filter: Option<Filter_>,
+            selector_filter: Option<@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+            extra_filter: Option<Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -1688,12 +1689,12 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
             async fn query_for_update(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn _Updater>>> {
                 let list: Vec<_> = self._list.into_iter()
                     .filter(|v| {
-                        if let Some(selector) = &self.selector {
-                            if !_filter_@{ selector }@(v, selector) {
+                        if let Some(filter) = &self.selector_filter {
+                            if !_filter_@{ selector }@(v, filter) {
                                 return false;
                             }
                         }
-                        if let Some(filter) = &self.filter {
+                        if let Some(filter) = &self.extra_filter {
                             if !filter.check(v as &dyn @{ pascal_name }@).unwrap() {
                                 return false;
                             }
@@ -1706,12 +1707,12 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
             async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>> {
                 let list: Vec<_> = self._list.into_iter()
                     .filter(|v| {
-                        if let Some(selector) = &self.selector {
-                            if !_filter_@{ selector }@(v, selector) {
+                        if let Some(filter) = &self.selector_filter {
+                            if !_filter_@{ selector }@(v, filter) {
                                 return false;
                             }
                         }
-                        if let Some(filter) = &self.filter {
+                        if let Some(filter) = &self.extra_filter {
                             if !filter.check(v as &dyn @{ pascal_name }@).unwrap() {
                                 return false;
                             }
@@ -1724,12 +1725,12 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
                 let list: Vec<_> = self._list.into_iter()
                     .filter(|v| {
-                        if let Some(selector) = &self.selector {
-                            if !_filter_@{ selector }@(v, selector) {
+                        if let Some(filter) = &self.selector_filter {
+                            if !_filter_@{ selector }@(v, filter) {
                                 return false;
                             }
                         }
-                        if let Some(filter) = &self.filter {
+                        if let Some(filter) = &self.extra_filter {
                             if !filter.check(v as &dyn @{ pascal_name }@).unwrap() {
                                 return false;
                             }
@@ -1739,8 +1740,8 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
                     .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>).collect();
                 Ok(list.len() as i64)
             }
-            fn selector(mut self: Box<Self>, selector: @{ pascal_name }@Query@{ selector|pascal }@Selector) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.selector = Some(selector); self }
-            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
+            fn selector_filter(mut self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.selector_filter = Some(filter); self }
+            fn extra_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.extra_filter = Some(filter); self }
             @%- if def.is_soft_delete() %@
             fn with_trashed(mut self: Box<Self>, mode: bool) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.with_trashed = mode; self  }
             @%- endif %@
@@ -1755,7 +1756,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
 #[cfg(any(feature = "mock", test))]
 #[allow(unused_variables)]
 #[allow(unused_imports)]
-fn _filter@{ filter_map.suffix }@(v: &super::super::super::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::@{ filter_map.model_name()|pascal }@Entity, filter: &@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Selector) -> bool {
+fn _filter@{ filter_map.suffix }@(v: &super::super::super::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::@{ filter_map.model_name()|pascal }@Entity, filter: &@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> bool {
     use super::super::super::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::*;
     @%- for (filter, filter_def) in filter_map.filters %@
     @{- filter_def.emu_str(filter, filter_map.model) }@
@@ -1797,8 +1798,8 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
         #[derive(Default)]
         struct V {
             _list: Vec<@{ pascal_name }@Entity>,
-            selector: Option<@{ pascal_name }@Query@{ selector|pascal }@Selector>,
-            filter: Option<Filter_>,
+            selector_filter: Option<@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+            extra_filter: Option<Filter_>,
             cursor: Option<@{ pascal_name }@Query@{ selector|pascal }@Cursor>,
             order: Option<@{ pascal_name }@Query@{ selector|pascal }@Order>,
             reverse: bool,
@@ -1828,12 +1829,12 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
             async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
                 let mut list: Vec<_> = self._list.into_iter()
                     .filter(|v| {
-                        if let Some(selector) = &self.selector {
-                            if !_filter_@{ selector }@(v, selector) {
+                        if let Some(filter) = &self.selector_filter {
+                            if !_filter_@{ selector }@(v, filter) {
                                 return false;
                             }
                         }
-                        if let Some(filter) = &self.filter {
+                        if let Some(filter) = &self.extra_filter {
                             if !filter.check(v as &dyn @{ pascal_name }@).unwrap() {
                                 return false;
                             }
@@ -1875,12 +1876,12 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
                 let list: Vec<_> = self._list.into_iter()
                     .filter(|v| {
-                        if let Some(selector) = &self.selector {
-                            if !_filter_@{ selector }@(v, selector) {
+                        if let Some(filter) = &self.selector_filter {
+                            if !_filter_@{ selector }@(v, filter) {
                                 return false;
                             }
                         }
-                        if let Some(filter) = &self.filter {
+                        if let Some(filter) = &self.extra_filter {
                             if !filter.check(v as &dyn @{ pascal_name }@).unwrap() {
                                 return false;
                             }
@@ -1895,8 +1896,8 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
                     .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>).collect();
                 Ok(list.len() as i64)
             }
-            fn selector(mut self: Box<Self>, selector: @{ pascal_name }@Query@{ selector|pascal }@Selector) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.selector = Some(selector); self }
-            fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.filter = Some(filter); self }
+            fn selector_filter(mut self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.selector_filter = Some(filter); self }
+            fn extra_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.extra_filter = Some(filter); self }
             fn cursor(mut self: Box<Self>, cursor: @{ pascal_name }@Query@{ selector|pascal }@Cursor) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.cursor = Some(cursor); self }
             fn order_by(mut self: Box<Self>, order: @{ pascal_name }@Query@{ selector|pascal }@Order) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.order = Some(order); self  }
             fn reverse(mut self: Box<Self>, mode: bool) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.reverse = mode; self  }
