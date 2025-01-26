@@ -865,12 +865,10 @@ impl OrderDef {
                 } else {
                     v.push(format!("_obj.{}()?", _to_var_name(field)));
                 }
+            } else if t.not_null {
+                v.push(format!("_obj.{}().clone()", _to_var_name(field)));
             } else {
-                if t.not_null {
-                    v.push(format!("_obj.{}().clone()", _to_var_name(field)));
-                } else {
-                    v.push(format!("_obj.{}().clone()?", _to_var_name(field)));
-                }
+                v.push(format!("_obj.{}().clone()?", _to_var_name(field)));
             }
         }
         format!("({})", &v.join(", "))

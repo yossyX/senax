@@ -134,8 +134,13 @@ function Groups({ formData }: any) {
   return (
     <>
       <SpaceBetween direction="vertical" size="xs">
-        <AutoField
+      <AutoField
           name="name"
+          {...formData}
+          autocomplete={formData.additionalData.groups}
+        />
+        <AutoField
+          name="group"
           {...formData}
           autocomplete={formData.additionalData.groups}
         />

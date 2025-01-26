@@ -594,7 +594,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
         for (cur_model_name, def) in defs.iter() {
             let model = def.borrow();
             for (rel_name, rel_def) in model.merged_relations.iter() {
-                if !rel_def.is_type_of_belongs_to() {
+                if rel_def.is_type_of_has() {
                     let foreign_ids = rel_def.get_foreign_id(&model);
                     if model.full_name().eq(&rel_def.model) {
                         ensure!(

@@ -52,6 +52,7 @@ function AutoField(props: Props) {
     return <></>;
   }
   const label = property.title || name;
+  const labelWithOptionality = (required ? label : <span>{label} <i>- optional</i></span>);
   const definition = getDefinition(name, property, definitions);
   const type = Array.isArray(definition.type)
     ? definition.type[0]
@@ -116,7 +117,7 @@ function AutoField(props: Props) {
           definition={definition}
           required={required}
           errors={errors}
-          label={label}
+          label={labelWithOptionality}
           values={props.options}
         />
       );
@@ -151,7 +152,7 @@ function AutoField(props: Props) {
           form={form}
           definition={definition}
           errors={errors}
-          label={label}
+          label={labelWithOptionality}
           values={definition.enum}
         />
       );
@@ -168,7 +169,7 @@ function AutoField(props: Props) {
           definition={definition}
           required={required}
           errors={errors}
-          label={label}
+          label={labelWithOptionality}
           values={definition.enum}
         />
       );
@@ -218,7 +219,7 @@ function AutoField(props: Props) {
         render={({ field }) => (
           <FormField
             description={definition.description}
-            label={label}
+            label={labelWithOptionality}
             errorText={errors[name]?.message}
           >
             <Input
@@ -255,7 +256,7 @@ function AutoField(props: Props) {
           return (
             <FormField
               description={definition.description}
-              label={label}
+              label={labelWithOptionality}
               errorText={errors[name]?.message}
             >
               <Autosuggest
@@ -294,7 +295,7 @@ function AutoField(props: Props) {
         render={({ field }) => (
           <FormField
             description={definition.description}
-            label={label}
+            label={labelWithOptionality}
             errorText={errors[name]?.message}
           >
             <Textarea
@@ -330,7 +331,7 @@ function AutoField(props: Props) {
         form={form}
         definition={definition}
         errors={errors}
-        label={label}
+        label={labelWithOptionality}
       />
     );
   }
@@ -344,7 +345,7 @@ function AutoField(props: Props) {
       render={({ field }) => (
         <FormField
           description={definition.description}
-          label={label}
+          label={labelWithOptionality}
           errorText={errors[name]?.message}
         >
           <Input

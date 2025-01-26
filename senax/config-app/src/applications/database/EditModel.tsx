@@ -539,6 +539,39 @@ function BelongsTo({ formData }: any) {
 }
 
 function BelongsToOuterDb({ formData }: any) {
+  const [dbs, setDbs] = React.useState([]);
+  React.useEffect(() => {
+    fetch("/api/db")
+      .then((res) => res.json())
+      .then((json) => setDbs(json))
+      .catch(() => alert("error"));
+  }, []);
+  const db = useWatch({
+    control: formData.form.control,
+    name: "db",
+  });
+  const [groups, setGroups] = React.useState([]);
+  React.useEffect(() => {
+    if (db) {
+      fetch(`/api/db/${db}`)
+      .then((res) => res.json())
+      .then((json) => setGroups(json.groups))
+      .catch(() => alert("error"));
+    }
+  }, [db]);
+  const group = useWatch({
+    control: formData.form.control,
+    name: "group",
+  });
+  const [models, setModels] = React.useState([]);
+  React.useEffect(() => {
+    if (db && group) {
+      fetch(`/api/model_names/${db}`)
+      .then((res) => res.json())
+      .then((json) => setModels(json[group]))
+      .catch(() => alert("error"));
+    }
+  }, [db, group]);
   const model = useWatch({
     control: formData.form.control,
     name: "model",
@@ -557,9 +590,11 @@ function BelongsToOuterDb({ formData }: any) {
         <AutoField name="name" {...formData} />
         <AutoField name="label" {...formData} />
         <AutoField name="comment" {...formData} textarea />
-        <AutoField name="db" {...formData} />
-        <AutoField name="group" {...formData} />
-        <AutoField name="model" {...formData} />
+        <AutoField name="db" {...formData} autocomplete={dbs} />
+        <AutoField name="group" {...formData} autocomplete={groups.map(
+            (v: any) => v.name,
+          )} />
+        <AutoField name="model" {...formData} autocomplete={models}  />
         <AutoField
           name="local"
           {...formData}

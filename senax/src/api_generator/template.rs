@@ -10,16 +10,16 @@ use super::schema::{ApiDbDef, ApiModelDef};
     source = r###"
     impl QueryRoot {
     @%- if !camel_case %@
-    #[graphql(name = "@{ db }@")]
+    #[graphql(name = "@{ db_path }@")]
     @%- endif %@
-    async fn @{ db|to_var_name }@(&self) -> @{ db|snake|to_var_name }@::GqlQuery@{ db|pascal }@ {
-        @{ db|snake|to_var_name }@::GqlQuery@{ db|pascal }@
+    async fn @{ db_path|to_var_name }@(&self) -> @{ db_path|snake|to_var_name }@::GqlQuery@{ db_path|pascal }@ {
+        @{ db_path|snake|to_var_name }@::GqlQuery@{ db_path|pascal }@
     }"###,
     ext = "txt",
     escape = "none"
 )]
 pub struct QueryRootTemplate<'a> {
-    pub db: &'a str,
+    pub db_path: &'a str,
     pub camel_case: bool,
 }
 
@@ -28,16 +28,16 @@ pub struct QueryRootTemplate<'a> {
     source = r###"
     impl MutationRoot {
     @%- if !camel_case %@
-    #[graphql(name = "@{ db }@")]
+    #[graphql(name = "@{ db_path }@")]
     @%- endif %@
-    async fn @{ db|to_var_name }@(&self) -> @{ db|snake|to_var_name }@::GqlMutation@{ db|pascal }@ {
-        @{ db|snake|to_var_name }@::GqlMutation@{ db|pascal }@
+    async fn @{ db_path|to_var_name }@(&self) -> @{ db_path|snake|to_var_name }@::GqlMutation@{ db_path|pascal }@ {
+        @{ db_path|snake|to_var_name }@::GqlMutation@{ db_path|pascal }@
     }"###,
     ext = "txt",
     escape = "none"
 )]
 pub struct MutationRootTemplate<'a> {
-    pub db: &'a str,
+    pub db_path: &'a str,
     pub camel_case: bool,
 }
 
@@ -51,15 +51,15 @@ use crate::auto_api::{Role, RoleGuard};
 
 // Do not modify this line. (GqlMod:)
 
-pub struct GqlQuery@{ db|pascal }@;
+pub struct GqlQuery@{ db_path|pascal }@;
 #[Object]
-impl GqlQuery@{ db|pascal }@ {
+impl GqlQuery@{ db_path|pascal }@ {
     // Do not modify this line. (GqlQuery)
 }
 
-pub struct GqlMutation@{ db|pascal }@;
+pub struct GqlMutation@{ db_path|pascal }@;
 #[Object]
-impl GqlMutation@{ db|pascal }@ {
+impl GqlMutation@{ db_path|pascal }@ {
     // Do not modify this line. (GqlMutation)
 }
 
@@ -73,7 +73,7 @@ pub fn gen_json_schema(dir: &std::path::Path) -> anyhow::Result<()> {
 }
 
 #[macro_export]
-macro_rules! gql_@{ db|snake }@_find {
+macro_rules! gql_@{ db_path|snake }@_find {
     ( $f:ident $p:tt, $repo:expr, $auth:expr, $gql_ctx:expr ) => {
         match $f$p.await {
             Ok(obj) => {
@@ -97,7 +97,7 @@ macro_rules! gql_@{ db|snake }@_find {
 }
 
 #[macro_export]
-macro_rules! gql_@{ db|snake }@_selector {
+macro_rules! gql_@{ db_path|snake }@_selector {
     ( $f:ident $p:tt, $repo:expr, $gql_ctx:expr ) => {
         match $f$p.await {
             Ok(result) => Ok(result),
@@ -117,7 +117,7 @@ macro_rules! gql_@{ db|snake }@_selector {
 }
 
 #[macro_export]
-macro_rules! api_@{ db|snake }@_selector {
+macro_rules! api_@{ db_path|snake }@_selector {
     ( $f:ident $p:tt, $repo:expr ) => {
         match $f$p.await {
             Ok(result) => Ok(result),
@@ -137,7 +137,7 @@ macro_rules! api_@{ db|snake }@_selector {
 }
 
 #[macro_export]
-macro_rules! gql_@{ db|snake }@_count {
+macro_rules! gql_@{ db_path|snake }@_count {
     ( $f:ident $p:tt, $repo:expr, $gql_ctx:expr ) => {
         match $f$p.await {
             Ok(count) => Ok(count),
@@ -161,6 +161,7 @@ macro_rules! gql_@{ db|snake }@_count {
 )]
 pub struct DbTemplate<'a> {
     pub db: &'a str,
+    pub db_path: &'a str,
 }
 
 #[derive(Template)]
@@ -185,8 +186,8 @@ pub struct DbModTemplate<'a> {
     @%- if !camel_case %@
     #[graphql(name = "@{ name }@")]
     @%- endif %@
-    async fn @{ name|to_var_name }@(&self) -> @{ name|snake|to_var_name }@::GqlQuery@{ db|pascal }@@{ name|pascal }@ {
-        @{ name|snake|to_var_name }@::GqlQuery@{ db|pascal }@@{ name|pascal }@
+    async fn @{ name|to_var_name }@(&self) -> @{ name|snake|to_var_name }@::GqlQuery@{ db_path|pascal }@@{ name|pascal }@ {
+        @{ name|snake|to_var_name }@::GqlQuery@{ db_path|pascal }@@{ name|pascal }@
     }
     @%- endfor %@
     // Do not modify this line. (GqlQuery)"###,
@@ -194,7 +195,7 @@ pub struct DbModTemplate<'a> {
     escape = "none"
 )]
 pub struct DbQueryTemplate<'a> {
-    pub db: &'a str,
+    pub db_path: &'a str,
     pub add_groups: &'a BTreeSet<String>,
     pub camel_case: bool,
 }
@@ -205,15 +206,15 @@ pub struct DbQueryTemplate<'a> {
     @%- if !camel_case %@
     #[graphql(name = "@{ name }@")]
     @%- endif %@
-    async fn @{ name|to_var_name }@(&self) -> @{ name|snake|to_var_name }@::GqlMutation@{ db|pascal }@@{ name|pascal }@ {
-        @{ name|snake|to_var_name }@::GqlMutation@{ db|pascal }@@{ name|pascal }@
+    async fn @{ name|to_var_name }@(&self) -> @{ name|snake|to_var_name }@::GqlMutation@{ db_path|pascal }@@{ name|pascal }@ {
+        @{ name|snake|to_var_name }@::GqlMutation@{ db_path|pascal }@@{ name|pascal }@
     }
     // Do not modify this line. (GqlMutation)"###,
     ext = "txt",
     escape = "none"
 )]
 pub struct DbMutationTemplate<'a> {
-    pub db: &'a str,
+    pub db_path: &'a str,
     pub name: &'a str,
     pub camel_case: bool,
 }
@@ -326,10 +327,12 @@ pub struct GroupJsonSchemaTemplate<'a> {
 #[template(path = "api/model.rs", escape = "none")]
 pub struct ModelTemplate<'a> {
     pub db: &'a str,
+    pub db_path: &'a str,
     pub group: &'a str,
+    pub group_path: &'a str,
     pub mod_name: &'a str,
-    pub name: &'a str,
     pub pascal_name: &'a str,
+    pub graphql_name: &'a str,
     pub id_name: &'a str,
     pub def: &'a Arc<ModelDef>,
     pub camel_case: bool,
@@ -343,8 +346,8 @@ pub struct BaseModelTemplate<'a> {
     pub group: &'a str,
     pub mod_name: &'a str,
     pub model_name: &'a str,
-    pub graphql_name: &'a str,
     pub pascal_name: &'a str,
+    pub graphql_name: &'a str,
     pub config: &'a ApiDbDef,
     pub def: &'a Arc<ModelDef>,
     pub camel_case: bool,
@@ -393,14 +396,12 @@ pub struct DbConfigTemplate;
 #[derive(Template)]
 #[template(path = "api/model.tsx", escape = "none")]
 pub struct ModelTsTemplate<'a> {
-    pub db: &'a str,
-    pub db_case: String,
-    pub group: &'a str,
-    pub group_case: String,
-    pub mod_name: &'a str,
-    pub model_case: String,
-    pub name: &'a str,
-    pub pascal_name: &'a str,
+    pub path: String,
+    pub model_path: &'a str,
+    pub curly_begin: String,
+    pub curly_end: &'a str,
+    pub pascal_name: String,
+    pub graphql_name: &'a str,
     pub id_name: &'a str,
     pub def: &'a Arc<ModelDef>,
     pub gql_fields: String,

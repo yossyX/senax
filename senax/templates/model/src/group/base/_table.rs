@@ -4345,6 +4345,7 @@ impl QueryBuilder {
         Ok(result)
     }
 
+    #[allow(clippy::if_same_then_else)]
     fn _sql(&self, sql_cols: &str, for_update: bool, shard_id: ShardId) -> String {
         let mut sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
@@ -4438,6 +4439,7 @@ impl QueryBuilder {
     @%- if def.use_cache() %@
 
     #[cfg(not(feature="cache_update_only"))]
+    #[allow(clippy::if_same_then_else)]
     async fn _select_from_cache(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         let mut sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
@@ -4576,6 +4578,7 @@ impl QueryBuilder {
     @%- if !def.disable_update() || def.soft_delete().is_some() %@
 
     #[allow(unused_mut)]
+    #[allow(clippy::if_same_then_else)]
     pub@{ visibility }@ async fn update(self, conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<u64> {
         @%- if def.updated_at_conf().is_some() %@
         if obj._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
@@ -4664,6 +4667,7 @@ impl QueryBuilder {
     }
 
     #[allow(unused_mut)]
+    #[allow(clippy::if_same_then_else)]
     pub@{ visibility }@ async fn force_delete(self, conn: &mut DbConn) -> Result<u64> {
         @%- if def.on_delete_list.is_empty() %@
         let mut sql = format!(
@@ -5812,6 +5816,7 @@ impl _@{ pascal_name }@ {
         unimplemented!("cache_update_only feature disables fetching from cache.")
     }
     #[cfg(not(feature="cache_update_only"))]
+    #[allow(clippy::if_same_then_else)]
     pub@{ visibility }@ async fn find_all_from_cache(
         conn: &DbConn,
         filter: Option<Filter_>,

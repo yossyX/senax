@@ -19,7 +19,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, force: bool) -> Result<()> {
     for db in &db_list {
         crate::common::check_ascii_name(db);
     }
-    let name = sanitize_filename::sanitize(name);
+    let name = crate::common::check_ascii_name(name).to_string();
     fs::create_dir_all(&name)?;
     let base_path: PathBuf = name.parse()?;
 

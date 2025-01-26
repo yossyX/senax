@@ -7,8 +7,8 @@ use crate::{common::fs_write, DOMAIN_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FIL
 
 pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     let base_path: PathBuf = if let Some(name) = name {
-        let name = sanitize_filename::sanitize(name);
-        fs::create_dir_all(&name)?;
+        crate::common::check_ascii_name(name);
+        fs::create_dir_all(name)?;
         name.parse()?
     } else {
         ".".parse()?

@@ -664,6 +664,9 @@ pub struct RelDef {
 }
 pub const MODEL_NAME_SPLITTER: &str = "::";
 impl RelDef {
+    pub fn is_type_of_has(&self) -> bool {
+        self.rel_type.unwrap() == RelationsType::HasMany || self.rel_type.unwrap() == RelationsType::HasOne
+    }
     pub fn is_type_of_has_many(&self) -> bool {
         self.rel_type.unwrap() == RelationsType::HasMany
     }

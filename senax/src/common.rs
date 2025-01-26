@@ -306,12 +306,12 @@ pub fn check_js(script: &str) -> anyhow::Result<()> {
     })
 }
 
-pub fn read_group_yml(db: &str, group_name: &str) -> anyhow::Result<IndexMap<String, ModelDef>> {
+pub fn read_group_yml(db: &str, group: &str) -> anyhow::Result<IndexMap<String, ModelDef>> {
     crate::common::check_ascii_name(db);
-    crate::common::check_ascii_name(group_name);
+    crate::common::check_ascii_name(group);
     let path = Path::new(SCHEMA_PATH)
         .join(db)
-        .join(format!("{group_name}.yml"));
+        .join(format!("{group}.yml"));
     if path.exists() {
         parse_yml_file(&path)
     } else {
@@ -321,21 +321,21 @@ pub fn read_group_yml(db: &str, group_name: &str) -> anyhow::Result<IndexMap<Str
 
 pub fn write_group_yml(
     db: &str,
-    group_name: &str,
+    group: &str,
     data: &IndexMap<String, ModelDef>,
 ) -> anyhow::Result<()> {
     if READ_ONLY.load(Ordering::SeqCst) {
         return Ok(());
     }
     crate::common::check_ascii_name(db);
-    crate::common::check_ascii_name(group_name);
+    crate::common::check_ascii_name(group);
     let path = Path::new(SCHEMA_PATH)
         .join(db)
-        .join(format!("{group_name}.yml"));
+        .join(format!("{group}.yml"));
     if let Some(bk) = BACKUP.get() {
         if path.exists() {
             let content = fs::read_to_string(&path)?;
-            let dir = bk.join(format!("group-{db}-{group_name}-{}.yml", Local::now()));
+            let dir = bk.join(format!("group-{db}-{group}-{}.yml", Local::now()));
             fs::write(dir, content)?;
         }
     }
@@ -383,8 +383,8 @@ pub fn read_api_yml(
     db: &str,
     group: &str,
 ) -> anyhow::Result<IndexMap<String, Option<ApiModelDef>>> {
-    let server = sanitize_filename::sanitize(server);
-    let db = sanitize_filename::sanitize(db);
+    crate::common::check_ascii_name(server);
+    crate::common::check_ascii_name(db);
     crate::common::check_ascii_name(group);
 
     let config_path = Path::new(&server).join(API_SCHEMA_PATH).join("_config.yml");
@@ -418,8 +418,8 @@ pub fn write_api_yml(
     if READ_ONLY.load(Ordering::SeqCst) {
         return Ok(());
     }
-    let server = sanitize_filename::sanitize(server);
-    let db = sanitize_filename::sanitize(db);
+    crate::common::check_ascii_name(server);
+    crate::common::check_ascii_name(db);
     crate::common::check_ascii_name(group);
 
     let path = Path::new(&server)

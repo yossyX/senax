@@ -683,6 +683,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
         }
         #[allow(unused_mut)]
         #[allow(unused_variables)]
+        #[allow(clippy::match_single_binding)]
         fn _cursor(mut fltr: crate::models::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::Filter_, cursor: &@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> anyhow::Result<crate::models::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::Filter_> {
             @%- if !selector_def.orders.is_empty() %@
             match cursor {
@@ -700,6 +701,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
         #[allow(unused_imports)]
         use @{ pascal_name }@Query@{ selector|pascal }@Builder as _Query@{ selector|pascal }@Builder;
         #[async_trait]
+        #[allow(clippy::if_same_then_else)]
         impl @{ pascal_name }@Query@{ selector|pascal }@Builder for V {
             async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
                 let mut conn = self.conn.lock().await;

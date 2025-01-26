@@ -324,6 +324,13 @@ pub struct ModelDef {
 #[serde(deny_unknown_fields)]
 /// ### Model Definition
 pub struct ModelJson {
+    #[serde(default, skip_deserializing, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(skip)]
+    pub merged_fields: Vec<(String, FieldDef)>,
+    #[serde(default, skip_deserializing, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(skip)]
+    pub merged_relations: Vec<(String, RelDef)>,
+
     /// ### モデル名
     /// 単数形、スネークケース
     #[schemars(regex(pattern = r"^[A-Za-z][_0-9A-Za-z]*(?<!_)$"))]
@@ -466,6 +473,8 @@ pub struct ModelJson {
 impl From<ModelDef> for ModelJson {
     fn from(value: ModelDef) -> Self {
         Self {
+            merged_fields: value.merged_fields.into_iter().collect(),
+            merged_relations: value.merged_relations.into_iter().collect(),
             name: value.name,
             _name: value._name,
             _soft_delete: value._soft_delete,
@@ -1606,7 +1615,7 @@ impl ModelDef {
     pub fn relations_in_cache(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| v.1.in_cache() && !v.1.is_type_of_belongs_to())
+            .filter(|v| v.1.in_cache() && v.1.is_type_of_has())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1617,7 +1626,7 @@ impl ModelDef {
         self.merged_relations
             .iter()
             .filter(|v| (!self_only || !v.1.in_abstract))
-            .filter(|v| !v.1.is_type_of_has_many())
+            .filter(|v| v.1.is_type_of_belongs_to() || v.1.is_type_of_has_one())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
