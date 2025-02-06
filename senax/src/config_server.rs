@@ -26,6 +26,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
+use tokio::sync::Semaphore;
 use tower_http::compression::CompressionLayer;
 use validator::Validate;
 
@@ -38,6 +39,8 @@ use crate::common::{
 };
 use crate::schema::{self, ConfigDef, ConfigJson, FieldDef, ModelDef, ModelJson, ValueObjectJson};
 use crate::{API_SCHEMA_PATH, SCHEMA_PATH};
+
+static SEMAPHORE: Semaphore = Semaphore::const_new(1);
 
 pub async fn start(
     host: &Option<String>,
@@ -263,11 +266,13 @@ fn file_response(
 }
 
 async fn get_db() -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = crate::db_generator::list();
     json_response(result)
 }
 
 async fn get_db_config(AxumPath(db): AxumPath<String>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let db_name = &db;
         check_ascii_name(db_name)?;
@@ -284,6 +289,7 @@ async fn save_db_config(
     AxumPath(db): AxumPath<String>,
     Json(data): Json<ConfigJson>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let db = &db;
         check_ascii_name(db)?;
@@ -333,6 +339,7 @@ async fn save_db_config(
 }
 
 async fn get_config_schema() -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let schema = schema::json_schema::json_config_schema()?;
         Ok(schema)
@@ -342,6 +349,7 @@ async fn get_config_schema() -> impl IntoResponse {
 }
 
 async fn get_model_schema() -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let schema = schema::json_schema::json_model_schema()?;
         Ok(schema)
@@ -351,6 +359,7 @@ async fn get_model_schema() -> impl IntoResponse {
 }
 
 async fn get_vo_schema() -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let schema = schema::json_schema::json_simple_vo_schema()?;
         Ok(schema)
@@ -360,6 +369,7 @@ async fn get_vo_schema() -> impl IntoResponse {
 }
 
 async fn get_api_config_schema() -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let schema = schema::json_schema::json_api_config_schema()?;
         Ok(schema)
@@ -369,6 +379,7 @@ async fn get_api_config_schema() -> impl IntoResponse {
 }
 
 async fn get_api_db_schema() -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let schema = schema::json_schema::json_api_db_schema()?;
         Ok(schema)
@@ -378,6 +389,7 @@ async fn get_api_db_schema() -> impl IntoResponse {
 }
 
 async fn get_api_schema() -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let schema = schema::json_schema::json_api_schema()?;
         Ok(schema)
@@ -387,6 +399,7 @@ async fn get_api_schema() -> impl IntoResponse {
 }
 
 async fn get_model_names(AxumPath(db): AxumPath<String>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let db_name = &db;
         check_ascii_name(db_name)?;
@@ -407,6 +420,7 @@ async fn get_model_names(AxumPath(db): AxumPath<String>) -> impl IntoResponse {
 }
 
 async fn get_models(AxumPath(path): AxumPath<(String, String)>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let models: Vec<_> = read_group_yml(&path.0, &path.1)?
             .into_iter()
@@ -423,6 +437,7 @@ async fn get_models(AxumPath(path): AxumPath<(String, String)>) -> impl IntoResp
 }
 
 async fn get_merged_models(AxumPath(path): AxumPath<(String, String)>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         check_ascii_name(&path.0)?;
         check_ascii_name(&path.1)?;
@@ -453,6 +468,7 @@ async fn create_model(
     AxumPath(path): AxumPath<(String, String)>,
     Json(data): Json<ModelJson>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut models = read_group_yml(&path.0, &path.1)?;
         anyhow::ensure!(!models.contains_key(&data.name), "Duplicate names.");
@@ -470,6 +486,7 @@ async fn save_model(
     AxumPath(path): AxumPath<(String, String, String)>,
     Json(data): Json<ModelJson>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut models = read_group_yml(&path.0, &path.1)?;
         let name = data.name.clone();
@@ -489,6 +506,7 @@ async fn save_model(
 }
 
 async fn delete_model(AxumPath(path): AxumPath<(String, String, String)>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut models = read_group_yml(&path.0, &path.1)?;
         models.remove(&path.2);
@@ -503,6 +521,7 @@ async fn save_models(
     AxumPath(path): AxumPath<(String, String)>,
     Json(data): Json<Vec<ModelJson>>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut models: IndexMap<String, ModelDef> = IndexMap::new();
         for v in data {
@@ -518,6 +537,7 @@ async fn save_models(
 }
 
 async fn get_simple_vo() -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let vo_list: Vec<_> = read_simple_vo_yml()?
             .into_iter()
@@ -534,6 +554,7 @@ async fn get_simple_vo() -> impl IntoResponse {
 }
 
 async fn save_simple_vo_list(Json(data): Json<Vec<ValueObjectJson>>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut vo_map: IndexMap<String, FieldDef> = IndexMap::new();
         for v in data {
@@ -549,6 +570,7 @@ async fn save_simple_vo_list(Json(data): Json<Vec<ValueObjectJson>>) -> impl Int
 }
 
 async fn create_simple_vo(Json(data): Json<ValueObjectJson>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut vo_list = read_simple_vo_yml()?;
         anyhow::ensure!(!vo_list.contains_key(&data.name), "Duplicate names.");
@@ -566,6 +588,7 @@ async fn save_simple_vo(
     AxumPath(path): AxumPath<String>,
     Json(data): Json<ValueObjectJson>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut vo_list = read_simple_vo_yml()?;
         let name = data.name.clone();
@@ -585,6 +608,7 @@ async fn save_simple_vo(
 }
 
 async fn delete_simple_vo(AxumPath(path): AxumPath<String>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut vo_list = read_simple_vo_yml()?;
         vo_list.remove(&path);
@@ -596,6 +620,7 @@ async fn delete_simple_vo(AxumPath(path): AxumPath<String>) -> impl IntoResponse
 }
 
 async fn get_api_server() -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut list = Vec::new();
         for entry in fs::read_dir(Path::new("."))? {
@@ -612,6 +637,7 @@ async fn get_api_server() -> impl IntoResponse {
 }
 
 async fn get_api_server_db(AxumPath(path): AxumPath<String>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let server = check_ascii_name(&path)?;
         let mut list = Vec::new();
@@ -629,6 +655,7 @@ async fn get_api_server_db(AxumPath(path): AxumPath<String>) -> impl IntoRespons
 }
 
 async fn get_api_server_config(AxumPath(path): AxumPath<String>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let server = check_ascii_name(&path)?;
         let path = Path::new(server).join(API_SCHEMA_PATH).join("_config.yml");
@@ -644,6 +671,7 @@ async fn save_api_server_config(
     AxumPath(path): AxumPath<String>,
     Json(data): Json<ApiConfigJson>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let server = check_ascii_name(&path)?;
         if !READ_ONLY.load(Ordering::SeqCst) {
@@ -671,6 +699,7 @@ async fn save_api_server_config(
 }
 
 async fn get_api_server_groups(AxumPath(path): AxumPath<(String, String)>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let server = check_ascii_name(&path.0)?;
         let db_path = check_ascii_name(&path.1)?;
@@ -690,6 +719,7 @@ async fn get_api_server_groups(AxumPath(path): AxumPath<(String, String)>) -> im
 }
 
 async fn get_api_server_db_config(AxumPath(path): AxumPath<(String, String)>) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let server = check_ascii_name(&path.0)?;
         let db_path = check_ascii_name(&path.1)?;
@@ -710,6 +740,7 @@ async fn save_api_server_db_config(
     AxumPath(path): AxumPath<(String, String)>,
     Json(data): Json<ApiDbJson>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let server = check_ascii_name(&path.0)?;
         let db_path = check_ascii_name(&path.1)?;
@@ -763,6 +794,7 @@ async fn save_api_server_db_config(
 async fn get_api_server_models(
     AxumPath(path): AxumPath<(String, String, String)>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let server = check_ascii_name(&path.0)?;
         let db_path = check_ascii_name(&path.1)?;
@@ -805,6 +837,7 @@ async fn get_api_server_models(
 async fn clean_api_server_models(
     AxumPath(path): AxumPath<(String, String, String)>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let server = check_ascii_name(&path.0)?;
         let db_path = check_ascii_name(&path.1)?;
@@ -873,6 +906,7 @@ async fn clean_api_server_models(
 async fn get_api_server_model_paths(
     AxumPath(path): AxumPath<(String, String, String)>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let list: Vec<_> = read_api_yml(&path.0, &path.1, &path.2)?
             .into_iter()
@@ -892,6 +926,7 @@ async fn save_api_server_models(
     AxumPath(path): AxumPath<(String, String, String)>,
     Json(data): Json<Vec<ApiModelJson>>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut map: IndexMap<String, Option<ApiModelDef>> = IndexMap::new();
         for v in data {
@@ -914,6 +949,7 @@ async fn create_api_server_model(
     AxumPath(path): AxumPath<(String, String, String)>,
     Json(data): Json<ApiModelJson>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         data.validate()?;
         let mut map = read_api_yml(&path.0, &path.1, &path.2)?;
@@ -936,6 +972,7 @@ async fn update_api_server_model(
     AxumPath(path): AxumPath<(String, String, String, String)>,
     Json(data): Json<ApiModelJson>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         data.validate()?;
         let mut map = read_api_yml(&path.0, &path.1, &path.2)?;
@@ -957,6 +994,7 @@ async fn update_api_server_model(
 async fn delete_api_server_model(
     AxumPath(path): AxumPath<(String, String, String, String)>,
 ) -> impl IntoResponse {
+    let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut map = read_api_yml(&path.0, &path.1, &path.2)?;
         map.remove(&path.3);

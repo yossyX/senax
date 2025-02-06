@@ -1470,13 +1470,7 @@ async fn check_connection(
                 } else {
                     options
                 };
-                let options = options
-                    .log_statements(LevelFilter::Trace)
-                    .set_names(false)
-                    .pipes_as_concat(false)
-                    .no_engine_subsitution(false)
-                    .timezone(None);
-                list.push((addr, options));
+                list.push((addr, crate::db_options(options)));
             }
             Ok(list)
         });
