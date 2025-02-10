@@ -89,12 +89,12 @@ pub fn json_stream_response<T: Serialize>(
                                     error!("stream error: {}", err);
                                     return;
                                 }
-                            }
-                        }
+                    }
+                    }
                         Err(err) => {
                             error!("stream error: {}", err);
                             return;
-                        }
+                }
                     }
                 }
                 yield Ok(Bytes::from_static(c3.as_bytes()));
@@ -128,15 +128,15 @@ fn error_response(err: anyhow::Error, ctx: &Ctx) -> HttpResponse {
         match e {
             ApiError::NotFound => {
                 info!(target: "server::not_found", ctx = ctx.ctx_no(); "{}", e);
-                HttpResponse::NotFound().body("not found")
+                HttpResponse::NotFound().body("Not Found")
             }
             ApiError::Unauthorized => {
                 info!(target: "server::unauthorized", ctx = ctx.ctx_no(); "{}", e);
-                HttpResponse::Unauthorized().body("unauthorized")
+                HttpResponse::Unauthorized().body("Unauthorized")
             }
             ApiError::Forbidden => {
                 warn!(target: "server::forbidden", ctx = ctx.ctx_no(); "{}", e);
-                HttpResponse::Forbidden().body("forbidden")
+                HttpResponse::Forbidden().body("Forbidden")
             }
             ApiError::BadRequest(msg) => {
                 info!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", msg);
@@ -189,6 +189,23 @@ fn error_response(err: anyhow::Error, ctx: &Ctx) -> HttpResponse {
     } else {
         error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", err.root_cause());
         HttpResponse::InternalServerError().body("Internal Server Error")
+    }
+}
+
+impl From<&ApiError> for actix_web::Error {
+    fn from(e: &ApiError) -> Self {
+        match e {
+            ApiError::NotFound => actix_web::error::ErrorNotFound("Not Found"),
+            ApiError::Unauthorized => actix_web::error::ErrorUnauthorized("Unauthorized"),
+            ApiError::Forbidden => actix_web::error::ErrorForbidden("Forbidden"),
+            ApiError::BadRequest(msg) => actix_web::error::ErrorBadRequest(msg.to_string()),
+            ApiError::BadRequestJson(value) => actix_web::error::ErrorBadRequest(value.to_string()),
+            ApiError::ValidationError(errors) => actix_web::error::ErrorBadRequest(errors.to_string()),
+            ApiError::InternalServerError(err) => {
+                error!(target: "server::internal_error", "{}", err);
+                actix_web::error::ErrorInternalServerError("Internal Server Error")
+            }
+        }
     }
 }
 @{-"\n"}@
