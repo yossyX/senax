@@ -45,6 +45,7 @@ const ID_OF_SEQUENCE: u32 = 1;
 @%- if !config.force_disable_cache %@
 const ID_OF_CACHE_SYNC: u32 = 2;
 @%- endif %@
+const DISABLE_CACHE: bool = @{ config.force_disable_cache }@ || cfg!(feature = "cache_update_only");
 
 static DB_URL: RwLock<String> = RwLock::const_new(String::new());
 static DB_USER: RwLock<Option<String>> = RwLock::const_new(None);
@@ -67,8 +68,8 @@ static SHARD_NUM: OnceCell<usize> = OnceCell::new();
 type AddrPoolMap = FxHashMap<SocketAddr, (DbPool, bool)>;
 static READER: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
 static CACHE: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
+static READER_POOL_SEMAPHORE: Semaphore = Semaphore::const_new(1);
 @%- if config.use_sequence %@
-
 static SEQUENCE: Lazy<Vec<Mutex<(u64, u64)>>> = Lazy::new(|| {
     DbConn::shard_num_range()
         .map(|_| Mutex::new((0, 0)))
@@ -216,14 +217,16 @@ pub async fn init() -> Result<()> {
         );
     }
 
-    let cache = CACHE.get().unwrap();
-    ensure!(!cache.is_empty(), "There are no database shards for cache.");
-    for (i, s) in cache.iter().enumerate() {
-        let s = s.read().await;
-        ensure!(
-            !s.is_empty(),
-            "There are no database connections for cache.(code:0, {i})"
-        );
+    if !DISABLE_CACHE {
+        let cache = CACHE.get().unwrap();
+        ensure!(!cache.is_empty(), "There are no database shards for cache.");
+        for (i, s) in cache.iter().enumerate() {
+            let s = s.read().await;
+            ensure!(
+                !s.is_empty(),
+                "There are no database connections for cache.(code:0, {i})"
+            );
+        }
     }
     log::info!("Connection to database completed.");
 
@@ -398,7 +401,7 @@ pub async fn connect(
         });
     }
 
-    if update_cache {
+    if update_cache && !DISABLE_CACHE {
         join_set.spawn(async move {
             tokio::spawn(async move {
                 let _lock = if let Some(shard_id) = shard_id {
@@ -635,10 +638,7 @@ impl DbConn {
     /// Cache transaction synchronization
     #[allow(dead_code)]
     pub(crate) fn cache_sync(&self) -> u64 {
-        self.cache_tx
-            .get(&self.shard_id)
-            .map(|v| v.0)
-            .unwrap_or_default()
+        self.cache_tx.get(&self.shard_id).map(|v| v.0).unwrap_or(0)
     }
 
     pub fn set_clear_all_cache(&mut self) {
@@ -1470,13 +1470,7 @@ async fn check_connection(
                 } else {
                     options
                 };
-                let options = options
-                    .log_statements(LevelFilter::Trace)
-                    .set_names(false)
-                    .pipes_as_concat(false)
-                    .no_engine_subsitution(false)
-                    .timezone(None);
-                list.push((addr, options));
+                list.push((addr, crate::db_options(options)));
             }
             Ok(list)
         });
@@ -1555,6 +1549,7 @@ async fn check_connection(
                             if writable {
                                 continue;
                             }
+                            let _s = READER_POOL_SEMAPHORE.acquire().await.unwrap();
                             if let Some(old) = old_pools.remove(&addr) {
                                 let mut pools =
                                     pool_collection.get().unwrap()[shard_id].write().await;
@@ -1833,6 +1828,7 @@ async fn reset_reader_pool(
                 }
             }
             if !c.is_empty() {
+                let _s = READER_POOL_SEMAPHORE.acquire().await?;
                 let new_addrs: FxHashSet<_> = c.iter().map(|v| v.0).collect();
                 let old_addrs: FxHashSet<_> = {
                     let pools = pool_collection.get().unwrap()[idx].read().await;
@@ -1843,9 +1839,15 @@ async fn reset_reader_pool(
                         let mut pools = pool_collection.get().unwrap()[idx].write().await;
                         pools.entry(addr).and_modify(|(_, w)| *w = writable);
                     } else {
-                        let pool = reader_connect_with(pool_option.clone(), options).await?;
-                        let mut pools = pool_collection.get().unwrap()[idx].write().await;
-                        pools.insert(addr, (pool, writable));
+                        match reader_connect_with(pool_option.clone(), options).await {
+                            Ok(pool) => {
+                                let mut pools = pool_collection.get().unwrap()[idx].write().await;
+                                pools.insert(addr, (pool, writable));
+                            }
+                            Err(e) => {
+                                warn!("{}", e);
+                            }
+                        }
                     }
                 }
                 let mut pools = pool_collection.get().unwrap()[idx].write().await;

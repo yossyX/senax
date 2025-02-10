@@ -243,6 +243,17 @@ pub async fn clear_whole_cache() {
         .await;
 }
 
+pub(crate) fn db_options(options: connection::DbConnectOptions) -> connection::DbConnectOptions {
+    use sqlx::ConnectOptions;
+    options
+        .log_statements(log::LevelFilter::Trace)
+        .set_names(false)
+        .pipes_as_concat(false)
+        .no_engine_subsitution(false)
+        .statement_cache_capacity(5)
+        .timezone(None)
+}
+
 pub(crate) fn db_options_for_write() -> sqlx::pool::PoolOptions<connection::DbType> {
     sqlx::pool::PoolOptions::new()
         .acquire_timeout(Duration::from_secs(5))
