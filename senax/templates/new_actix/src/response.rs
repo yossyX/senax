@@ -89,12 +89,12 @@ pub fn json_stream_response<T: Serialize>(
                                     error!("stream error: {}", err);
                                     return;
                                 }
-                    }
-                    }
+                            }
+                        }
                         Err(err) => {
                             error!("stream error: {}", err);
                             return;
-                }
+                        }
                     }
                 }
                 yield Ok(Bytes::from_static(c3.as_bytes()));
