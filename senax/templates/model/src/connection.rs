@@ -65,10 +65,9 @@ static USE_IPV6_ONLY: AtomicBool = AtomicBool::new(false);
 
 static WRITER: RwLock<Vec<Option<(SocketAddr, DbPool)>>> = RwLock::const_new(Vec::new());
 static SHARD_NUM: OnceCell<usize> = OnceCell::new();
-type AddrPoolMap = FxHashMap<SocketAddr, (DbPool, bool)>;
+type AddrPoolMap = FxHashMap<SocketAddr, (Arc<PoolInfo>, Option<bool>)>;
 static READER: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
 static CACHE: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
-static READER_POOL_SEMAPHORE: Semaphore = Semaphore::const_new(1);
 @%- if config.use_sequence %@
 static SEQUENCE: Lazy<Vec<Mutex<(u64, u64)>>> = Lazy::new(|| {
     DbConn::shard_num_range()
@@ -81,6 +80,28 @@ static NOTIFY_RECEIVER: RwLock<Vec<NotifyFn>> = RwLock::const_new(Vec::new());
 static NOTIFY_RECEIVER_COUNT: AtomicUsize = AtomicUsize::new(0);
 static NOTIFY_LIST: RwLock<Option<FxHashMap<(TableName, String), NotifyOp>>> =
     RwLock::const_new(None);
+
+struct PoolInfo {
+    addr: SocketAddr,
+    target: Target,
+    inner: DbPool,
+}
+
+impl Drop for PoolInfo {
+    fn drop(&mut self) {
+        log::info!("remove connection for {}: {}", self.target, self.addr);
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, strum::Display)]
+enum Target {
+    #[strum(to_string = "write")]
+    Write,
+    #[strum(to_string = "read")]
+    Read,
+    #[strum(to_string = "cache")]
+    Cache,
+}
 
 macro_rules! split_shard {
     ( $x:expr ) => {{
@@ -273,7 +294,15 @@ pub async fn reconnect() {
     let mut join_set = JoinSet::new();
     for shard_id in DbConn::shard_num_range() {
         join_set.spawn(async move {
-            if let Err(e) = connect(true, true, true, Some(shard_id)).await {
+            if let Err(e) = connect(true, false, false, Some(shard_id)).await {
+                log::error!("{}", e);
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            if let Err(e) = connect(false, true, false, Some(shard_id)).await {
+                log::error!("{}", e);
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            if let Err(e) = connect(false, false, true, Some(shard_id)).await {
                 log::error!("{}", e);
             }
         });
@@ -394,6 +423,7 @@ pub async fn connect(
                     db_options_for_read(),
                     &READER,
                     shard_id,
+                    Target::Read,
                 )
                 .await
             })
@@ -443,6 +473,7 @@ pub async fn connect(
                     db_options_for_cache(),
                     &CACHE,
                     shard_id,
+                    Target::Cache,
                 )
                 .await
             })
@@ -732,7 +763,7 @@ impl DbConn {
             join.spawn(async move {
                 tokio::time::sleep(Duration::from_millis(20 * i as u64)).await;
                 // spawn to prevent processing interruptions until a newly acquired connection enters the pool
-                tokio::spawn(async move { pool.acquire().await }).await
+                tokio::spawn(async move { pool.inner.acquire().await }).await
             });
         }
         while let Some(r) = join.join_next().await {
@@ -1404,12 +1435,22 @@ async fn lookup(url: &url::Url) -> Result<Vec<SocketAddr>> {
     }
 }
 
-async fn check_if_writable(options: &DbConnectOptions) -> Result<bool> {
+async fn check_if_writable(options: &DbConnectOptions) -> Result<Option<bool>> {
     use sqlx::{Acquire, Connection};
-    let mut conn = DbConnection::connect_with(options).await?;
+    let mut conn = match DbConnection::connect_with(options).await {
+        Err(sqlx::Error::Database(e)) => {
+            // Assumes too many connections
+            warn!("{}", e);
+            return Ok(None);
+        }
+        Err(e) => {
+            anyhow::bail!(e);
+        }
+        Ok(conn) => conn,
+    };
     let conn = conn.acquire().await?;
     let row: (i8,) = sqlx::query_as(CHECK_SQL).fetch_one(conn).await?;
-    Ok(row.0 == CHECK_SQL_WRITABLE_RESULT)
+    Ok(Some(row.0 == CHECK_SQL_WRITABLE_RESULT))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1417,12 +1458,12 @@ async fn check_connection(
     urls: &str,
     user: &Option<String>,
     pw: &Option<String>,
-    requires_writable: bool,
     shard_id: usize,
-    old_pools: Option<AddrPoolMap>,
+    removals: Option<Arc<Mutex<AddrPoolMap>>>,
     pool_option: Option<sqlx::pool::PoolOptions<connection::DbType>>,
     pool_collection: Option<&'static OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>>>,
-) -> Result<Vec<(SocketAddr, DbConnectOptions, bool)>> {
+    target: Target,
+) -> Result<Vec<(SocketAddr, DbConnectOptions, Option<bool>)>> {
     let re = regex::Regex::new(r"[ \t]+").unwrap();
     let mut join_set: JoinSet<Result<Vec<(SocketAddr, DbConnectOptions)>>> = JoinSet::new();
     for url in re.split(urls) {
@@ -1483,12 +1524,8 @@ async fn check_connection(
                 Ok(res) => match res {
                     Ok(writable) => {
                         let options = options.log_statements(LevelFilter::Debug);
-                        if requires_writable {
-                            if writable {
-                                Some((addr, options, writable))
-                            } else {
-                                None
-                            }
+                        if target == Target::Write && writable == Some(false) {
+                            None
                         } else {
                             Some((addr, options, writable))
                         }
@@ -1508,7 +1545,7 @@ async fn check_connection(
             }
         });
     }
-    if requires_writable {
+    if target == Target::Write {
         while let Some(r) = join_set.join_next().await {
             if let Some(r) = r? {
                 return Ok(vec![r]);
@@ -1517,7 +1554,7 @@ async fn check_connection(
         Ok(vec![])
     } else {
         let (tx, mut rx) = mpsc::channel(10);
-        let mut old_pools = old_pools.unwrap();
+        let removals = removals.unwrap();
         let pool_option = pool_option.unwrap();
         tokio::spawn(async move {
             while let Some(r) = join_set.join_next().await {
@@ -1525,28 +1562,40 @@ async fn check_connection(
                     if let Err(r) = tx.send(r).await {
                         if let Some(pool_collection) = pool_collection {
                             let (addr, options, writable) = r.0;
-                            if writable {
+                            if writable == Some(true) {
                                 continue;
                             }
-                            let _s = READER_POOL_SEMAPHORE.acquire().await.unwrap();
-                            if let Some(old) = old_pools.remove(&addr) {
+                            if let Some(old) = removals.lock().await.remove(&addr) {
                                 let mut pools =
                                     pool_collection.get().unwrap()[shard_id].write().await;
-                                pools.retain(|_, (_, w)| !*w);
+                                if writable == Some(false) {
+                                    pools.retain(|_, (_, w)| *w != Some(true));
+                                }
                                 pools.insert(addr, (old.0, writable));
                                 continue;
                             }
-                            let pool = reader_connect_with(pool_option.clone(), options).await;
-                            let conn = match pool {
-                                Ok(conn) => conn,
-                                Err(e) => {
-                                    warn!("{}", e);
-                                    continue;
+                            if writable.is_some() {
+                                let pool = reader_connect_with(pool_option.clone(), options).await;
+                                let pool = match pool {
+                                    Ok(pool) => pool,
+                                    Err(e) => {
+                                        warn!("{}", e);
+                                        continue;
+                                    }
+                                };
+                                log::info!("add connection for {}: {}", target, addr);
+                                let mut pools =
+                                    pool_collection.get().unwrap()[shard_id].write().await;
+                                if writable == Some(false) {
+                                    pools.retain(|_, (_, w)| *w != Some(true));
                                 }
-                            };
-                            let mut pools = pool_collection.get().unwrap()[shard_id].write().await;
-                            pools.retain(|_, (_, w)| !*w);
-                            pools.insert(addr, (conn, writable));
+                                let pool = Arc::new(PoolInfo {
+                                    addr: addr.clone(),
+                                    target,
+                                    inner: pool,
+                                });
+                                pools.insert(addr, (pool, writable));
+                            }
                         }
                     }
                 }
@@ -1619,13 +1668,33 @@ async fn reset_writer_pool(
         join_set.spawn(async move {
             let mut join = JoinSet::new();
             join.spawn(async move {
-                check_connection(&_s_url, &_s_user, &_s_pw, true, idx, None, None, None).await
+                check_connection(
+                    &_s_url,
+                    &_s_user,
+                    &_s_pw,
+                    idx,
+                    None,
+                    None,
+                    None,
+                    Target::Write,
+                )
+                .await
             });
             let (tx, mut rx) = tokio::sync::mpsc::channel(2);
             if check_fast_failover {
                 join.spawn(async move {
                     let _ = tokio::time::timeout(Duration::from_millis(500), rx.recv()).await;
-                    check_connection(&_r_url, &_r_user, &_r_pw, true, idx, None, None, None).await
+                    check_connection(
+                        &_r_url,
+                        &_r_user,
+                        &_r_pw,
+                        idx,
+                        None,
+                        None,
+                        None,
+                        Target::Write,
+                    )
+                    .await
                 });
             }
             let mut c = Vec::new();
@@ -1645,27 +1714,30 @@ async fn reset_writer_pool(
                 }
             }
 
-            if let Some((addr, options, _writable)) = c.pop() {
+            if let Some((addr, options, writable)) = c.pop() {
                 if let Some(old) = &pool_collection.read().await[idx] {
                     if old.0 == addr {
                         return Ok(());
                     }
                 }
-                let new_pool = writer_connect_with(pool_option, options).await?;
-                let pool = &mut pool_collection.write().await[idx];
-                @%- if !config.force_disable_cache %@
-                #[cfg(not(feature = "cache_update_only"))]
-                if pool.is_some() {
-                    let new_pool = new_pool.clone();
-                    tokio::spawn(async move {
-                        if let Ok(pool) = new_pool.acquire().await {
-                            let sync = DbConn::___inc_cache_sync(pool).await.unwrap_or_default();
-                            models::common::_clear_cache(idx as ShardId, sync, false).await;
-                        }
-                    });
+                if writable == Some(true) {
+                    let new_pool = writer_connect_with(pool_option, options).await?;
+                    let pool = &mut pool_collection.write().await[idx];
+                    @%- if !config.force_disable_cache %@
+                    #[cfg(not(feature = "cache_update_only"))]
+                    if pool.is_some() {
+                        let new_pool = new_pool.clone();
+                        tokio::spawn(async move {
+                            if let Ok(pool) = new_pool.acquire().await {
+                                let sync = DbConn::___inc_cache_sync(pool).await.unwrap_or(0);
+                                models::common::_clear_cache(idx as ShardId, sync, false).await;
+                            }
+                        });
+                    }
+                    @%- endif %@
+                    log::info!("switch connection for {}: {}", Target::Write, addr);
+                    *pool = Some((addr, new_pool));
                 }
-                @%- endif %@
-                *pool = Some((addr, new_pool));
             }
             Ok(())
         });
@@ -1731,6 +1803,7 @@ async fn reset_reader_pool(
     pool_option: sqlx::pool::PoolOptions<connection::DbType>,
     pool_collection: &'static OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>>,
     shard_id: Option<ShardId>,
+    target: Target,
 ) -> Result<()> {
     let s_url_list: Vec<_> = split_shard!(s_url).collect();
     let mut join_set: JoinSet<Result<()>> = JoinSet::new();
@@ -1755,8 +1828,9 @@ async fn reset_reader_pool(
         let pool_option = pool_option.clone();
         let check_fast_failover = ENABLE_FAST_FAILOVER.load(Ordering::Relaxed) && r_url != *s_url;
         join_set.spawn(async move {
-            let pools1 = pool_collection.get().unwrap()[idx].read().await.clone();
-            let pools2 = pools1.clone();
+            let removals = Arc::new(Mutex::new(AddrPoolMap::default()));
+            let mut removals_lock = removals.lock().await;
+            let removals_ = removals.clone();
             let option1 = pool_option.clone();
             let option2 = option1.clone();
             let mut join = JoinSet::new();
@@ -1765,27 +1839,28 @@ async fn reset_reader_pool(
                     &_r_url,
                     &_r_user,
                     &_r_pw,
-                    false,
                     idx,
-                    Some(pools1),
+                    Some(removals_),
                     Some(option1),
                     Some(pool_collection),
+                    target,
                 )
                 .await
             });
             let (tx, mut rx) = tokio::sync::mpsc::channel(2);
             if check_fast_failover {
+                let removals_ = removals.clone();
                 join.spawn(async move {
                     let _ = tokio::time::timeout(Duration::from_millis(500), rx.recv()).await;
                     check_connection(
                         &_s_url,
                         &_s_user,
                         &_s_pw,
-                        false,
                         idx,
-                        Some(pools2),
+                        Some(removals_),
                         Some(option2),
                         Some(pool_collection),
+                        target,
                     )
                     .await
                 });
@@ -1807,7 +1882,6 @@ async fn reset_reader_pool(
                 }
             }
             if !c.is_empty() {
-                let _s = READER_POOL_SEMAPHORE.acquire().await?;
                 let new_addrs: FxHashSet<_> = c.iter().map(|v| v.0).collect();
                 let old_addrs: FxHashSet<_> = {
                     let pools = pool_collection.get().unwrap()[idx].read().await;
@@ -1817,10 +1891,16 @@ async fn reset_reader_pool(
                     if old_addrs.contains(&addr) {
                         let mut pools = pool_collection.get().unwrap()[idx].write().await;
                         pools.entry(addr).and_modify(|(_, w)| *w = writable);
-                    } else {
+                    } else if writable.is_some() {
                         match reader_connect_with(pool_option.clone(), options).await {
                             Ok(pool) => {
+                                log::info!("add connection for {}: {}", target, addr);
                                 let mut pools = pool_collection.get().unwrap()[idx].write().await;
+                                let pool = Arc::new(PoolInfo {
+                                    addr: addr.clone(),
+                                    target,
+                                    inner: pool,
+                                });
                                 pools.insert(addr, (pool, writable));
                             }
                             Err(e) => {
@@ -1830,8 +1910,14 @@ async fn reset_reader_pool(
                     }
                 }
                 let mut pools = pool_collection.get().unwrap()[idx].write().await;
-                let has_not_writable = pools.iter().any(|(_, v)| !v.1);
-                pools.retain(|k, v| new_addrs.contains(k) && (!has_not_writable || !v.1));
+                *removals_lock = pools.clone();
+                removals_lock.retain(|k, _| !new_addrs.contains(k));
+                pools.retain(|k, _| new_addrs.contains(k));
+                let has_readable = pools.iter().any(|(_, v)| v.1 == Some(false));
+                if has_readable {
+                    // remove writable connections
+                    pools.retain(|_, v| v.1 != Some(true));
+                }
             }
             Ok(())
         });
