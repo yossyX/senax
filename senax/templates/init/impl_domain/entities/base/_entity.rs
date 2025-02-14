@@ -710,6 +710,9 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 } else {
                     filter!()
                 };
+                @%- if def.use_cache() %@
+                let extra_filter = self.extra_filter.clone().unwrap_or_default();
+                @%- endif %@
                 if let Some(filter) = self.extra_filter {
                     fltr = fltr.and(filter);
                 }
@@ -735,7 +738,31 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 @%- if def.is_soft_delete() %@
                 query = query.when(self.with_trashed, |v| v.with_trashed());
                 @%- endif %@
-                Ok(query.select@% if def.use_cache() %@_from_cache@% endif %@(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>).collect())
+                @%- if def.use_cache() %@
+                use domain::models::Check_ as _;
+                let mut excluded = 0;
+                let result = query
+                    .select_from_cache(conn)
+                    .await?
+                    .into_iter()
+                    .filter_map(|v| {
+                        let v = Box::new(v) as Box<dyn @{ pascal_name }@Cache>;
+                        if extra_filter.check(&*v).unwrap_or(true) {
+                            Some(v)
+                        } else {
+                            excluded += 1;
+                            None
+                        }
+                    })
+                    .collect();
+                if excluded > 0 {
+                    // This is usually not an issue, but if it occurs frequently, please review the process.
+                    log::warn!(ctx = conn.ctx_no(); "Objects updated while querying have been excluded: count={}.", excluded);
+                }
+                Ok(result)
+                @%- else %@
+                Ok(query.select(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>).collect())
+                @%- endif %@
             }
             async fn stream(self: Box<Self>, single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> + Send>>> {
                 let mut conn = self.conn.clone().lock_owned().await;
@@ -747,6 +774,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 } else {
                     filter!()
                 };
+                let extra_filter = self.extra_filter.clone().unwrap_or_default();
                 if let Some(filter) = self.extra_filter {
                     fltr = fltr.and(filter);
                 }
@@ -820,7 +848,7 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                         if let Some(list) = ret.take() {
                             for v in list {
                                 let v = Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>;
-                                if fltr.check(&*v).unwrap_or(true) {
+                                if extra_filter.check(&*v).unwrap_or(true) {
                                     yield Ok(v);
                                 } else {
                                     excluded += 1;
@@ -832,19 +860,20 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                     if let Some(list) = ret.take() {
                         for v in list {
                             let v = Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>;
-                            if fltr.check(&*v).unwrap_or(true) {
+                            if extra_filter.check(&*v).unwrap_or(true) {
                                 yield Ok(v);
                             } else {
                                 excluded += 1;
                             }
                         }
                     }
+                    let mut conn_lock = conn.clone().lock_owned().await;
+                    let conn = conn_lock.deref_mut();
                     if excluded > 0 {
-                        log::info!("Objects updated while streaming have been excluded. This is usually not an issue, but if it occurs frequently, please review the process.: {}", excluded);
+                        // This is usually not an issue, but if it occurs frequently, please review the process.
+                        log::warn!(ctx = conn.ctx_no(); "Objects updated while streaming have been excluded: count={}.", excluded);
                     }
                     if single_transaction {
-                        let mut conn_lock = conn.clone().lock_owned().await;
-                        let conn = conn_lock.deref_mut();
                         conn.release_read_tx()?;
                     }
                 }.boxed())
@@ -930,12 +959,31 @@ impl _@{ pascal_name }@Query for @{ pascal_name }@RepositoryImpl {
                 @%- endif %@
                 if let Some(mut obj) = obj {
                     if let Some(filter) = self.filter {
-                        _@{ pascal_name }@Joiner::join(&mut obj, conn, Joiner_::merge(self.joiner, filter.joiner())).await?;
+                        _@{ pascal_name }@Joiner::join(&mut obj, conn, Joiner_::merge(self.joiner, filter.joiner_cache_only())).await?;
                         use domain::models::Check_ as _;
-                        if filter.check(&obj as &dyn @{ pascal_name }@Cache)? {
-                            Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@Cache>))
-                        } else {
-                            Ok(None)
+                        match filter.check(&obj as &dyn @{ pascal_name }@Cache) {
+                            Ok(true) => Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@Cache>)),
+                            Ok(false) => {
+                                log::warn!(ctx = conn.ctx_no(); "Forbidden: {:?}", @{ def.primaries()|fmt_join_with_paren2("self.id", "self.id.{index}", ", ") }@);
+                                Ok(None)
+                            }
+                            Err(_) => {
+                                @%- if def.is_soft_delete() %@
+                                let exists = if self.with_trashed {
+                                    _@{ pascal_name }@::exists_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, Some(filter)).await?
+                                } else {
+                                    _@{ pascal_name }@::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, Some(filter)).await?
+                                };
+                                @%- else %@
+                                let exists = _@{ pascal_name }@::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, Some(filter)).await?;
+                                @%- endif %@
+                                if exists {
+                                    Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@Cache>))
+                                } else {
+                                    log::warn!(ctx = conn.ctx_no(); "Forbidden: {:?}", @{ def.primaries()|fmt_join_with_paren2("self.id", "self.id.{index}", ", ") }@);
+                                    Ok(None)
+                                }
+                            }
                         }
                     } else {
                         _@{ pascal_name }@Joiner::join(&mut obj, conn, self.joiner).await?;

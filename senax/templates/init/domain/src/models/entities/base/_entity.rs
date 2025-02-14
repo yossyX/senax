@@ -1102,6 +1102,29 @@ impl ColRel_ {
             _ => unreachable!()
         }
     }
+    #[allow(unreachable_patterns)]
+    #[allow(clippy::needless_update)]
+    #[allow(clippy::match_single_binding)]
+    fn joiner_cache_only(&self) -> Option<Box<Joiner_>> {
+        match self {
+            @{- def.relations_belonging_cache(false)|fmt_rel_join("
+            ColRel_::{rel_name}(c) => Some(Box::new(Joiner_{
+                {rel_name}: Some(c.as_ref().and_then(|c| c.joiner_cache_only()).unwrap_or_default()),
+                ..Default::default()
+            })),", "") }@
+            @{- def.relations_one_cache(false)|fmt_rel_join("
+            ColRel_::{rel_name}(c) => Some(Box::new(Joiner_{
+                {rel_name}: Some(c.as_ref().and_then(|c| c.joiner_cache_only()).unwrap_or_default()),
+                ..Default::default()
+            })),", "") }@
+            @{- def.relations_many_cache(false)|fmt_rel_join("
+            ColRel_::{rel_name}(c) => Some(Box::new(Joiner_{
+                {rel_name}: Some(c.as_ref().and_then(|c| c.joiner_cache_only()).unwrap_or_default()),
+                ..Default::default()
+            })),", "") }@
+            _ => None
+        }
+    }
 }
 impl Check_<dyn @{ pascal_name }@Cache> for ColRel_ {
     #[allow(unreachable_patterns)]
@@ -1188,6 +1211,11 @@ pub enum Filter_ {
     RawWithParam(String, Vec<String>),
     Boolean(bool),
 }
+impl Default for Filter_ {
+    fn default() -> Self {
+        Filter_::new_and()
+    }
+}
 impl Filter_ {
     pub fn new_and() -> Filter_ {
         Filter_::And(vec![])
@@ -1244,6 +1272,17 @@ impl Filter_ {
             Filter_::NotExists(c) => c.joiner(),
             Filter_::EqAny(c) => c.joiner(),
             Filter_::NotAll(c) => c.joiner(),
+            _ => None
+        }
+    }
+    pub fn joiner_cache_only(&self) -> Option<Box<Joiner_>> {
+        match self {
+            Filter_::And(list) => list.iter().fold(None, |acc, c| Joiner_::merge(acc, c.joiner_cache_only())),
+            Filter_::Or(list) => list.iter().fold(None, |acc, c| Joiner_::merge(acc, c.joiner_cache_only())),
+            Filter_::Exists(c) => c.joiner_cache_only(),
+            Filter_::NotExists(c) => c.joiner_cache_only(),
+            Filter_::EqAny(c) => c.joiner_cache_only(),
+            Filter_::NotAll(c) => c.joiner_cache_only(),
             _ => None
         }
     }
