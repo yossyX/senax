@@ -3916,6 +3916,11 @@ pub@{ visibility }@ enum Filter_ {
     RawWithParam(String, Vec<String>),
     Boolean(bool),
 }
+impl Default for Filter_ {
+    fn default() -> Self {
+        Filter_::new_and()
+    }
+}
 impl Filter_ {
     pub@{ visibility }@ fn new_and() -> Filter_ {
         Filter_::And(vec![])
@@ -6338,6 +6343,19 @@ impl _@{ pascal_name }@ {
         @%- endif %@
         Ok(data.map(_@{ pascal_name }@::from))
     }
+
+    pub@{ visibility }@ async fn exists<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<bool>
+    where
+        T: Into<Primary>,
+    {
+        let id: InnerPrimary = (&id.into()).into();
+        @%- if def.dummy_always_present() %@
+        Ok(true)
+        @%- else %@
+        let data: Option<Count> = Self::__find_optional(conn, id, TrashMode::Not, filter).await?;
+        Ok(data.unwrap_or_default().c > 0)
+        @%- endif %@
+    }
     @%- if !def.disable_update() %@
 
     pub@{ visibility }@ async fn find_optional_for_update<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@Updater>>
@@ -6366,6 +6384,19 @@ impl _@{ pascal_name }@ {
         let data: Option<Data> = Self::__find_optional(conn, id, TrashMode::With, filter).await?;
         @%- endif %@
         Ok(data.map(_@{ pascal_name }@::from))
+    }
+
+    pub@{ visibility }@ async fn exists_with_trashed<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<bool>
+    where
+        T: Into<Primary>,
+    {
+        let id: InnerPrimary = (&id.into()).into();
+        @%- if def.dummy_always_present() %@
+        Ok(true)
+        @%- else %@
+        let data: Option<Count> = Self::__find_optional(conn, id, TrashMode::With, filter).await?;
+        Ok(data.unwrap_or_default().c > 0)
+        @%- endif %@
     }
     @%- endif %@
 
