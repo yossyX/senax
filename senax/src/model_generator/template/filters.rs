@@ -464,7 +464,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
 }
 
 pub fn fmt_rel_outer_db_join(
-    v: Vec<(&ModelDef, &String, &BelongsToOuterDbDef)>,
+    v: Vec<(&ModelDef, &String, &RelDef)>,
     f: &str,
     sep: &str,
 ) -> ::askama::Result<String> {
@@ -480,7 +480,7 @@ pub fn fmt_rel_outer_db_join(
 
 fn _fmt_rel_outer_db(
     f: &str,
-    rel: &&BelongsToOuterDbDef,
+    rel: &&RelDef,
     name: &&String,
     model: &&ModelDef,
     index: i32,
@@ -511,7 +511,7 @@ fn _fmt_rel_outer_db(
         crate::common::rel_hash(format!("{}::{}::{}", &model.group_name, &model.name, name));
     f.replace("{rel_name}", &_to_var_name(name))
         .replace("{raw_rel_name}", name)
-        .replace("{raw_db}", &rel.db)
+        .replace("{raw_db}", rel.db())
         .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
         .replace("{rel_name_camel}", &name.to_case(Case::Camel))
         .replace("{rel_hash}", &rel_hash.to_string())

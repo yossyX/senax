@@ -434,7 +434,7 @@ pub struct FieldDef {
     #[serde(skip)]
     pub rel: Option<(String, super::RelDef)>,
     #[serde(skip)]
-    pub outer_db_rel: Option<(String, super::BelongsToOuterDbDef)>,
+    pub outer_db_rel: Option<(String, super::RelDef)>,
     #[serde(skip)]
     pub auto_gen: bool,
     #[serde(skip)]
@@ -1653,7 +1653,7 @@ impl FieldDef {
             let name = def.get_id_name();
             if domain_mode() {
                 let mod_name = def.get_group_mod_var();
-                return format!("_{}_model_::{}::{}", def.db, mod_name, name);
+                return format!("_{}_model_::{}::{}", def.db(), mod_name, name);
             } else {
                 let mod_name = def.get_group_mod_name();
                 return format!("rel_{}::{}", mod_name, name);
@@ -2310,7 +2310,7 @@ impl FieldDef {
             let name = def.get_id_name();
             if domain_mode() {
                 let mod_name = def.get_group_mod_var();
-                format!("_{}_model_::{}::{}", def.db, mod_name, name)
+                format!("_{}_model_::{}::{}", def.db(), mod_name, name)
             } else {
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)
@@ -2391,7 +2391,7 @@ impl FieldDef {
             let name = def.get_id_name();
             if domain_mode() {
                 let mod_name = def.get_group_mod_var();
-                return format!("&_{}_model_::{}::{}", def.db, mod_name, name);
+                return format!("&_{}_model_::{}::{}", def.db(), mod_name, name);
             } else {
                 let mod_name = def.get_group_mod_name();
                 return format!("&rel_{}::{}", mod_name, name);
@@ -2465,7 +2465,7 @@ impl FieldDef {
             let name = def.get_id_name();
             if domain_mode() {
                 let mod_name = def.get_group_mod_var();
-                format!("_{}_model_::{}::{}", def.db, mod_name, name)
+                format!("_{}_model_::{}::{}", def.db(), mod_name, name)
             } else {
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)

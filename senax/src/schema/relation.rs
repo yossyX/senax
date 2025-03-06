@@ -15,6 +15,7 @@ pub enum RelationsType {
     HasMany,
     BelongsTo,
     HasOne,
+    BelongsToOuterDb,
 }
 
 #[derive(
@@ -491,9 +492,8 @@ pub struct BelongsToOuterDbDef {
     pub comment: Option<String>,
     /// ### 結合先のデータベース
     pub db: String,
-    /// ### 結合先のグループ
-    pub group: String,
     /// ### 結合先のモデル
+    /// グループ名は::区切りで指定
     pub model: String,
     /// ### 結合するローカルのフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -522,9 +522,8 @@ pub struct BelongsToOuterDbJson {
     pub comment: Option<String>,
     /// ### 結合先のデータベース
     pub db: String,
-    /// ### 結合先のグループ
-    pub group: String,
     /// ### 結合先のモデル
+    /// グループ名は::区切りで指定
     pub model: String,
     /// ### 結合するローカルのフィールド名
     /// 複数の場合はカンマ区切り
@@ -545,7 +544,6 @@ impl From<BelongsToOuterDbDef> for BelongsToOuterDbJson {
             label: value.label,
             comment: value.comment,
             db: value.db,
-            group: value.group,
             model: value.model,
             local: value.local.map(|v| v.to_vec().join(", ")),
             with_trashed: value.with_trashed,
@@ -560,7 +558,6 @@ impl From<BelongsToOuterDbJson> for BelongsToOuterDbDef {
             label: value.label,
             comment: value.comment,
             db: value.db,
-            group: value.group,
             model: value.model,
             local: value.local.and_then(|v| {
                 StringOrArray::from_vec(v.split(',').map(|v| v.trim().to_string()).collect())
@@ -570,73 +567,33 @@ impl From<BelongsToOuterDbJson> for BelongsToOuterDbDef {
         }
     }
 }
+impl From<&BelongsToOuterDbDef> for RelDef {
+    fn from(value: &BelongsToOuterDbDef) -> Self {
+        Self {
+            label: value.label.clone(),
+            comment: value.comment.clone(),
+            db: Some(value.db.clone()),
+            model: value.model.clone(),
+            rel_type: Some(RelationsType::BelongsToOuterDb),
+            local: value.local.as_ref().map(|v| v.to_vec()),
+            with_trashed: value.with_trashed,
+            disable_index: value.disable_index,
+            ..Default::default()
+        }
+    }
+}
 impl BelongsToOuterDbDef {
-    pub fn get_foreign_class_name(&self) -> String {
-        if domain_mode() {
-            self.get_foreign_model_name().1.to_case(Case::Pascal)
+    pub fn convert(rel: &BelongsToOuterDbDef, group: &str) -> RelDef {
+        let mut d: RelDef = rel.into();
+        if d.model.contains(MODEL_NAME_SPLITTER) {
+            let (group_name, stem_name) = d.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+            crate::common::check_name(group_name);
+            crate::common::check_name(stem_name);
         } else {
-            format!("_{}", self.get_foreign_model_name().1.to_case(Case::Pascal))
+            crate::common::check_name(&d.model);
+            d.model = format!("{}::{}", group, d.model);
         }
-    }
-    pub fn get_id_name(&self) -> String {
-        to_id_name(&self.model)
-    }
-    pub fn get_group_var(&self) -> String {
-        _to_var_name(&self.get_group_name())
-    }
-    pub fn get_mod_name(&self) -> String {
-        self.get_foreign_model_name().0
-    }
-    pub fn get_group_mod_name(&self) -> String {
-        format!(
-            "{}_{}_{}",
-            self.db,
-            self.get_group_name(),
-            self.get_mod_name()
-        )
-    }
-    pub fn get_group_mod_var(&self) -> String {
-        format!(
-            "{}::{}",
-            _to_var_name(&self.get_group_name()),
-            _to_var_name(&self.get_mod_name())
-        )
-    }
-    pub fn get_base_group_mod_var(&self) -> String {
-        format!(
-            "{}::_base::_{}",
-            _to_var_name(&self.get_group_name()),
-            &self.get_mod_name()
-        )
-    }
-    pub fn get_local_id(&self, name: &str) -> Vec<String> {
-        match self.local {
-            None => vec![format!("{}_id", name)],
-            Some(StringOrArray::One(ref local)) => vec![local.to_owned()],
-            Some(StringOrArray::Many(ref local)) => local.to_owned(),
-        }
-    }
-    pub fn get_local_cols<'a>(
-        &self,
-        name: &'a str,
-        model: &'a ModelDef,
-    ) -> Vec<(&'a String, &'a FieldDef)> {
-        let ids = self.get_local_id(name);
-        let mut result = Vec::new();
-        for id in &ids {
-            if let Some(v) = model.merged_fields.get_key_value(id) {
-                result.push(v);
-            }
-        }
-        result
-    }
-
-    pub fn get_foreign_model_name(&self) -> (String, String) {
-        (self.model.to_case(Case::Snake), self.model.to_string())
-    }
-
-    pub fn get_group_name(&self) -> String {
-        self.group.to_string()
+        d
     }
 }
 
@@ -647,6 +604,7 @@ pub struct RelDef {
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    pub db: Option<String>,
     pub model: String,
     #[serde(rename = "type")]
     pub rel_type: Option<RelationsType>,
@@ -676,6 +634,12 @@ impl RelDef {
     pub fn is_type_of_belongs_to(&self) -> bool {
         self.rel_type.unwrap() == RelationsType::BelongsTo
     }
+    pub fn is_type_of_belongs_to_outer_db(&self) -> bool {
+        self.rel_type.unwrap() == RelationsType::BelongsToOuterDb
+    }
+    pub fn db(&self) -> &str {
+        self.db.as_deref().unwrap_or("--RELATION HAS NO DB--")
+    }
     pub fn get_foreign_class_name(&self) -> String {
         if domain_mode() {
             self.get_foreign_model_name().1.to_case(Case::Pascal)
@@ -684,6 +648,10 @@ impl RelDef {
         }
     }
     pub fn get_id_name(&self) -> String {
+        if self.is_type_of_belongs_to_outer_db() {
+            let (_group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+            return to_id_name(stem_name);
+        }
         let target_model = self.get_foreign_model();
         if target_model.id().is_empty() {
             error_exit!(
@@ -700,7 +668,16 @@ impl RelDef {
         self.get_foreign_model_name().0
     }
     pub fn get_group_mod_name(&self) -> String {
-        format!("{}_{}", self.get_group_name(), self.get_mod_name())
+        if let Some(db) = &self.db {
+            format!(
+                "{}_{}_{}",
+                db,
+                self.get_group_name(),
+                self.get_mod_name()
+            )
+        } else {
+            format!("{}_{}", self.get_group_name(), self.get_mod_name())
+        }
     }
     pub fn get_group_mod_var(&self) -> String {
         format!(
@@ -769,8 +746,13 @@ impl RelDef {
     }
 
     pub fn get_foreign_model_name(&self) -> (String, String) {
-        let (group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
-        get_model_name(Some(group_name), stem_name)
+        if self.is_type_of_belongs_to_outer_db() {
+            let (_group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+            (stem_name.to_case(Case::Snake), stem_name.to_string())
+        } else {
+            let (group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+            get_model_name(Some(group_name), stem_name)
+        }
     }
 
     pub fn get_model_by_name(name: &str, cur_group_name: Option<String>) -> Arc<ModelDef> {

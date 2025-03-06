@@ -523,8 +523,8 @@ impl ConfigDef {
         let groups = super::GROUPS.read().unwrap().as_ref().unwrap().clone();
         for (_, models) in groups {
             for (_, model) in models {
-                for (_, belongs) in &model.belongs_to_outer_db {
-                    v.insert(belongs.db.to_string());
+                for (_, belongs) in &model.belongs_to_outer_db() {
+                    v.insert(belongs.db().to_string());
                 }
             }
         }

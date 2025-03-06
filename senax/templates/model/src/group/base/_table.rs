@@ -54,8 +54,8 @@ use crate::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
 #[allow(unused_imports)]
 use domain::value_objects;
 pub use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name|to_var_name }@::{join, Joiner_};
-@%- for (name, rel_def) in def.belongs_to_outer_db %@
-use domain::models::@{ rel_def.db|to_var_name }@::@{ rel_def.get_group_mod_var() }@ as join_@{ rel_def.get_group_mod_name() }@;
+@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+use domain::models::@{ rel_def.db()|to_var_name }@::@{ rel_def.get_group_mod_var() }@ as join_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 @%- endif %@
 @%- for mod_name in def.relation_mods() %@
@@ -66,8 +66,8 @@ use domain::models::@{ db|snake|to_var_name }@::@{ mod_name[0]|to_var_name }@::@
 use crate::models::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- endif %@
 @%- endfor %@
-@%- for (name, rel_def) in def.belongs_to_outer_db %@
-use db_@{ rel_def.db }@::models::@{ rel_def.get_base_group_mod_var() }@ as rel_@{ rel_def.get_group_mod_name() }@;
+@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+use db_@{ rel_def.db() }@::models::@{ rel_def.get_base_group_mod_var() }@ as rel_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 const USE_CACHE: bool = @{ def.use_cache() }@;
 const USE_ALL_ROWS_CACHE: bool = @{ def.use_all_rows_cache() }@;
@@ -2129,21 +2129,21 @@ impl RelCol@{ rel_name|pascal }@ {
 }
 
 trait RelPk@{ rel_name|pascal }@ {
-    fn primary(&self) -> Option<rel_@{ rel.db }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary>;
+    fn primary(&self) -> Option<rel_@{ rel.db() }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary>;
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
-    fn primary(&self) -> Option<rel_@{ rel.db }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
+    fn primary(&self) -> Option<rel_@{ rel.db() }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
     }
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
-    fn primary(&self) -> Option<rel_@{ rel.db }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
+    fn primary(&self) -> Option<rel_@{ rel.db() }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
-    fn primary(&self) -> Option<rel_@{ rel.db }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
+    fn primary(&self) -> Option<rel_@{ rel.db() }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
     }
 }

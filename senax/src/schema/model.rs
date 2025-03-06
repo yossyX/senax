@@ -1609,6 +1609,7 @@ impl ModelDef {
     pub fn relations(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| !v.1.is_type_of_belongs_to_outer_db())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1617,6 +1618,13 @@ impl ModelDef {
             .iter()
             .filter(|v| v.1.in_cache() && v.1.is_type_of_has())
             .map(|v| (self, v.0, v.1))
+            .collect()
+    }
+    pub fn belongs_to_outer_db(&self) -> Vec<(&String, &RelDef)> {
+        self.merged_relations
+            .iter()
+            .filter(|v| v.1.is_type_of_belongs_to_outer_db())
+            .map(|v| (v.0, v.1))
             .collect()
     }
     pub fn relations_one_and_belonging(
@@ -1666,10 +1674,11 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_belonging_outer_db(&self) -> Vec<(&ModelDef, &String, &BelongsToOuterDbDef)> {
-        self.belongs_to_outer_db
+    pub fn relations_belonging_outer_db(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+        self.merged_relations
             .iter()
             // .filter(|v| ApiRelationDef::has(v.0))
+            .filter(|v| v.1.is_type_of_belongs_to_outer_db())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1824,10 +1833,10 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn outer_db_relation_constraint(&self) -> Vec<(&ModelDef, &String, &BelongsToOuterDbDef)> {
-        self.belongs_to_outer_db
+    pub fn outer_db_relation_constraint(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+        self.merged_relations
             .iter()
-            .filter(|v| !v.1.disable_index)
+            .filter(|v| v.1.is_type_of_belongs_to_outer_db() && !v.1.disable_index)
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1905,7 +1914,7 @@ impl ModelDef {
 
     pub fn relation_mods(&self) -> Vec<Vec<String>> {
         let mut mods: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        for (_name, rel) in self.merged_relations.iter() {
+        for (_name, rel) in self.merged_relations.iter().filter(|v| !v.1.is_type_of_belongs_to_outer_db()) {
             let group_name = rel.get_group_name();
             let mod_name = rel.get_mod_name();
             if let std::collections::btree_map::Entry::Vacant(e) = mods.entry(group_name.clone()) {

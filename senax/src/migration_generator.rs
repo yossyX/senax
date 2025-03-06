@@ -446,7 +446,7 @@ fn ref_op(r: &Option<schema::ReferenceOption>) -> Option<ReferenceOption> {
 }
 
 fn escape(s: &String) -> String {
-    format!("\"{}\"", s)
+    format!("`{}`", s)
 }
 
 #[derive(Display, Eq, PartialOrd, Ord, PartialEq)]

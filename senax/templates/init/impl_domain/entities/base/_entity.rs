@@ -21,8 +21,8 @@ use senax_common::types::point::ToPoint as _;
 use std::ops::{Deref as _, DerefMut as _};
 #[allow(unused_imports)]
 use domain::models::@{ db|snake|to_var_name }@ as _model_;
-@%- for (name, rel_def) in def.belongs_to_outer_db %@
-use domain::models::@{ rel_def.db|to_var_name }@ as _@{ rel_def.db }@_model_;
+@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+use domain::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
 @%- endfor %@
 
 type _Getter_ = dyn crate::models::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::_@{ pascal_name }@Getter;

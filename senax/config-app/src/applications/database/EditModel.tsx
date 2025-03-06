@@ -298,7 +298,6 @@ function EditModel() {
                 columns={[
                   { field: "name", editable: true },
                   { field: "db", editable: true },
-                  { field: "group", editable: true },
                   { field: "model", editable: true },
                   { field: "local", editable: true },
                 ]}
@@ -550,28 +549,28 @@ function BelongsToOuterDb({ formData }: any) {
     control: formData.form.control,
     name: "db",
   });
-  const [groups, setGroups] = React.useState([]);
+  const baseGroup = formData.additionalData.group;
+  const [models, setModels] = React.useState([] as string[]);
   React.useEffect(() => {
     if (db) {
-      fetch(`/api/db/${db}`)
+      fetch(`/api/model_names/${db}`)
       .then((res) => res.json())
-      .then((json) => setGroups(json.groups))
+      .then((json) => {
+        const model_names = [];
+        for (const group in json) {
+          for (const name of json[group]) {
+            if (baseGroup === group) {
+              model_names.push(name);
+            } else {
+              model_names.push(group + "::" + name);
+            }
+          }
+        }
+        setModels(model_names);
+      })
       .catch(() => alert("error"));
     }
   }, [db]);
-  const group = useWatch({
-    control: formData.form.control,
-    name: "group",
-  });
-  const [models, setModels] = React.useState([]);
-  React.useEffect(() => {
-    if (db && group) {
-      fetch(`/api/model_names/${db}`)
-      .then((res) => res.json())
-      .then((json) => setModels(json[group]))
-      .catch(() => alert("error"));
-    }
-  }, [db, group]);
   const model = useWatch({
     control: formData.form.control,
     name: "model",
@@ -591,9 +590,6 @@ function BelongsToOuterDb({ formData }: any) {
         <AutoField name="label" {...formData} />
         <AutoField name="comment" {...formData} textarea />
         <AutoField name="db" {...formData} autocomplete={dbs} />
-        <AutoField name="group" {...formData} autocomplete={groups.map(
-            (v: any) => v.name,
-          )} />
         <AutoField name="model" {...formData} autocomplete={models}  />
         <AutoField
           name="local"
