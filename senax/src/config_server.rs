@@ -852,7 +852,7 @@ async fn clean_api_server_models(
         } else {
             group_path
         };
-        let models: HashMap<_, _> = read_group_yml(&db, group)?
+        let models: HashMap<_, _> = read_group_yml(db, group)?
             .into_iter()
             .enumerate()
             .map(|(nth, (name, _))| (name, nth))

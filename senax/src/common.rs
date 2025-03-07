@@ -424,7 +424,7 @@ pub fn write_api_yml(
 
     let path = Path::new(&server)
         .join(API_SCHEMA_PATH)
-        .join(&db)
+        .join(db)
         .join(format!("{}.yml", group));
     if let Some(bk) = BACKUP.get() {
         if path.exists() {

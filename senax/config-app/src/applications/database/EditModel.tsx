@@ -31,14 +31,13 @@ function EditModel() {
   DETAIL = detail;
   const [db_data, vo_list] = useRouteLoaderData("db") as any;
   const [models, jsonSchema, _model_names] = useRouteLoaderData("group") as any;
-  const model_names = [];
+  const model_names = {} as any;
+  const group_names = [];
   for (const group in _model_names) {
+    group_names.push(group);
+    model_names[group] = [];
     for (const name of _model_names[group]) {
-      if (params.group === group) {
-        model_names.push(name);
-      } else {
-        model_names.push(group + "::" + name);
-      }
+      model_names[group].push(name);
     }
   }
   let data: any = {};
@@ -96,6 +95,7 @@ function EditModel() {
     additionalData: {
       db: params.db,
       group: params.group,
+      group_names,
       model_names,
       modelData,
       selfGroup: params.group,
@@ -282,8 +282,9 @@ function EditModel() {
                 {...formData}
                 columns={[
                   { field: "name", editable: true },
-                  { field: "model", editable: true },
-                  { field: "local", editable: true },
+                  { field: "model" },
+                  { field: "group" },
+                  { field: "local" },
                   { field: "on_delete", editable: true },
                 ]}
                 dialog={BelongsTo}
@@ -297,9 +298,10 @@ function EditModel() {
                 hidden={!detail}
                 columns={[
                   { field: "name", editable: true },
-                  { field: "db", editable: true },
-                  { field: "model", editable: true },
-                  { field: "local", editable: true },
+                  { field: "db" },
+                  { field: "group" },
+                  { field: "model" },
+                  { field: "local" },
                 ]}
                 dialog={BelongsToOuterDb}
                 resolver={yupResolver(
@@ -311,8 +313,9 @@ function EditModel() {
                 {...formData}
                 columns={[
                   { field: "name", editable: true },
-                  { field: "model", editable: true },
-                  { field: "foreign", editable: true },
+                  { field: "group" },
+                  { field: "model" },
+                  { field: "foreign" },
                 ]}
                 dialog={HasOne}
                 resolver={yupResolver(
@@ -324,8 +327,9 @@ function EditModel() {
                 {...formData}
                 columns={[
                   { field: "name", editable: true },
-                  { field: "model", editable: true },
-                  { field: "foreign", editable: true },
+                  { field: "group" },
+                  { field: "model" },
+                  { field: "foreign" },
                 ]}
                 dialog={HasMany}
                 resolver={yupResolver(
@@ -498,28 +502,36 @@ function EnumValue({ formData }: any) {
 }
 
 function BelongsTo({ formData }: any) {
+  const group = useWatch({
+    control: formData.form.control,
+    name: "group",
+  });
   const model = useWatch({
     control: formData.form.control,
     name: "model",
   });
-  if (formData.form.getValues("name") === undefined) {
-    if (model !== undefined) {
-      formData.form.setValue("name", model, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
+  React.useEffect(() => {
+    if (formData.form.getValues("name") === undefined) {
+      if (model !== undefined) {
+        formData.form.setValue("name", model, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
     }
-  }
+  }, [model]);
+  const baseGroup = formData.additionalData.group;
   return (
     <>
       <SpaceBetween direction="vertical" size="xs">
         <AutoField name="name" {...formData} />
         <AutoField name="label" {...formData} />
         <AutoField name="comment" {...formData} textarea />
+        <AutoField name="group" {...formData} autocomplete={formData.additionalData.group_names} />
         <AutoField
           name="model"
           {...formData}
-          autocomplete={formData.additionalData.model_names}
+          autocomplete={formData.additionalData.model_names[group || baseGroup] || []}
         />
         <AutoField
           name="local"
@@ -550,27 +562,29 @@ function BelongsToOuterDb({ formData }: any) {
     name: "db",
   });
   const baseGroup = formData.additionalData.group;
-  const [models, setModels] = React.useState([] as string[]);
+  const [groups, setGroups] = React.useState([]);
   React.useEffect(() => {
     if (db) {
-      fetch(`/api/model_names/${db}`)
-      .then((res) => res.json())
-      .then((json) => {
-        const model_names = [];
-        for (const group in json) {
-          for (const name of json[group]) {
-            if (baseGroup === group) {
-              model_names.push(name);
-            } else {
-              model_names.push(group + "::" + name);
-            }
-          }
-        }
-        setModels(model_names);
-      })
-      .catch(() => alert("error"));
+      fetch(`/api/db/${db}`)
+        .then((res) => res.json())
+        .then((json) => setGroups(json.groups))
+        .catch(() => alert("error"));
     }
   }, [db]);
+  const group = useWatch({
+    control: formData.form.control,
+    name: "group",
+  });
+  const [models, setModels] = React.useState([]);
+  React.useEffect(() => {
+    const g = group || baseGroup;
+    if (db && g) {
+      fetch(`/api/model_names/${db}`)
+        .then((res) => res.json())
+        .then((json) => setModels(json[g] || []))
+        .catch(() => alert("error"));
+    }
+  }, [db, group]);
   const model = useWatch({
     control: formData.form.control,
     name: "model",
@@ -590,7 +604,10 @@ function BelongsToOuterDb({ formData }: any) {
         <AutoField name="label" {...formData} />
         <AutoField name="comment" {...formData} textarea />
         <AutoField name="db" {...formData} autocomplete={dbs} />
-        <AutoField name="model" {...formData} autocomplete={models}  />
+        <AutoField name="group" {...formData} autocomplete={groups.map(
+          (v: any) => v.name,
+        )} />
+        <AutoField name="model" {...formData} autocomplete={models} />
         <AutoField
           name="local"
           {...formData}
@@ -606,40 +623,46 @@ function BelongsToOuterDb({ formData }: any) {
 }
 
 function HasOne({ formData }: any) {
+  const group = useWatch({
+    control: formData.form.control,
+    name: "group",
+  });
   const model = useWatch({
     control: formData.form.control,
     name: "model",
   });
-  if (formData.form.getValues("name") === undefined) {
-    if (model !== undefined) {
-      formData.form.setValue("name", model, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
+  React.useEffect(() => {
+    if (formData.form.getValues("name") === undefined) {
+      if (model !== undefined) {
+        formData.form.setValue("name", model, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
     }
-  }
+  }, [model]);
+  const baseGroup = formData.additionalData.group;
   const [foreign, setForeign] = React.useState(undefined as any);
   const db = formData.additionalData.db;
-  const ms = model?.split("::") || [];
-  const name = ms.pop();
-  const group = ms.length > 0 ? ms[0] : formData.additionalData.group;
+  const _group = group || formData.additionalData.group;
   React.useEffect(() => {
-    fetch(`/api/models/${db}/${group}`)
+    fetch(`/api/models/${db}/${_group}`)
       .then((res) => res.json())
       .then((data) => {
-        setForeign(data.find((v: any) => v.name === name));
+        setForeign(data.find((v: any) => v.name === model));
       });
-  }, [db, group, name]);
+  }, [db, group, model]);
   return (
     <>
       <SpaceBetween direction="vertical" size="xs">
         <AutoField name="name" {...formData} />
         <AutoField name="label" {...formData} />
         <AutoField name="comment" {...formData} textarea />
+        <AutoField name="group" {...formData} autocomplete={formData.additionalData.group_names} />
         <AutoField
           name="model"
           {...formData}
-          autocomplete={formData.additionalData.model_names}
+          autocomplete={formData.additionalData.model_names[group || baseGroup] || []}
         />
         <AutoField
           name="foreign"
@@ -653,40 +676,46 @@ function HasOne({ formData }: any) {
 }
 
 function HasMany({ formData }: any) {
+  const group = useWatch({
+    control: formData.form.control,
+    name: "group",
+  });
   const model = useWatch({
     control: formData.form.control,
     name: "model",
   });
-  if (formData.form.getValues("name") === undefined) {
-    if (model !== undefined) {
-      formData.form.setValue("name", pluralize.plural(model), {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
+  React.useEffect(() => {
+    if (formData.form.getValues("name") === undefined) {
+      if (model !== undefined) {
+        formData.form.setValue("name", pluralize.plural(model), {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
     }
-  }
+  }, [model]);
+  const baseGroup = formData.additionalData.group;
   const [foreign, setForeign] = React.useState(undefined as any);
   const db = formData.additionalData.db;
-  const ms = model?.split("::") || [];
-  const name = ms.pop();
-  const group = ms.length > 0 ? ms[0] : formData.additionalData.group;
+  const _group = group || formData.additionalData.group;
   React.useEffect(() => {
-    fetch(`/api/models/${db}/${group}`)
+    fetch(`/api/models/${db}/${_group}`)
       .then((res) => res.json())
       .then((data) => {
-        setForeign(data.find((v: any) => v.name === name));
+        setForeign(data.find((v: any) => v.name === model));
       });
-  }, [db, group, name]);
+  }, [db, group, model]);
   return (
     <>
       <SpaceBetween direction="vertical" size="xs">
         <AutoField name="name" {...formData} />
         <AutoField name="label" {...formData} />
         <AutoField name="comment" {...formData} textarea />
+        <AutoField name="group" {...formData} autocomplete={formData.additionalData.group_names} />
         <AutoField
           name="model"
           {...formData}
-          autocomplete={formData.additionalData.model_names}
+          autocomplete={formData.additionalData.model_names[group || baseGroup] || []}
         />
         <AutoField
           name="foreign"
@@ -820,9 +849,8 @@ function Filter({ formData, definitions }: any) {
   const [foreign, setForeign] = React.useState(undefined as any);
   const db = formData.additionalData.db;
   const relationDef = relationList.find((v: any) => v.name === relation);
-  const ms = (relationDef?.model || relation || "").split("::") || [];
-  const name = ms.pop();
-  const group = ms.length > 0 ? ms[0] : formData.additionalData.group;
+  const name = relationDef?.model || relation || "";
+  const group = relationDef?.group || formData.additionalData.group;
   React.useEffect(() => {
     fetch(`/api/models/${db}/${group}`)
       .then((res) => res.json())
