@@ -83,7 +83,7 @@ const routes: RouteObject[] = [
                   `/api/api_server/${params.server}/${params.db}/_config`,
                 ),
                 fetch_json(`/api/api_server/${params.server}/_config`),
-                fetch_json(`/api/db/${params.db}`),
+                fetch_json(`/api/api_server/${params.server}/${params.db}/_groups`),
               ]);
             },
             action: async ({ params, request }) => {
@@ -112,8 +112,9 @@ const routes: RouteObject[] = [
                   `/api/api_server/${params.server}/${params.db}/${params.group}`,
                 ),
                 fetch_json(`/api/api_schema`),
-                fetch_json(`/api/models/${params.db}/${params.group}`),
+                fetch_json(`/api/api_server/${params.server}/${params.db}/${params.group}/_models`),
                 fetch_json(`/api/api_server/${params.server}/_config`),
+                fetch_json(`/api/api_server/${params.server}/${params.db}/_config`),
               ]);
             },
             children: [

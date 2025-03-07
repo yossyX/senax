@@ -352,6 +352,10 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 def.relations
                     .insert(name.clone(), BelongsToDef::convert(rel, group_name, name));
             }
+            for (name, rel) in &def.belongs_to_outer_db {
+                def.relations
+                    .insert(name.clone(), BelongsToOuterDbDef::convert(rel, group_name));
+            }
             def.merged_relations.clone_from(&def.relations);
             def.merged_indexes =
                 def.indexes
@@ -441,20 +445,20 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
         for (cur_model_name, def) in defs.iter() {
             {
                 let mut model = def.borrow_mut();
-                for (rel_name, rel_def) in model.belongs_to_outer_db.clone().iter() {
-                    let local_ids = rel_def.get_local_id(rel_name);
-                    if local_ids.len() == 1 {
-                        let col_name = &local_ids[0];
-                        if let Some(column_def) = model.merged_fields.get_mut(col_name) {
-                            column_def.outer_db_rel = Some((rel_name.clone(), rel_def.clone()));
-                            column_def.main_primary = false;
-                            column_def.id_class = None;
-                            column_def.enum_class = None;
-                            column_def.value_object = None;
+                for (rel_name, rel_def) in model.merged_relations.clone().iter() {
+                    if rel_def.is_type_of_belongs_to_outer_db() {
+                        let local_ids = rel_def.get_local_id(rel_name);
+                        if local_ids.len() == 1 {
+                            let col_name = &local_ids[0];
+                            if let Some(column_def) = model.merged_fields.get_mut(col_name) {
+                                column_def.outer_db_rel = Some((rel_name.clone(), rel_def.clone()));
+                                column_def.main_primary = false;
+                                column_def.id_class = None;
+                                column_def.enum_class = None;
+                                column_def.value_object = None;
+                            }
                         }
                     }
-                }
-                for (rel_name, rel_def) in model.merged_relations.clone().iter() {
                     if rel_def.is_type_of_belongs_to() {
                         let local_ids = rel_def.get_local_id(rel_name);
                         if local_ids.len() == 1 {
@@ -513,7 +517,8 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                                     rel_name, cur_model_name);
                             }
                         }
-                    } else {
+                    }
+                    if rel_def.is_type_of_has() {
                         let foreign_ids = rel_def.get_foreign_id(&model);
                         if foreign_ids.len() == 1 {
                             let col_name = &foreign_ids[0];
@@ -594,7 +599,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
         for (cur_model_name, def) in defs.iter() {
             let model = def.borrow();
             for (rel_name, rel_def) in model.merged_relations.iter() {
-                if !rel_def.is_type_of_belongs_to() {
+                if rel_def.is_type_of_has() {
                     let foreign_ids = rel_def.get_foreign_id(&model);
                     if model.full_name().eq(&rel_def.model) {
                         ensure!(

@@ -75,9 +75,9 @@ pub struct FilterJson {
     #[serde(rename = "type")]
     pub _type: FilterType,
     /// ### フィールド
-    /// 複数の場合はカンマ区切りで記述。また、該当する複数カラムインデックスが必要。
+    /// 複数の場合は該当する複数カラムインデックスが必要
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fields: Option<String>,
+    pub fields: Option<Vec<String>>,
     /// ### 必須
     #[serde(default, skip_serializing_if = "crate::schema::is_false")]
     pub required: bool,
@@ -105,7 +105,7 @@ impl From<FilterDef> for FilterJson {
             fields: if value.fields.is_empty() {
                 None
             } else {
-                Some(value.fields.into_keys().collect::<Vec<_>>().join(", "))
+                Some(value.fields.into_keys().collect::<Vec<_>>())
             },
             required: value.required,
             relation: value.relation,
@@ -130,12 +130,10 @@ impl From<FilterJson> for FilterDef {
             _type: value._type,
             fields: value
                 .fields
-                .map(|v| {
-                    v.split(',')
-                        .map(|v| (v.trim().to_string(), None))
-                        .collect::<IndexMap<_, _>>()
-                })
-                .unwrap_or_default(),
+                .unwrap_or_default()
+                .into_iter()
+                .map(|v| (v, None))
+                .collect::<IndexMap<_, _>>(),
             required: value.required,
             relation: value.relation,
             relation_fields: value
@@ -865,12 +863,10 @@ impl OrderDef {
                 } else {
                     v.push(format!("_obj.{}()?", _to_var_name(field)));
                 }
+            } else if t.not_null {
+                v.push(format!("_obj.{}().clone()", _to_var_name(field)));
             } else {
-                if t.not_null {
-                    v.push(format!("_obj.{}().clone()", _to_var_name(field)));
-                } else {
-                    v.push(format!("_obj.{}().clone()?", _to_var_name(field)));
-                }
+                v.push(format!("_obj.{}().clone()?", _to_var_name(field)));
             }
         }
         format!("({})", &v.join(", "))

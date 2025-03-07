@@ -15,6 +15,7 @@ pub enum RelationsType {
     HasMany,
     BelongsTo,
     HasOne,
+    BelongsToOuterDb,
 }
 
 #[derive(
@@ -48,13 +49,17 @@ impl StringOrArray {
             StringOrArray::Many(v) => v.clone(),
         }
     }
-    fn from_vec(mut value: Vec<String>) -> Option<StringOrArray> {
-        if value.is_empty() {
-            None
-        } else if value.len() == 1 {
-            Some(StringOrArray::One(value.pop().unwrap()))
+    fn from_vec(value: Option<Vec<String>>) -> Option<StringOrArray> {
+        if let Some(mut value) = value {
+            if value.is_empty() {
+                None
+            } else if value.len() == 1 {
+                Some(StringOrArray::One(value.pop().unwrap()))
+            } else {
+                Some(StringOrArray::Many(value))
+            }
         } else {
-            Some(StringOrArray::Many(value))
+            None
         }
     }
     #[allow(dead_code)]
@@ -76,8 +81,10 @@ pub struct HasOneDef {
     /// ### コメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    /// ### 結合先のグループ
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// ### 結合先のモデル
-    /// 他のグループは::区切りで指定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// ### 結合先のフィールド名
@@ -102,14 +109,15 @@ pub struct HasOneJson {
     /// ### コメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    /// ### 結合先のグループ
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// ### 結合先のモデル
-    /// 他のグループは::区切りで指定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// ### 結合先のフィールド名
-    /// 複数の場合はカンマ区切り
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub foreign: Option<String>,
+    pub foreign: Option<Vec<String>>,
     /// ### 親モデルのキャッシュに含まれない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_cache: bool,
@@ -121,8 +129,9 @@ impl From<HasOneDef> for HasOneJson {
             name: Default::default(),
             label: value.label,
             comment: value.comment,
+            group: value.group,
             model: value.model,
-            foreign: value.foreign.map(|v| v.to_vec().join(", ")),
+            foreign: value.foreign.map(|v| v.to_vec()),
             disable_cache: value.disable_cache,
         }
     }
@@ -133,10 +142,9 @@ impl From<HasOneJson> for HasOneDef {
         Self {
             label: value.label,
             comment: value.comment,
+            group: value.group,
             model: value.model,
-            foreign: value.foreign.and_then(|v| {
-                StringOrArray::from_vec(v.split(',').map(|v| v.trim().to_string()).collect())
-            }),
+            foreign: StringOrArray::from_vec(value.foreign),
             disable_cache: value.disable_cache,
         }
     }
@@ -147,7 +155,11 @@ impl From<&HasOneDef> for RelDef {
         Self {
             label: value.label.clone(),
             comment: value.comment.clone(),
-            model: value.model.clone().unwrap_or_default(),
+            model: if let Some(group) = &value.group {
+                format!("{}::{}", group, value.model.as_deref().unwrap_or_default())
+            } else {
+                value.model.clone().unwrap_or_default()
+            },
             rel_type: Some(RelationsType::HasOne),
             foreign: value.foreign.as_ref().map(|v| v.to_vec()),
             in_cache: !value.disable_cache,
@@ -164,7 +176,11 @@ impl HasOneDef {
             } else if d.model.contains(MODEL_NAME_SPLITTER) {
                 let (group_name, stem_name) = d.model.split_once(MODEL_NAME_SPLITTER).unwrap();
                 crate::common::check_name(group_name);
-                crate::common::check_name(stem_name);
+                if stem_name.is_empty() {
+                    d.model = format!("{}::{}", group_name, name);
+                } else {
+                    crate::common::check_name(stem_name);
+                }
             } else {
                 crate::common::check_name(&d.model);
                 d.model = format!("{}::{}", group, d.model);
@@ -191,8 +207,10 @@ pub struct HasManyDef {
     /// ### コメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    /// ### 結合先のグループ
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// ### 結合先のモデル
-    /// 他のグループは::区切りで指定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// ### 結合先のフィールド名
@@ -230,14 +248,15 @@ pub struct HasManyJson {
     /// ### コメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    /// ### 結合先のグループ
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// ### 結合先のモデル
-    /// 他のグループは::区切りで指定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// ### 結合先のフィールド名
-    /// 複数の場合はカンマ区切り
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub foreign: Option<String>,
+    pub foreign: Option<Vec<String>>,
     /// ### 親モデルのキャッシュに含まれない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_cache: bool,
@@ -262,8 +281,9 @@ impl From<HasManyDef> for HasManyJson {
             name: Default::default(),
             label: value.label,
             comment: value.comment,
+            group: value.group,
             model: value.model,
-            foreign: value.foreign.map(|v| v.to_vec().join(", ")),
+            foreign: value.foreign.map(|v| v.to_vec()),
             disable_cache: value.disable_cache,
             additional_filter: value.additional_filter,
             order_by: value.order_by,
@@ -278,10 +298,9 @@ impl From<HasManyJson> for HasManyDef {
         Self {
             label: value.label,
             comment: value.comment,
+            group: value.group,
             model: value.model,
-            foreign: value.foreign.and_then(|v| {
-                StringOrArray::from_vec(v.split(',').map(|v| v.trim().to_string()).collect())
-            }),
+            foreign: StringOrArray::from_vec(value.foreign),
             disable_cache: value.disable_cache,
             additional_filter: value.additional_filter,
             order_by: value.order_by,
@@ -296,7 +315,11 @@ impl From<&HasManyDef> for RelDef {
         Self {
             label: value.label.clone(),
             comment: value.comment.clone(),
-            model: value.model.clone().unwrap_or_default(),
+            model: if let Some(group) = &value.group {
+                format!("{}::{}", group, value.model.as_deref().unwrap_or_default())
+            } else {
+                value.model.clone().unwrap_or_default()
+            },
             rel_type: Some(RelationsType::HasMany),
             foreign: value.foreign.as_ref().map(|v| v.to_vec()),
             in_cache: !value.disable_cache,
@@ -317,7 +340,11 @@ impl HasManyDef {
             } else if d.model.contains(MODEL_NAME_SPLITTER) {
                 let (group_name, stem_name) = d.model.split_once(MODEL_NAME_SPLITTER).unwrap();
                 crate::common::check_name(group_name);
-                crate::common::check_name(stem_name);
+                if stem_name.is_empty() {
+                    d.model = format!("{}::{}", group_name, name);
+                } else {
+                    crate::common::check_name(stem_name);
+                }
             } else {
                 crate::common::check_name(&d.model);
                 d.model = format!("{}::{}", group, d.model);
@@ -344,8 +371,10 @@ pub struct BelongsToDef {
     /// ### コメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    /// ### 結合先のグループ
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// ### 結合先のモデル
-    /// 他のグループは::区切りで指定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// ### 結合するローカルのフィールド名
@@ -381,14 +410,15 @@ pub struct BelongsToJson {
     /// ### コメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    /// ### 結合先のグループ
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// ### 結合先のモデル
-    /// 他のグループは::区切りで指定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     /// ### 結合するローカルのフィールド名
-    /// 複数の場合はカンマ区切り
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub local: Option<String>,
+    pub local: Option<Vec<String>>,
     /// ### リレーション先が論理削除されていても取得する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub with_trashed: bool,
@@ -411,8 +441,9 @@ impl From<BelongsToDef> for BelongsToJson {
             name: Default::default(),
             label: value.label,
             comment: value.comment,
+            group: value.group,
             model: value.model,
-            local: value.local.map(|v| v.to_vec().join(", ")),
+            local: value.local.map(|v| v.to_vec()),
             with_trashed: value.with_trashed,
             disable_index: value.disable_index,
             on_delete: value.on_delete,
@@ -426,10 +457,9 @@ impl From<BelongsToJson> for BelongsToDef {
         Self {
             label: value.label,
             comment: value.comment,
+            group: value.group,
             model: value.model,
-            local: value.local.and_then(|v| {
-                StringOrArray::from_vec(v.split(',').map(|v| v.trim().to_string()).collect())
-            }),
+            local: StringOrArray::from_vec(value.local),
             with_trashed: value.with_trashed,
             disable_index: value.disable_index,
             on_delete: value.on_delete,
@@ -443,7 +473,11 @@ impl From<&BelongsToDef> for RelDef {
         Self {
             label: value.label.clone(),
             comment: value.comment.clone(),
-            model: value.model.clone().unwrap_or_default(),
+            model: if let Some(group) = &value.group {
+                format!("{}::{}", group, value.model.as_deref().unwrap_or_default())
+            } else {
+                value.model.clone().unwrap_or_default()
+            },
             rel_type: Some(RelationsType::BelongsTo),
             local: value.local.as_ref().map(|v| v.to_vec()),
             with_trashed: value.with_trashed,
@@ -463,7 +497,11 @@ impl BelongsToDef {
             } else if d.model.contains(MODEL_NAME_SPLITTER) {
                 let (group_name, stem_name) = d.model.split_once(MODEL_NAME_SPLITTER).unwrap();
                 crate::common::check_name(group_name);
-                crate::common::check_name(stem_name);
+                if stem_name.is_empty() {
+                    d.model = format!("{}::{}", group_name, name);
+                } else {
+                    crate::common::check_name(stem_name);
+                }
             } else {
                 crate::common::check_name(&d.model);
                 d.model = format!("{}::{}", group, d.model);
@@ -492,7 +530,8 @@ pub struct BelongsToOuterDbDef {
     /// ### 結合先のデータベース
     pub db: String,
     /// ### 結合先のグループ
-    pub group: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// ### 結合先のモデル
     pub model: String,
     /// ### 結合するローカルのフィールド名
@@ -523,13 +562,13 @@ pub struct BelongsToOuterDbJson {
     /// ### 結合先のデータベース
     pub db: String,
     /// ### 結合先のグループ
-    pub group: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// ### 結合先のモデル
     pub model: String,
     /// ### 結合するローカルのフィールド名
-    /// 複数の場合はカンマ区切り
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub local: Option<String>,
+    pub local: Option<Vec<String>>,
     /// ### リレーション先が論理削除されていても取得する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub with_trashed: bool,
@@ -547,7 +586,7 @@ impl From<BelongsToOuterDbDef> for BelongsToOuterDbJson {
             db: value.db,
             group: value.group,
             model: value.model,
-            local: value.local.map(|v| v.to_vec().join(", ")),
+            local: value.local.map(|v| v.to_vec()),
             with_trashed: value.with_trashed,
             disable_index: value.disable_index,
         }
@@ -562,81 +601,43 @@ impl From<BelongsToOuterDbJson> for BelongsToOuterDbDef {
             db: value.db,
             group: value.group,
             model: value.model,
-            local: value.local.and_then(|v| {
-                StringOrArray::from_vec(v.split(',').map(|v| v.trim().to_string()).collect())
-            }),
+            local: StringOrArray::from_vec(value.local),
             with_trashed: value.with_trashed,
             disable_index: value.disable_index,
         }
     }
 }
+impl From<&BelongsToOuterDbDef> for RelDef {
+    fn from(value: &BelongsToOuterDbDef) -> Self {
+        Self {
+            label: value.label.clone(),
+            comment: value.comment.clone(),
+            db: Some(value.db.clone()),
+            model: if let Some(group) = &value.group {
+                format!("{}::{}", group, value.model)
+            } else {
+                value.model.clone()
+            },
+            rel_type: Some(RelationsType::BelongsToOuterDb),
+            local: value.local.as_ref().map(|v| v.to_vec()),
+            with_trashed: value.with_trashed,
+            disable_index: value.disable_index,
+            ..Default::default()
+        }
+    }
+}
 impl BelongsToOuterDbDef {
-    pub fn get_foreign_class_name(&self) -> String {
-        if domain_mode() {
-            self.get_foreign_model_name().1.to_case(Case::Pascal)
+    pub fn convert(rel: &BelongsToOuterDbDef, group: &str) -> RelDef {
+        let mut d: RelDef = rel.into();
+        if d.model.contains(MODEL_NAME_SPLITTER) {
+            let (group_name, stem_name) = d.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+            crate::common::check_name(group_name);
+            crate::common::check_name(stem_name);
         } else {
-            format!("_{}", self.get_foreign_model_name().1.to_case(Case::Pascal))
+            crate::common::check_name(&d.model);
+            d.model = format!("{}::{}", group, d.model);
         }
-    }
-    pub fn get_id_name(&self) -> String {
-        to_id_name(&self.model)
-    }
-    pub fn get_group_var(&self) -> String {
-        _to_var_name(&self.get_group_name())
-    }
-    pub fn get_mod_name(&self) -> String {
-        self.get_foreign_model_name().0
-    }
-    pub fn get_group_mod_name(&self) -> String {
-        format!(
-            "{}_{}_{}",
-            self.db,
-            self.get_group_name(),
-            self.get_mod_name()
-        )
-    }
-    pub fn get_group_mod_var(&self) -> String {
-        format!(
-            "{}::{}",
-            _to_var_name(&self.get_group_name()),
-            _to_var_name(&self.get_mod_name())
-        )
-    }
-    pub fn get_base_group_mod_var(&self) -> String {
-        format!(
-            "{}::_base::_{}",
-            _to_var_name(&self.get_group_name()),
-            &self.get_mod_name()
-        )
-    }
-    pub fn get_local_id(&self, name: &str) -> Vec<String> {
-        match self.local {
-            None => vec![format!("{}_id", name)],
-            Some(StringOrArray::One(ref local)) => vec![local.to_owned()],
-            Some(StringOrArray::Many(ref local)) => local.to_owned(),
-        }
-    }
-    pub fn get_local_cols<'a>(
-        &self,
-        name: &'a str,
-        model: &'a ModelDef,
-    ) -> Vec<(&'a String, &'a FieldDef)> {
-        let ids = self.get_local_id(name);
-        let mut result = Vec::new();
-        for id in &ids {
-            if let Some(v) = model.merged_fields.get_key_value(id) {
-                result.push(v);
-            }
-        }
-        result
-    }
-
-    pub fn get_foreign_model_name(&self) -> (String, String) {
-        (self.model.to_case(Case::Snake), self.model.to_string())
-    }
-
-    pub fn get_group_name(&self) -> String {
-        self.group.to_string()
+        d
     }
 }
 
@@ -647,6 +648,7 @@ pub struct RelDef {
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
+    pub db: Option<String>,
     pub model: String,
     #[serde(rename = "type")]
     pub rel_type: Option<RelationsType>,
@@ -664,6 +666,10 @@ pub struct RelDef {
 }
 pub const MODEL_NAME_SPLITTER: &str = "::";
 impl RelDef {
+    pub fn is_type_of_has(&self) -> bool {
+        self.rel_type.unwrap() == RelationsType::HasMany
+            || self.rel_type.unwrap() == RelationsType::HasOne
+    }
     pub fn is_type_of_has_many(&self) -> bool {
         self.rel_type.unwrap() == RelationsType::HasMany
     }
@@ -673,6 +679,12 @@ impl RelDef {
     pub fn is_type_of_belongs_to(&self) -> bool {
         self.rel_type.unwrap() == RelationsType::BelongsTo
     }
+    pub fn is_type_of_belongs_to_outer_db(&self) -> bool {
+        self.rel_type.unwrap() == RelationsType::BelongsToOuterDb
+    }
+    pub fn db(&self) -> &str {
+        self.db.as_deref().unwrap_or("--RELATION HAS NO DB--")
+    }
     pub fn get_foreign_class_name(&self) -> String {
         if domain_mode() {
             self.get_foreign_model_name().1.to_case(Case::Pascal)
@@ -681,6 +693,10 @@ impl RelDef {
         }
     }
     pub fn get_id_name(&self) -> String {
+        if self.is_type_of_belongs_to_outer_db() {
+            let (_group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+            return to_id_name(stem_name);
+        }
         let target_model = self.get_foreign_model();
         if target_model.id().is_empty() {
             error_exit!(
@@ -697,7 +713,11 @@ impl RelDef {
         self.get_foreign_model_name().0
     }
     pub fn get_group_mod_name(&self) -> String {
-        format!("{}_{}", self.get_group_name(), self.get_mod_name())
+        if let Some(db) = &self.db {
+            format!("{}_{}_{}", db, self.get_group_name(), self.get_mod_name())
+        } else {
+            format!("{}_{}", self.get_group_name(), self.get_mod_name())
+        }
     }
     pub fn get_group_mod_var(&self) -> String {
         format!(
@@ -766,8 +786,13 @@ impl RelDef {
     }
 
     pub fn get_foreign_model_name(&self) -> (String, String) {
-        let (group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
-        get_model_name(Some(group_name), stem_name)
+        if self.is_type_of_belongs_to_outer_db() {
+            let (_group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+            (stem_name.to_case(Case::Snake), stem_name.to_string())
+        } else {
+            let (group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
+            get_model_name(Some(group_name), stem_name)
+        }
     }
 
     pub fn get_model_by_name(name: &str, cur_group_name: Option<String>) -> Arc<ModelDef> {

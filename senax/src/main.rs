@@ -49,6 +49,7 @@ pub const SCHEMA_PATH: &str = "0_schema";
 pub const DOMAIN_PATH: &str = "1_domain";
 pub const DB_PATH: &str = "2_db";
 pub const SIMPLE_VALUE_OBJECTS_FILE: &str = "_simple_value_objects.yml";
+pub const DEFAULT_CONFIG_HOST: &str = "0.0.0.0";
 pub const DEFAULT_CONFIG_PORT: u16 = 9100;
 pub const API_SCHEMA_PATH: &str = "api_schema";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -78,6 +79,9 @@ enum Commands {
     },
     #[cfg(feature = "config")]
     Config {
+        /// open host
+        #[clap(long)]
+        host: Option<String>,
         /// open port
         #[clap(short, long)]
         port: Option<u16>,
@@ -103,6 +107,11 @@ enum Commands {
     /// Prepare to use DB
     InitDb {
         /// DB name
+        db: String,
+    },
+    /// check models
+    Check {
+        /// Specify the DB
         db: String,
     },
     /// generate models
@@ -240,12 +249,13 @@ async fn exec(cli: Cli) -> Result<()> {
         }
         #[cfg(feature = "config")]
         Commands::Config {
+            host,
             port,
             open,
             backup,
             read_only,
         } => {
-            config_server::start(*port, *open, backup, *read_only).await?;
+            config_server::start(host, *port, *open, backup, *read_only).await?;
         }
         Commands::NewActix { name, db, force } => {
             let db_list = db.split(',').map(|v| v.trim()).collect();
@@ -254,6 +264,10 @@ async fn exec(cli: Cli) -> Result<()> {
         Commands::InitDb { db } => {
             ensure!(db_re.is_match(db), "bad db name!");
             db_generator::generate(db)?;
+        }
+        Commands::Check { db } => {
+            ensure!(db_re.is_match(db), "bad db name!");
+            schema::parse(db, false, false)?;
         }
         Commands::Model {
             db,

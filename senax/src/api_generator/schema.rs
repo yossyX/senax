@@ -178,6 +178,10 @@ impl From<ApiRoleJson> for ApiRoleDef {
 #[serde(deny_unknown_fields)]
 /// ### API DB設定
 pub struct ApiDbDef {
+    /// ### データベース名
+    /// データベースパスと対象のデータベースが異なるときに指定する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub db: Option<String>,
     /// ### キャメルケースを使用する
     #[serde(default)]
     pub camel_case: Option<bool>,
@@ -233,6 +237,10 @@ impl ApiDbDef {
 #[serde(deny_unknown_fields)]
 /// ### API DB設定
 pub struct ApiDbJson {
+    /// ### データベース名
+    /// データベースパスと対象のデータベースが異なるときに指定する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub db: Option<String>,
     /// ### キャメルケースを使用する
     #[serde(default)]
     pub camel_case: Option<bool>,
@@ -253,6 +261,7 @@ pub struct ApiDbJson {
 impl From<ApiDbDef> for ApiDbJson {
     fn from(value: ApiDbDef) -> Self {
         Self {
+            db: value.db,
             camel_case: value.camel_case,
             with_label: value.with_label,
             with_comment: value.with_comment,
@@ -274,6 +283,7 @@ impl From<ApiDbDef> for ApiDbJson {
 impl From<ApiDbJson> for ApiDbDef {
     fn from(value: ApiDbJson) -> Self {
         Self {
+            db: value.db,
             camel_case: value.camel_case,
             with_label: value.with_label,
             with_comment: value.with_comment,
@@ -299,6 +309,10 @@ impl From<ApiDbJson> for ApiDbDef {
 #[serde(deny_unknown_fields)]
 /// ### APIグループ設定
 pub struct ApiGroupDef {
+    /// ### グループ名
+    /// グループパスと対象のグループが異なるときに指定する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// ### デフォルト参照権限
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub readable_roles: Vec<String>,
@@ -320,10 +334,14 @@ pub struct ApiGroupDef {
 #[serde(deny_unknown_fields)]
 /// ### APIグループ設定
 pub struct ApiGroupJson {
-    /// ### グループ名
+    /// ### グループパス
     #[schemars(regex(pattern = r"^[A-Za-z][_0-9A-Za-z]*(?<!_)$"))]
     pub name: String,
     pub _name: Option<String>,
+    /// ### グループ名
+    /// グループパスと対象のグループが異なるときに指定する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
     /// ### デフォルト参照権限
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub readable_roles: Vec<String>,
@@ -345,6 +363,7 @@ impl From<ApiGroupDef> for ApiGroupJson {
         Self {
             name: String::new(),
             _name: None,
+            group: value.group,
             readable_roles: value.readable_roles,
             creatable_roles: value.creatable_roles,
             importable_roles: value.importable_roles,
@@ -356,6 +375,7 @@ impl From<ApiGroupDef> for ApiGroupJson {
 impl From<ApiGroupJson> for ApiGroupDef {
     fn from(value: ApiGroupJson) -> Self {
         Self {
+            group: value.group,
             readable_roles: value.readable_roles,
             creatable_roles: value.creatable_roles,
             importable_roles: value.importable_roles,
@@ -491,6 +511,10 @@ pub type Relations = IndexMap<String, Option<ApiRelationDef>>;
 #[serde(deny_unknown_fields)]
 /// ### APIモデル定義
 pub struct ApiModelDef {
+    /// ### モデル名
+    /// モデルパスと対象のモデルが異なるときに指定する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     /// ### フィールド自動追加の無効化
     #[serde(default, skip_serializing_if = "is_false")]
     pub disable_auto_fields: bool,
@@ -547,9 +571,13 @@ pub struct ApiModelDef {
 #[serde(deny_unknown_fields)]
 /// ### APIモデル定義
 pub struct ApiModelJson {
-    /// ### モデル名
+    /// ### モデルパス
     #[schemars(regex(pattern = r"^[A-Za-z][_0-9A-Za-z]*(?<!_)$"))]
     pub name: String,
+    /// ### モデル名
+    /// モデルパスと対象のモデルが異なるときに指定する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     /// ### フィールド自動追加の無効化
     #[serde(default, skip_serializing_if = "is_false")]
     pub disable_auto_fields: bool,
@@ -615,6 +643,7 @@ impl From<ApiModelDef> for ApiModelJson {
     fn from(value: ApiModelDef) -> Self {
         Self {
             name: String::new(),
+            model: value.model,
             disable_auto_fields: value.disable_auto_fields,
             use_find_by_pk: value.use_find_by_pk,
             use_delete_by_pk: value.use_delete_by_pk,
@@ -662,6 +691,7 @@ impl TryFrom<ApiModelJson> for ApiModelDef {
     type Error = anyhow::Error;
     fn try_from(value: ApiModelJson) -> Result<Self, Self::Error> {
         Ok(Self {
+            model: value.model,
             disable_auto_fields: value.disable_auto_fields,
             use_find_by_pk: value.use_find_by_pk,
             use_delete_by_pk: value.use_delete_by_pk,

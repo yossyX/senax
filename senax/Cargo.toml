@@ -41,7 +41,6 @@ proc-macro2 = "1.0.76"
 rand = "0.8"
 regex = "1"
 rquickjs = { version = "0.4.3", features = ["rust-alloc"], default-features = false }
-sanitize-filename = "0.4.0"
 schemars = { version = "0.8.10", features = ["indexmap1", "preserve_order"] }
 semver = "1.0.22"
 senax-inflector = "0.1.0"

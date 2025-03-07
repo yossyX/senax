@@ -80,9 +80,9 @@ async fn delete(
     Ok(())
 }
 
-pub struct GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@;
+pub struct GqlQuery@{ graphql_name }@;
 #[async_graphql::Object]
-impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
+impl GqlQuery@{ graphql_name }@ {
     #[graphql(name = "_permission")]
     async fn _permission(
         &self,
@@ -153,7 +153,7 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        crate::gql_@{ db|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_path|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -166,7 +166,7 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        crate::gql_@{ db|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_path|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
     }
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
@@ -201,6 +201,7 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         @%- endif %@
         
         #[allow(unused_imports)]
+        #[allow(clippy::let_unit_value)]
         async fn _fetch(
             gql_ctx: &async_graphql::Context<'_>,
             repo: &RepositoriesImpl,
@@ -308,7 +309,7 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
                 let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
                 let auth: &AuthInfo = gql_ctx.data()?;
                 let order = order.unwrap_or_default();
-                let (mut list, previous, limit) = crate::gql_@{ db|snake }@_selector!(
+                let (mut list, previous, limit) = crate::gql_@{ db_path|snake }@_selector!(
                     _fetch(
                         gql_ctx, &repo, auth, &after, &before, first, last, &filter, order, offset,
                     ),
@@ -388,15 +389,15 @@ impl GqlQuery@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
             Ok(count)
         }
 
-        crate::gql_@{ db|snake }@_count!(_count(&repo, auth, &filter), repo, gql_ctx)
+        crate::gql_@{ db_path|snake }@_count!(_count(&repo, auth, &filter), repo, gql_ctx)
     }
     @%- endfor %@
     @%- endfor %@
 }
 
-pub struct GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@;
+pub struct GqlMutation@{ graphql_name }@;
 #[async_graphql::Object]
-impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
+impl GqlMutation@{ graphql_name }@ {
     @%- if !api_def.disable_mutation %@
     @#-
     @%- if !def.disable_update() %@
@@ -417,7 +418,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        crate::gql_@{ db|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_path|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -430,7 +431,7 @@ impl GqlMutation@{ db|pascal }@@{ group|pascal }@@{ mod_name|pascal }@ {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        crate::gql_@{ db|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_path|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
     #@
@@ -836,6 +837,7 @@ async fn @{ selector }@_handler(
     use futures::{Stream, StreamExt as _};
     use std::pin::Pin;
 
+    #[allow(clippy::let_unit_value)]
     async fn _fetch(
         repo: &RepositoriesImpl,
         auth: &AuthInfo,
@@ -900,7 +902,7 @@ async fn @{ selector }@_handler(
         }
         @%- endif %@
         let repo = RepositoriesImpl::new_with_ctx(&ctx);
-        let stream = crate::api_@{ db|snake }@_selector!(_fetch(&repo, &auth, &data), repo);
+        let stream = crate::api_@{ db_path|snake }@_selector!(_fetch(&repo, &auth, &data), repo);
         let order = data.order.unwrap_or_default();
         let stream = stream.map(move |obj| {
             obj.and_then(|obj| ResObj::try_from_(&*obj, &auth, order.to_cursor(&obj)))
@@ -970,7 +972,7 @@ async fn count_@{ selector }@_handler(
         }
         @%- endif %@
         let repo = RepositoriesImpl::new_with_ctx(&ctx);
-        Ok(crate::api_@{ db|snake }@_selector!(_count(&repo, &auth, &filter), repo))
+        Ok(crate::api_@{ db_path|snake }@_selector!(_count(&repo, &auth, &filter), repo))
     }
     .await;
     crate::response::json_response(result, &ctx)

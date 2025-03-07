@@ -12,6 +12,7 @@ import AutoMultiSelect from "./AutoMultiSelect";
 import AutoRadio from "./AutoRadio";
 import AutoObject from "./AutoObject";
 import AutoCodeEditor from "./AutoCodeEditor";
+import AutoMultiSuggest from "./AutoMultiSuggest";
 
 interface Props {
   name: string;
@@ -52,6 +53,7 @@ function AutoField(props: Props) {
     return <></>;
   }
   const label = property.title || name;
+  const labelWithOptionality = (required ? label : <span>{label} <i>- optional</i></span>);
   const definition = getDefinition(name, property, definitions);
   const type = Array.isArray(definition.type)
     ? definition.type[0]
@@ -79,7 +81,6 @@ function AutoField(props: Props) {
       : definition.items;
 
     if (items.type === "object") {
-      console.dir(form.getValues(name))
       if (props.hidden && (form.getValues(name) === undefined || form.getValues(name)?.length == 0)) {
         return <></>;
       }
@@ -116,8 +117,24 @@ function AutoField(props: Props) {
           definition={definition}
           required={required}
           errors={errors}
-          label={label}
+          label={labelWithOptionality}
           values={props.options}
+        />
+      );
+    } else if (props.autocomplete || property.autocomplete) {
+      if (props.hidden && !form.getValues(name)) {
+        return <></>;
+      }
+      return (
+        <AutoMultiSuggest
+          name={name}
+          path={path}
+          form={form}
+          definition={definition}
+          errors={errors}
+          label={labelWithOptionality}
+          required={required}
+          autocomplete={props.autocomplete || property.autocomplete}
         />
       );
     } else {
@@ -151,7 +168,7 @@ function AutoField(props: Props) {
           form={form}
           definition={definition}
           errors={errors}
-          label={label}
+          label={labelWithOptionality}
           values={definition.enum}
         />
       );
@@ -168,7 +185,7 @@ function AutoField(props: Props) {
           definition={definition}
           required={required}
           errors={errors}
-          label={label}
+          label={labelWithOptionality}
           values={definition.enum}
         />
       );
@@ -218,7 +235,7 @@ function AutoField(props: Props) {
         render={({ field }) => (
           <FormField
             description={definition.description}
-            label={label}
+            label={labelWithOptionality}
             errorText={errors[name]?.message}
           >
             <Input
@@ -255,7 +272,7 @@ function AutoField(props: Props) {
           return (
             <FormField
               description={definition.description}
-              label={label}
+              label={labelWithOptionality}
               errorText={errors[name]?.message}
             >
               <Autosuggest
@@ -294,7 +311,7 @@ function AutoField(props: Props) {
         render={({ field }) => (
           <FormField
             description={definition.description}
-            label={label}
+            label={labelWithOptionality}
             errorText={errors[name]?.message}
           >
             <Textarea
@@ -330,7 +347,7 @@ function AutoField(props: Props) {
         form={form}
         definition={definition}
         errors={errors}
-        label={label}
+        label={labelWithOptionality}
       />
     );
   }
@@ -344,7 +361,7 @@ function AutoField(props: Props) {
       render={({ field }) => (
         <FormField
           description={definition.description}
-          label={label}
+          label={labelWithOptionality}
           errorText={errors[name]?.message}
         >
           <Input

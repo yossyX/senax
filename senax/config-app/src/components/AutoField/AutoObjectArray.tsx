@@ -261,6 +261,8 @@ function AutoObjectArray(props: Props) {
                 : v[e.field]}
             </Box>
           );
+        } else if (type == "array") {
+          e.cell = (v: any) => ((v[e.field] || []).join(", "));
         } else {
           e.cell = (v: any) => v[e.field];
         }

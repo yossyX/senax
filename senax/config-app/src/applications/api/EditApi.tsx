@@ -23,7 +23,7 @@ import Status404 from "@/pages/Status404";
 
 function EditApi() {
   const params = useParams();
-  const [api_models, jsonSchema, models, apiConfig] = useRouteLoaderData(
+  const [api_models, jsonSchema, models, apiConfig, apiDbConfig] = useRouteLoaderData(
     "api_models"
   ) as any;
   const roles = apiConfig.roles.map((x: any) => x.name);
@@ -76,6 +76,10 @@ function EditApi() {
     control: form.control,
     name: "name",
   });
+  const model_name = useWatch({
+    control: form.control,
+    name: "model",
+  });
   const disable_mutation = useWatch({
     control: form.control,
     name: "disable_mutation",
@@ -85,15 +89,19 @@ function EditApi() {
     name: "use_import",
   });
   const [modelData, setModelData] = React.useState(undefined as any);
-  const db = params.db;
-  const group = params.group;
+  const server = params.server;
+  const db_path = params.db;
+  const group_path = params.group;
   React.useEffect(() => {
-    fetch(`/api/models/${db}/${group}`)
+    fetch(`/api/api_server/${server}/${db_path}/${group_path}/_models`)
       .then((res) => res.json())
       .then((data) => {
-        setModelData(data.find((v: any) => v.name === name));
+        setModelData(data.find((v: any) => model_name ? (v.name === model_name) : (v.name === name)));
       });
-  }, [db, group, name]);
+  }, [db_path, group_path, name, model_name]);
+
+  const db = apiDbConfig.db || params.db;
+  let group = apiDbConfig.groups.find((e: any) => e.name === group_path).group || group_path;
 
   const [dirtyDialog, setDirtyDialog] = React.useState(false);
   const dirty = React.useRef(false);
@@ -134,8 +142,8 @@ function EditApi() {
     dirtyDialog,
     setDirtyDialog,
     additionalData: {
-      db: params.db,
-      group: params.group,
+      db,
+      group,
       modelData,
       roles,
     },
@@ -183,6 +191,11 @@ function EditApi() {
                 name="name"
                 {...formData}
                 disabled={!!params.model}
+                autocomplete={model_names}
+              />
+              <AutoField
+                name="model"
+                {...formData}
                 autocomplete={model_names}
               />
               <AutoField name="disable_auto_fields" {...formData} />
@@ -288,9 +301,7 @@ function Field({ formData }: any) {
         <AutoField
           name="name"
           {...formData}
-          autocomplete={formData.additionalData.modelData?.fields?.map(
-            (v: any) => v.name
-          )}
+          autocomplete={formData.additionalData.modelData?.merged_fields.map((v: any) => v[0]) || []}
         />
         <AutoField name="visibility" {...formData} />
         <AutoField name="required" {...formData} />
@@ -305,24 +316,19 @@ function Field({ formData }: any) {
 }
 
 function Relation({ formData, definitions }: any) {
-  const relationList: any[] = [].concat(
-    formData.additionalData.modelData.belongs_to || [],
-    formData.additionalData.modelData.has_one || [],
-    formData.additionalData.modelData.has_many || []
-  );
-
+  const relations = formData.additionalData.modelData?.merged_relations || [];
   const relation = useWatch({
     control: formData.form.control,
     name: "name",
   });
   const [foreign, setForeign] = React.useState(undefined as any);
-  const db = formData.additionalData.db;
-  const relationDef = relationList.find((v: any) => v.name === relation);
+  const relationDef = relations.find((v: any) => v[0] == relation)?.[1];
+  const db = (relationDef?.db || formData.additionalData.db);
   const ms = (relationDef?.model || relation || "").split("::") || [];
   const name = ms.pop();
-  const group = ms.length > 0 ? ms[0] : formData.additionalData.group;
+  const group = relationDef?.group || (ms.length > 0 ? ms[0] : formData.additionalData.group);
   React.useEffect(() => {
-    fetch(`/api/models/${db}/${group}`)
+    fetch(`/api/merged_models/${db}/${group}`)
       .then((res) => res.json())
       .then((data) => {
         setForeign(data.find((v: any) => v.name === name));
@@ -330,6 +336,7 @@ function Relation({ formData, definitions }: any) {
   }, [db, group, name]);
   const additionalData = {
     ...formData.additionalData,
+    db,
     group,
     modelData: foreign,
   };
@@ -339,7 +346,7 @@ function Relation({ formData, definitions }: any) {
         <AutoField
           name="name"
           {...formData}
-          autocomplete={relationList.map((v: any) => v.name)}
+          autocomplete={relations.map((v: any) => v[0]) || []}
         />
         <AutoField name="visibility" {...formData} />
         <AutoField name="use_replace" {...formData} />
