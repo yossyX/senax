@@ -135,6 +135,7 @@ pub enum ItemPlaceholder {
     ColonNumber(i32),
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for ItemPlaceholder {
     fn to_string(&self) -> String {
         match *self {
@@ -195,6 +196,7 @@ impl<'a> From<&'a str> for Literal {
     }
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for Literal {
     fn to_string(&self) -> String {
         match *self {

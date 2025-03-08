@@ -20,6 +20,7 @@ use super::common::{
 use super::create_table_options::table_options;
 use super::keywords::escape;
 use super::order::{order_type, OrderType};
+use crate::common::take_until_unbalanced;
 use crate::create_table_options::TableOption;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -382,6 +383,24 @@ pub fn column_constraint(i: &[u8]) -> IResult<&[u8], Option<ColumnConstraint>> {
         |t| Some(ColumnConstraint::Srid(super::common::len_as_u32(t.2))),
     );
 
+    let generated = map(
+        tuple((
+            multispace0,
+            tag_no_case("GENERATED ALWAYS AS"),
+            multispace1,
+            tag("("),
+            take_until_unbalanced('(', ')'),
+            tag(")"),
+            multispace1,
+            tag_no_case("VIRTUAL"),
+            multispace0,
+        )),
+        |t| {
+            let query = str::from_utf8(t.4).unwrap().to_owned();
+            Some(ColumnConstraint::Generated(query))
+        },
+    );
+
     alt((
         not_null,
         null,
@@ -392,6 +411,7 @@ pub fn column_constraint(i: &[u8]) -> IResult<&[u8], Option<ColumnConstraint>> {
         character_set,
         collate,
         srid,
+        generated,
     ))(i)
 }
 
