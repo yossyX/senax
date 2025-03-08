@@ -374,10 +374,16 @@ pub fn make_table_def(
             let _ = write!(output, "{},", v.name);
             output
         });
-        if !config.disable_relation_index && !idx_check.contains(&check) {
-            table
-                .indexes
-                .insert(index_name.clone(), TableKey::Key(index_name, cols));
+        if !config.disable_relation_index {
+            if idx_check.contains(&check) {
+                table
+                    .indexes
+                    .insert(index_name.clone(), TableKey::Key(index_name, vec![]));
+            } else {
+                table
+                    .indexes
+                    .insert(index_name.clone(), TableKey::Key(index_name, cols));
+            }
         }
         if !def.ignore_foreign_key() {
             table.constraints.insert(
@@ -425,10 +431,16 @@ pub fn make_table_def(
             let _ = write!(output, "{},", v.name);
             output
         });
-        if !config.disable_relation_index && !idx_check.contains(&check) {
-            table
-                .indexes
-                .insert(index_name.clone(), TableKey::Key(index_name, cols));
+        if !config.disable_relation_index {
+            if idx_check.contains(&check) {
+                table
+                    .indexes
+                    .insert(index_name.clone(), TableKey::Key(index_name, vec![]));
+            } else {
+                table
+                    .indexes
+                    .insert(index_name.clone(), TableKey::Key(index_name, cols));
+            }
         }
     }
     Ok((table_name, table))
@@ -607,7 +619,7 @@ fn make_ddl(
             }
             for (name, index) in &new_table.indexes {
                 if let Some(old_index) = old_table.indexes.get(name) {
-                    if old_index != index {
+                    if old_index != index && !matches!(index, TableKey::Key(_, x) if x.is_empty()) {
                         // fix indexes
                         writeln!(
                             &mut result,
@@ -808,7 +820,7 @@ fn make_ddl(
             }
             for (name, index) in &new_table.indexes {
                 if let Some(old_index) = old_table.indexes.get(name) {
-                    if old_index != index {
+                    if old_index != index && !matches!(index, TableKey::Key(_, x) if x.is_empty()) {
                         // fix indexes
                         if !name.starts_with("IDX_FK_") {
                             history
@@ -825,7 +837,7 @@ fn make_ddl(
                             index
                         )?;
                     }
-                } else {
+                } else if !matches!(index, TableKey::Key(_, x) if x.is_empty()) {
                     // add indexes
                     if !name.starts_with("IDX_FK_") {
                         history
