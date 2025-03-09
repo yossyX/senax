@@ -11,6 +11,7 @@ pub struct Column {
     pub name: String,
     pub query: Option<String>,
     pub len: Option<u32>,
+    pub desc: bool,
 }
 
 impl PartialEq for Column {
@@ -20,7 +21,7 @@ impl PartialEq for Column {
         } else if self.query.is_some() || other.query.is_some() {
             false
         } else {
-            self.name == other.name && self.len == other.len
+            self.name == other.name && self.len == other.len && self.desc == other.desc
         }
     }
 }
@@ -34,6 +35,9 @@ impl fmt::Display for Column {
             if let Some(ref len) = self.len {
                 write!(f, "({})", len)?;
             }
+        }
+        if self.desc {
+            write!(f, " DESC")?;
         }
         Ok(())
     }

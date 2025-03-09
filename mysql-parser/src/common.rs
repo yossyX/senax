@@ -679,6 +679,7 @@ pub fn column_identifier_no_alias(i: &[u8]) -> IResult<&[u8], Column> {
             name: str::from_utf8(column).unwrap().to_string(),
             query: None,
             len: len.map(|l| u32::from_str(str::from_utf8(l).unwrap()).unwrap()),
+            desc: false,
         },
     ))
 }
@@ -691,6 +692,7 @@ pub fn column_identifier_query(i: &[u8]) -> IResult<&[u8], Column> {
             name: "".to_string(),
             query: Some(str::from_utf8(query).unwrap().to_string()),
             len: None,
+            desc: false,
         },
     ))
 }

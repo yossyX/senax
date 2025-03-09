@@ -64,14 +64,14 @@ impl fmt::Display for CreateTableStatement {
 
 // MySQL grammar element for index column definition (§13.1.18, index_col_name)
 pub fn index_col_name(i: &[u8]) -> IResult<&[u8], (Column, Option<OrderType>)> {
-    let (remaining_input, (column, order)) = tuple((
+    let (remaining_input, (mut column, order)) = tuple((
         terminated(
             alt((column_identifier_no_alias, column_identifier_query)),
             multispace0,
         ),
         opt(order_type),
     ))(i)?;
-
+    column.desc = order == Some(OrderType::OrderDescending);
     Ok((remaining_input, (column, order)))
 }
 
