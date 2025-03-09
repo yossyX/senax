@@ -49,7 +49,7 @@ pub enum ColumnConstraint {
     PrimaryKey,
     Unique,
     Srid(u32),
-    Generated(String),
+    Generated(String, bool),
 }
 
 impl fmt::Display for ColumnConstraint {
@@ -67,8 +67,13 @@ impl fmt::Display for ColumnConstraint {
             ColumnConstraint::Srid(srid) => {
                 write!(f, "/*!80003 SRID {} */", srid)
             }
-            ColumnConstraint::Generated(query) => {
-                write!(f, "GENERATED ALWAYS AS ({}) VIRTUAL", query)
+            ColumnConstraint::Generated(query, stored) => {
+                write!(
+                    f,
+                    "GENERATED ALWAYS AS ({}) {}",
+                    query,
+                    if *stored { "STORED" } else { "VIRTUAL" }
+                )
             }
         }
     }

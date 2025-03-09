@@ -392,12 +392,13 @@ pub fn column_constraint(i: &[u8]) -> IResult<&[u8], Option<ColumnConstraint>> {
             take_until_unbalanced('(', ')'),
             tag(")"),
             multispace1,
-            tag_no_case("VIRTUAL"),
+            alt((tag_no_case("VIRTUAL"), tag_no_case("STORED"))),
             multispace0,
         )),
         |t| {
             let query = str::from_utf8(t.4).unwrap().to_owned();
-            Some(ColumnConstraint::Generated(query))
+            let stored = str::from_utf8(t.7).unwrap().eq_ignore_ascii_case("STORED");
+            Some(ColumnConstraint::Generated(query, stored))
         },
     );
 
