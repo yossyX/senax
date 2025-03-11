@@ -64,7 +64,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     fn {var}(&self) -> {domain_outer} {
         _Getter_::_{raw_var}(self)
     }", "") }@
-@{- parent.cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- parent.cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         _Getter_::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -79,7 +79,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     fn {var}(&self) -> {domain_outer} {
         _Cache_::_{raw_var}(self)
     }", "") }@
-@{- parent.cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- parent.cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         _Cache_::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -94,7 +94,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     fn {var}(&self) -> {domain_outer} {
         self._data.{var}
     }", "") }@
-@{- parent.cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- parent.cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
@@ -136,7 +136,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
 }
 @%- endif %@
 impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@ for _@{ pascal_name }@ {
-@{- parent.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- parent.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         _Getter_::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -157,11 +157,11 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
 }
 #[allow(clippy::useless_conversion)]
 impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@UpdaterBase for _@{ pascal_name }@Updater {
-@{- parent.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- parent.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
-@{- parent.non_primaries_wo_read_only(true)|fmt_join("
+@{- parent.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         _Updater_::mut_{raw_var}(self).set(v{convert_domain_inner_type})
     }", "") }@
@@ -221,7 +221,7 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@ {
     fn {var}(&self) -> {domain_outer} {
         _Getter_::_{raw_var}(self)
     }", "") }@
-@{- def.cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         _Getter_::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -237,7 +237,7 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@Cache {
     fn {var}(&self) -> {domain_outer} {
         _Cache_::_{raw_var}(self)
     }", "") }@
-@{- def.cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         _Cache_::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -253,7 +253,7 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@Updater {
     fn {var}(&self) -> {domain_outer} {
         self._data.{var}
     }", "") }@
-@{- def.cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
@@ -287,7 +287,7 @@ impl @{ pascal_name }@Cache for _@{ pascal_name }@Cache {
     fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}>>> {
         Ok(_Cache_::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_var}::{class}>))
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>>> {
         Ok(_Cache_::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>))
@@ -296,7 +296,7 @@ impl @{ pascal_name }@Cache for _@{ pascal_name }@Cache {
 @%- endif %@
 
 impl @{ pascal_name }@ for _@{ pascal_name }@ {
-@{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         _Getter_::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -310,7 +310,7 @@ impl @{ pascal_name }@ for _@{ pascal_name }@ {
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_var}::{class}> + '_>> {
         Ok(Box::new(_Getter_::_{raw_rel_name}(self)?.iter().map(|v| v as &dyn _model_::{class_mod_var}::{class})))
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{raw_db}_model_::{class_mod_var}::{class}>> {
         Ok(_Getter_::_{raw_rel_name}(self)?.map(|v| v as &dyn _{raw_db}_model_::{class_mod_var}::{class}))
@@ -319,11 +319,11 @@ impl @{ pascal_name }@ for _@{ pascal_name }@ {
 
 #[allow(clippy::useless_conversion)]
 impl @{ pascal_name }@UpdaterBase for _@{ pascal_name }@Updater {
-@{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
-@{- def.non_primaries_wo_read_only(true)|fmt_join("
+@{- def.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         _Updater_::mut_{raw_var}(self).set(v{convert_domain_inner_type})
     }", "") }@

@@ -1611,7 +1611,7 @@ async fn check_connection(
                                     pools.retain(|_, (_, w)| *w != Some(true));
                                 }
                                 let pool = Arc::new(PoolInfo {
-                                    addr: addr.clone(),
+                                    addr,
                                     target,
                                     inner: pool,
                                 });
@@ -1918,7 +1918,7 @@ async fn reset_reader_pool(
                                 log::info!("add connection for {}: {}", target, addr);
                                 let mut pools = pool_collection.get().unwrap()[idx].write().await;
                                 let pool = Arc::new(PoolInfo {
-                                    addr: addr.clone(),
+                                    addr,
                                     target,
                                     inner: pool,
                                 });
@@ -1931,7 +1931,7 @@ async fn reset_reader_pool(
                     }
                 }
                 let mut pools = pool_collection.get().unwrap()[idx].write().await;
-                *removals_lock = pools.clone();
+                removals_lock.clone_from(&pools);
                 removals_lock.retain(|k, _| !new_addrs.contains(k));
                 pools.retain(|k, _| new_addrs.contains(k));
                 let has_readable = pools.iter().any(|(_, v)| v.1 == Some(false));

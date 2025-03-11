@@ -1304,7 +1304,7 @@ async fn _handle_delayed_msg_save(shard_id: ShardId) {
 @%- if def.has_delayed_update() %@
 
 fn aggregate_update(x: &_@{ pascal_name }@Updater, old: &mut _@{ pascal_name }@Updater) {
-    @{- def.non_primaries()|fmt_join("
+    @{- def.non_primaries_wo_read_only()|fmt_join("
     Accessor{accessor_with_sep_type}::_set(x._op.{var}, &mut old._update.{var}, &x._update.{var});", "") }@
 }
 @%- endif %@
@@ -1844,7 +1844,7 @@ pub@{ visibility }@ struct _@{ pascal_name }@ {
 @{ def.relations_one(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 @{ def.relations_many(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Vec<rel_{class_mod}::{class}>>,\n", "") -}@
 @{ def.relations_belonging(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
-@{ def.relations_belonging_outer_db()|fmt_rel_outer_db_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, strum::Display, EnumMessage, EnumString, IntoStaticStr, strum_macros::EnumIter, strum_macros::EnumProperty)]
@@ -1874,7 +1874,7 @@ pub@{ visibility }@ struct _@{ pascal_name }@Cache {
 @{ def.relations_many_uncached(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Vec<rel_{class_mod}::{class}>>,\n", "") -}@
 @{ def.relations_belonging_cache(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}Cache>>>,\n", "") -}@
 @{ def.relations_belonging_uncached(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
-@{ def.relations_belonging_outer_db()|fmt_rel_outer_db_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -2004,7 +2004,7 @@ pub@{ visibility }@ struct _@{ pascal_name }@Updater {
 @{ def.relations_one(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Vec<rel_{class_mod}::{class}Updater>>,\n", "") -}@
 @{ def.relations_many(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Vec<rel_{class_mod}::{class}Updater>>,\n", "") -}@
 @{ def.relations_belonging(false)|fmt_rel_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
-@{ def.relations_belonging_outer_db()|fmt_rel_outer_db_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("    pub(crate) {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 type _Updater_ = _@{ pascal_name }@Updater;
 @%- if !config.excluded_from_domain %@
@@ -2026,7 +2026,7 @@ impl From<domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name 
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -2081,7 +2081,7 @@ pub@{ visibility }@ trait _@{ pascal_name }@Getter: Send + Sync + 'static {
 ", "") -}@
 @{ def.relations_many(false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>>;
 ", "") -}@
-@{ def.relations_belonging_outer_db()|fmt_rel_outer_db_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
+@{ def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
 ", "") -}@
 }
 
@@ -2117,7 +2117,7 @@ impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
 }
 @%- endif %@
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_belonging_outer_db() %@
+@%- for (model, rel_name, rel) in def.relations_belonging_outer_db(false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn cols() -> &'static str {
@@ -2564,7 +2564,7 @@ pub@{ visibility }@ trait _@{ pascal_name }@Joiner {
             if joiner.{rel_name}.is_some() {
                 self.join_{raw_rel_name}(conn, joiner.{rel_name}).await?;
             }", "") }@
-            @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
             if joiner.{rel_name}.is_some() {
                 self.join_{raw_rel_name}(conn, joiner.{rel_name}).await?;
             }", "") }@
@@ -2575,7 +2575,7 @@ pub@{ visibility }@ trait _@{ pascal_name }@Joiner {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()>;", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()>;", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()>;", "") }@
 }
 
@@ -2599,7 +2599,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.{rel_name}.is_some() {
             return Ok(());
@@ -2670,7 +2670,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.{rel_name}.is_some() {
             return Ok(());
@@ -2783,7 +2783,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.{rel_name}.is_some() {
             return Ok(());
@@ -2886,7 +2886,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
@@ -2986,7 +2986,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
@@ -3271,7 +3271,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
 @%- endif %@
 @%- endif %@
 @%- if config.excluded_from_domain %@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
 
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -3309,7 +3309,7 @@ impl ColTr for Col_ {
 #[derive(Clone, Debug)]
 pub@{ visibility }@ enum ColOne_ {
 @{ def.all_fields_without_json()|fmt_join("    {var}({filter_type}),", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(_@{ pascal_name }@Index_@{ index_name }@),
 @%- endfor %@
 }
@@ -3321,7 +3321,7 @@ impl BindTr for ColOne_ {
     fn name(&self) -> &'static str {
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(_) => r#\"{col_esc}\"#,", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => r#"(@{ index.join_fields(def, "{col_esc}", ", ") }@)"#,
 @%- endfor %@
             _ => unreachable!(),
@@ -3330,7 +3330,7 @@ impl BindTr for ColOne_ {
     fn placeholder(&self) -> &'static str {
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(_) => \"{placeholder}\",", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "(@{ index.join_fields(def, "{placeholder}", ", ") }@)",
 @%- endfor %@
             _ => "?",
@@ -3343,7 +3343,7 @@ impl BindTr for ColOne_ {
         debug!("bind: {:?}", &self);
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(v) => query.bind(v{bind_as_for_filter}),", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(v) => query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@,
 @%- endfor %@
             _ => unreachable!(),
@@ -3356,7 +3356,7 @@ impl BindTr for ColOne_ {
         debug!("bind: {:?}", &self);
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(v) => query.bind(v{bind_as_for_filter}),", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(v) => query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@,
 @%- endfor %@
             _ => unreachable!(),
@@ -3430,7 +3430,7 @@ impl HashVal for VecColKey {
 #[derive(Clone, Debug)]
 pub@{ visibility }@ enum ColMany_ {
 @{ def.all_fields_without_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(Vec<_@{ pascal_name }@Index_@{ index_name }@>),
 @%- endfor %@
 }
@@ -3442,7 +3442,7 @@ impl BindTr for ColMany_ {
     fn name(&self) -> &'static str {
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColMany_::{var}(_) => r#\"{col_esc}\"#,", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_v) => r#"(@{ index.join_fields(def, "{col_esc}", ", ") }@)"#,
 @%- endfor %@
             _ => unreachable!(),
@@ -3451,7 +3451,7 @@ impl BindTr for ColMany_ {
     fn placeholder(&self) -> &'static str {
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColMany_::{var}(_) => \"{placeholder}\",", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_v) => "(@{ index.join_fields(def, "{placeholder}", ", ") }@)",
 @%- endfor %@
             _ => "?",
@@ -3460,7 +3460,7 @@ impl BindTr for ColMany_ {
     fn len(&self) -> usize {
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColMany_::{var}(v) => v.len(),", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(v) => v.len(),
 @%- endfor %@
             _ => unreachable!(),
@@ -3474,7 +3474,7 @@ impl BindTr for ColMany_ {
         // To improve build speed, do not use fold.
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColMany_::{var}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(v) => {for v in v { query = query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@; } query},
 @%- endfor %@
             _ => unreachable!(),
@@ -3487,7 +3487,7 @@ impl BindTr for ColMany_ {
         debug!("bind: {:?}", &self);
         match self {
 @{ def.all_fields_without_json()|fmt_join("            ColMany_::{var}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(v) => {for v in v { query = query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@; } query},
 @%- endfor %@
             _ => unreachable!(),
@@ -3704,24 +3704,24 @@ pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_
 impl ColRelTr for ColRel_ {
     #[allow(unused_mut)]
     #[allow(clippy::ptr_arg)]
-    fn write_rel(&self, buf: &mut String, idx: usize, without_key: bool, shard_id: ShardId) {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db().len() > 0 %@
+    fn write_rel(&self, buf: &mut String, idx: usize, without_key: bool, shard_id: ShardId, is_outer: bool) {
+@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db(false).len() > 0 %@
         match self {
 @{- def.relations_belonging(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
-                rel_{class_mod}::write_belonging_rel(buf, c, RelCol{rel_name_pascal}::cols_with_idx(idx), idx, without_key, shard_id, false);
+                rel_{class_mod}::write_belonging_rel(buf, c, RelCol{rel_name_pascal}::cols_with_idx(idx), idx, without_key, shard_id, is_outer);
             }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(c) => {
                 rel_{class_mod}::write_belonging_rel(buf, c, RelCol{rel_name_pascal}::cols_with_idx(idx), idx, without_key, shard_id, true);
             }", "") }@
 @{- def.relations_one(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
-                rel_{class_mod}::write_having_rel(buf, c, RelCol{rel_name_pascal}::cols(), Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren(), idx, without_key, shard_id);
+                rel_{class_mod}::write_having_rel(buf, c, RelCol{rel_name_pascal}::cols(), Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren(), idx, without_key, shard_id, is_outer);
             }", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
-                rel_{class_mod}::write_having_rel(buf, c, RelCol{rel_name_pascal}::cols(), Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren(), idx, without_key, shard_id);
+                rel_{class_mod}::write_having_rel(buf, c, RelCol{rel_name_pascal}::cols(), Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren(), idx, without_key, shard_id, is_outer);
             }", "") }@
         };
 @%- endif %@
@@ -3729,13 +3729,13 @@ impl ColRelTr for ColRel_ {
     #[allow(unused_mut)]
     #[allow(clippy::ptr_arg)]
     fn write_key(&self, buf: &mut String) {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db().len() > 0 %@
+@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db(false).len() > 0 %@
         match self {
 @{- def.relations_belonging(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 buf.push_str(RelCol{rel_name_pascal}::cols());
             }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(c) => {
                 buf.push_str(RelCol{rel_name_pascal}::cols());
             }", "") }@
@@ -3754,13 +3754,13 @@ impl ColRelTr for ColRel_ {
         self,
         query: QueryAs<'_, DbType, T, DbArguments>,
     ) -> QueryAs<'_, DbType, T, DbArguments> {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db().len() > 0 %@
+@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db(false).len() > 0 %@
         match self {
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 rel_{class_mod}::bind_for_rel_query_as(c, query)
             }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(c) => {
                 rel_{class_mod}::bind_for_rel_query_as(c, query)
             }", "") }@
@@ -3777,13 +3777,13 @@ impl ColRelTr for ColRel_ {
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db().len() > 0 %@
+@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db(false).len() > 0 %@
         match self {
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 rel_{class_mod}::bind_for_rel_query(c, query)
             }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(c) => {
                 rel_{class_mod}::bind_for_rel_query(c, query)
             }", "") }@
@@ -3811,7 +3811,7 @@ pub fn write_belonging_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols
     }
     let mut trash_mode = TrashMode::Not;
     if let Some(filter) = filter {
-        filter.write(buf, idx + 1, &mut trash_mode, shard_id);
+        filter.write(buf, idx + 1, &mut trash_mode, shard_id, is_outer);
     }
     if trash_mode == TrashMode::Not {
         buf.push_str(NOT_TRASHED_SQL)
@@ -3828,15 +3828,20 @@ pub fn write_belonging_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols
     }
 }
 
-pub fn write_having_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols1: &str, cols2: String, cols3: &str, idx: usize, without_key: bool, shard_id: ShardId) {
-    if without_key {
-        write!(buf, r#"SELECT {} FROM @{ table_name|db_esc }@ as _t{} WHERE "#, cols1, idx + 1).unwrap();
+pub fn write_having_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols1: &str, cols2: String, cols3: &str, idx: usize, without_key: bool, shard_id: ShardId, is_outer: bool) {
+    let db = if is_outer {
+        DbConn::real_db_name(shard_id)
     } else {
-        write!(buf, r#"SELECT /*+ NO_SEMIJOIN() */ * FROM @{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, cols2, cols3).unwrap();
+        ""
+    };
+    if without_key {
+        write!(buf, r#"SELECT {} FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, cols1, idx + 1).unwrap();
+    } else {
+        write!(buf, r#"SELECT /*+ NO_SEMIJOIN() */ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, cols2, cols3).unwrap();
     }
     let mut trash_mode = TrashMode::Not;
     if let Some(filter) = filter {
-        filter.write(buf, idx + 1, &mut trash_mode, shard_id);
+        filter.write(buf, idx + 1, &mut trash_mode, shard_id, is_outer);
     }
     if trash_mode == TrashMode::Not {
         buf.push_str(NOT_TRASHED_SQL)
@@ -4070,7 +4075,7 @@ pub@{ visibility }@ use @{ filter_macro_name }@_rel as filter_rel;
 @% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
 macro_rules! @{ filter_macro_name }@ {
     () => (@{ model_path }@::Filter_::new_and());
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
     ((@{ index.join_fields(def, "{name}", ", ") }@) = (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Eq(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
     ((@{ index.join_fields(def, "{name}", ", ") }@) > (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
     ((@{ index.join_fields(def, "{name}", ", ") }@) >= (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
@@ -4591,7 +4596,7 @@ impl QueryBuilder {
         }
         @%- endif %@
         let mut vec: Vec<String> = Vec::new();
-        @{- def.non_primaries()|fmt_join_cache_or_not("
+        @{- def.non_primaries_wo_read_only()|fmt_join_cache_or_not("
         assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "
         assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         let mut sql = format!(
@@ -4618,7 +4623,7 @@ impl QueryBuilder {
         }
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        @{- def.non_primaries()|fmt_join("
+        @{- def.non_primaries_wo_read_only()|fmt_join("
         for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{var}{bind_as});
         }","") }@
@@ -4928,7 +4933,7 @@ impl @{ id_name }@ {
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 @%- endif %@
@@ -5176,7 +5181,7 @@ impl _@{ pascal_name }@Getter for _@{ pascal_name }@ {
     fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
         self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")
     }", "") }@
-    @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+    @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
@@ -5302,7 +5307,7 @@ impl _@{ pascal_name }@Cache {
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
     }", "") }@
-    @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+    @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
     }", "") }@
@@ -5417,7 +5422,7 @@ impl Updater for _@{ pascal_name }@Updater {
     fn is_updated(&self) -> bool {
         false
         @%- if !def.disable_update() %@
-        @{- def.non_primaries()|fmt_join("
+        @{- def.non_primaries_wo_read_only()|fmt_join("
         || self._op.{var} != Op::None && self._op.{var} != Op::Skip", "") }@
         @%- endif %@
     }
@@ -5452,7 +5457,7 @@ impl _@{ pascal_name }@Updater {
             _phantom: Default::default(),
         }
     }", "") }@
-@{- def.non_primaries()|fmt_join("
+@{- def.non_primaries_wo_read_only()|fmt_join("
 {label}{comment}    pub fn mut_{raw_var}(&mut self) -> Accessor{accessor_with_type} {
         Accessor{accessor} {
             op: &mut self._op.{var},
@@ -5479,7 +5484,7 @@ impl _@{ pascal_name }@Updater {
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
@@ -5605,7 +5610,7 @@ impl From<Data> for _@{ pascal_name }@ {
             _inner,
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -5622,7 +5627,7 @@ impl From<Data> for _@{ pascal_name }@Updater {
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -5638,7 +5643,7 @@ impl From<Arc<CacheWrapper>> for _@{ pascal_name }@Cache {
 @{- def.relations_many_uncached(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging_uncached(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -5683,7 +5688,7 @@ impl Serialize for _@{ pascal_name }@ {
         if self.{rel_name}.is_some() {
             len += 1;
         }", "") }@
-        @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+        @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
         if self.{rel_name}.is_some() {
             len += 1;
         }", "") }@
@@ -5698,7 +5703,7 @@ impl Serialize for _@{ pascal_name }@ {
         if self.{rel_name}.is_some() {
             state.serialize_field(\"{rel_name}\", &self.{rel_name})?;
         }", "") }@
-        @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+        @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
         if self.{rel_name}.is_some() {
             state.serialize_field(\"{rel_name}\", &self.{rel_name})?;
         }", "") }@
@@ -5747,7 +5752,7 @@ impl _@{ pascal_name }@ {
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 
@@ -5771,7 +5776,7 @@ impl _@{ pascal_name }@ {
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 @%- for parent in def.downcast_aggregation() %@
@@ -5786,7 +5791,7 @@ impl _@{ pascal_name }@ {
                 },
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("\n                {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n                {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n                {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n                {rel_name}: None,", "") }@
             })
         } else {
             None
@@ -5804,7 +5809,7 @@ impl _@{ pascal_name }@ {
             },
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 @%- endfor %@
@@ -6759,9 +6764,9 @@ impl _@{ pascal_name }@ {
     #[allow(clippy::unnecessary_cast)]
     async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, replace: bool) -> Result<(_@{ pascal_name }@, CacheOp)> {
         let sql = if replace {
-            r#"REPLACE INTO @{ table_name|db_esc }@ (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields()|fmt_join("{placeholder}", ",") }@)"#
+            r#"REPLACE INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#
         } else {
-            r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields()|fmt_join("{placeholder}", ",") }@)"#
+            r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#
         };
         let query = bind_to_query(sql, &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
@@ -6814,7 +6819,7 @@ impl _@{ pascal_name }@ {
         let mut update_cache = false; // To distinguish from updates that do not require cache updates
         if obj.is_updated() {
             let mut vec: Vec<String> = Vec::new();
-            @{- def.non_primaries_wo_read_only(false)|fmt_join_cache_or_not("
+            @{- def.non_primaries_wo_invisibles_and_read_only(false)|fmt_join_cache_or_not("
             assign_sql!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, update_cache, \"{placeholder}\");", "
             assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
             @%- if def.versioned %@
@@ -6830,7 +6835,7 @@ impl _@{ pascal_name }@ {
             @%- endif %@
             let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-            @{- def.non_primaries_wo_read_only(false)|fmt_join("
+            @{- def.non_primaries_wo_invisibles_and_read_only(false)|fmt_join("
             for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
                 query = query.bind(obj._update.{var}{bind_as});
             }","") }@
@@ -6889,14 +6894,14 @@ impl _@{ pascal_name }@ {
     fn assign_non_primaries(obj: &_@{ pascal_name }@Updater) -> (Vec<String>, bool) {
         let mut update_cache = false;
         let mut vec: Vec<String> = Vec::new();
-        @{- def.non_primaries()|fmt_join_cache_or_not("
+        @{- def.non_primaries_wo_read_only()|fmt_join_cache_or_not("
         assign_sql!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, update_cache, \"{placeholder}\");", "
         assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         (vec, update_cache)
     }
 
     fn bind_non_primaries<'a>(obj: &'a _@{ pascal_name }@Updater, mut query: Query<'a, DbType, DbArguments>, _sql: &'a str) -> Query<'a, DbType, DbArguments> {
-        @{- def.non_primaries()|fmt_join("
+        @{- def.non_primaries_wo_read_only()|fmt_join("
         for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{var}{bind_as});
         }","") }@
@@ -6914,8 +6919,8 @@ impl _@{ pascal_name }@ {
         vec.push(r#"\"@{ def.get_counting_col() }@\" = LAST_INSERT_ID(\"@{ def.get_counting_col() }@\")"#.to_string());
         @%- endif %@
         let sql = format!(r#"INSERT INTO @{ table_name|db_esc }@ 
-            (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) 
-            VALUES (@{ def.all_fields()|fmt_join("{placeholder}", ",") }@) ON DUPLICATE KEY UPDATE {}"#, &vec.join(","));
+            (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) 
+            VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@) ON DUPLICATE KEY UPDATE {}"#, &vec.join(","));
         let query = bind_to_query(&sql, &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let query = Self::bind_non_primaries(&obj, query, &sql);
@@ -7094,8 +7099,8 @@ impl _@{ pascal_name }@ {
         obj.__validate()?;
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
-        let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) 
-            VALUES (@{ def.all_fields()|fmt_join("{placeholder}", ",") }@)"#;
+        let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) 
+            VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
         let query = bind_to_query(sql, &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = if conn.wo_tx() {
@@ -7354,8 +7359,8 @@ impl _@{ pascal_name }@ {
             const SQL_NORMAL: &str = r#"INSERT "#; 
             const SQL_IGNORE: &str = r#"INSERT IGNORE "#; 
             const SQL_REPLACE: &str = r#"REPLACE "#; 
-            const SQL1: &str = r#"INTO @{ table_name|db_esc }@ (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) VALUES "#;
-            const SQL2: &str = r#"(@{ def.all_fields()|fmt_join("{placeholder}", ",") }@)"#;
+            const SQL1: &str = r#"INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES "#;
+            const SQL2: &str = r#"(@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
             const SQL3: &str = r#" AS new ON DUPLICATE KEY UPDATE @{ def.non_primaries_without_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@"#;
             let mut sql = String::with_capacity(SQL_IGNORE.len() + SQL1.len() + (SQL2.len() + 1) * list.len() + SQL3.len());
             if ignore {
@@ -7377,7 +7382,7 @@ impl _@{ pascal_name }@ {
             let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for data in list {
-    @{- def.all_fields()|fmt_join("\n                query = query.bind(data._data.{var}{bind_as});", "") }@
+    @{- def.all_fields_wo_read_only()|fmt_join("\n                query = query.bind(data._data.{var}{bind_as});", "") }@
             }
             let result = if conn.wo_tx() {
                 query.execute(conn.acquire_writer().await?.as_mut()).await?
@@ -7497,8 +7502,8 @@ impl _@{ pascal_name }@ {
         if list.is_empty() {
             return Ok(());
         }
-        const SQL1: &str = r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields()|fmt_join("{col_esc}", ",") }@) VALUES "#;
-        const SQL2: &str = r#"(@{ def.all_fields()|fmt_join("{placeholder}", ",") }@)"#;
+        const SQL1: &str = r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES "#;
+        const SQL2: &str = r#"(@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
         let mut sql = String::with_capacity(SQL1.len() + (SQL2.len() + 1) * list.len() + 100);
         sql.push_str(SQL1);
         sql.push_str(SQL2);
@@ -7514,7 +7519,7 @@ impl _@{ pascal_name }@ {
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for data in list {
-@{- def.all_fields()|fmt_join("
+@{- def.all_fields_wo_read_only()|fmt_join("
             query = query.bind(data.{var}{bind_as});", "") }@
             info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "bulk_upsert", ctx = conn.ctx_no(); "{}", &data);
             debug!("{:?}", &data);
@@ -8156,7 +8161,7 @@ impl _@{ pascal_name }@ {
 #[allow(clippy::needless_borrow)]
 fn bind_to_query<'a>(sql: &'a str, data: &'a Data) -> Query<'a, DbType, DbArguments> {
     let mut query = sqlx::query(sql);
-    @{- def.all_fields()|fmt_join("
+    @{- def.all_fields_wo_read_only()|fmt_join("
     query = query.bind(data.{var}{bind_as});", "") }@
     query
 }
@@ -8178,7 +8183,7 @@ impl _@{ pascal_name }@Factory {
 @{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: self.{rel_name}.map(|v| vec![v.create()]),", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: self.{rel_name}.map(|v| v.into_iter().map(|v| v.create()).collect()),", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -8192,7 +8197,7 @@ impl From<_@{ pascal_name }@Updater> for _@{ pascal_name }@ {
         to.{rel_name} = from.{rel_name}.map(|v| v.into_iter().map(|v| v.into()).collect());", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name};", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
         to.{rel_name} = from.{rel_name};", "") }@
         to
     }
@@ -8206,7 +8211,7 @@ impl From<Box<_@{ pascal_name }@Updater>> for Box<_@{ pascal_name }@> {
         to.{rel_name} = from.{rel_name}.map(|v| v.into_iter().map(|v| v.into()).collect());", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name};", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
         to.{rel_name} = from.{rel_name};", "") }@
         Box::new(to)
     }

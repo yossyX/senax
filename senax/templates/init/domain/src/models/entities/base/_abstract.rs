@@ -79,7 +79,7 @@ pub trait @{ pascal_name }@Common: std::fmt::Debug@% if !def.parents().is_empty(
 {label}{comment}    fn _{raw_var}(&self) -> {inner};", "") }@
 @{- def.only_version()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {outer};", "") }@
-@{- def.cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 }
 
@@ -101,7 +101,7 @@ pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common@% if !def.parents().is
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
 pub trait @{ pascal_name }@: @{ pascal_name }@Common@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@@% endfor %@@% endif %@ {
-@{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.relations_belonging(true)|fmt_rel_join("
     fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_var}::{class}Primary> {
@@ -116,9 +116,9 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common@% if !def.parents().is_empt
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
 pub trait @{ pascal_name }@UpdaterBase: @{ pascal_name }@Common + crate::models::MarkForDelete@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater@% endfor %@@% endif %@ {
-@{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
-@{- def.non_primaries_wo_read_only(true)|fmt_join("
+@{- def.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>>;

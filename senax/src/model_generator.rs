@@ -337,12 +337,14 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 let force_index = if config.disable_force_index_on_limit {
                     String::new()
                 } else {
+                    use senax_mysql_parser::common::TableKey;
                     let (_table_name, table_def) =
                         crate::migration_generator::make_table_def(def, &config)?;
                     let mut indexes: Vec<_> = table_def
                         .indexes
-                        .keys()
-                        .map(|v| template::filters::_to_db_col(v, true))
+                        .iter()
+                        .filter(|(_, index)| !matches!(index, TableKey::Key(_, x) if x.is_empty()))
+                        .map(|v| template::filters::_to_db_col(v.0, true))
                         .collect();
                     if indexes.is_empty() {
                         String::new()

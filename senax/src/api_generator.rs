@@ -28,9 +28,9 @@ pub mod template;
 #[allow(clippy::too_many_arguments)]
 pub fn generate(
     server_path: &Path,
-    db_path: &str,
-    group_path: &Option<String>,
-    model_path: &Option<String>,
+    db_route: &str,
+    group_route: &Option<String>,
+    model_route: &Option<String>,
     ts_dir: &Option<PathBuf>,
     inquiry: bool,
     force: bool,
@@ -42,12 +42,12 @@ pub fn generate(
     );
 
     let schema_dir = server_path.join(API_SCHEMA_PATH);
-    let db_config_path = schema_dir.join(format!("{db_path}.yml"));
+    let db_config_path = schema_dir.join(format!("{db_route}.yml"));
     let db = if db_config_path.exists() {
         let db_config: ApiDbDef = parse_yml_file(&db_config_path)?;
-        db_config.db.clone().unwrap_or(db_path.to_string())
+        db_config.db.clone().unwrap_or(db_route.to_string())
     } else {
-        db_path.to_string()
+        db_route.to_string()
     };
 
     model_generator::check_version(&db)?;
@@ -79,7 +79,7 @@ pub fn generate(
     let file_path = src_path.join("auto_api.rs");
     let mut content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
-    let db_var_name = _to_var_name(&db_path.to_case(Case::Snake));
+    let db_var_name = _to_var_name(&db_route.to_case(Case::Snake));
     let reg = Regex::new(&format!(r"pub mod {};", db_var_name))?;
     if !reg.is_match(&content) {
         content = content.replace(
@@ -93,21 +93,21 @@ pub fn generate(
             "// Do not modify this line. (ApiRouteConfig)",
             &format!(
                 "cfg.service(scope(\"/{}\").configure({}::route_config));\n    // Do not modify this line. (ApiRouteConfig)",
-                &db_path,
+                &db_route,
                 db_var_name,
             ),
         );
         content = content.replace(
             "    // Do not modify this line. (ApiJsonSchema)",
-            &format!("    {}::gen_json_schema(&dir.join(\"{}\"))?;\n    // Do not modify this line. (ApiJsonSchema)", db_var_name, &db_path.to_case(Case::Snake)),
+            &format!("    {}::gen_json_schema(&dir.join(\"{}\"))?;\n    // Do not modify this line. (ApiJsonSchema)", db_var_name, &db_route.to_case(Case::Snake)),
         );
         let tpl = QueryRootTemplate {
-            db_path,
+            db_route,
             camel_case: db_config.camel_case(),
         };
         content = content.replace("impl QueryRoot {", tpl.render()?.trim_start());
         let tpl = MutationRootTemplate {
-            db_path,
+            db_route,
             camel_case: db_config.camel_case(),
         };
         content = content.replace("impl MutationRoot {", tpl.render()?.trim_start());
@@ -167,7 +167,7 @@ pub fn generate(
 
     fs_write(file_path, &*content)?;
 
-    let schema_dir = schema_dir.join(db_path);
+    let schema_dir = schema_dir.join(db_route);
     fs::create_dir_all(&schema_dir)?;
 
     let ts_dir = if let Some(ts_dir) = ts_dir {
@@ -176,7 +176,7 @@ pub fn generate(
                 ts_dir
                     .join("src")
                     .join("gql_query")
-                    .join(db_path.to_case(Case::Snake)),
+                    .join(db_route.to_case(Case::Snake)),
             )
         } else {
             eprintln!("The ts-dir directory does not exist.: {}", ts_dir.display());
@@ -191,7 +191,7 @@ pub fn generate(
         }
     }
 
-    let group_paths = if let Some(group) = group_path {
+    let group_routes = if let Some(group) = group_route {
         vec![group.clone()]
     } else if db_config.groups.is_empty() {
         groups
@@ -204,7 +204,7 @@ pub fn generate(
     };
     let base_path = src_path.join("auto_api");
     let mut db_file_group_names = Vec::new();
-    let db_base_path = base_path.join(db_path.to_case(Case::Snake));
+    let db_base_path = base_path.join(db_route.to_case(Case::Snake));
     let mut remove_files = HashSet::new();
     if clean && db_base_path.exists() {
         for entry in glob::glob(&format!("{}/**/*.rs", db_base_path.display()))? {
@@ -215,8 +215,8 @@ pub fn generate(
         }
     }
     fs::create_dir_all(&db_base_path)?;
-    for group_path in &group_paths {
-        let schema_path = schema_dir.join(&format!("{group_path}.yml"));
+    for group_route in &group_routes {
+        let schema_path = schema_dir.join(&format!("{group_route}.yml"));
         let mut api_model_map: IndexMap<String, Option<ApiModelDef>> = if schema_path.exists() {
             parse_yml_file(&schema_path)?
         } else {
@@ -229,19 +229,19 @@ pub fn generate(
         }
         let mut update_group_def = false;
 
-        let group_name = if let Some(Some(api_group_def)) = db_config.groups.get(group_path) {
-            api_group_def.group.as_ref().unwrap_or(group_path)
+        let group_name = if let Some(Some(api_group_def)) = db_config.groups.get(group_route) {
+            api_group_def.group.as_ref().unwrap_or(group_route)
         } else {
-            group_path
+            group_route
         };
         let group = groups
             .get(group_name)
             .unwrap_or_else(|| panic!("The {db} DB does not have {group_name} group."));
-        let group_path_mod_name = group_path.to_case(Case::Snake);
+        let group_route_mod_name = group_route.to_case(Case::Snake);
         let group_mod_name = group_name.to_case(Case::Snake);
 
-        let model_paths = if let Some(model_path) = model_path {
-            vec![model_path.clone()]
+        let model_routes = if let Some(route) = model_route {
+            vec![route.clone()]
         } else if inquiry {
             group
                 .iter()
@@ -251,38 +251,37 @@ pub fn generate(
         } else {
             api_model_map.iter().map(|(v, _)| v.clone()).collect()
         };
-        // let mut model_path_names = Vec::new();
 
-        for model_path in &model_paths {
-            if api_model_map.get(model_path).is_none()
+        for model_route in &model_routes {
+            if api_model_map.get(model_route).is_none()
                 && inquiry
                 && !dialoguer::Confirm::new()
-                    .with_prompt(format!("Add an API for the {} model?", model_path))
+                    .with_prompt(format!("Add an API for the {} model?", model_route))
                     .default(true)
                     .interact()?
             {
                 continue;
             }
-            let model_name = if let Some(Some(api_model)) = api_model_map.get(model_path) {
-                api_model.model.as_ref().unwrap_or(model_path)
+            let model_name = if let Some(Some(api_model)) = api_model_map.get(model_route) {
+                api_model.model.as_ref().unwrap_or(model_route)
             } else {
-                model_path
+                model_route
             };
             let def = group.get(model_name).unwrap_or_else(|| {
                 panic!("The {group_name} group does not have {model_name} model.")
             });
 
             let api_def = write_model_file(
-                &db_base_path.join(&group_path_mod_name),
+                &db_base_path.join(&group_route_mod_name),
                 &db,
-                db_path,
+                db_route,
                 &group_mod_name,
-                &group_path_mod_name,
+                &group_route_mod_name,
                 model_name,
-                model_path,
+                model_route,
                 def,
                 api_model_map
-                    .get(model_path)
+                    .get(model_route)
                     .cloned()
                     .map(|v| v.unwrap_or_default()),
                 &db_config,
@@ -291,35 +290,34 @@ pub fn generate(
                 &ts_dir,
                 &mut remove_files,
             )?;
-            // model_path_names.push(&def.name);
-            if !api_model_map.contains_key(model_path) {
+            if !api_model_map.contains_key(model_route) {
                 if api_def == ApiModelDef::default() {
-                    api_model_map.insert(model_path.clone(), None);
+                    api_model_map.insert(model_route.clone(), None);
                 } else {
-                    api_model_map.insert(model_path.clone(), Some(api_def));
+                    api_model_map.insert(model_route.clone(), Some(api_def));
                 }
                 update_group_def = true;
             }
         }
-        if !model_paths.is_empty() {
+        if !model_routes.is_empty() {
             write_group_file(
                 &db_base_path,
-                db_path,
-                &group_path_mod_name,
-                &model_paths,
+                db_route,
+                &group_route_mod_name,
+                &model_routes,
                 db_config.camel_case(),
                 force || clean,
                 &mut remove_files,
             )?;
-            db_file_group_names.push(group_path.clone());
+            db_file_group_names.push(group_route.clone());
         }
         if !schema_path.exists() || update_group_def {
             let mut buf = "# yaml-language-server: $schema=../../../senax-schema.json#properties/api_model\n\n".to_string();
             buf.push_str(&simplify_yml(serde_yaml::to_string(&api_model_map)?)?);
             fs_write(schema_path, &buf)?;
         }
-        if !db_config.groups.contains_key(group_path) {
-            db_config.groups.insert(group_path.to_string(), None);
+        if !db_config.groups.contains_key(group_route) {
+            db_config.groups.insert(group_route.to_string(), None);
             let mut buf =
                 "# yaml-language-server: $schema=../../senax-schema.json#definitions/ApiDbDef\n\n"
                     .to_string();
@@ -330,7 +328,7 @@ pub fn generate(
     write_db_file(
         &base_path,
         &db,
-        db_path,
+        db_route,
         &db_file_group_names,
         force || clean,
         &db_config,
@@ -345,15 +343,15 @@ pub fn generate(
 fn write_db_file(
     path: &Path,
     db: &str,
-    db_path: &str,
+    db_route: &str,
     group_names: &[String],
     force: bool,
     config: &ApiDbDef,
 ) -> Result<()> {
     let camel_case = config.camel_case();
-    let file_path = path.join(format!("{}.rs", &db_path.to_case(Case::Snake)));
+    let file_path = path.join(format!("{}.rs", &db_route.to_case(Case::Snake)));
     let content = if force || !file_path.exists() {
-        template::DbTemplate { db, db_path }.render()?
+        template::DbTemplate { db, db_route }.render()?
     } else {
         fs::read_to_string(&file_path)?
     };
@@ -382,7 +380,7 @@ fn write_db_file(
     let tpl = template::DbModTemplate { all, add_groups };
     let content = re.replace(&content, tpl.render()?);
     let tpl = template::DbQueryTemplate {
-        db_path,
+        db_route,
         add_groups,
         camel_case,
     };
@@ -392,7 +390,7 @@ fn write_db_file(
     );
     for group in add_groups {
         let tpl = template::DbMutationTemplate {
-            db_path,
+            db_route,
             name: group,
             camel_case,
         };
@@ -420,17 +418,21 @@ fn write_db_file(
 
 fn write_group_file(
     path: &Path,
-    db: &str,
-    group: &str,
-    model_paths: &[String],
+    db_route: &str,
+    group_route: &str,
+    model_routes: &[String],
     camel_case: bool,
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
-    let file_path = path.join(format!("{}.rs", group));
+    let file_path = path.join(format!("{}.rs", group_route));
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
-        template::GroupTemplate { db, group }.render()?
+        template::GroupTemplate {
+            db: db_route,
+            group: group_route,
+        }
+        .render()?
     } else {
         fs::read_to_string(&file_path)?
     };
@@ -446,7 +448,7 @@ fn write_group_file(
         .filter(|v| !v.is_empty())
         .map(|v| v.to_string())
         .collect();
-    let add_models: BTreeSet<String> = model_paths
+    let add_models: BTreeSet<String> = model_routes
         .iter()
         .filter(|v| !all.contains(*v))
         .map(|v| v.to_string())
@@ -459,8 +461,8 @@ fn write_group_file(
     let tpl = template::GroupModTemplate { all, add_models };
     let mut content = re.replace(&content, tpl.render()?).to_string();
     let tpl = template::GroupImplTemplate {
-        db,
-        group,
+        db: db_route,
+        group: group_route,
         add_models,
         mode: "Query",
         camel_case,
@@ -470,8 +472,8 @@ fn write_group_file(
         &tpl.render()?,
     );
     let tpl = template::GroupImplTemplate {
-        db,
-        group,
+        db: db_route,
+        group: group_route,
         add_models,
         mode: "Mutation",
         camel_case,
@@ -503,11 +505,11 @@ fn write_group_file(
 fn write_model_file(
     path: &Path,
     db: &str,
-    db_path: &str,
+    db_route: &str,
     group: &str,
-    group_path: &str,
+    group_route: &str,
     model_name: &str,
-    model_path: &str,
+    model_route: &str,
     def: &Arc<ModelDef>,
     api_def: Option<ApiModelDef>,
     config: &ApiDbDef,
@@ -532,23 +534,23 @@ fn write_model_file(
 
     let mod_name = def.mod_name();
     let mod_name = &mod_name;
-    let model_path_mod_name = model_path.to_case(Case::Snake);
+    let model_route_mod_name = model_route.to_case(Case::Snake);
     let pascal_name = &model_name.to_case(Case::Pascal);
     let graphql_name = &format!(
         "{}{}{}",
-        db_path.to_case(Case::Pascal),
-        group_path.to_case(Case::Pascal),
-        model_path.to_case(Case::Pascal)
+        db_route.to_case(Case::Pascal),
+        group_route.to_case(Case::Pascal),
+        model_route.to_case(Case::Pascal)
     );
     fs::create_dir_all(path)?;
-    let file_path = path.join(format!("{}.rs", &model_path_mod_name));
+    let file_path = path.join(format!("{}.rs", &model_route_mod_name));
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         template::ModelTemplate {
             db,
-            db_path,
+            db_route,
             group,
-            group_path,
+            group_route,
             mod_name,
             pascal_name: &model_name.to_case(Case::Pascal),
             graphql_name,
@@ -607,31 +609,41 @@ fn write_model_file(
     fs_write(file_path, &*content)?;
 
     if let Some(ts_dir) = ts_dir {
-        let ts_dir = ts_dir.join(group_path);
+        let ts_dir = ts_dir.join(group_route);
         fs::create_dir_all(&ts_dir)?;
         let file_path = ts_dir.join(format!("{}.tsx", model_name));
         use inflector::Inflector;
         let db_case = if config.camel_case() {
-            db_path.to_camel_case()
+            db_route.to_camel_case()
         } else {
-            db_path.to_string()
+            db_route.to_string()
         };
         let group_case = if config.camel_case() {
-            group_path.to_camel_case()
+            group_route.to_camel_case()
         } else {
-            group_path.to_string()
+            group_route.to_string()
         };
         let model_case = if config.camel_case() {
-            model_path.to_camel_case()
+            model_route.to_camel_case()
         } else {
-            model_path.to_string()
+            model_route.to_string()
         };
         let tpl = template::ModelTsTemplate {
-            path: format!("{}_{}_{}", db_path, group_path, model_path),
-            model_path,
+            path: format!(
+                "{}_{}_{}",
+                db_route.to_case(Case::Snake),
+                group_route.to_case(Case::Snake),
+                model_route.to_case(Case::Snake)
+            ),
+            model_route,
             curly_begin: format!("{}{{{}{{{}", db_case, group_case, model_case),
             curly_end: "}}",
-            pascal_name: format!("{}{}{}", &db.to_case(Case::Pascal), &group.to_case(Case::Pascal), &model_name.to_case(Case::Pascal)),
+            pascal_name: format!(
+                "{}{}{}",
+                &db.to_case(Case::Pascal),
+                &group.to_case(Case::Pascal),
+                &model_name.to_case(Case::Pascal)
+            ),
             graphql_name,
             id_name: &to_id_name(model_name),
             def,

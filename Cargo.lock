@@ -3781,7 +3781,7 @@ dependencies = [
 
 [[package]]
 name = "senax"
-version = "0.3.18"
+version = "0.3.19"
 dependencies = [
  "Inflector",
  "anyhow",
@@ -3818,7 +3818,7 @@ dependencies = [
  "schemars",
  "semver",
  "senax-inflector 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "senax-mysql-parser 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "senax-mysql-parser 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -4016,7 +4016,7 @@ dependencies = [
 
 [[package]]
 name = "senax-mysql-parser"
-version = "0.1.4"
+version = "0.1.7"
 dependencies = [
  "derive_more",
  "nom",
@@ -4025,9 +4025,9 @@ dependencies = [
 
 [[package]]
 name = "senax-mysql-parser"
-version = "0.1.4"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d968db3414604716e8db188e8ac38c7d8f41ea76edc6917ca30aead1b4cecee"
+checksum = "bcfbb946b31bfe0500f80b23ea83843170dc4921e2008542021c86a00c4483c3"
 dependencies = [
  "derive_more",
  "nom",

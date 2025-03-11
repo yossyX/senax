@@ -309,9 +309,7 @@ pub fn check_js(script: &str) -> anyhow::Result<()> {
 pub fn read_group_yml(db: &str, group: &str) -> anyhow::Result<IndexMap<String, ModelDef>> {
     crate::common::check_ascii_name(db);
     crate::common::check_ascii_name(group);
-    let path = Path::new(SCHEMA_PATH)
-        .join(db)
-        .join(format!("{group}.yml"));
+    let path = Path::new(SCHEMA_PATH).join(db).join(format!("{group}.yml"));
     if path.exists() {
         parse_yml_file(&path)
     } else {
@@ -329,9 +327,7 @@ pub fn write_group_yml(
     }
     crate::common::check_ascii_name(db);
     crate::common::check_ascii_name(group);
-    let path = Path::new(SCHEMA_PATH)
-        .join(db)
-        .join(format!("{group}.yml"));
+    let path = Path::new(SCHEMA_PATH).join(db).join(format!("{group}.yml"));
     if let Some(bk) = BACKUP.get() {
         if path.exists() {
             let content = fs::read_to_string(&path)?;
@@ -483,4 +479,16 @@ pub fn set_api_config(server: &str) -> anyhow::Result<()> {
         API_CONFIG.write().unwrap().replace(config);
     }
     Ok(())
+}
+
+pub fn hex_digest(v: &str) -> String {
+    use sha2::{Digest, Sha256};
+    use std::fmt::Write;
+    Sha256::digest(v)
+        .iter()
+        .take(4)
+        .fold(String::new(), |mut output, x| {
+            let _ = write!(output, "{:02X}", x);
+            output
+        })
 }

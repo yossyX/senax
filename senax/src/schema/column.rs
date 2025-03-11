@@ -527,6 +527,12 @@ pub struct FieldDef {
     #[schemars(default, schema_with = "default_value_schema")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<serde_yaml::Value>,
+    /// ### Generated Column のクエリ
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    /// ### Generated Column を保存する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stored: Option<bool>,
     /// ### DBのテーブル定義に使用するコメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sql_comment: Option<String>,
@@ -643,6 +649,12 @@ pub struct FieldJson {
     /// ### デフォルト値
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
+    /// ### Generated Column のクエリ
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    /// ### Generated Column を保存する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stored: Option<bool>,
     /// ### DBのテーブル定義に使用するコメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sql_comment: Option<String>,
@@ -722,6 +734,12 @@ pub struct ValueObjectJson {
     /// ### デフォルト値
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
+    /// ### Generated Column のクエリ
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    /// ### Generated Column を保存する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub stored: bool,
     /// ### DBのテーブル定義に使用するコメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sql_comment: Option<String>,
@@ -763,6 +781,8 @@ impl From<FieldDef> for FieldJson {
             column_name: value.column_name,
             srid: value.srid,
             default: value.default.map(|v| yaml_value_to_str(&v).unwrap()),
+            query: value.query,
+            stored: value.stored,
             sql_comment: value.sql_comment,
             hidden: value.hidden,
             secret: value.secret,
@@ -809,6 +829,8 @@ impl From<FieldJson> for FieldDef {
             column_name: value.column_name,
             srid: value.srid,
             default: value.default.map(|v| serde_yaml::from_str(&v).unwrap()),
+            query: value.query,
+            stored: value.stored,
             sql_comment: value.sql_comment,
             hidden: value.hidden,
             secret: value.secret,
@@ -838,6 +860,8 @@ impl From<FieldDef> for ValueObjectJson {
             column_name: value.column_name,
             srid: value.srid,
             default: value.default.map(|v| yaml_value_to_str(&v).unwrap()),
+            query: value.query,
+            stored: value.stored.unwrap_or_default(),
             sql_comment: value.sql_comment,
             hidden: value.hidden.unwrap_or_default(),
             secret: value.secret.unwrap_or_default(),
@@ -884,6 +908,8 @@ impl From<ValueObjectJson> for FieldDef {
             column_name: value.column_name,
             srid: value.srid,
             default: value.default.map(|v| serde_yaml::from_str(&v).unwrap()),
+            query: value.query,
+            stored: Some(value.stored),
             sql_comment: value.sql_comment,
             hidden: Some(value.hidden),
             secret: Some(value.secret),
@@ -926,6 +952,12 @@ impl FieldDef {
         if let Some(default) = org.default {
             self.default = Some(default);
         }
+        if let Some(query) = org.query {
+            self.query = Some(query);
+        }
+        if let Some(stored) = org.stored {
+            self.stored = Some(stored);
+        }
         if let Some(sql_comment) = org.sql_comment {
             self.sql_comment = Some(sql_comment);
         }
@@ -952,9 +984,12 @@ impl FieldDef {
             || self.data_type == DataType::BigInt
     }
     pub fn exclude_from_cache(&self) -> bool {
-        self.exclude_from_cache == Some(true)
+        self.exclude_from_cache == Some(true) || self.query.is_some()
     }
     pub fn skip_factory(&self) -> bool {
+        if self.query.is_some() {
+            return true;
+        }
         if let Some(v) = self.skip_factory {
             return v;
         }
@@ -1083,9 +1118,11 @@ impl FieldDef {
         if let Some(value) = &self.default {
             let result = match self.data_type {
                 DataType::Char | DataType::Varchar => {
-                    format!("{:?}.to_string()", yaml_value_to_str(value).unwrap())
+                    format!("{:?}.to_string().into()", yaml_value_to_str(value).unwrap())
                 }
-                DataType::Text => format!("{:?}.to_string()", yaml_value_to_str(value).unwrap()),
+                DataType::Text => {
+                    format!("{:?}.to_string().into()", yaml_value_to_str(value).unwrap())
+                }
                 DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt
                     if self.enum_values.is_some() =>
                 {
@@ -1207,10 +1244,10 @@ impl FieldDef {
                 )
             }
             _ => {
-                if let Some(ref column_name) = self.column_name {
+                if self.column_name.is_some() || self.query.is_some() {
                     format!(
                         "    #[sql(query = {:?})]\n",
-                        &format!("\"{}\"", column_name)
+                        &format!("\"{}\"", self.get_col_name(name))
                     )
                 } else {
                     "".to_owned()
@@ -2963,6 +3000,9 @@ impl FieldDef {
         typ
     }
     pub fn is_addable(&self) -> bool {
+        if self.query.is_some() {
+            return false;
+        }
         let mut is_num = self.data_type == DataType::TinyInt
             || self.data_type == DataType::SmallInt
             || self.data_type == DataType::Int
@@ -3327,8 +3367,10 @@ impl FieldDef {
     }
 
     pub fn get_col_name<'a>(&'a self, name: &'a str) -> Cow<'a, str> {
-        if let Some(ref column_name) = self.column_name {
+        if let Some(column_name) = &self.column_name {
             column_name.into()
+        } else if let Some(query) = &self.query {
+            format!("{}_{}", name, crate::common::hex_digest(query)).into()
         } else {
             name.into()
         }

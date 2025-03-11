@@ -1,6 +1,6 @@
 [package]
 name = "senax"
-version = "0.3.18"
+version = "0.3.19"
 edition = "2021"
 authors = ["yossyX"]
 license = "MIT OR Apache-2.0"
@@ -44,7 +44,7 @@ rquickjs = { version = "0.4.3", features = ["rust-alloc"], default-features = fa
 schemars = { version = "0.8.10", features = ["indexmap1", "preserve_order"] }
 semver = "1.0.22"
 senax-inflector = "0.1.0"
-senax-mysql-parser = "0.1.4"
+senax-mysql-parser = "=0.1.7"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde_yaml = "0.8"

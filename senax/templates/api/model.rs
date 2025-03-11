@@ -153,7 +153,7 @@ impl GqlQuery@{ graphql_name }@ {
         let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        crate::gql_@{ db_path|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -166,7 +166,7 @@ impl GqlQuery@{ graphql_name }@ {
         let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        crate::gql_@{ db_path|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
     }
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
@@ -309,7 +309,7 @@ impl GqlQuery@{ graphql_name }@ {
                 let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
                 let auth: &AuthInfo = gql_ctx.data()?;
                 let order = order.unwrap_or_default();
-                let (mut list, previous, limit) = crate::gql_@{ db_path|snake }@_selector!(
+                let (mut list, previous, limit) = crate::gql_@{ db_route|snake }@_selector!(
                     _fetch(
                         gql_ctx, &repo, auth, &after, &before, first, last, &filter, order, offset,
                     ),
@@ -389,7 +389,7 @@ impl GqlQuery@{ graphql_name }@ {
             Ok(count)
         }
 
-        crate::gql_@{ db_path|snake }@_count!(_count(&repo, auth, &filter), repo, gql_ctx)
+        crate::gql_@{ db_route|snake }@_count!(_count(&repo, auth, &filter), repo, gql_ctx)
     }
     @%- endfor %@
     @%- endfor %@
@@ -418,7 +418,7 @@ impl GqlMutation@{ graphql_name }@ {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        crate::gql_@{ db_path|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -431,7 +431,7 @@ impl GqlMutation@{ graphql_name }@ {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        crate::gql_@{ db_path|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
     #@
@@ -902,7 +902,7 @@ async fn @{ selector }@_handler(
         }
         @%- endif %@
         let repo = RepositoriesImpl::new_with_ctx(&ctx);
-        let stream = crate::api_@{ db_path|snake }@_selector!(_fetch(&repo, &auth, &data), repo);
+        let stream = crate::api_@{ db_route|snake }@_selector!(_fetch(&repo, &auth, &data), repo);
         let order = data.order.unwrap_or_default();
         let stream = stream.map(move |obj| {
             obj.and_then(|obj| ResObj::try_from_(&*obj, &auth, order.to_cursor(&obj)))
@@ -972,7 +972,7 @@ async fn count_@{ selector }@_handler(
         }
         @%- endif %@
         let repo = RepositoriesImpl::new_with_ctx(&ctx);
-        Ok(crate::api_@{ db_path|snake }@_selector!(_count(&repo, &auth, &filter), repo))
+        Ok(crate::api_@{ db_route|snake }@_selector!(_count(&repo, &auth, &filter), repo))
     }
     .await;
     crate::response::json_response(result, &ctx)

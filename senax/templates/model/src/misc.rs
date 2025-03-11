@@ -64,7 +64,7 @@ pub(crate) trait BindArrayTr {
     ) -> Query<'_, DbType, DbArguments>;
 }
 pub(crate) trait ColRelTr {
-    fn write_rel(&self, buf: &mut String, idx: usize, without_key: bool, shard_id: ShardId);
+    fn write_rel(&self, buf: &mut String, idx: usize, without_key: bool, shard_id: ShardId, is_outer: bool);
     fn write_key(&self, buf: &mut String);
     fn bind_to_query_as<T>(
         self,
@@ -77,7 +77,7 @@ pub(crate) trait FilterTr
 where
     Self: Sized,
 {
-    fn write(&self, buf: &mut String, idx: usize, trash_mode: &mut TrashMode, shard_id: ShardId);
+    fn write(&self, buf: &mut String, idx: usize, trash_mode: &mut TrashMode, shard_id: ShardId, is_outer: bool);
     fn bind_to_query_as<T>(
         self,
         query: sqlx::query::QueryAs<'_, DbType, T, DbArguments>,
@@ -106,7 +106,7 @@ where
 #[rustfmt::skip]
 macro_rules! filter {
     ( $t:ty ) => {
-        fn write(&self, buf: &mut String, idx: usize, trash_mode: &mut TrashMode, shard_id: ShardId) {
+        fn write(&self, buf: &mut String, idx: usize, trash_mode: &mut TrashMode, shard_id: ShardId, is_outer: bool) {
             match self {
                 Filter_::WithTrashed => {
                     *trash_mode = TrashMode::With;
@@ -319,7 +319,7 @@ macro_rules! filter {
                 }
                 Filter_::Not(c) => {
                     buf.push_str("NOT (");
-                    c.write(buf, idx, trash_mode, shard_id);
+                    c.write(buf, idx, trash_mode, shard_id, is_outer);
                     buf.truncate(buf.len() - 5);
                     buf.push_str(") AND ");
                 }
@@ -327,7 +327,7 @@ macro_rules! filter {
                     if !v.is_empty() {
                         buf.push_str("(");
                         for c in v.iter() {
-                            c.write(buf, idx, trash_mode, shard_id);
+                            c.write(buf, idx, trash_mode, shard_id, is_outer);
                         }
                         buf.truncate(buf.len() - 5);
                         buf.push_str(") AND ");
@@ -339,7 +339,7 @@ macro_rules! filter {
                     if !v.is_empty() {
                         buf.push_str("(");
                         for c in v.iter() {
-                            c.write(buf, idx, trash_mode, shard_id);
+                            c.write(buf, idx, trash_mode, shard_id, is_outer);
                             buf.truncate(buf.len() - 5);
                             buf.push_str(" OR ");
                         }
@@ -351,24 +351,24 @@ macro_rules! filter {
                 }
                 Filter_::Exists(c) => {
                     buf.push_str("EXISTS (");
-                    c.write_rel(buf, idx, false, shard_id);
+                    c.write_rel(buf, idx, false, shard_id, is_outer);
                     buf.push_str(") AND ");
                 }
                 Filter_::NotExists(c) => {
                     buf.push_str("NOT EXISTS (");
-                    c.write_rel(buf, idx, false, shard_id);
+                    c.write_rel(buf, idx, false, shard_id, is_outer);
                     buf.push_str(") AND ");
                 }
                 Filter_::EqAny(c) => {
                     c.write_key(buf);
                     buf.push_str(" = ANY (");
-                    c.write_rel(buf, idx, true, shard_id);
+                    c.write_rel(buf, idx, true, shard_id, is_outer);
                     buf.push_str(") AND ");
                 }
                 Filter_::NotAll(c) => {
                     c.write_key(buf);
                     buf.push_str(" <> ALL (");
-                    c.write_rel(buf, idx, true, shard_id);
+                    c.write_rel(buf, idx, true, shard_id, is_outer);
                     buf.push_str(") AND ");
                 }
                 Filter_::Raw(raw) => {
@@ -497,7 +497,7 @@ macro_rules! filter {
             let mut s = String::with_capacity(100);
             s.push_str("WHERE ");
             if let Some(ref c) = filter {
-                c.write(&mut s, 1, &mut trash_mode, shard_id);
+                c.write(&mut s, 1, &mut trash_mode, shard_id, false);
             }
             if trash_mode == TrashMode::Not {
                 s.push_str(not_trashed_sql)

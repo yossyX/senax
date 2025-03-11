@@ -13,6 +13,7 @@ import AutoRadio from "./AutoRadio";
 import AutoObject from "./AutoObject";
 import AutoCodeEditor from "./AutoCodeEditor";
 import AutoMultiSuggest from "./AutoMultiSuggest";
+import AutoNullableCheckbox from "./AutoNullableCheckbox";
 
 interface Props {
   name: string;
@@ -195,18 +196,13 @@ function AutoField(props: Props) {
       return <></>;
     }
     return (
-      <AutoRadio
+      <AutoNullableCheckbox
         name={name}
         path={path}
         form={form}
         definition={definition}
         errors={errors}
         label={label}
-        values={[
-          { const: "", title: "default" },
-          { const: true, title: "true" },
-          { const: false, title: "false" },
-        ]}
       />
     );
   } else if (type == "boolean") {

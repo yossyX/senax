@@ -872,10 +872,22 @@ impl ApiModelDef {
     }
     #[allow(dead_code)]
     pub fn disable_gql(&self) -> bool {
-        API_CONFIG.read().unwrap().as_ref().unwrap().disable_gql.unwrap_or_default()
+        API_CONFIG
+            .read()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .disable_gql
+            .unwrap_or_default()
     }
     pub fn use_json_api(&self) -> bool {
-        API_CONFIG.read().unwrap().as_ref().unwrap().use_json_api.unwrap_or_default()
+        API_CONFIG
+            .read()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .use_json_api
+            .unwrap_or_default()
     }
     pub fn readable_roles(&self, config: &ApiDbDef, group: &str) -> Vec<String> {
         if self.readable_roles.is_empty() {

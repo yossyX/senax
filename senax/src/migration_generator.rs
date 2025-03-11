@@ -5,7 +5,6 @@ use derive_more::Display;
 use indexmap::IndexMap;
 use senax_mysql_parser::column;
 use senax_mysql_parser::common::{Literal, ReferenceOption, SqlType, TableKey};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::fmt::Write;
@@ -15,7 +14,7 @@ use std::str::FromStr;
 
 use crate::common::fs_write;
 use crate::ddl::table::{Column, Constraint, Table};
-use crate::schema::{self, AutoGeneration, SoftDelete, CONFIG, GROUPS, MODELS};
+use crate::schema::{self, AutoGeneration, SoftDelete, SortDirection, CONFIG, GROUPS, MODELS};
 use crate::{ddl, DB_PATH};
 
 pub const UTF8_BYTE_LEN: u32 = 4;
@@ -123,6 +122,10 @@ pub fn make_table_def(
             primary_key: Default::default(),
             unique: Default::default(),
             srid: col.srid,
+            query: col
+                .query
+                .clone()
+                .map(|v| (v, col.stored.unwrap_or_default())),
         };
         let sql_type = match col.data_type {
             schema::DataType::TinyInt if col.signed => SqlType::Tinyint,
@@ -237,6 +240,7 @@ pub fn make_table_def(
             name: c.get_col_name(n).to_string(),
             query: None,
             len: None,
+            desc: false,
         })
         .collect();
     if !cols.is_empty() {
@@ -276,7 +280,16 @@ pub fn make_table_def(
                 if !col.not_null && index.index_type == Some(schema::IndexType::Spatial) {
                     error_exit!("All parts of a SPATIAL index must be NOT NULL: {}", n)
                 }
-                column::Column { name, query, len }
+                let desc = c
+                    .as_ref()
+                    .map(|c| c.direction == Some(SortDirection::Desc))
+                    .unwrap_or_default();
+                column::Column {
+                    name,
+                    query,
+                    len,
+                    desc,
+                }
             })
             .collect();
         let query = cols
@@ -286,16 +299,8 @@ pub fn make_table_def(
             .join(",");
         let mut index_name = index_name.to_owned();
         if !query.is_empty() {
-            let digest =
-                Sha256::digest(query)
-                    .iter()
-                    .take(4)
-                    .fold(String::new(), |mut output, x| {
-                        let _ = write!(output, "{:02X}", x);
-                        output
-                    });
             index_name.push('_');
-            index_name.push_str(&digest);
+            index_name.push_str(&crate::common::hex_digest(&query));
         }
         if index.index_type == Some(schema::IndexType::Unique) {
             let mut check = String::new();
@@ -346,6 +351,7 @@ pub fn make_table_def(
                     name: local_col_name,
                     query: None,
                     len: None,
+                    desc: false,
                 }
             })
             .collect();
@@ -357,6 +363,7 @@ pub fn make_table_def(
                 name: c.get_col_name(n).to_string(),
                 query: None,
                 len: None,
+                desc: false,
             })
             .collect();
         let index_name = format!("IDX_FK_{}", &name);
@@ -367,6 +374,7 @@ pub fn make_table_def(
                     name: col.to_string(),
                     query: None,
                     len: None,
+                    desc: false,
                 });
             }
         }
@@ -413,6 +421,7 @@ pub fn make_table_def(
                     name: local_col_name,
                     query: None,
                     len: None,
+                    desc: false,
                 }
             })
             .collect();
@@ -424,6 +433,7 @@ pub fn make_table_def(
                     name: col.to_string(),
                     query: None,
                     len: None,
+                    desc: false,
                 });
             }
         }

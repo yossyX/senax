@@ -1065,6 +1065,12 @@ impl ModelDef {
     pub fn all_fields(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields.iter().collect()
     }
+    pub fn all_fields_wo_read_only(&self) -> Vec<(&String, &FieldDef)> {
+        self.merged_fields
+            .iter()
+            .filter(|v| v.1.query.is_none())
+            .collect()
+    }
     pub fn all_except_secret(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
@@ -1190,10 +1196,18 @@ impl ModelDef {
             .filter(|(_k, v)| !v.primary)
             .collect()
     }
+    pub fn non_primaries_wo_read_only(&self) -> Vec<(&String, &FieldDef)> {
+        self.merged_fields
+            .iter()
+            .filter(|(_k, v)| !v.primary && v.query.is_none())
+            .collect()
+    }
     pub fn non_primaries_without_created_at(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
-            .filter(|(k, v)| !v.primary && !ConfigDef::created_at().as_str().eq(k.as_str()))
+            .filter(|(k, v)| {
+                !v.primary && v.query.is_none() && !ConfigDef::created_at().as_str().eq(k.as_str())
+            })
             .collect()
     }
     pub fn non_primaries_addable(&self) -> Vec<(&String, &FieldDef)> {
@@ -1202,7 +1216,7 @@ impl ModelDef {
             .filter(|(_k, v)| !v.primary && v.is_addable())
             .collect()
     }
-    pub fn non_primaries_wo_read_only(&self, self_only: bool) -> Vec<(&String, &FieldDef)> {
+    pub fn non_primaries_wo_invisibles(&self, self_only: bool) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
             .filter(|(_k, v)| !self_only || !v.in_abstract)
@@ -1210,6 +1224,21 @@ impl ModelDef {
                 !v.primary
                     && !ConfigDef::version().eq(&**k)
                     && !ConfigDef::aggregation_type().eq(&**k)
+            })
+            .collect()
+    }
+    pub fn non_primaries_wo_invisibles_and_read_only(
+        &self,
+        self_only: bool,
+    ) -> Vec<(&String, &FieldDef)> {
+        self.merged_fields
+            .iter()
+            .filter(|(_k, v)| !self_only || !v.in_abstract)
+            .filter(|(k, v)| {
+                !v.primary
+                    && !ConfigDef::version().eq(&**k)
+                    && !ConfigDef::aggregation_type().eq(&**k)
+                    && v.query.is_none()
             })
             .collect()
     }
@@ -1231,7 +1260,7 @@ impl ModelDef {
             .filter(|(_k, v)| !v.exclude_from_cache())
             .collect()
     }
-    pub fn cache_cols_wo_primaries_and_read_only(&self) -> Vec<(&String, &FieldDef)> {
+    pub fn cache_cols_wo_primaries_and_invisibles(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
             .filter(|(k, v)| {
@@ -1243,7 +1272,7 @@ impl ModelDef {
             })
             .collect()
     }
-    pub fn non_cache_cols_wo_primaries_and_read_only(&self) -> Vec<(&String, &FieldDef)> {
+    pub fn non_cache_cols_wo_primaries_and_invisibles(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
             .filter(|(k, v)| {
@@ -1484,7 +1513,7 @@ impl ModelDef {
             .filter(|(_k, v)| v.default.is_some())
             .collect()
     }
-    pub fn multi_index(&self) -> Vec<(String, IndexDef)> {
+    pub fn multi_index(&self, cache_only: bool) -> Vec<(String, IndexDef)> {
         let mut map = BTreeMap::new();
         for (index_name, def) in &self.merged_indexes {
             if def.fields.len() > 1
@@ -1495,6 +1524,9 @@ impl ModelDef {
                         self.name
                     )
                     });
+                    if cache_only && col.exclude_from_cache() {
+                        return false;
+                    }
                     if !col.is_comparable() {
                         return false;
                     }
@@ -1674,10 +1706,14 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_belonging_outer_db(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_belonging_outer_db(
+        &self,
+        self_only: bool,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             // .filter(|v| ApiRelationDef::has(v.0))
+            .filter(|v| (!self_only || !v.1.in_abstract))
             .filter(|v| v.1.is_type_of_belongs_to_outer_db())
             .map(|v| (self, v.0, v.1))
             .collect()
@@ -1914,7 +1950,11 @@ impl ModelDef {
 
     pub fn relation_mods(&self) -> Vec<Vec<String>> {
         let mut mods: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        for (_name, rel) in self.merged_relations.iter().filter(|v| !v.1.is_type_of_belongs_to_outer_db()) {
+        for (_name, rel) in self
+            .merged_relations
+            .iter()
+            .filter(|v| !v.1.is_type_of_belongs_to_outer_db())
+        {
             let group_name = rel.get_group_name();
             let mod_name = rel.get_mod_name();
             if let std::collections::btree_map::Entry::Vacant(e) = mods.entry(group_name.clone()) {

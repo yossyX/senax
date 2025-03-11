@@ -15,7 +15,7 @@ use super::super::@{ mod_name|to_var_name }@::@{ pascal_name }@Updater as _Updat
 #[allow(unused_imports)]
 use crate::models::@{ db|snake|to_var_name }@ as _model_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
-use crate::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
+pub use crate::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
 @%- endfor %@
 
 pub mod consts {
@@ -238,7 +238,7 @@ pub trait @{ pascal_name }@Common: std::fmt::Debug@% for parent in def.parent() 
 {label}{comment}    fn {var}(&self) -> {outer};", "") }@
 @{- def.only_version()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {outer};", "") }@
-@{- def.cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 }
 
@@ -257,7 +257,7 @@ pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common + dyn_clone::DynClone 
     fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_var}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
     fn _{raw_rel_name}_id(&self) -> Option<_{raw_db}_model_::{class_mod_var}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
@@ -265,20 +265,20 @@ pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common + dyn_clone::DynClone 
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>>;", "") }@
 @{- def.relations_belonging_uncached(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}>>>;", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>>>;", "") }@
 }
 
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
 pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent in def.parent() %@ + super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@@% endfor %@ + 'static {
-@{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.relations_belonging(true)|fmt_rel_join("
     fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_var}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
     fn _{raw_rel_name}_id(&self) -> Option<_{raw_db}_model_::{class_mod_var}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
@@ -286,15 +286,15 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent 
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_var}::{class}>>;", "") }@
 @{- def.relations_many(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_var}::{class}> + '_>>;", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{raw_db}_model_::{class_mod_var}::{class}>>;", "") }@
 }
 
 @{ def.label|label0 -}@
 pub trait @{ pascal_name }@UpdaterBase: downcast_rs::Downcast + Send + Sync + @{ pascal_name }@Common + crate::models::MarkForDelete@% for parent in def.parent() %@ + super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater@% endfor %@ + 'static {
-@{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
-@{- def.non_primaries_wo_read_only(true)|fmt_join("
+@{- def.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>>;
@@ -330,13 +330,13 @@ impl @{ pascal_name }@Factory {
 pub struct @{ pascal_name }@Entity {
 @{- def.primaries()|fmt_join("
     pub {var}: {domain_outer_owned},", "") }@
-@{- def.non_primaries_wo_read_only(false)|fmt_join("
+@{- def.non_primaries_wo_invisibles(false)|fmt_join("
     pub {var}: {domain_outer_owned},", "") }@
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
     pub {rel_name}: Option<Box<_model_::{class_mod_var}::{class}Entity>>,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
     pub {rel_name}: Vec<Box<_model_::{class_mod_var}::{class}Entity>>,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     pub {rel_name}: Option<Box<_{raw_db}_model_::{class_mod_var}::{class}Entity>>,", "") }@
     #[serde(skip)]
     pub _delete: bool,
@@ -355,7 +355,7 @@ impl super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to
     fn {var}(&self) -> {outer} {
         1
     }", "") }@
-@{- parent.cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- parent.cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
@@ -378,7 +378,7 @@ impl super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
 impl super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@ for @{ pascal_name }@Entity {
-@{- parent.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- parent.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
@@ -394,11 +394,11 @@ impl super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
 impl super::super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@UpdaterBase for @{ pascal_name }@Entity {
-@{- parent.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- parent.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
-@{- parent.non_primaries_wo_read_only(true)|fmt_join("
+@{- parent.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         self.{var} = v{convert_domain_factory}
     }", "") }@
@@ -453,7 +453,7 @@ impl @{ pascal_name }@Common for @{ pascal_name }@Entity {
     fn {var}(&self) -> {outer} {
         1
     }", "") }@
-@{- def.cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
@@ -485,7 +485,7 @@ impl @{ pascal_name }@Cache for @{ pascal_name }@Entity {
     fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}>>> {
         Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_var}::{class}>::from(v.clone())))
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
     fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>>> {
         Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _{raw_db}_model_::{class_mod_var}::{class}>::from(v.clone())))
     }", "") }@
@@ -494,7 +494,7 @@ impl @{ pascal_name }@Cache for @{ pascal_name }@Entity {
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
 impl @{ pascal_name }@ for @{ pascal_name }@Entity {
-@{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
@@ -506,7 +506,7 @@ impl @{ pascal_name }@ for @{ pascal_name }@Entity {
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_var}::{class}> + '_>> {
         Ok(Box::new(self.{rel_name}.iter().map(|v| v.as_ref() as &dyn _model_::{class_mod_var}::{class})))
     }", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{raw_db}_model_::{class_mod_var}::{class}>> {
         Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _{raw_db}_model_::{class_mod_var}::{class}))
     }", "") }@
@@ -515,11 +515,11 @@ impl @{ pascal_name }@ for @{ pascal_name }@Entity {
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
 impl @{ pascal_name }@UpdaterBase for @{ pascal_name }@Entity {
-@{- def.non_cache_cols_wo_primaries_and_read_only()|fmt_join("
+@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
-@{- def.non_primaries_wo_read_only(true)|fmt_join("
+@{- def.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         self.{var} = v{convert_domain_factory}
     }", "") }@
@@ -575,7 +575,7 @@ impl crate::models::MarkForDelete for @{ pascal_name }@Entity {
 pub struct Joiner_ {
 @{- def.relations()|fmt_rel_join("
     pub {rel_name}: Option<Box<_model_::{class_mod_var}::Joiner_>>,", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     pub {rel_name}: Option<Box<_{raw_db}_model_::{class_mod_var}::Joiner_>>,", "") }@
 }
 impl Joiner_ {
@@ -584,7 +584,7 @@ impl Joiner_ {
         false
         @{- def.relations()|fmt_rel_join("
             || self.{rel_name}.is_some()", "") }@
-        @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+        @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
             || self.{rel_name}.is_some()", "") }@
     }
     #[allow(unused_variables)]
@@ -594,7 +594,7 @@ impl Joiner_ {
                 Some(Box::new(Joiner_{
                     @{- def.relations()|fmt_rel_join("
                     {rel_name}: _model_::{class_mod_var}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
-                    @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+                    @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
                     {rel_name}: _{raw_db}_model_::{class_mod_var}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
                 }))
             } else {
@@ -613,9 +613,9 @@ macro_rules! _join_@{ fetch_macro_name }@ {
 @{- def.relations()|fmt_rel_join("
     ({rel_name}) => ($crate::models::--1--::{group_var}::{mod_var}::join!({}));
     ({rel_name}: $p:tt) => ($crate::models::--1--::{group_var}::{mod_var}::join!($p));", "")|replace1(db|snake|to_var_name) }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
-    ({rel_name}) => ($crate::models::--1--::{group_var}::{mod_var}::join!({}));
-    ({rel_name}: $p:tt) => ($crate::models::--1--::{group_var}::{mod_var}::join!($p));", "")|replace1(db|snake|to_var_name) }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+    ({rel_name}) => (--1--::_{raw_db}_model_::{group_var}::{mod_var}::join!({}));
+    ({rel_name}: $p:tt) => (--1--::_{raw_db}_model_::{group_var}::{mod_var}::join!($p));", "")|replace1(base_path) }@
     () => ();
 }
 pub use _join_@{ fetch_macro_name }@ as _join;
@@ -929,7 +929,7 @@ pub trait _@{ pascal_name }@Query: Send + Sync {
     @%- endfor %@
     fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn @{ pascal_name }@QueryFindBuilder>;
 }
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
 
 #[allow(non_camel_case_types)]
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -958,7 +958,7 @@ impl Col_ {
         match self {
             @{- def.primaries()|fmt_join("
             Col_::{var} => {filter_check_null},", "") }@
-            @{- def.cache_cols_wo_primaries_and_read_only()|fmt_join("
+            @{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
             Col_::{var} => {filter_check_null},", "") }@
             _ => unimplemented!(),
         }
@@ -969,7 +969,7 @@ impl Col_ {
 #[derive(Clone, Debug)]
 pub enum ColOne_ {
 @{ def.all_fields_without_json()|fmt_join("    {var}({filter_type}),", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@),
 @%- endfor %@
 }
@@ -980,7 +980,7 @@ impl ColOne_ {
         match self {
             @{- def.equivalence_cache_fields_without_json()|fmt_join("
             ColOne_::{var}(c) => _obj.{var}(){filter_check_eq},", "") }@
-            @%- for (index_name, index) in def.multi_index() %@
+            @%- for (index_name, index) in def.multi_index(true) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{var}(){filter_check_eq})", " && ") }@,
             @%- endfor %@
             _ => unimplemented!(),
@@ -991,7 +991,7 @@ impl ColOne_ {
         let o = match self {
             @{- def.comparable_cache_fields_without_json()|fmt_join("
             ColOne_::{var}(c) => _obj.{var}(){filter_check_cmp},", "") }@
-            @%- for (index_name, index) in def.multi_index() %@
+            @%- for (index_name, index) in def.multi_index(true) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{var}(){filter_check_cmp})", ".then") }@,
             @%- endfor %@
             _ => unimplemented!(),
@@ -1021,7 +1021,7 @@ pub enum ColKey_ {
 #[derive(Clone, Debug)]
 pub enum ColMany_ {
 @{ def.all_fields_without_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(Vec<@{ pascal_name }@Index_@{ index_name }@>),
 @%- endfor %@
 }
@@ -1032,7 +1032,7 @@ impl ColMany_ {
         match self {
             @{- def.equivalence_cache_fields_without_json()|fmt_join("
             ColMany_::{var}(list) => list.iter().any(|c| _obj.{var}(){filter_check_eq}),", "") }@
-            @%- for (index_name, index) in def.multi_index() %@
+            @%- for (index_name, index) in def.multi_index(true) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(list) => list.iter().any(|@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)| @{ index.join_fields(def, "(_obj.{var}(){filter_check_eq})", " && ") }@),
             @%- endfor %@
             _ => unimplemented!(),
@@ -1075,7 +1075,7 @@ pub enum ColRel_ {
     {rel_name}(Option<Box<_model_::{base_class_mod_var}::Filter_>>),", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
     {rel_name}(Option<Box<_model_::{base_class_mod_var}::Filter_>>),", "") }@
-@{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     {rel_name}(Option<Box<_{raw_db}_model_::{base_class_mod_var}::Filter_>>),", "") }@
 }
 impl ColRel_ {
@@ -1094,7 +1094,7 @@ impl ColRel_ {
                 {rel_name}: Some(c.as_ref().and_then(|c| c.joiner()).unwrap_or_default()),
                 ..Default::default()
             })),", "") }@
-            @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(c) => Some(Box::new(Joiner_{
                 {rel_name}: Some(c.as_ref().and_then(|c| c.joiner()).unwrap_or_default()),
                 ..Default::default()
@@ -1138,7 +1138,7 @@ impl Check_<dyn @{ pascal_name }@Cache> for ColRel_ {
             @{- def.relations_many(false)|fmt_rel_join("
             ColRel_::{rel_name}(None) => !_obj.{rel_name}()?.is_empty(),
             ColRel_::{rel_name}(Some(f)) => _obj.{rel_name}()?.iter().try_fold(false, |acc, v| Ok::<bool, anyhow::Error>(acc || f.check(v.as_ref())?))?,", "") }@
-            @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(None) => _obj.{rel_name}()?.is_some(),
             ColRel_::{rel_name}(Some(f)) => _obj.{rel_name}()?.map(|v| f.check(&*v)).unwrap_or(Ok(false))?,", "") }@
             _ => unreachable!()
@@ -1157,7 +1157,7 @@ impl Check_<dyn @{ pascal_name }@> for ColRel_ {
             @{- def.relations_many(false)|fmt_rel_join("
             ColRel_::{rel_name}(None) => _obj.{rel_name}()?.next().is_some(),
             ColRel_::{rel_name}(Some(f)) => _obj.{rel_name}()?.try_fold(false, |acc, v| Ok::<bool, anyhow::Error>(acc || f.check(v)?))?,", "") }@
-            @{- def.relations_belonging_outer_db()|fmt_rel_outer_db_join("
+            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(None) => _obj.{rel_name}()?.is_some(),
             ColRel_::{rel_name}(Some(f)) => _obj.{rel_name}()?.map(|v| f.check(v)).unwrap_or(Ok(false))?,", "") }@
             _ => unreachable!()
@@ -1425,9 +1425,9 @@ macro_rules! @{ filter_macro_name }@_rel {
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(None));
     (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(Some(Box::new($crate::models::@{ db|snake|to_var_name }@::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
-@%- for (model_def, col_name, rel_def) in def.relations_belonging_outer_db() %@
+@%- for (model_def, col_name, rel_def) in def.relations_belonging_outer_db(false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(None));
-    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(Some(Box::new($crate::models::@{ db|snake|to_var_name }@::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
+    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(Some(Box::new(@{ model_path }@::_@{ rel_def.db() }@_model_::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
     () => ();
 }
@@ -1436,7 +1436,7 @@ pub use @{ filter_macro_name }@_rel as filter_rel;
 @% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
 macro_rules! @{ filter_macro_name }@ {
     () => (@{ model_path }@::Filter_::new_and());
-@%- for (index_name, index) in def.multi_index() %@
+@%- for (index_name, index) in def.multi_index(false) %@
     ((@{ index.join_fields(def, "{name}", ", ") }@) = (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Eq(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
     ((@{ index.join_fields(def, "{name}", ", ") }@) > (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gt(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
     ((@{ index.join_fields(def, "{name}", ", ") }@) >= (@{ index.join_fields(def, "$e{index}:expr", ", ") }@)) => (@{ model_path }@::Filter_::Gte(@{ model_path }@::ColOne_::@{ index.join_fields(def, "{name}", "_") }@((@{ index.join_fields(def, "$e{index}.clone()", ", ") }@).try_into()?)));
@@ -1849,6 +1849,7 @@ impl _@{ pascal_name }@Query for Emu@{ pascal_name }@Repository {
             @%- endif %@
         }
         #[allow(unused_variables)]
+        #[allow(unreachable_code)]
         fn _cursor(v: &@{ pascal_name }@Entity, cursor: &@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> bool {
             @%- if !selector_def.orders.is_empty() %@
             match cursor {

@@ -143,6 +143,7 @@ pub struct Constraint {
     pub primary_key: bool,
     pub unique: bool,
     pub srid: Option<u32>,
+    pub query: Option<(String, bool)>,
 }
 
 impl PartialEq for Constraint {
@@ -185,6 +186,14 @@ impl fmt::Display for Constraint {
         if let Some(srid) = self.srid {
             write!(f, " /*!80003 SRID {} */", srid)?;
         }
+        if let Some((query, stored)) = &self.query {
+            write!(
+                f,
+                " GENERATED ALWAYS AS ({}) {}",
+                query,
+                if *stored { "STORED" } else { "VIRTUAL" }
+            )?;
+        }
         Ok(())
     }
 }
@@ -218,6 +227,9 @@ impl From<Vec<ColumnConstraint>> for Constraint {
                 }
                 ColumnConstraint::Srid(v) => {
                     constraint.srid = Some(v);
+                }
+                ColumnConstraint::Generated(q, s) => {
+                    constraint.query = Some((q, s));
                 }
             }
         }
@@ -442,11 +454,12 @@ mod tests {
             `point1` point /*!80003 SRID 4326 */ DEFAULT NULL,
             `point2` point NOT NULL /*!80003 SRID 4326 */,
             `text` longtext NOT NULL,
+            `sidec` double GENERATED ALWAYS AS (sqrt(((`sidea` * `sidea`) + (`sideb` * `sideb`)))) VIRTUAL,
             PRIMARY KEY (`todo_id`),
             UNIQUE KEY `UQ_description` (`description`(20)),
             UNIQUE KEY `UQ_name_id` (`name_id`) USING BTREE,
             KEY `IDX_name_index` (`time1`,`time2`),
-            KEY `IDX_xxxxx` (`gggggg`),
+            KEY `IDX_xxxxx` (`gggggg` DESC),
             KEY `IDX_json1` ((cast(`json1` as unsigned array))),
             KEY `IDX_json3a` (`name_id`,(cast(`json3` as char(21) array))),
             FULLTEXT KEY `FT_text` (`text`) /*!50100 WITH PARSER `ngram` */ ,

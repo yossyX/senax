@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, fmt::Display, str::FromStr};
 
 #[derive(Deserialize, Serialize, Copy, Clone, Debug, Default, PartialEq, JsonSchema)]
-#[cfg_attr(feature = "graphql6", derive(graphql6::SimpleObject, graphql6::InputObject))]
+#[cfg_attr(
+    feature = "graphql6",
+    derive(graphql6::SimpleObject, graphql6::InputObject)
+)]
 #[cfg_attr(feature = "graphql6", graphql(input_name = "PointInput"))]
 #[cfg_attr(feature = "utoipa5", derive(utoipa5::ToSchema))]
 #[cfg_attr(feature = "utoipa5", schema(as = PointInput))]
