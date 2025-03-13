@@ -12,8 +12,8 @@ import AutoMultiSelect from "./AutoMultiSelect";
 import AutoRadio from "./AutoRadio";
 import AutoObject from "./AutoObject";
 import AutoCodeEditor from "./AutoCodeEditor";
-import AutoMultiSuggest from "./AutoMultiSuggest";
 import AutoNullableCheckbox from "./AutoNullableCheckbox";
+import AutoMultiInput from "./AutoMultiInput";
 
 interface Props {
   name: string;
@@ -122,12 +122,12 @@ function AutoField(props: Props) {
           values={props.options}
         />
       );
-    } else if (props.autocomplete || property.autocomplete) {
+    } else {
       if (props.hidden && !form.getValues(name)) {
         return <></>;
       }
       return (
-        <AutoMultiSuggest
+        <AutoMultiInput
           name={name}
           path={path}
           form={form}
@@ -136,10 +136,9 @@ function AutoField(props: Props) {
           label={labelWithOptionality}
           required={required}
           autocomplete={props.autocomplete || property.autocomplete}
+          isModal={props.isModal}
         />
       );
-    } else {
-      throw new Error("unsupported");
     }
   } else if (type == "object") {
     if (props.hidden && form.getValues(name) === undefined) {

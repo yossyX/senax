@@ -4,7 +4,7 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use rust_decimal::Decimal;
 use senax_common::{cache::calc_mem_size, ShardId};
 use serde_json::Value;
-use sqlx::query::{Query, QueryAs};
+use sqlx::query::Query;
 use std::convert::TryFrom;
 
 use crate::connection::{DbArguments, DbType};
@@ -26,6 +26,12 @@ macro_rules! fetch {
 }
 pub(crate) use fetch;
 
+#[derive(Default, sqlx::FromRow, senax_macros::SqlCol)]
+pub struct Count {
+    #[sql(query = "count(*)")]
+    pub c: i64,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub(crate) enum TrashMode {
     #[default]
@@ -45,19 +51,11 @@ pub(crate) trait BindTr {
     fn len(&self) -> usize {
         1
     }
-    fn bind_to_query_as<T>(
-        self,
-        query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments>;
     fn bind_to_query(self, query: Query<'_, DbType, DbArguments>)
         -> Query<'_, DbType, DbArguments>;
 }
 #[allow(dead_code)]
 pub(crate) trait BindArrayTr {
-    fn query_as_each_bind<T>(
-        self,
-        query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments>;
     fn query_each_bind(
         self,
         query: Query<'_, DbType, DbArguments>,
@@ -66,10 +64,6 @@ pub(crate) trait BindArrayTr {
 pub(crate) trait ColRelTr {
     fn write_rel(&self, buf: &mut String, idx: usize, without_key: bool, shard_id: ShardId, is_outer: bool);
     fn write_key(&self, buf: &mut String);
-    fn bind_to_query_as<T>(
-        self,
-        query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments>;
     fn bind_to_query(self, query: Query<'_, DbType, DbArguments>)
         -> Query<'_, DbType, DbArguments>;
 }
@@ -78,10 +72,6 @@ where
     Self: Sized,
 {
     fn write(&self, buf: &mut String, idx: usize, trash_mode: &mut TrashMode, shard_id: ShardId, is_outer: bool);
-    fn bind_to_query_as<T>(
-        self,
-        query: sqlx::query::QueryAs<'_, DbType, T, DbArguments>,
-    ) -> sqlx::query::QueryAs<'_, DbType, T, DbArguments>;
     fn bind_to_query(
         self,
         query: sqlx::query::Query<'_, DbType, DbArguments>,
@@ -385,56 +375,6 @@ macro_rules! filter {
                     buf.push_str("? AND ");
                 }
             };
-        }
-        fn bind_to_query_as<T>(
-            self,
-            mut query: sqlx::query::QueryAs<'_, DbType, T, DbArguments>,
-        ) -> sqlx::query::QueryAs<'_, DbType, T, DbArguments> {
-            match self {
-                Filter_::WithTrashed => query,
-                Filter_::OnlyTrashed => query,
-                Filter_::Match(_c, v) => query.bind(v),
-                Filter_::MatchBoolean(_c, v) => query.bind(v),
-                Filter_::MatchExpansion(_c, v) => query.bind(v),
-                Filter_::IsNull(_c) => query,
-                Filter_::IsNotNull(_c) => query,
-                Filter_::Eq(c) => c.bind_to_query_as(query),
-                Filter_::EqKey(c) => c.bind_to_query_as(query),
-                Filter_::NotEq(c) => c.bind_to_query_as(query),
-                Filter_::Gt(c) => c.bind_to_query_as(query),
-                Filter_::Gte(c) => c.bind_to_query_as(query),
-                Filter_::Lt(c) => c.bind_to_query_as(query),
-                Filter_::Lte(c) => c.bind_to_query_as(query),
-                Filter_::Like(c) => c.bind_to_query_as(query),
-                Filter_::AllBits(c) => c.bind_to_query_as(query),
-                Filter_::AnyBits(c) => c.bind_to_query_as(query),
-                Filter_::In(c) => c.bind_to_query_as(query),
-                Filter_::NotIn(c) => c.bind_to_query_as(query),
-                Filter_::MemberOf(c, p) => if let Some(p) = p { c.bind_to_query_as(query).bind(p) } else { c.bind_to_query_as(query) },
-                Filter_::Contains(c, p) => if let Some(p) = p { c.bind_to_query_as(query.bind(p)) } else { c.bind_to_query_as(query) },
-                Filter_::Overlaps(c, p) => if let Some(p) = p { c.bind_to_query_as(query.bind(p)) } else { c.bind_to_query_as(query) },
-                Filter_::JsonIn(c, p) => c.bind_to_query_as(query.bind(p)),
-                Filter_::JsonContainsPath(c, p) => query.bind(p),
-                Filter_::JsonEq(c, p) => c.bind_to_query_as(query.bind(p)),
-                Filter_::JsonLt(c, p) => c.bind_to_query_as(query.bind(p)),
-                Filter_::JsonLte(c, p) => c.bind_to_query_as(query.bind(p)),
-                Filter_::JsonGt(c, p) => c.bind_to_query_as(query.bind(p)),
-                Filter_::JsonGte(c, p) => c.bind_to_query_as(query.bind(p)),
-                Filter_::Within(c) => c.bind_to_query_as(query),
-                Filter_::Intersects(c) => c.bind_to_query_as(query),
-                Filter_::Crosses(c) => c.bind_to_query_as(query),
-                Filter_::DWithin(c) => c.bind_to_query_as(query),
-                Filter_::Not(c) => c.bind_to_query_as(query),
-                Filter_::And(v) => {for c in v { query = c.bind_to_query_as(query); } query},
-                Filter_::Or(v) => {for c in v { query = c.bind_to_query_as(query); } query},
-                Filter_::Exists(c) => c.bind_to_query_as(query),
-                Filter_::NotExists(c) => c.bind_to_query_as(query),
-                Filter_::EqAny(c) => c.bind_to_query_as(query),
-                Filter_::NotAll(c) => c.bind_to_query_as(query),
-                Filter_::Raw(_c) => query,
-                Filter_::RawWithParam(_c, param) => {for v in param { query = query.bind(v); } query},
-                Filter_::Boolean(v) => query.bind(v),
-            }
         }
         fn bind_to_query(
             self,

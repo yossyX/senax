@@ -9,7 +9,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::schema::{ConfigDef, VALUE_OBJECTS};
+use crate::schema::{ConfigDef, StringOrArray, VALUE_OBJECTS};
 use crate::{
     common::fs_write,
     schema::{self, set_domain_mode, to_id_name, ModelDef, CONFIG, GROUPS, MODELS},
@@ -334,26 +334,30 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
 
                 let file_path = model_group_base_dir.join(format!("_{}.rs", mod_name));
                 remove_files.remove(file_path.as_os_str());
-                let force_index = if config.disable_force_index_on_limit {
-                    String::new()
-                } else {
-                    use senax_mysql_parser::common::TableKey;
-                    let (_table_name, table_def) =
-                        crate::migration_generator::make_table_def(def, &config)?;
-                    let mut indexes: Vec<_> = table_def
-                        .indexes
-                        .iter()
-                        .filter(|(_, index)| !matches!(index, TableKey::Key(_, x) if x.is_empty()))
-                        .map(|v| template::filters::_to_db_col(v.0, true))
-                        .collect();
-                    if indexes.is_empty() {
-                        String::new()
-                    } else {
-                        indexes.push(template::filters::_to_db_col("PRIMARY", true));
-                        let indexes_esc = indexes.join(",");
-                        format!(" FORCE INDEX({indexes_esc})")
+                let mut force_indexes = Vec::new();
+                let (_, _, idx_map) = crate::migration_generator::make_table_def(def, &config)?;
+                for (index_name, index_def) in &def.merged_indexes {
+                    for (force_index_name, force_index_def) in &index_def.force_index_on {
+                        let force_index_def = force_index_def.clone().unwrap_or_default();
+                        let includes = force_index_def
+                            .includes
+                            .unwrap_or(StringOrArray::One(force_index_name.clone()));
+                        let mut cond: Vec<_> = includes
+                            .to_vec()
+                            .iter()
+                            .map(|v| format!("filter_digest.contains({:?})", v))
+                            .collect();
+                        let excludes = force_index_def
+                            .excludes
+                            .unwrap_or(StringOrArray::Many(vec![]));
+                        for v in excludes.to_vec() {
+                            cond.push(format!("!filter_digest.contains({:?})", v));
+                        }
+                        let idx = idx_map.get(index_name).unwrap();
+                        let idx = format!("{:?}", template::filters::_to_db_col(idx, true));
+                        force_indexes.push((cond.join(" && "), idx));
                     }
-                };
+                }
                 let tpl = template::GroupBaseTableTemplate {
                     db,
                     group_name,
@@ -363,7 +367,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     id_name: &to_id_name(model_name),
                     table_name: &table_name,
                     def,
-                    force_index,
+                    force_indexes,
                     config: &config,
                     version_col: schema::ConfigDef::version(),
                     visibility,
@@ -403,6 +407,16 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     for file in &remove_files {
         println!("REMOVE:{}", file.to_string_lossy());
         fs::remove_file(file)?;
+        let ancestors = Path::new(file).ancestors();
+        for ancestor in ancestors {
+            if let Ok(dir) = ancestor.read_dir() {
+                if dir.count() == 0 {
+                    fs::remove_dir(ancestor)?;
+                } else {
+                    break;
+                }
+            }
+        }
     }
     Ok(())
 }

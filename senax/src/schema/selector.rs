@@ -132,6 +132,8 @@ impl From<FilterJson> for FilterDef {
                 .fields
                 .unwrap_or_default()
                 .into_iter()
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
                 .map(|v| (v, None))
                 .collect::<IndexMap<_, _>>(),
             required: value.required,

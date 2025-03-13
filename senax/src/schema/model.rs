@@ -204,6 +204,7 @@ pub struct ModelDef {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skip_ddl: Option<bool>,
     /// ### 主キーのみで構成され、常に存在するダミー
+    /// deprecated
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dummy_always_present: Option<bool>,
     /// ### 外部キー制約をDDLに出力しない
@@ -354,6 +355,7 @@ pub struct ModelJson {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skip_ddl: Option<bool>,
     /// ### 主キーのみで構成され、常に存在するダミー
+    /// deprecated
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dummy_always_present: Option<bool>,
     /// ### 外部キー制約をDDLに出力しない

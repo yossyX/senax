@@ -5,6 +5,10 @@ use crate::models::@{ db|snake|to_var_name }@ as _model_;
 #[allow(unused_imports)]
 use crate::value_objects;
 use async_trait::async_trait;
+@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+#[allow(unused_imports)]
+pub use crate::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
+@%- endfor %@
 
 pub use super::_base::_@{ mod_name }@::consts;
 @%- for (enum_name, column_def) in def.num_enums(true) %@

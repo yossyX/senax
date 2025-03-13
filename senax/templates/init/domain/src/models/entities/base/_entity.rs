@@ -952,8 +952,15 @@ pub enum Col_ {
 @{ def.all_fields()|fmt_join("    {var},", "\n") }@
 }
 #[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
 impl Col_ {
-    #[allow(clippy::match_single_binding)]
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields()|fmt_join("
+            Col_::{var} => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
     pub fn check_null<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
         match self {
             @{- def.primaries()|fmt_join("
@@ -974,8 +981,18 @@ pub enum ColOne_ {
 @%- endfor %@
 }
 #[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
 impl ColOne_ {
-    #[allow(clippy::match_single_binding)]
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_without_json()|fmt_join("
+            ColOne_::{var}(_) => \"{col}\",", "") }@
+            @%- for (index_name, index) in def.multi_index(false) %@
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "{name}", ", ") }@>",
+            @%- endfor %@
+            _ => unimplemented!(),
+        }
+    }
     pub fn check_eq<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
         match self {
             @{- def.equivalence_cache_fields_without_json()|fmt_join("
@@ -986,7 +1003,6 @@ impl ColOne_ {
             _ => unimplemented!(),
         }
     }
-    #[allow(clippy::match_single_binding)]
     pub fn check_cmp<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T, order: std::cmp::Ordering, eq: bool) -> Result<bool, bool> {
         let o = match self {
             @{- def.comparable_cache_fields_without_json()|fmt_join("
@@ -998,7 +1014,6 @@ impl ColOne_ {
         };
         Ok(o == order || eq && o == std::cmp::Ordering::Equal)
     }
-    #[allow(clippy::match_single_binding)]
     pub fn check_like<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
         #[allow(unused_imports)]
         use crate::models::Like as _;
@@ -1016,6 +1031,17 @@ pub enum ColKey_ {
     @{- def.unique_key()|fmt_index_col("
     {var}({filter_type}),", "") }@
 }
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColKey_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.unique_key()|fmt_join("
+            ColKey_::{var}(_) => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
+}
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
@@ -1026,8 +1052,18 @@ pub enum ColMany_ {
 @%- endfor %@
 }
 #[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
 impl ColMany_ {
-    #[allow(clippy::match_single_binding)]
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_without_json()|fmt_join("
+            ColMany_::{var}(_) => \"{col}\",", "") }@
+            @%- for (index_name, index) in def.multi_index(false) %@
+            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "{name}", ", ") }@>",
+            @%- endfor %@
+            _ => unimplemented!(),
+        }
+    }
     pub fn check_in<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
         match self {
             @{- def.equivalence_cache_fields_without_json()|fmt_join("
@@ -1046,12 +1082,34 @@ pub enum ColJson_ {
 @{- def.all_fields_only_json()|fmt_join("
     {var}(serde_json::Value),", "") }@
 }
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColJson_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_only_json()|fmt_join("
+            ColJson_::{var}(_) => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
+}
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColJsonArray_ {
 @{- def.all_fields_only_json()|fmt_join("
     {var}(Vec<serde_json::Value>),", "") }@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColJsonArray_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_only_json()|fmt_join("
+            ColJsonArray_::{var}(_) => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[allow(non_camel_case_types)]
@@ -1060,12 +1118,34 @@ pub enum ColGeo_ {
 @{- def.all_fields_only_geo()|fmt_join("
     {var}(serde_json::Value, u32),", "") }@
 }
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColGeo_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_only_geo()|fmt_join("
+            ColGeo_::{var}(_, _) => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
+}
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColGeoDistance_ {
 @{- def.all_fields_only_geo()|fmt_join("
     {var}(serde_json::Value, f64, u32),", "") }@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColGeoDistance_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_only_geo()|fmt_join("
+            ColGeoDistance_::{var}(_, _, _) => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[allow(non_camel_case_types)]
@@ -1077,6 +1157,33 @@ pub enum ColRel_ {
     {rel_name}(Option<Box<_model_::{base_class_mod_var}::Filter_>>),", "") }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     {rel_name}(Option<Box<_{raw_db}_model_::{base_class_mod_var}::Filter_>>),", "") }@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl std::fmt::Display for ColRel_ {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            @{- def.relations_one_and_belonging(false)|fmt_rel_join("
+            ColRel_::{rel_name}(v) => if let Some(v) = v {
+                write!(_f, \"{raw_rel_name}:<{}>\", v)
+            } else {
+                write!(_f, \"{raw_rel_name}\")
+            },", "") }@
+            @{- def.relations_many(false)|fmt_rel_join("
+            ColRel_::{rel_name}(v) => if let Some(v) = v {
+                write!(_f, \"{raw_rel_name}:<{}>\", v)
+            } else {
+                write!(_f, \"{raw_rel_name}\")
+            },", "") }@
+            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+            ColRel_::{rel_name}(v) => if let Some(v) = v {
+                write!(_f, \"{raw_rel_name}:<{}>\", v)
+            } else {
+                write!(_f, \"{raw_rel_name}\")
+            },", "") }@
+            _ => unimplemented!(),
+        }
+    }
 }
 impl ColRel_ {
     #[allow(unreachable_patterns)]
@@ -1214,6 +1321,55 @@ pub enum Filter_ {
 impl Default for Filter_ {
     fn default() -> Self {
         Filter_::new_and()
+    }
+}
+impl std::fmt::Display for Filter_ {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Filter_::WithTrashed => write!(f, "WithTrashed"),
+            Filter_::OnlyTrashed => write!(f, "OnlyTrashed"),
+            Filter_::Match(cols, _) => write!(f, "Match:<{}>", cols.iter().map(|v| v._name()).collect::<Vec<_>>().join(",")),
+            Filter_::MatchBoolean(cols, _) => write!(f, "MatchBoolean:<{}>", cols.iter().map(|v| v._name()).collect::<Vec<_>>().join(",")),
+            Filter_::MatchExpansion(cols, _) => write!(f, "MatchExpansion:<{}>", cols.iter().map(|v| v._name()).collect::<Vec<_>>().join(",")),
+            Filter_::IsNull(col) => write!(f, "IsNull:{}", col._name()),
+            Filter_::IsNotNull(col) => write!(f, "IsNotNull:{}", col._name()),
+            Filter_::Eq(col) => write!(f, "Eq:{}", col._name()),
+            Filter_::EqKey(col) => write!(f, "EqKey:{}", col._name()),
+            Filter_::NotEq(col) => write!(f, "NotEq:{}", col._name()),
+            Filter_::Gt(col) => write!(f, "Gt:{}", col._name()),
+            Filter_::Gte(col) => write!(f, "Gte:{}", col._name()),
+            Filter_::Lt(col) => write!(f, "Lt:{}", col._name()),
+            Filter_::Lte(col) => write!(f, "Lte:{}", col._name()),
+            Filter_::Like(col) => write!(f, "Like:{}", col._name()),
+            Filter_::AllBits(col) => write!(f, "AllBits:{}", col._name()),
+            Filter_::AnyBits(col) => write!(f, "AnyBits:{}", col._name()),
+            Filter_::In(col) => write!(f, "In:{}", col._name()),
+            Filter_::NotIn(col) => write!(f, "NotIn:{}", col._name()),
+            Filter_::MemberOf(col, _) => write!(f, "MemberOf:{}", col._name()),
+            Filter_::Contains(col, _) => write!(f, "Contains:{}", col._name()),
+            Filter_::Overlaps(col, _) => write!(f, "Overlaps:{}", col._name()),
+            Filter_::JsonIn(col, _) => write!(f, "JsonIn:{}", col._name()),
+            Filter_::JsonContainsPath(col, _) => write!(f, "JsonContainsPath:{}", col._name()),
+            Filter_::JsonEq(col, _) => write!(f, "JsonEq:{}", col._name()),
+            Filter_::JsonLt(col, _) => write!(f, "JsonLt:{}", col._name()),
+            Filter_::JsonLte(col, _) => write!(f, "JsonLte:{}", col._name()),
+            Filter_::JsonGt(col, _) => write!(f, "JsonGt:{}", col._name()),
+            Filter_::JsonGte(col, _) => write!(f, "JsonGte:{}", col._name()),
+            Filter_::Within(col) => write!(f, "Within:{}", col._name()),
+            Filter_::Intersects(col) => write!(f, "Intersects:{}", col._name()),
+            Filter_::Crosses(col) => write!(f, "Crosses:{}", col._name()),
+            Filter_::DWithin(col) => write!(f, "DWithin:{}", col._name()),
+            Filter_::Not(filter) => write!(f, "Not:<{}>", filter.to_string()),
+            Filter_::And(filters) => write!(f, "And:<{}>", filters.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")),
+            Filter_::Or(filters) => write!(f, "Or:<{}>", filters.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")),
+            Filter_::Exists(col_rel) => write!(f, "Exists:<{}>", col_rel),
+            Filter_::NotExists(col_rel) => write!(f, "NotExists:<{}>", col_rel),
+            Filter_::EqAny(col_rel) => write!(f, "EqAny:<{}>", col_rel),
+            Filter_::NotAll(col_rel) => write!(f, "NotAll:<{}>", col_rel),
+            Filter_::Raw(sql) => write!(f, "Raw:<{}>", sql),
+            Filter_::RawWithParam(sql, _) => write!(f, "Raw:<{}>", sql),
+            Filter_::Boolean(v) => write!(f, "Boolean:{}", v),
+        }
     }
 }
 impl Filter_ {
@@ -1795,7 +1951,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
 #[cfg(any(feature = "mock", test))]
 #[allow(unused_variables)]
 #[allow(unused_imports)]
-fn _filter@{ filter_map.suffix }@(v: &super::super::super::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::@{ filter_map.model_name()|pascal }@Entity, filter: &@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> bool {
+fn _filter@{ filter_map.suffix }@(v: &impl super::super::super::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::@{ filter_map.model_name()|pascal }@, filter: &@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> bool {
     use super::super::super::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::*;
     @%- for (filter, filter_def) in filter_map.filters %@
     @{- filter_def.emu_str(filter, filter_map.model) }@

@@ -336,6 +336,16 @@ pub fn generate(
     for file in &remove_files {
         println!("REMOVE:{}", file.to_string_lossy());
         fs::remove_file(file)?;
+        let ancestors = Path::new(file).ancestors();
+        for ancestor in ancestors {
+            if let Ok(dir) = ancestor.read_dir() {
+                if dir.count() == 0 {
+                    fs::remove_dir(ancestor)?;
+                } else {
+                    break;
+                }
+            }
+        }
     }
     Ok(())
 }

@@ -84,10 +84,23 @@ function _createYupSchema(
         });
       }
     } else if (items.type === "string") {
-      def = yup.array().of(yup.string().required());
+      let d = yup.string().required();
+      if (property.title) {
+        d = d.label(property.title);
+      }
+      if (items.pattern) {
+        d = d.matches(
+          new RegExp(items.pattern, "u"),
+          "${label} is not valid",
+        );
+      }
+      def = yup.array().of(d);
     }
     if (def && definition.minItems !== undefined) {
       def = def.min(definition.minItems);
+    }
+    if (def && definition.maxItems !== undefined) {
+      def = def.max(definition.maxItems);
     }
   } else if (definition.oneOf) {
     if ("enum" in definition.oneOf[0]) {

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::model_generator::template::filters::_to_db_col;
 
-use super::{ConfigDef, FieldDef, ModelDef, _to_var_name};
+use super::{ConfigDef, FieldDef, ModelDef, StringOrArray, _to_var_name};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -109,6 +109,52 @@ impl From<&String> for Parser {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
 #[serde(deny_unknown_fields)]
+/// ### FORCE INDEX定義
+pub struct ForceIndexOnDef {
+    /// ### 検索文字列
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub includes: Option<StringOrArray>,
+    /// ### 除外文字列
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excludes: Option<StringOrArray>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
+/// ### FORCE INDEX定義
+pub struct ForceIndexOnJson {
+    /// ### 名前
+    #[schemars(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$"))]
+    pub name: String,
+    /// ### 検索文字列
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub includes: Option<Vec<String>>,
+    /// ### 除外文字列
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub excludes: Option<Vec<String>>,
+}
+
+impl From<ForceIndexOnDef> for ForceIndexOnJson {
+    fn from(value: ForceIndexOnDef) -> Self {
+        Self {
+            name: Default::default(),
+            includes: value.includes.map(|v| v.to_vec()),
+            excludes: value.excludes.map(|v| v.to_vec()),
+        }
+    }
+}
+
+impl From<ForceIndexOnJson> for ForceIndexOnDef {
+    fn from(value: ForceIndexOnJson) -> Self {
+        Self {
+            includes: StringOrArray::from_vec(value.includes),
+            excludes: StringOrArray::from_vec(value.excludes),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
 /// ### インデックス定義
 pub struct IndexDef {
     /// ### フィールド
@@ -120,6 +166,10 @@ pub struct IndexDef {
     /// ### パーサー
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parser: Option<Parser>,
+    /// ### FORCE INDEX指定
+    /// 検索filterのダイジェストに指定された文字列が含まれていた場合に、FORCE INDEXを指定する
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub force_index_on: IndexMap<String, Option<ForceIndexOnDef>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
@@ -138,6 +188,10 @@ pub struct IndexJson {
     /// ### パーサー
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parser: Option<Parser>,
+    /// ### FORCE INDEX指定
+    /// 検索filterのダイジェストに指定された文字列が含まれていた場合に、FORCE INDEXを指定する
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub force_index_on: Vec<ForceIndexOnJson>,
 }
 
 impl From<IndexDef> for IndexJson {
@@ -155,6 +209,15 @@ impl From<IndexDef> for IndexJson {
                 .collect(),
             index_type: value.index_type,
             parser: value.parser,
+            force_index_on: value
+                .force_index_on
+                .into_iter()
+                .map(|(k, v)| {
+                    let mut v: ForceIndexOnJson = v.unwrap_or_default().into();
+                    v.name = k;
+                    v
+                })
+                .collect(),
         }
     }
 }
@@ -177,6 +240,19 @@ impl From<IndexJson> for IndexDef {
                 .collect(),
             index_type: value.index_type,
             parser: value.parser,
+            force_index_on: value
+                .force_index_on
+                .into_iter()
+                .map(|v| {
+                    let name = v.name.clone();
+                    let v: ForceIndexOnDef = v.into();
+                    if v == ForceIndexOnDef::default() {
+                        (name, None)
+                    } else {
+                        (name, Some(v))
+                    }
+                })
+                .collect(),
         }
     }
 }

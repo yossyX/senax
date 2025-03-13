@@ -33,7 +33,7 @@ pub async fn generate(
         MODELS.write().unwrap().replace(defs.clone());
         for (_model_name, def) in defs {
             if def.has_table() {
-                let (table_name, table) = make_table_def(def, &config)?;
+                let (table_name, table, _) = make_table_def(def, &config)?;
                 new_tables.insert(table_name, table);
             }
         }
@@ -80,7 +80,7 @@ pub async fn generate(
 pub fn make_table_def(
     def: &std::sync::Arc<schema::ModelDef>,
     config: &schema::ConfigDef,
-) -> Result<(String, Table)> {
+) -> Result<(String, Table, IndexMap<String, String>)> {
     let default_collation = if def.collation.is_some() {
         def.collation.clone()
     } else {
@@ -247,12 +247,13 @@ pub fn make_table_def(
         table.primary = Some(TableKey::PrimaryKey(cols));
     }
     let mut idx_check = HashSet::new();
-    for (index_name, index) in &def.merged_indexes {
+    let mut idx_map = IndexMap::new();
+    for (org_index_name, index) in &def.merged_indexes {
         let fields = if !index.fields.is_empty() {
             index.fields.clone()
         } else {
             let mut fields = IndexMap::new();
-            fields.insert(index_name.clone(), None);
+            fields.insert(org_index_name.clone(), None);
             fields
         };
         let cols: Vec<column::Column> = fields
@@ -297,7 +298,7 @@ pub fn make_table_def(
             .filter_map(|v| v.query.clone())
             .collect::<Vec<_>>()
             .join(",");
-        let mut index_name = index_name.to_owned();
+        let mut index_name = org_index_name.clone();
         if !query.is_empty() {
             index_name.push('_');
             index_name.push_str(&crate::common::hex_digest(&query));
@@ -309,17 +310,20 @@ pub fn make_table_def(
                 idx_check.insert(check.clone());
             }
             let index_name = format!("UQ_{}", index_name);
+            idx_map.insert(org_index_name.clone(), index_name.clone());
             table
                 .indexes
                 .insert(index_name.clone(), TableKey::UniqueKey(index_name, cols));
         } else if index.index_type == Some(schema::IndexType::Fulltext) {
             let index_name = format!("FT_{}", index_name);
+            idx_map.insert(org_index_name.clone(), index_name.clone());
             table.indexes.insert(
                 index_name.clone(),
                 TableKey::FulltextKey(index_name, cols, index.parser.map(|v| v.to_string())),
             );
         } else if index.index_type == Some(schema::IndexType::Spatial) {
             let index_name = format!("SP_{}", index_name);
+            idx_map.insert(org_index_name.clone(), index_name.clone());
             table
                 .indexes
                 .insert(index_name.clone(), TableKey::SpatialKey(index_name, cols));
@@ -330,6 +334,7 @@ pub fn make_table_def(
                 idx_check.insert(check.clone());
             }
             let index_name = format!("IDX_{}", index_name);
+            idx_map.insert(org_index_name.clone(), index_name.clone());
             table
                 .indexes
                 .insert(index_name.clone(), TableKey::Key(index_name, cols));
@@ -453,7 +458,7 @@ pub fn make_table_def(
             }
         }
     }
-    Ok((table_name, table))
+    Ok((table_name, table, idx_map))
 }
 
 fn ref_op(r: &Option<schema::ReferenceOption>) -> Option<ReferenceOption> {

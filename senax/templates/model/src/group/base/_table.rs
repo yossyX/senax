@@ -22,8 +22,8 @@ use senax_common::{err, types::blob::*, types::geo_point::*, types::point::*, Sq
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use sqlx::query::{Query, QueryAs};
-use sqlx::Execute as _;
+use sqlx::query::Query;
+use sqlx::{Execute as _, FromRow as _};
 use std::borrow::Borrow;
 use std::boxed::Box;
 use std::collections::{BTreeMap, HashMap};
@@ -47,7 +47,7 @@ use crate::cache::Cache;
 @% endif %@
 use crate::connection::{DbArguments, DbConn, DbRow, DbType};
 use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, ToJsonBlob as _, IntoJson as _, OrderTr};
-use crate::misc::{BindValue, Updater, Size, TrashMode};
+use crate::misc::{BindValue, Count, Updater, Size, TrashMode};
 use crate::models::USE_FAST_CACHE;
 use crate::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
 @%- if !config.excluded_from_domain %@
@@ -2945,12 +2945,12 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
 @{- def.relations_many_with_limit()|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
-        let union: Vec<_> = self.iter().map(|v| {
+        let queries: Vec<_> = self.iter().map(|v| {
             let filter = RelFil{rel_name_pascal}::filter(v){additional_filter};
             rel_{class_mod}::{class}::query().filter(filter){order_and_limit}
         }).collect();
         use rel_{class_mod}::UnionBuilder;
-        let mut list = union.select(conn, None, None, None).await?;
+        let mut list = queries.select_union(conn, None, None, None).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let mut map = AHashMap::default();
         for row in list {
@@ -3047,12 +3047,12 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
 @{- def.relations_many_with_limit()|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
-        let union: Vec<_> = self.iter().map(|v| {
+        let queries: Vec<_> = self.iter().map(|v| {
             let filter = RelFil{rel_name_pascal}::filter(v){additional_filter};
             rel_{class_mod}::{class}::query().filter(filter){order_and_limit}
         }).collect();
         use rel_{class_mod}::UnionBuilder;
-        let mut list = union.select_for_update(conn).await?;
+        let mut list = queries.select_union_for_update(conn).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let mut map = AHashMap::default();
         for row in list {
@@ -3115,12 +3115,12 @@ impl CacheWrapper {
 @{- def.relations_many_cache_with_limit()|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
-        let union: Vec<_> = vec.iter().map(|v| {
+        let queries: Vec<_> = vec.iter().map(|v| {
             let filter = RelFil{rel_name_pascal}::filter(v){additional_filter};
             rel_{class_mod}::{class}::query().filter(filter){order_and_limit}
         }).collect();
         use rel_{class_mod}::_UnionBuilder;
-        let list: Vec<Arc<_>> = union.__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
+        let list: Vec<Arc<_>> = queries.__select_union_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
         let mut map = AHashMap::default();
         for row in list {
             if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
@@ -3215,12 +3215,12 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
 @{- def.relations_many_uncached_with_limit()|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
-        let union: Vec<_> = self.iter().map(|v| {
+        let queries: Vec<_> = self.iter().map(|v| {
             let filter = RelFil{rel_name_pascal}::filter(v){additional_filter};
             rel_{class_mod}::{class}::query().filter(filter){order_and_limit}
         }).collect();
         use rel_{class_mod}::UnionBuilder;
-        let mut list = union.select(conn, None, None, None).await?;
+        let mut list = queries.select_union(conn, None, None, None).await?;
         rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let mut map = AHashMap::default();
         for row in list {
@@ -3336,19 +3336,6 @@ impl BindTr for ColOne_ {
             _ => "?",
         }
     }
-    fn bind_to_query_as<T>(
-        self,
-        query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments> {
-        debug!("bind: {:?}", &self);
-        match self {
-@{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(v) => query.bind(v{bind_as_for_filter}),", "\n") }@
-@%- for (index_name, index) in def.multi_index(false) %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(v) => query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@,
-@%- endfor %@
-            _ => unreachable!(),
-        }
-    }
     fn bind_to_query(
         self,
         query: Query<'_, DbType, DbArguments>,
@@ -3380,17 +3367,6 @@ impl BindTr for ColKey_ {
         match self {
             @{- def.unique_key()|fmt_index_col("
             ColKey_::{var}(_v) => r#\"{col_esc}\"#,", "") }@
-            _ => unreachable!(),
-        }
-    }
-    fn bind_to_query_as<T>(
-        self,
-        query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments> {
-        debug!("bind: {:?}", &self);
-        match self {
-            @{- def.unique_key()|fmt_index_col("
-            ColKey_::{var}(v) => query.bind(v{bind_as_for_filter}),", "") }@
             _ => unreachable!(),
         }
     }
@@ -3466,20 +3442,6 @@ impl BindTr for ColMany_ {
             _ => unreachable!(),
         }
     }
-    fn bind_to_query_as<T>(
-        self,
-        mut query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments> {
-        debug!("bind: {:?}", &self);
-        // To improve build speed, do not use fold.
-        match self {
-@{ def.all_fields_without_json()|fmt_join("            ColMany_::{var}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "\n") }@
-@%- for (index_name, index) in def.multi_index(false) %@
-            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(v) => {for v in v { query = query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@; } query},
-@%- endfor %@
-            _ => unreachable!(),
-        }
-    }
     fn bind_to_query(
         self,
         mut query: Query<'_, DbType, DbArguments>,
@@ -3511,17 +3473,6 @@ impl BindTr for ColJson_ {
         match self {
 @{- def.all_fields_only_json()|fmt_join("
             ColJson_::{var}(_v) => r#\"{col_esc}\"#,", "") }@
-            _ => unreachable!(),
-        }
-    }
-    fn bind_to_query_as<T>(
-        self,
-        query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments> {
-        debug!("bind: {:?}", &self);
-        match self {
-@{- def.all_fields_only_json()|fmt_join("
-            ColJson_::{var}(v) => query.bind(v{bind_as_for_filter}),", "") }@
             _ => unreachable!(),
         }
     }
@@ -3557,17 +3508,6 @@ impl BindTr for ColJsonArray_ {
             _ => unreachable!(),
         }
     }
-    fn bind_to_query_as<T>(
-        self,
-        query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments> {
-        debug!("bind: {:?}", &self);
-        match self {
-@{- def.all_fields_only_json()|fmt_join("
-            ColJsonArray_::{var}(v) => query.bind(sqlx::types::Json(v{bind_as_for_filter})),", "") }@
-            _ => unreachable!(),
-        }
-    }
     fn bind_to_query(
         self,
         query: Query<'_, DbType, DbArguments>,
@@ -3581,17 +3521,6 @@ impl BindTr for ColJsonArray_ {
     }
 }
 impl BindArrayTr for ColJsonArray_ {
-    fn query_as_each_bind<T>(
-        self,
-        mut query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments> {
-        debug!("bind: {:?}", &self);
-        match self {
-@{- def.all_fields_only_json()|fmt_join("
-            ColJsonArray_::{var}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "") }@
-            _ => unreachable!(),
-        }
-    }
     fn query_each_bind(
         self,
         mut query: Query<'_, DbType, DbArguments>,
@@ -3624,17 +3553,6 @@ impl BindTr for ColGeo_ {
             _ => unreachable!(),
         }
     }
-    fn bind_to_query_as<T>(
-        self,
-        query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments> {
-        debug!("bind: {:?}", &self);
-        match self {
-@{- def.all_fields_only_geo()|fmt_join("
-            ColGeo_::{var}(v, srid) => query.bind(v{bind_as_for_filter}).bind(srid),", "") }@
-            _ => unreachable!(),
-        }
-    }
     fn bind_to_query(
         self,
         query: Query<'_, DbType, DbArguments>,
@@ -3664,17 +3582,6 @@ impl BindTr for ColGeoDistance_ {
         match self {
 @{- def.all_fields_only_geo()|fmt_join("
             ColGeoDistance_::{var}(_, _, _) => r#\"{col_esc}\"#,", "") }@
-            _ => unreachable!(),
-        }
-    }
-    fn bind_to_query_as<T>(
-        self,
-        query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments> {
-        debug!("bind: {:?}", &self);
-        match self {
-@{- def.all_fields_only_geo()|fmt_join("
-            ColGeoDistance_::{var}(v, d, srid) => query.bind(v.clone(){bind_as_for_filter}).bind(srid).bind(d).bind(v{bind_as_for_filter}).bind(srid).bind(d),", "") }@
             _ => unreachable!(),
         }
     }
@@ -3748,29 +3655,6 @@ impl ColRelTr for ColRel_ {
                 buf.push_str(Primary::cols());
             }", "") }@
         };
-@%- endif %@
-    }
-    fn bind_to_query_as<T>(
-        self,
-        query: QueryAs<'_, DbType, T, DbArguments>,
-    ) -> QueryAs<'_, DbType, T, DbArguments> {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db(false).len() > 0 %@
-        match self {
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("
-            ColRel_::{rel_name}(c) => {
-                rel_{class_mod}::bind_for_rel_query_as(c, query)
-            }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-            ColRel_::{rel_name}(c) => {
-                rel_{class_mod}::bind_for_rel_query_as(c, query)
-            }", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
-            ColRel_::{rel_name}(c) => {
-                rel_{class_mod}::bind_for_rel_query_as(c, query)
-            }", "") }@
-        }
-@%- else %@
-        query
 @%- endif %@
     }
     fn bind_to_query(
@@ -3855,14 +3739,6 @@ pub fn write_having_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols1: 
     }
     if without_key && buf.ends_with(" WHERE ") {
         buf.truncate(buf.len() - " WHERE ".len());
-    }
-}
-
-pub fn bind_for_rel_query_as<T>(filter: Option<Box<Filter_>>, query: QueryAs<'_, DbType, T, DbArguments>) -> QueryAs<'_, DbType, T, DbArguments> {
-    if let Some(filter) = filter {
-        filter.bind_to_query_as(query)
-    } else {
-        query
     }
 }
 
@@ -4197,11 +4073,6 @@ macro_rules! @{ order_macro_name }@ {
 pub@{ visibility }@ use @{ order_macro_name }@ as order;
 @%- endif %@
 
-#[derive(Default, sqlx::FromRow, senax_macros::SqlCol)]
-struct Count {
-    #[sql(query = "count(*)")]
-    c: i64,
-}
 @%- if config.excluded_from_domain %@
 
 #[derive(Debug, Clone, Default)]
@@ -4347,23 +4218,36 @@ impl QueryBuilder {
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
     {
-        let sql = self._sql(T::_sql_cols(), false, conn.shard_id());
-        let mut query = sqlx::query_as::<_, T>(&sql);
+        let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        debug!("filter digest:{}", filter_digest);
+        let sql = self._sql(T::_sql_cols(), false, conn.shard_id(), &filter_digest);
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         query = self._bind(query);
+        let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
-        Ok(result)
+        if now.elapsed() > std::time::Duration::from_secs(1) {
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+        }
+        let result: sqlx::Result<Vec<_>> = result.iter().map(T::from_row).collect();
+        Ok(result?)
     }
 
     #[allow(clippy::if_same_then_else)]
-    fn _sql(&self, sql_cols: &str, for_update: bool, shard_id: ShardId) -> String {
+    fn _sql(&self, sql_cols: &str, for_update: bool, shard_id: ShardId, filter_digest: &str) -> String {
+        let mut force_indexes: Vec<&'static str> = Vec::new();
+        @%- for (cond, idx) in force_indexes %@
+        if @{ cond }@ {
+            force_indexes.push(@{ idx }@);
+        }
+        @%- endfor %@
         let mut sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
             sql_cols,
-            if self.limit.is_some() && self.raw_order.is_none() {
-                r#"@{ force_index }@"#
+            if !force_indexes.is_empty() {
+                format!(" FORCE INDEX({})", force_indexes.join(","))
             } else {
-                ""
+                String::new()
             },
             Filter_::write_where(
                 &self.filter,
@@ -4392,10 +4276,10 @@ impl QueryBuilder {
         sql
     }
 
-    fn _bind<T>(self, mut query: QueryAs<DbType, T, DbArguments>) -> QueryAs<DbType, T, DbArguments> {
+    fn _bind(self, mut query: Query<DbType, DbArguments>) -> Query<DbType, DbArguments> {
         if let Some(c) = self.filter {
             debug!("filter: {:?}", &c);
-            query = c.bind_to_query_as(query);
+            query = c.bind_to_query(query);
         }
         for value in self.bind.into_iter() {
             debug!("bind: {:?}", &value);
@@ -4425,22 +4309,36 @@ impl QueryBuilder {
             + Unpin
             + 'static,
     {
-        let sql = self._sql(T::_sql_cols(), false, conn.shard_id());
+        let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        debug!("filter digest:{}", filter_digest);
+        let sql = self._sql(T::_sql_cols(), false, conn.shard_id(), &filter_digest);
         let (tx, rx) = mpsc::channel(1000);
         let mut executor = conn.acquire_reader().await?;
         let ctx_no = conn.ctx_no();
         tokio::spawn(async move {
-            let mut query = sqlx::query_as::<_, T>(&sql);
+            let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = ctx_no);
             query = self._bind(query);
+            let now = std::time::Instant::now();
             let mut result = query.fetch(executor.as_mut());
+            if now.elapsed() > std::time::Duration::from_secs(1) {
+                warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+            }
             while let Some(v) = result.try_next().await.unwrap_or_else(|e| {
                 warn!("{}", e);
                 None
             }) {
-                if let Err(e) = tx.send(v).await {
-                    warn!("{}", e);
-                    break;
+                match T::from_row(&v) {
+                    Ok(v) => {
+                        if let Err(e) = tx.send(v).await {
+                            warn!("{}", e);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        error!("{}", e);
+                        break;
+                    }
                 }
             }
         });
@@ -4451,12 +4349,20 @@ impl QueryBuilder {
     #[cfg(not(feature="cache_update_only"))]
     #[allow(clippy::if_same_then_else)]
     async fn _select_from_cache(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
+        let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        debug!("filter digest:{}", filter_digest);
+        let mut force_indexes: Vec<&'static str> = Vec::new();
+        @%- for (cond, idx) in force_indexes %@
+        if @{ cond }@ {
+            force_indexes.push(@{ idx }@);
+        }
+        @%- endfor %@
         let mut sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
-            if self.limit.is_some() && self.raw_order.is_none() {
-                r#"@{ force_index }@"#
+            if !force_indexes.is_empty() {
+                format!(" FORCE INDEX({})", force_indexes.join(","))
             } else {
-                ""
+                String::new()
             },
             Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id()),
             &self.raw_query,
@@ -4468,11 +4374,17 @@ impl QueryBuilder {
         if let Some(offset) = self.offset {
             write!(sql, " offset {}", offset)?;
         }
-        let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let joiner = self.joiner.take();
         query = self._bind(query);
+        let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
+        if now.elapsed() > std::time::Duration::from_secs(1) {
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+        }
+        let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
+        let result = result?;
         let ids: Vec<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> = result.iter().map(|id| id.into()).collect();
         conn.release_cache_tx();
         let mut list = _@{ pascal_name }@::find_many_from_cache(conn, ids).await?;
@@ -4488,17 +4400,24 @@ impl QueryBuilder {
     @%- if !def.disable_update() %@
 
     pub@{ visibility }@ async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
-        let sql = self._sql(Data::_sql_cols(), !conn.wo_tx(), conn.shard_id());
-        let mut query = sqlx::query_as::<_, Data>(&sql);
+        let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        debug!("filter digest:{}", filter_digest);
+        let sql = self._sql(Data::_sql_cols(), !conn.wo_tx(), conn.shard_id(), &filter_digest);
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let joiner = self.joiner.take();
         query = self._bind(query);
+        let now = std::time::Instant::now();
         let result = if conn.wo_tx() {
             query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
         } else {
             query.fetch_all(conn.get_tx().await?.as_mut()).await?
         };
-        let mut list: Vec<_Updater_> = result
+        if now.elapsed() > std::time::Duration::from_secs(1) {
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+        }
+        let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
+        let mut list: Vec<_Updater_> = result?
             .into_iter()
             .map(_Updater_::from)
             .collect();
@@ -4590,6 +4509,14 @@ impl QueryBuilder {
     #[allow(unused_mut)]
     #[allow(clippy::if_same_then_else)]
     pub@{ visibility }@ async fn update(self, conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<u64> {
+        let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        debug!("filter digest:{}", filter_digest);
+        let mut force_indexes: Vec<&'static str> = Vec::new();
+        @%- for (cond, idx) in force_indexes %@
+        if @{ cond }@ {
+            force_indexes.push(@{ idx }@);
+        }
+        @%- endfor %@
         @%- if def.updated_at_conf().is_some() %@
         if obj._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
             obj.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
@@ -4601,10 +4528,10 @@ impl QueryBuilder {
         assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         let mut sql = format!(
             r#"UPDATE @{ table_name|db_esc }@ as _t1{} SET {} {} {} {}"#,
-            if self.limit.is_some() && self.raw_order.is_none() {
-                r#"@{ force_index }@"#
+            if !force_indexes.is_empty() {
+                format!(" FORCE INDEX({})", force_indexes.join(","))
             } else {
-                ""
+                String::new()
             },
             &vec.join(","),
             Filter_::write_where(
@@ -4648,11 +4575,15 @@ impl QueryBuilder {
                 BindValue::BinaryUuid(v) => query.bind(v),
             };
         }
+        let now = std::time::Instant::now();
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await?
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
+        if now.elapsed() > std::time::Duration::from_secs(1) {
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+        }
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
@@ -4680,12 +4611,20 @@ impl QueryBuilder {
     #[allow(clippy::if_same_then_else)]
     pub@{ visibility }@ async fn force_delete(self, conn: &mut DbConn) -> Result<u64> {
         @%- if def.on_delete_list.is_empty() %@
+        let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        debug!("filter digest:{}", filter_digest);
+        let mut force_indexes: Vec<&'static str> = Vec::new();
+        @%- for (cond, idx) in force_indexes %@
+        if @{ cond }@ {
+            force_indexes.push(@{ idx }@);
+        }
+        @%- endfor %@
         let mut sql = format!(
             r#"DELETE FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
-            if self.limit.is_some() && self.raw_order.is_none() {
-                r#"@{ force_index }@"#
+            if !force_indexes.is_empty() {
+                format!(" FORCE INDEX({})", force_indexes.join(","))
             } else {
-                ""
+                String::new()
             },
             Filter_::write_where(
                 &self.filter,
@@ -4723,22 +4662,34 @@ impl QueryBuilder {
                 BindValue::BinaryUuid(v) => query.bind(v),
             };
         }
+        let now = std::time::Instant::now();
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await?
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
+        if now.elapsed() > std::time::Duration::from_secs(1) {
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+        }
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
         Ok(result.rows_affected())
         @%- else %@
+        let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        debug!("filter digest:{}", filter_digest);
+        let mut force_indexes: Vec<&'static str> = Vec::new();
+        @%- for (cond, idx) in force_indexes %@
+        if @{ cond }@ {
+            force_indexes.push(@{ idx }@);
+        }
+        @%- endfor %@
         let mut sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
-            if self.limit.is_some() && self.raw_order.is_none() {
-                r#"@{ force_index }@"#
+            if !force_indexes.is_empty() {
+                format!(" FORCE INDEX({})", force_indexes.join(","))
             } else {
-                ""
+                String::new()
             },
             Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id()),
             &self.raw_query,
@@ -4755,11 +4706,16 @@ impl QueryBuilder {
         } else {
             write!(sql, " FOR UPDATE").unwrap();
         }
-        let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         query = self._bind(query);
+        let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
-        let ids: Vec<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> = result.iter().map(|id| id.into()).collect();
+        if now.elapsed() > std::time::Duration::from_secs(1) {
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+        }
+        let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
+        let ids: Vec<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> = result?.iter().map(|id| id.into()).collect();
         _@{ pascal_name }@::force_delete_by_ids(conn, ids).await
         @%- endif %@
     }
@@ -4767,32 +4723,27 @@ impl QueryBuilder {
 
 #[async_trait]
 pub@{ visibility }@ trait UnionBuilder {
-    async fn select(self, conn: &mut DbConn, order: Option<Vec<Order_>>, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<_@{ pascal_name }@>>;
-    async fn select_for_update(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>>;
+    async fn select_union(self, conn: &mut DbConn, order: Option<Vec<Order_>>, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<_@{ pascal_name }@>>;
+    async fn select_union_for_update(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>>;
 }
 @%- if !config.force_disable_cache %@
 
 #[cfg(not(feature="cache_update_only"))]
 #[async_trait]
 pub(crate) trait _UnionBuilder {
-    async fn __select_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>>;
+    async fn __select_union_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>>;
 }
 @%- endif %@
 
-async fn _union<T>(
+async fn _union(
     mut list: Vec<QueryBuilder>,
     conn: &mut DbConn,
+    sql_cols: &str,
     order: Option<Vec<Order_>>,
     limit: Option<usize>,
     offset: Option<usize>,
     for_update: bool,
-) -> Result<Vec<T>>
-where
-    T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row>
-        + SqlColumns
-        + Send
-        + Sync
-        + Unpin,
+) -> Result<Vec<<DbType as sqlx::Database>::Row>>
 {
     if order.is_none() && limit.is_none() && offset.is_none() {
         let mut result = Vec::new();
@@ -4803,10 +4754,13 @@ where
             }
             let mut sql = chunk
                 .iter()
-                .map(|v| format!("({})", v._sql(T::_sql_cols(), for_update, conn.shard_id())))
+                .map(|v| {
+                    let filter_digest = v.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+                    format!("({})", v._sql(sql_cols, for_update, conn.shard_id(), &filter_digest))
+                })
                 .collect::<Vec<_>>()
                 .join(" UNION ALL ");
-            let mut query = sqlx::query_as::<_, T>(&sql);
+            let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for builder in chunk {
                 query = builder._bind(query);
@@ -4817,7 +4771,10 @@ where
     } else {
         let mut sql = list
             .iter()
-            .map(|v| format!("({})", v._sql(T::_sql_cols(), for_update, conn.shard_id())))
+            .map(|v| {
+                let filter_digest = v.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+                format!("({})", v._sql(sql_cols, for_update, conn.shard_id(), &filter_digest))
+            })
             .collect::<Vec<_>>()
             .join(" UNION ");
         write!(sql, " {}", Order_::write_order(&order, &None))?;
@@ -4827,31 +4784,32 @@ where
         if let Some(offset) = offset {
             write!(sql, " offset {}", offset)?;
         }
-        let mut query = sqlx::query_as::<_, T>(&sql);
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for builder in list {
             query = builder._bind(query);
         }
-        let result = crate::misc::fetch!(conn, query, fetch_all);
-        Ok(result)
+        Ok(crate::misc::fetch!(conn, query, fetch_all))
     }
 }
 
 #[async_trait]
 impl UnionBuilder for Vec<QueryBuilder> {
-    async fn select(mut self, conn: &mut DbConn, order: Option<Vec<Order_>>, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<_@{ pascal_name }@>> {
+    async fn select_union(mut self, conn: &mut DbConn, order: Option<Vec<Order_>>, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<_@{ pascal_name }@>> {
         if self.is_empty() {
             return Ok(Vec::new());
         }
-        let result: Vec<Data> = _union(self, conn, order, limit, offset, false).await?;
-        Ok(result.into_iter().map(_@{ pascal_name }@::from).collect())
+        let result = _union(self, conn, Data::_sql_cols(), order, limit, offset, false).await?;
+        let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
+        Ok(result?.into_iter().map(_@{ pascal_name }@::from).collect())
     }
-    async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
+    async fn select_union_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
         if self.is_empty() {
             return Ok(Vec::new());
         }
-        let result: Vec<Data> = _union(self, conn, None, None, None, true).await?;
-        Ok(result.into_iter().map(_@{ pascal_name }@Updater::from).collect())
+        let result = _union(self, conn, Data::_sql_cols(), None, None, None, true).await?;
+        let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
+        Ok(result?.into_iter().map(_@{ pascal_name }@Updater::from).collect())
     }
 }
 @%- if !config.force_disable_cache %@
@@ -4859,10 +4817,11 @@ impl UnionBuilder for Vec<QueryBuilder> {
 #[cfg(not(feature="cache_update_only"))]
 #[async_trait]
 impl _UnionBuilder for Vec<QueryBuilder> {
-    async fn __select_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
-        let result: Vec<CacheData> = _union(self, conn, None, None, None, false).await?;
+    async fn __select_union_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
+        let result = _union(self, conn, CacheData::_sql_cols(), None, None, None, false).await?;
+        let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
-        let list = result.into_iter().map(|v| Arc::new(CacheWrapper::_from_inner(v, conn.shard_id(), time)).into()).collect();
+        let list = result?.into_iter().map(|v| Arc::new(CacheWrapper::_from_inner(v, conn.shard_id(), time)).into()).collect();
         Ok(list)
     }
 }
@@ -5845,13 +5804,21 @@ impl _@{ pascal_name }@ {
         }
         let mut conn = DbConn::_new_with_ctx(ctx_no, shard_id);
         conn.begin_cache_tx().await?;
+        let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        debug!("filter digest:{}", filter_digest);
+        let mut force_indexes: Vec<&'static str> = Vec::new();
+        @%- for (cond, idx) in force_indexes %@
+        if @{ cond }@ {
+            force_indexes.push(@{ idx }@);
+        }
+        @%- endfor %@
         let mut sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1{} {} {}"#,
             CacheData::_sql_cols(),
-            if limit.is_some() {
-                r#"@{ force_index }@"#
+            if !force_indexes.is_empty() {
+                format!(" FORCE INDEX({})", force_indexes.join(","))
             } else {
-                ""
+                String::new()
             },
             Filter_::write_where(
                 &filter,
@@ -5866,14 +5833,19 @@ impl _@{ pascal_name }@ {
         if let Some(limit) = limit {
             write!(sql, " limit {}", limit)?;
         }
-        let mut query = sqlx::query_as::<_, CacheData>(&sql);
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
-            query = c.bind_to_query_as(query);
+            query = c.bind_to_query(query);
         }
+        let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
+        if now.elapsed() > std::time::Duration::from_secs(1) {
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+        }
+        let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
-        let mut list: Vec<CacheWrapper> = result.into_iter().map(|data| CacheWrapper::_from_inner(data, shard_id, time)).collect();
+        let mut list: Vec<CacheWrapper> = result?.into_iter().map(|data| CacheWrapper::_from_inner(data, shard_id, time)).collect();
         @{- def.relations_in_cache()|fmt_rel_join("\n        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut list, &mut conn).await?;", "") }@
         let list: Vec<_@{ pascal_name }@Cache> = list.into_iter().map(|v| Arc::new(v).into()).collect();
         let arc = Arc::new(list);
@@ -5922,12 +5894,13 @@ impl _@{ pascal_name }@ {
             ),
             Order_::write_order(&order, &None)
         );
-        let mut query = sqlx::query_as::<_, CacheData>(&sql);
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = crate::misc::fetch!(conn, query, fetch_all);
+        let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
         #[allow(clippy::needless_collect)]
-        let mut list: Vec<CacheWrapper> = result.into_iter().map(|data| CacheWrapper::_from_inner(data, shard_id, time)).collect();
+        let mut list: Vec<CacheWrapper> = result?.into_iter().map(|data| CacheWrapper::_from_inner(data, shard_id, time)).collect();
         @{- def.relations_in_cache()|fmt_rel_join("\n        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut list, &mut conn).await?;", "") }@
         let list: Vec<_@{ pascal_name }@Cache> = list.into_iter().map(|v| Arc::new(v).into()).collect();
         let arc = Arc::new(list);
@@ -5986,17 +5959,17 @@ impl _@{ pascal_name }@ {
                     }
                 })
                 .collect();
-            @%- else %@
-            let mut v = Self::___find_many(conn, ids, trash_mode, filter.clone()).await?;
-            @%- endif %@
             list.append(&mut v);
+            @%- else %@
+            let v = Self::___find_many(conn, Data::_sql_cols(), ids, trash_mode, filter.clone()).await?;
+            let mut v: sqlx::Result<Vec<_>> = v.iter().map(Data::from_row).collect();
+            list.append(&mut v?);
+            @%- endif %@
         }
         Ok(list)
     }
     #[allow(clippy::needless_borrow)]
-    async fn ___find_many<T>(conn: &mut DbConn, ids: &[InnerPrimary], trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Vec<T>>
-    where
-        T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
+    async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Vec<<DbType as sqlx::Database>::Row>>
     {
         if ids.is_empty() {
             return Ok(Vec::new());
@@ -6010,20 +5983,19 @@ impl _@{ pascal_name }@ {
         let q = "@{ def.primaries()|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
         let sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ {filter_str} @{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({});"#,
-            T::_sql_cols(),
+            sql_cols,
             &q[0..q.len() - 1]
         );
-        let mut query = sqlx::query_as::<_, T>(&sql);
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
-            query = c.bind_to_query_as(query);
+            query = c.bind_to_query(query);
         }
         for id in ids {
             @{- def.primaries()|fmt_join("
             query = query.bind(id.{index}{bind_as});", "") }@
         }
-        let result = crate::misc::fetch!(conn, query, fetch_all);
-        Ok(result)
+        Ok(crate::misc::fetch!(conn, query, fetch_all))
     }
 @%- if def.use_cache() %@
 
@@ -6050,10 +6022,12 @@ impl _@{ pascal_name }@ {
                     }
                 })
                 .collect();
-            @%- else %@
-            let mut v = Self::___find_many(conn, ids, TrashMode::With, None).await?;
-            @%- endif %@
             result.append(&mut v);
+            @%- else %@
+            let v = Self::___find_many(conn, CacheData::_sql_cols(), ids, TrashMode::With, None).await?;
+            let mut v: sqlx::Result<Vec<_>> = v.iter().map(CacheData::from_row).collect();
+            result.append(&mut v?);
+            @%- endif %@
         }
         let time = MSec::now();
         let list = result.into_iter().map(|v| CacheWrapper::_from_inner(v, conn.shard_id(), time)).collect();
@@ -6349,7 +6323,7 @@ impl _@{ pascal_name }@ {
             ..Default::default()
         });
         @%- else %@
-        let data: Option<Data> = Self::__find_optional(conn, id, TrashMode::Not, filter).await?;
+        let data: Option<Data> = Self::__find_optional(conn, Data::_sql_cols(), id, TrashMode::Not, filter).await?.map(|v| Data::from_row(&v)).transpose()?;
         @%- endif %@
         Ok(data.map(_@{ pascal_name }@::from))
     }
@@ -6362,7 +6336,7 @@ impl _@{ pascal_name }@ {
         @%- if def.dummy_always_present() %@
         Ok(true)
         @%- else %@
-        let data: Option<Count> = Self::__find_optional(conn, id, TrashMode::Not, filter).await?;
+        let data: Option<Count> = Self::__find_optional(conn, Count::_sql_cols(), id, TrashMode::Not, filter).await?.map(|v| Count::from_row(&v)).transpose()?;
         Ok(data.unwrap_or_default().c > 0)
         @%- endif %@
     }
@@ -6391,7 +6365,7 @@ impl _@{ pascal_name }@ {
             ..Default::default()
         });
         @%- else %@
-        let data: Option<Data> = Self::__find_optional(conn, id, TrashMode::With, filter).await?;
+        let data: Option<Data> = Self::__find_optional(conn, Data::_sql_cols(), id, TrashMode::With, filter).await?.map(|v| Data::from_row(&v)).transpose()?;
         @%- endif %@
         Ok(data.map(_@{ pascal_name }@::from))
     }
@@ -6404,16 +6378,14 @@ impl _@{ pascal_name }@ {
         @%- if def.dummy_always_present() %@
         Ok(true)
         @%- else %@
-        let data: Option<Count> = Self::__find_optional(conn, id, TrashMode::With, filter).await?;
+        let data: Option<Count> = Self::__find_optional(conn, Count::_sql_cols(), id, TrashMode::With, filter).await?.map(|v| Count::from_row(&v)).transpose()?;
         Ok(data.unwrap_or_default().c > 0)
         @%- endif %@
     }
     @%- endif %@
 
     #[allow(clippy::needless_borrow)]
-    async fn __find_optional<T>(conn: &mut DbConn, id: InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Option<T>>
-    where
-        T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
+    async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Option<<DbType as sqlx::Database>::Row>>
     {
         let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
         if filter_str.is_empty() {
@@ -6421,11 +6393,11 @@ impl _@{ pascal_name }@ {
         } else {
             filter_str.push_str(" AND ");
         }
-        let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#, T::_sql_cols());
-        let mut query = sqlx::query_as::<_, T>(&sql);
+        let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#, sql_cols);
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
-            query = c.bind_to_query_as(query);
+            query = c.bind_to_query(query);
         }
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
@@ -6514,17 +6486,17 @@ impl _@{ pascal_name }@ {
             filter_str.push_str(" AND ");
         }
         let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ FOR UPDATE"#, Data::_sql_cols());
-        let mut query = sqlx::query_as::<_, Data>(&sql);
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
-            query = c.bind_to_query_as(query);
+            query = c.bind_to_query(query);
         }
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
         if conn.wo_tx() {
-            Ok(query.fetch_optional(conn.acquire_writer().await?.as_mut()).await?)
+            Ok(query.fetch_optional(conn.acquire_writer().await?.as_mut()).await?.map(|v| Data::from_row(&v)).transpose()?)
         } else {
-            Ok(query.fetch_optional(conn.get_tx().await?.as_mut()).await?)
+            Ok(query.fetch_optional(conn.get_tx().await?.as_mut()).await?.map(|v| Data::from_row(&v)).transpose()?)
         }
     }
 
@@ -6533,7 +6505,8 @@ impl _@{ pascal_name }@ {
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
-        Self::__find_many_for_update(conn, ids, TrashMode::Not, filter).await
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
+        Self::__find_many_for_update(conn, &ids, TrashMode::Not, filter).await
     }
 
     pub@{ visibility }@ async fn find_many_for_update_with_trashed<I, T>(conn: &mut DbConn, ids: I, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
@@ -6541,16 +6514,13 @@ impl _@{ pascal_name }@ {
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
-        Self::__find_many_for_update(conn, ids, TrashMode::With, filter).await
+        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
+        Self::__find_many_for_update(conn, &ids, TrashMode::With, filter).await
     }
 
     #[allow(clippy::needless_borrow)]
-    async fn __find_many_for_update<I, T>(conn: &mut DbConn, ids: I, trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Primary>,
+    async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
     {
-        let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         if ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -6569,10 +6539,10 @@ impl _@{ pascal_name }@ {
                 Data::_sql_cols(),
                 &q[0..q.len() - 1],
             );
-            let mut query = sqlx::query_as::<_, Data>(&sql);
+            let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             if let Some(c) = filter.clone() {
-                query = c.bind_to_query_as(query);
+                query = c.bind_to_query(query);
             }
             for id in ids {
                 @{- def.primaries()|fmt_join("
@@ -6583,7 +6553,8 @@ impl _@{ pascal_name }@ {
             } else {
                 query.fetch_all(conn.get_tx().await?.as_mut()).await?
             };
-            result
+            let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
+            result?
                 .into_iter()
                 .map(_Updater_::from)
                 .for_each(|obj| list.push(obj));
@@ -7659,7 +7630,7 @@ impl _@{ pascal_name }@ {
                     Data::_sql_cols(),
                     &q[0..q.len() - 1]
                 );
-                let mut query = sqlx::query_as::<_, Data>(&sql);
+                let mut query = sqlx::query(&sql);
                 let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
                 for id in ids {
                     @{- def.primaries()|fmt_join("
@@ -7670,7 +7641,8 @@ impl _@{ pascal_name }@ {
                 } else {
                     query.fetch_all(conn.get_tx().await?.as_mut()).await?
                 };
-                let list: Vec<_@{ pascal_name }@> = result.into_iter().map(|v| v.into()).collect();
+                let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
+                let list: Vec<_@{ pascal_name }@> = result?.into_iter().map(|v| v.into()).collect();
                 _@{ pascal_name }@::_before_delete(conn, &list).await?;
                 conn.push_callback(Box::new(|| {
                     async move {
@@ -7972,7 +7944,7 @@ impl _@{ pascal_name }@ {
                 Data::_sql_cols(),
                 &q[0..q.len() - 1]
             );
-            let mut query = sqlx::query_as::<_, Data>(&sql);
+            let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
@@ -7982,6 +7954,8 @@ impl _@{ pascal_name }@ {
             } else {
                 query.fetch_all(conn.get_tx().await?.as_mut()).await?
             };
+            let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
+            let result = result?
             let result_num = result.len() as u64;
             let list: Vec<Self> = result.into_iter().map(|v| v.into()).collect();
             let id_list: Vec<InnerPrimary> = list.iter().map(|v| v.into()).collect();
@@ -8010,16 +7984,18 @@ impl _@{ pascal_name }@ {
                 r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
                 &q[0..q.len() - 1]
             );
-            let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
+            let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
-            let id_list = if conn.wo_tx() {
+            let result = if conn.wo_tx() {
                 query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.fetch_all(conn.get_tx().await?.as_mut()).await?
             };
+            let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
+            let id_list = result?;
             let result_num = id_list.len() as u64;
 @%- if !config.force_disable_cache %@
             @%- if def.act_as_job_queue() %@
@@ -8076,15 +8052,15 @@ impl _@{ pascal_name }@ {
                 r#"SELECT count(*) as c FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
                 &q[0..q.len() - 1]
             );
-            let mut query = sqlx::query_as::<_, Count>(&sql);
+            let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
             let result = if conn.wo_tx() {
-                query.fetch_one(conn.acquire_writer().await?.as_mut()).await?
+                Count::from_row(&query.fetch_one(conn.acquire_writer().await?.as_mut()).await?)?
             } else {
-                query.fetch_one(conn.get_tx().await?.as_mut()).await?
+                Count::from_row(&query.fetch_one(conn.get_tx().await?.as_mut()).await?)?
             };
             ensure!(
                 result.c == 0,
@@ -8112,16 +8088,18 @@ impl _@{ pascal_name }@ {
                 r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
                 &q[0..q.len() - 1]
             );
-            let mut query = sqlx::query_as::<_, InnerPrimary>(&sql);
+            let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for id in ids {
                 query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             }
-            let id_list = if conn.wo_tx() {
+            let result = if conn.wo_tx() {
                 query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
             } else {
                 query.fetch_all(conn.get_tx().await?.as_mut()).await?
             };
+            let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
+            let id_list = result?;
             let result_num = id_list.len() as u64;
 @%- if !config.force_disable_cache %@
             @%- if def.act_as_job_queue() %@

@@ -94,7 +94,6 @@ pub async fn start(
             .with_graceful_shutdown(shutdown_signal())
             .await
             .unwrap();
-        writeln!(&mut stdout, "stop")?;
     }
     Ok(())
 }

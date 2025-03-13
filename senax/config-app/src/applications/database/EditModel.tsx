@@ -762,6 +762,17 @@ function Index({ formData, definitions }: any) {
         />
         <AutoField name="type" {...formData} />
         <AutoField name="parser" {...formData} hidden={type !== "fulltext"} />
+        <AutoField
+          name="force_index_on"
+          {...formData}
+          columns={[
+            { field: "name", editable: true },
+          ]}
+          dialog={ForceIndexOn}
+          resolver={yupResolver(
+            createYupSchema(definitions.ForceIndexOnJson, definitions),
+          )}
+        />
       </SpaceBetween>
     </>
   );
@@ -779,6 +790,18 @@ function IndexField({ formData }: any) {
         <AutoField name="direction" {...formData} />
         <AutoField name="length" {...formData} />
         <AutoField name="query" {...formData} />
+      </SpaceBetween>
+    </>
+  );
+}
+
+function ForceIndexOn({ formData }: any) {
+  return (
+    <>
+      <SpaceBetween direction="vertical" size="xs">
+        <AutoField name="name" {...formData} />
+        <AutoField name="includes" {...formData} />
+        <AutoField name="excludes" {...formData} />
       </SpaceBetween>
     </>
   );

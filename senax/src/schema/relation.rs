@@ -49,7 +49,13 @@ impl StringOrArray {
             StringOrArray::Many(v) => v.clone(),
         }
     }
-    fn from_vec(value: Option<Vec<String>>) -> Option<StringOrArray> {
+    pub fn from_vec(value: Option<Vec<String>>) -> Option<StringOrArray> {
+        let value: Option<Vec<String>> = value.map(|v| {
+            v.iter()
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .collect()
+        });
         if let Some(mut value) = value {
             if value.is_empty() {
                 None
@@ -60,13 +66,6 @@ impl StringOrArray {
             }
         } else {
             None
-        }
-    }
-    #[allow(dead_code)]
-    pub fn last(&self) -> &str {
-        match self {
-            StringOrArray::One(v) => v,
-            StringOrArray::Many(v) => v.last().unwrap(),
         }
     }
 }
@@ -117,6 +116,7 @@ pub struct HasOneJson {
     pub model: Option<String>,
     /// ### 結合先のフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(inner(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$")))]
     pub foreign: Option<Vec<String>>,
     /// ### 親モデルのキャッシュに含まれない
     #[serde(default, skip_serializing_if = "super::is_false")]
@@ -256,6 +256,7 @@ pub struct HasManyJson {
     pub model: Option<String>,
     /// ### 結合先のフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(inner(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$")))]
     pub foreign: Option<Vec<String>>,
     /// ### 親モデルのキャッシュに含まれない
     #[serde(default, skip_serializing_if = "super::is_false")]
@@ -418,6 +419,7 @@ pub struct BelongsToJson {
     pub model: Option<String>,
     /// ### 結合するローカルのフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(inner(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$")))]
     pub local: Option<Vec<String>>,
     /// ### リレーション先が論理削除されていても取得する
     #[serde(default, skip_serializing_if = "super::is_false")]
@@ -568,6 +570,7 @@ pub struct BelongsToOuterDbJson {
     pub model: String,
     /// ### 結合するローカルのフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(inner(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$")))]
     pub local: Option<Vec<String>>,
     /// ### リレーション先が論理削除されていても取得する
     #[serde(default, skip_serializing_if = "super::is_false")]
