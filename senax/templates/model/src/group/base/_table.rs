@@ -4227,7 +4227,7 @@ impl QueryBuilder {
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(T::from_row).collect();
         Ok(result?)
@@ -4235,12 +4235,7 @@ impl QueryBuilder {
 
     #[allow(clippy::if_same_then_else)]
     fn _sql(&self, sql_cols: &str, for_update: bool, shard_id: ShardId, filter_digest: &str) -> String {
-        let mut force_indexes: Vec<&'static str> = Vec::new();
-        @%- for (cond, idx) in force_indexes %@
-        if @{ cond }@ {
-            force_indexes.push(@{ idx }@);
-        }
-        @%- endfor %@
+        let force_indexes = make_force_indexes(filter_digest);
         let mut sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
             sql_cols,
@@ -4322,7 +4317,7 @@ impl QueryBuilder {
             let now = std::time::Instant::now();
             let mut result = query.fetch(executor.as_mut());
             if now.elapsed() > std::time::Duration::from_secs(1) {
-                warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+                warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
             }
             while let Some(v) = result.try_next().await.unwrap_or_else(|e| {
                 warn!("{}", e);
@@ -4351,12 +4346,7 @@ impl QueryBuilder {
     async fn _select_from_cache(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!("filter digest:{}", filter_digest);
-        let mut force_indexes: Vec<&'static str> = Vec::new();
-        @%- for (cond, idx) in force_indexes %@
-        if @{ cond }@ {
-            force_indexes.push(@{ idx }@);
-        }
-        @%- endfor %@
+        let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
             if !force_indexes.is_empty() {
@@ -4381,7 +4371,7 @@ impl QueryBuilder {
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
         let result = result?;
@@ -4414,7 +4404,7 @@ impl QueryBuilder {
             query.fetch_all(conn.get_tx().await?.as_mut()).await?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
         let mut list: Vec<_Updater_> = result?
@@ -4511,12 +4501,7 @@ impl QueryBuilder {
     pub@{ visibility }@ async fn update(self, conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<u64> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!("filter digest:{}", filter_digest);
-        let mut force_indexes: Vec<&'static str> = Vec::new();
-        @%- for (cond, idx) in force_indexes %@
-        if @{ cond }@ {
-            force_indexes.push(@{ idx }@);
-        }
-        @%- endfor %@
+        let force_indexes = make_force_indexes(&filter_digest);
         @%- if def.updated_at_conf().is_some() %@
         if obj._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
             obj.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
@@ -4582,7 +4567,7 @@ impl QueryBuilder {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
@@ -4613,12 +4598,7 @@ impl QueryBuilder {
         @%- if def.on_delete_list.is_empty() %@
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!("filter digest:{}", filter_digest);
-        let mut force_indexes: Vec<&'static str> = Vec::new();
-        @%- for (cond, idx) in force_indexes %@
-        if @{ cond }@ {
-            force_indexes.push(@{ idx }@);
-        }
-        @%- endfor %@
+        let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
             r#"DELETE FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
             if !force_indexes.is_empty() {
@@ -4669,7 +4649,7 @@ impl QueryBuilder {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
@@ -4678,12 +4658,7 @@ impl QueryBuilder {
         @%- else %@
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!("filter digest:{}", filter_digest);
-        let mut force_indexes: Vec<&'static str> = Vec::new();
-        @%- for (cond, idx) in force_indexes %@
-        if @{ cond }@ {
-            force_indexes.push(@{ idx }@);
-        }
-        @%- endfor %@
+        let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
             if !force_indexes.is_empty() {
@@ -4712,7 +4687,7 @@ impl QueryBuilder {
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
         let ids: Vec<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> = result?.iter().map(|id| id.into()).collect();
@@ -5806,12 +5781,7 @@ impl _@{ pascal_name }@ {
         conn.begin_cache_tx().await?;
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!("filter digest:{}", filter_digest);
-        let mut force_indexes: Vec<&'static str> = Vec::new();
-        @%- for (cond, idx) in force_indexes %@
-        if @{ cond }@ {
-            force_indexes.push(@{ idx }@);
-        }
-        @%- endfor %@
+        let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1{} {} {}"#,
             CacheData::_sql_cols(),
@@ -5841,7 +5811,7 @@ impl _@{ pascal_name }@ {
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() / 1000, filter_digest);
+            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
@@ -8134,6 +8104,20 @@ impl _@{ pascal_name }@ {
         Ok(())
     }
 @%- endfor %@
+}
+
+#[allow(unused_mut)]
+@%- if force_indexes.len() > 0 %@
+#[inline(never)]
+@%- endif %@
+fn make_force_indexes(filter_digest: &str) -> Vec<&'static str> {
+    let mut force_indexes: Vec<&'static str> = Vec::new();
+    @%- for (cond, idx) in force_indexes %@
+    if @{ cond }@ {
+        force_indexes.push(@{ idx }@);
+    }
+    @%- endfor %@
+    force_indexes
 }
 
 #[allow(clippy::needless_borrow)]
