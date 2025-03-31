@@ -545,7 +545,7 @@ pub struct GroupDef {
 pub struct GroupJson {
     pub id: Option<u64>,
     /// ### グループ名
-    /// スネークケース
+    /// スネークケース推奨
     #[schemars(regex(pattern = r"^[A-Za-z][_0-9A-Za-z]*(?<!_)$"))]
     pub name: String,
     pub _name: Option<String>,

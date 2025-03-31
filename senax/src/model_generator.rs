@@ -165,6 +165,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let tpl = template::ConnectionTemplate {
         db,
         config: &config,
+        groups: &groups,
         tx_isolation: config.tx_isolation.map(|v| v.as_str()),
         read_tx_isolation: config.read_tx_isolation.map(|v| v.as_str()),
     };
@@ -378,7 +379,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     write_domain_entity(
                         &domain_db_dir,
                         db,
-                        &config,
                         group_name,
                         mod_name,
                         force,
@@ -657,7 +657,6 @@ fn write_domain_abstract(
 fn write_domain_entity(
     domain_db_dir: &Path,
     db: &str,
-    config: &ConfigDef,
     group_name: &String,
     mod_name: &str,
     force: bool,
@@ -697,7 +696,6 @@ fn write_domain_entity(
     remove_files.remove(file_path.as_os_str());
     let tpl = template::DomainBaseEntityTemplate {
         db,
-        config,
         group_name,
         mod_name,
         model_name,

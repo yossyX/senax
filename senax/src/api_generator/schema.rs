@@ -212,24 +212,20 @@ impl ApiDbDef {
         }
     }
     pub fn camel_case(&self) -> bool {
-        return self
-            .camel_case
-            .unwrap_or_else(|| API_CONFIG.read().unwrap().as_ref().unwrap().camel_case);
+        self.camel_case
+            .unwrap_or_else(|| API_CONFIG.read().unwrap().as_ref().unwrap().camel_case)
     }
     pub fn with_label(&self) -> bool {
-        return self
-            .with_label
-            .unwrap_or_else(|| API_CONFIG.read().unwrap().as_ref().unwrap().with_label);
+        self.with_label
+            .unwrap_or_else(|| API_CONFIG.read().unwrap().as_ref().unwrap().with_label)
     }
     pub fn with_comment(&self) -> bool {
-        return self
-            .with_comment
-            .unwrap_or_else(|| API_CONFIG.read().unwrap().as_ref().unwrap().with_comment);
+        self.with_comment
+            .unwrap_or_else(|| API_CONFIG.read().unwrap().as_ref().unwrap().with_comment)
     }
     pub fn hide_timestamp(&self) -> bool {
-        return self
-            .hide_timestamp
-            .unwrap_or_else(|| API_CONFIG.read().unwrap().as_ref().unwrap().hide_timestamp);
+        self.hide_timestamp
+            .unwrap_or_else(|| API_CONFIG.read().unwrap().as_ref().unwrap().hide_timestamp)
     }
 }
 

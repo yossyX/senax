@@ -13,7 +13,9 @@ js_updater = ["rquickjs"]
 graphiql = []
 
 [dependencies]
+@%- if session %@
 db_session = { path = "../2_db/session" }
+@%- endif %@
 
 actix-web = "4.1"
 ahash.workspace = true

@@ -605,7 +605,7 @@ impl Joiner_ {
         }
     }
 }
-@%- let fetch_macro_name = "{}_{}_{}"|format(db, group_name, model_name) %@
+@%- let fetch_macro_name = "{}_{}_{}"|format(db|snake, group_name, model_name) %@
 @% let model_path = "$crate::models::{}::{}::{}"|format(db|snake|to_var_name, group_name|to_var_name, mod_name|to_var_name) -%@
 @% let base_path = "$crate::models::{}::{}::_base::_{}"|format(db|snake|to_var_name, group_name|to_var_name, mod_name) -%@
 #[macro_export]
@@ -1359,7 +1359,7 @@ impl std::fmt::Display for Filter_ {
             Filter_::Intersects(col) => write!(f, "Intersects:{}", col._name()),
             Filter_::Crosses(col) => write!(f, "Crosses:{}", col._name()),
             Filter_::DWithin(col) => write!(f, "DWithin:{}", col._name()),
-            Filter_::Not(filter) => write!(f, "Not:<{}>", filter.to_string()),
+            Filter_::Not(filter) => write!(f, "Not:<{}>", filter),
             Filter_::And(filters) => write!(f, "And:<{}>", filters.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")),
             Filter_::Or(filters) => write!(f, "Or:<{}>", filters.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")),
             Filter_::Exists(col_rel) => write!(f, "Exists:<{}>", col_rel),
@@ -1496,9 +1496,9 @@ impl Check_<dyn @{ pascal_name }@> for Filter_ {
     }
 }
 
-@% let filter_macro_name = "filter_{}_{}"|format(group_name, model_name) -%@
+@% let filter_macro_name = "filter_{}_{}_{}"|format(db|snake, group_name, model_name) -%@
 @% let model_path = "$crate::models::{}::{}::_base::_{}"|format(db|snake|to_var_name, group_name|to_var_name, mod_name) -%@
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_null {
 @%- for (col_name, column_def) in def.nullable() %@
     (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
@@ -1507,7 +1507,7 @@ macro_rules! @{ filter_macro_name }@_null {
 }
 pub use @{ filter_macro_name }@_null as filter_null;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_text {
 @%- for (col_name, column_def) in def.text() %@
     (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
@@ -1516,7 +1516,7 @@ macro_rules! @{ filter_macro_name }@_text {
 }
 pub use @{ filter_macro_name }@_text as filter_text;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_one {
 @%- for (col_name, column_def) in def.all_fields_without_json() %@
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColOne_::@{ col_name|to_var_name }@($e.clone().try_into()?));
@@ -1524,7 +1524,7 @@ macro_rules! @{ filter_macro_name }@_one {
 }
 pub use @{ filter_macro_name }@_one as filter_one;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_many {
 @%- for (col_name, column_def) in def.all_fields_without_json() %@
     (@{ col_name }@ [$($e:expr),*]) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@(vec![ $( $e.clone().try_into()? ),* ]));
@@ -1533,7 +1533,7 @@ macro_rules! @{ filter_macro_name }@_many {
 }
 pub use @{ filter_macro_name }@_many as filter_many;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_json {
 @%- for (col_name, column_def) in def.all_fields_only_json() %@
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJson_::@{ col_name|to_var_name }@($e.clone().try_into()?));
@@ -1542,7 +1542,7 @@ macro_rules! @{ filter_macro_name }@_json {
 }
 pub use @{ filter_macro_name }@_json as filter_json;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_json_array {
 @%- for (col_name, column_def) in def.all_fields_only_json() %@
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJsonArray_::@{ col_name|to_var_name }@($e.iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
@@ -1551,7 +1551,7 @@ macro_rules! @{ filter_macro_name }@_json_array {
 }
 pub use @{ filter_macro_name }@_json_array as filter_json_array;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_geo {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
     (@{ col_name }@ $e:expr, $s:expr) => (@{ model_path }@::ColGeo_::@{ col_name|to_var_name }@($e.clone().try_into()?, $s));
@@ -1561,7 +1561,7 @@ macro_rules! @{ filter_macro_name }@_geo {
 }
 pub use @{ filter_macro_name }@_geo as filter_geo;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_geo_distance {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
     (@{ col_name }@ $e:expr, $d:expr, $s:expr) => (@{ model_path }@::ColGeoDistance_::@{ col_name|to_var_name }@($e.clone().try_into()?, $d, $s));
@@ -1571,7 +1571,7 @@ macro_rules! @{ filter_macro_name }@_geo_distance {
 }
 pub use @{ filter_macro_name }@_geo_distance as filter_geo_distance;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_rel {
 @%- for (model_def, col_name, rel_def) in def.relations_one_and_belonging(false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(None));
@@ -1589,7 +1589,7 @@ macro_rules! @{ filter_macro_name }@_rel {
 }
 pub use @{ filter_macro_name }@_rel as filter_rel;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@ {
     () => (@{ model_path }@::Filter_::new_and());
 @%- for (index_name, index) in def.multi_index(false) %@
@@ -1679,8 +1679,8 @@ pub enum Order_ {
     IsNullDesc(Col_),
 }
 
-@% let order_macro_name = "order_{}_{}"|format(group_name, model_name) -%@
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+@% let order_macro_name = "order_{}_{}_{}"|format(db|snake, group_name, model_name) -%@
+#[macro_export]
 macro_rules! @{ order_macro_name }@_col {
 @%- for (col_name, column_def) in def.all_fields() %@
     (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
@@ -1688,7 +1688,7 @@ macro_rules! @{ order_macro_name }@_col {
 }
 pub use @{ order_macro_name }@_col as order_by_col;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ order_macro_name }@_one {
     ($i:ident) => (@{ model_path }@::Order_::Asc(@{ model_path }@::order_by_col!($i)));
     ($i:ident ASC) => (@{ model_path }@::Order_::Asc(@{ model_path }@::order_by_col!($i)));
@@ -1698,7 +1698,7 @@ macro_rules! @{ order_macro_name }@_one {
 }
 pub use @{ order_macro_name }@_one as order_by_one;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ order_macro_name }@ {
     ($($($i:ident)+),+) => (vec![$( @{ model_path }@::order_by_one!($($i)+)),+]);
 }
@@ -1747,10 +1747,10 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
         Box::new(V(map.get(&id).cloned(), None@% if def.is_soft_delete() %@, false@% endif %@))
     }
     @%- endif %@
-    fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn _Updater> {
+    fn convert_factory(&self, _factory: @{ pascal_name }@Factory) -> Box<dyn _Updater> {
         Box::new(@{ pascal_name }@Entity {
 @{- def.non_auto_primary_for_factory()|fmt_join("
-            {var}: factory.{var}{convert_domain_factory},", "") }@
+            {var}: _factory.{var}{convert_domain_factory},", "") }@
             ..Default::default()
         })
     }

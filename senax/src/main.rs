@@ -36,6 +36,7 @@ pub(crate) mod ddl {
 }
 mod actix_generator;
 mod api_generator;
+mod client_generator;
 #[cfg(feature = "config")]
 mod config_server;
 mod db_generator;
@@ -77,37 +78,50 @@ enum Commands {
         #[clap(long)]
         non_snake_case: bool,
     },
+    /// Prepare to use DB
+    NewDb {
+        /// DB name
+        db: String,
+    },
+    /// Generate an web server
+    NewServer {
+        /// Server name
+        name: String,
+        /// DB names
+        #[clap(long)]
+        db: String,
+        /// Use session
+        #[clap(long)]
+        session: bool,
+        /// Force overwrite
+        #[clap(short, long)]
+        force: bool,
+    },
+    /// Generate an client
+    NewClient {
+        /// Client name
+        name: String,
+        /// Server name
+        server: String,
+        /// Force overwrite
+        #[clap(short, long)]
+        force: bool,
+    },
     #[cfg(feature = "config")]
     Config {
-        /// open host
+        /// Host
         #[clap(long)]
         host: Option<String>,
-        /// open port
+        /// Port
         #[clap(short, long)]
         port: Option<u16>,
-        /// open browser
+        /// Open browser
         #[clap(short, long)]
         open: bool,
         #[clap(long)]
         backup: Option<PathBuf>,
         #[clap(long)]
         read_only: bool,
-    },
-    /// Generate an actix server
-    NewActix {
-        /// package name
-        name: String,
-        /// DB names
-        #[clap(long)]
-        db: String,
-        /// Force overwrite
-        #[clap(short, long)]
-        force: bool,
-    },
-    /// Prepare to use DB
-    InitDb {
-        /// DB name
-        db: String,
     },
     /// check models
     Check {
@@ -117,7 +131,7 @@ enum Commands {
     /// generate models
     Model {
         /// Specify the DB
-        db: String,
+        db: Option<String>,
         /// Force overwrite
         #[clap(short, long)]
         force: bool,
@@ -129,11 +143,11 @@ enum Commands {
         skip_version_check: bool,
     },
     /// generate api
-    GenApi {
+    Api {
         /// Specify the server path
         path: PathBuf,
         /// Specify the DB
-        db: String,
+        db: Option<String>,
         /// Specify the group
         group: Option<String>,
         /// Specify the model
@@ -152,10 +166,11 @@ enum Commands {
     },
     /// generate migration ddl
     GenMigrate {
-        /// Specify the DB
-        db: String,
         /// Specify description and generate a file
         description: Option<String>,
+        /// Specify the DB
+        #[clap(long)]
+        db: Option<String>,
         #[clap(long)]
         skip_empty: bool,
         #[clap(long)]
@@ -247,6 +262,30 @@ async fn exec(cli: Cli) -> Result<()> {
         } => {
             init_generator::generate(name, *non_snake_case)?;
         }
+        Commands::NewDb { db } => {
+            ensure!(db_re.is_match(db), "bad db name!");
+            db_generator::generate(db)?;
+        }
+        Commands::NewServer {
+            name,
+            db,
+            session,
+            force,
+        } => {
+            if *session {
+                init_generator::session()?;
+                model_generator::generate("session", false, false, false)?;
+            }
+            let db_list = db.split(',').map(|v| v.trim()).collect();
+            actix_generator::generate(name, db_list, *session, *force)?;
+        }
+        Commands::NewClient {
+            name,
+            server,
+            force,
+        } => {
+            client_generator::generate(name, server, *force)?;
+        }
         #[cfg(feature = "config")]
         Commands::Config {
             host,
@@ -256,14 +295,6 @@ async fn exec(cli: Cli) -> Result<()> {
             read_only,
         } => {
             config_server::start(host, *port, *open, backup, *read_only).await?;
-        }
-        Commands::NewActix { name, db, force } => {
-            let db_list = db.split(',').map(|v| v.trim()).collect();
-            actix_generator::generate(name, db_list, *force)?;
-        }
-        Commands::InitDb { db } => {
-            ensure!(db_re.is_match(db), "bad db name!");
-            db_generator::generate(db)?;
         }
         Commands::Check { db } => {
             ensure!(db_re.is_match(db), "bad db name!");
@@ -275,10 +306,16 @@ async fn exec(cli: Cli) -> Result<()> {
             clean,
             skip_version_check,
         } => {
-            ensure!(db_re.is_match(db), "bad db name!");
-            model_generator::generate(db, *force, *clean, *skip_version_check)?;
+            if let Some(db) = db {
+                ensure!(db_re.is_match(db), "bad db name!");
+                model_generator::generate(db, *force, *clean, *skip_version_check)?;
+            } else {
+                for db in crate::db_generator::db_list(false)? {
+                    model_generator::generate(&db, *force, *clean, *skip_version_check)?;
+                }
+            }
         }
-        Commands::GenApi {
+        Commands::Api {
             path,
             db,
             group,
@@ -288,20 +325,35 @@ async fn exec(cli: Cli) -> Result<()> {
             force,
             clean,
         } => {
-            ensure!(db_re.is_match(db), "bad db name!");
-            api_generator::generate(path, db, group, model, ts_dir, *inquiry, *force, *clean)?;
+            if let Some(db) = db {
+                ensure!(db_re.is_match(db), "bad db name!");
+                api_generator::generate(path, db, group, model, ts_dir, *inquiry, *force, *clean)?;
+            } else {
+                for db in crate::api_generator::api_db_list(path)? {
+                    api_generator::generate(
+                        path, &db, group, model, ts_dir, *inquiry, *force, *clean,
+                    )?;
+                }
+            }
         }
         Commands::GenMigrate {
-            db,
             description,
+            db,
             skip_empty,
             use_test_db,
         } => {
-            ensure!(db_re.is_match(db), "bad db name!");
-            migration_generator::generate(db, description, *skip_empty, *use_test_db).await?;
+            if let Some(db) = db {
+                ensure!(db_re.is_match(db), "bad db name!");
+                migration_generator::generate(db, description, *skip_empty, *use_test_db).await?;
+            } else {
+                for db in crate::db_generator::db_list(false)? {
+                    migration_generator::generate(&db, description, *skip_empty, *use_test_db)
+                        .await?;
+                }
+            }
         }
         Commands::ReflectMigrationChanges => {
-            for db in crate::db_generator::list()? {
+            for db in crate::db_generator::db_list(true)? {
                 common::reflect_migration_changes(&db)?;
             }
         }

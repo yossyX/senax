@@ -10,11 +10,15 @@ use actix_web::{guard, middleware, web, App, HttpMessage, HttpServer};
 use anyhow::{ensure, Context, Result};
 use async_graphql::{EmptySubscription, Schema};
 use clap::{Parser, Subcommand};
+@%- if session %@
 use db_session::models::session::session::_SessionStore;
+@%- endif %@
 use dotenvy::dotenv;
 use mimalloc::MiMalloc;
 use once_cell::sync::OnceCell;
+@%- if session %@
 use sha2::{Digest, Sha512};
+@%- endif %@
 use std::collections::HashMap;
 use std::env;
 use std::net::TcpListener;
@@ -48,7 +52,9 @@ const DEFAULT_WORK_DIR: &str = "temp";
 const LINKER_PORT: &str = "LINKER_PORT";
 const LINKER_PASSWORD: &str = "LINKER_PASSWORD";
 const SECRET_KEY: &str = "SECRET_KEY";
+@%- if session %@
 const SESSION_SECRET_KEY: &str = "SESSION_SECRET_KEY";
+@%- endif %@
 // for Hot Deploy
 const SERVER_STARTER_PORT: &str = "SERVER_STARTER_PORT";
 #[cfg(unix)]
@@ -292,6 +298,7 @@ async fn main() -> Result<()> {
 
     tokio::spawn(handle_signals());
 
+    @%- if session %@
     tokio::spawn(async move {
         loop {
             senax_actix_session::SessionMiddleware::gc(_SessionStore, None).await;
@@ -301,6 +308,7 @@ async fn main() -> Result<()> {
     let session_secret_key = env::var(SESSION_SECRET_KEY)
         .map(|v| Sha512::digest(v).to_vec())
         .with_context(|| format!("{} required", SESSION_SECRET_KEY))?;
+    @%- endif %@
 
     let server = HttpServer::new(move || {
         let app = make_app().into_app()
@@ -329,12 +337,14 @@ async fn main() -> Result<()> {
                 }
                 srv.call(req)
             })
+            @%- if session %@
             .wrap(
                 senax_actix_session::SessionMiddleware::builder(_SessionStore, &session_secret_key)
                     .cookie_secure(!cfg!(debug_assertions))
                     .cookie_name(if cfg!(debug_assertions) { "sid".into() } else { "__Host-sid".into() })
                     .build(),
             )
+            @%- endif %@
             .configure(routes::root::route_config)
             .service(
                 web::resource("/gql")

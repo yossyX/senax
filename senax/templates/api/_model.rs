@@ -28,6 +28,7 @@ fn delete_guard() -> impl async_graphql::Guard {
 @%- endif %@
 @%- endif %@
 
+#[allow(dead_code)]
 fn api_query_guard(auth: &AuthInfo) -> Option<bool> {
     auth.has_role(&[@{ api_def.readable_roles(config, group)|to_api_guard }@])
 }

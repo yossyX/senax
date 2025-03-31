@@ -400,6 +400,10 @@ function Field({ formData, definitions }: any) {
     control: formData.form.control,
     name: "primary",
   });
+  const query = useWatch({
+    control: formData.form.control,
+    name: "query",
+  });
   const NUMBER = ["tinyint", "smallint", "int", "bigint", "float", "double"];
   return (
     <>
@@ -478,9 +482,9 @@ function Field({ formData, definitions }: any) {
             {...formData}
             hidden={!["geo_point", "geometry"].includes(type)}
           />
-          <AutoField name="default" {...formData} />
-          <AutoField name="query" {...formData} />
-          <AutoField name="stored" {...formData} />
+          <AutoField name="default" {...formData} hidden={primary} />
+          <AutoField name="query" {...formData} hidden={primary} />
+          <AutoField name="stored" {...formData} hidden={!query}/>
           <AutoField name="sql_comment" {...formData} />
           <AutoField name="hidden" {...formData} />
           <AutoField name="secret" {...formData} />

@@ -333,7 +333,7 @@ pub struct ModelJson {
     pub merged_relations: Vec<(String, RelDef)>,
 
     /// ### モデル名
-    /// 単数形、スネークケース
+    /// 単数形、スネークケース推奨
     #[schemars(regex(pattern = r"^[A-Za-z][_0-9A-Za-z]*(?<!_)$"))]
     pub name: String,
     /// ### リネーム元テーブル名

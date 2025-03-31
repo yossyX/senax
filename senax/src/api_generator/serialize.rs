@@ -185,7 +185,7 @@ pub fn generate(server_path: &Path, db: &str, group: &Option<String>) -> Result<
     let mut api_groups: Vec<Group> = Vec::new();
 
     for org_group_name in &group_names {
-        let schema_path = schema_dir.join(&format!("{org_group_name}.yml"));
+        let schema_path = schema_dir.join(format!("{org_group_name}.yml"));
         let mut api_group_def: IndexMap<String, Option<ApiModelDef>> = if schema_path.exists() {
             parse_yml_file(&schema_path)?
         } else {

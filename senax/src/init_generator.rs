@@ -1,7 +1,10 @@
 use anyhow::Result;
 use askama::Template;
 use rand::distributions::{Alphanumeric, DistString};
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::{common::fs_write, DOMAIN_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE};
 
@@ -23,7 +26,6 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     let tpl = EnvTemplate {
         tz: std::env::var("TZ").unwrap_or_default(),
         secret_key: Alphanumeric.sample_string(&mut rng, 40),
-        session_key: Alphanumeric.sample_string(&mut rng, 80),
     };
     fs_write(file_path, tpl.render()?)?;
 
@@ -36,19 +38,22 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     let tpl = GitignoreTemplate;
     fs_write(file_path, tpl.render()?)?;
 
+    let file_path = base_path.join("build.sh");
+    let tpl = BuildShTemplate;
+    fs_write(&file_path, tpl.render()?)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let metadata = file_path.metadata()?;
+        let mut permissions = metadata.permissions();
+        permissions.set_mode(0o100 | permissions.mode());
+        fs::set_permissions(file_path, permissions)?;
+    }
+
     crate::schema::json_schema::write_schema(&base_path)?;
 
     let schema_path = base_path.join(SCHEMA_PATH);
     fs::create_dir_all(&schema_path)?;
-
-    let file_path = schema_path.join("session.yml");
-    let tpl = SessionTemplate {
-        db_id: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_micros() as u64,
-    };
-    fs_write(file_path, tpl.render()?)?;
 
     let file_path = schema_path.join(SIMPLE_VALUE_OBJECTS_FILE);
     let tpl = SimpleValueObjectsTemplate;
@@ -89,6 +94,22 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     Ok(())
 }
 
+pub fn session() -> Result<()> {
+    anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
+    let schema_path = Path::new(SCHEMA_PATH);
+    fs::create_dir_all(schema_path)?;
+
+    let file_path = schema_path.join("session.yml");
+    let tpl = SessionTemplate {
+        db_id: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64,
+    };
+    fs_write(file_path, tpl.render()?)?;
+    Ok(())
+}
+
 #[derive(Template)]
 #[template(path = "init/_Cargo.toml", escape = "none")]
 pub struct CargoTemplate;
@@ -98,12 +119,15 @@ pub struct CargoTemplate;
 pub struct EnvTemplate {
     pub tz: String,
     pub secret_key: String,
-    pub session_key: String,
 }
 
 #[derive(Template)]
 #[template(path = "init/.gitignore", escape = "none")]
 pub struct GitignoreTemplate;
+
+#[derive(Template)]
+#[template(path = "init/build.sh", escape = "none")]
+pub struct BuildShTemplate;
 
 #[derive(Template)]
 #[template(path = "init/schema/session.yml", escape = "none")]

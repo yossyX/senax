@@ -11,9 +11,13 @@ use std::collections::BTreeMap;
 #[allow(unused_imports)]
 use utoipa_actix_web::scope;
 use validator::ValidationErrors;
+@%- if session %@
 
+#[allow(unused_imports)]
 pub use db_session::models::session::session::{_SessionStore, SESSION_ROLE};
+#[allow(unused_imports)]
 pub use senax_actix_session::Session;
+@%- endif %@
 
 use crate::auth::{AuthInfo, Role};
 use crate::context::Ctx;
@@ -24,6 +28,7 @@ use crate::db::RepositoriesImpl;
 pub type QuerySchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
 pub const LIMIT_COMPLEXITY: usize = 1000;
+#[allow(dead_code)]
 pub const USE_SINGLE_TRANSACTION_FOR_STREAM: bool = false;
 
 #[derive(Debug, thiserror::Error)]
@@ -130,7 +135,7 @@ struct RoleGuard(Role);
 impl async_graphql::Guard for RoleGuard {
     async fn check(&self, _gql_ctx: &async_graphql::Context<'_>) -> async_graphql::Result<()> {
         let auth: &AuthInfo = _gql_ctx.data()?;
-        let role = claims.role().ok_or_else(|| GqlError::Unauthorized.extend())?;
+        let role = auth.role().ok_or_else(|| GqlError::Unauthorized.extend())?;
         if role == self.0 {
             return Ok(());
         }

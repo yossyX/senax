@@ -75,6 +75,7 @@ pub struct MiscTemplate<'a> {
 pub struct ConnectionTemplate<'a> {
     pub db: &'a str,
     pub config: &'a ConfigDef,
+    pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
     pub tx_isolation: Option<&'a str>,
     pub read_tx_isolation: Option<&'a str>,
 }
@@ -580,7 +581,6 @@ pub struct DomainEntityTemplate<'a> {
 )]
 pub struct DomainBaseEntityTemplate<'a> {
     pub db: &'a str,
-    pub config: &'a ConfigDef,
     pub group_name: &'a str,
     pub mod_name: &'a str,
     pub model_name: &'a str,

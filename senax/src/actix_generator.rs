@@ -11,10 +11,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::common::fs_write;
-use crate::schema::CONFIG;
+use crate::{
+    api_generator::template::{ConfigTemplate, DbConfigTemplate},
+    schema::CONFIG,
+};
+use crate::{common::fs_write, API_SCHEMA_PATH};
 
-pub fn generate(name: &str, db_list: Vec<&str>, force: bool) -> Result<()> {
+pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> Result<()> {
+    anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
     let non_snake_case = crate::common::check_non_snake_case()?;
     for db in &db_list {
         crate::common::check_ascii_name(db);
@@ -38,13 +42,16 @@ pub fn generate(name: &str, db_list: Vec<&str>, force: bool) -> Result<()> {
         }
     }
 
+    let mut rng = rand::thread_rng();
+    let session_key = Alphanumeric.sample_string(&mut rng, 80);
+
     let mut file_path = PathBuf::from("./.env");
     if !file_path.exists() {
         file_path = base_path.join(".env");
     }
     if file_path.exists() {
         let content = fs::read_to_string(&file_path)?;
-        fs_write(file_path, fix_env(&content, &name)?)?;
+        fs_write(file_path, fix_env(&content, &name, session, &session_key)?)?;
     }
 
     let mut file_path = PathBuf::from("./.env.example");
@@ -53,12 +60,18 @@ pub fn generate(name: &str, db_list: Vec<&str>, force: bool) -> Result<()> {
     }
     if file_path.exists() {
         let content = fs::read_to_string(&file_path)?;
-        fs_write(file_path, fix_env(&content, &name)?)?;
+        fs_write(file_path, fix_env(&content, &name, session, &session_key)?)?;
+    }
+
+    let file_path = Path::new("./build.sh");
+    if file_path.exists() {
+        let content = fs::read_to_string(file_path)?;
+        fs_write(file_path, fix_build_sh(&content, &name)?)?;
     }
 
     let file_path = base_path.join("Cargo.toml");
     let mut content = if force || !file_path.exists() {
-        CargoTemplate { name }.render()?
+        CargoTemplate { name, session }.render()?
     } else {
         fs::read_to_string(&file_path)?
     };
@@ -77,6 +90,21 @@ pub fn generate(name: &str, db_list: Vec<&str>, force: bool) -> Result<()> {
     }
     fs_write(file_path, &*content)?;
 
+    let schema_dir = base_path.join(API_SCHEMA_PATH);
+    fs::create_dir_all(&schema_dir)?;
+    let config_path = schema_dir.join("_config.yml");
+    if !config_path.exists() {
+        let tpl = ConfigTemplate;
+        fs_write(&config_path, tpl.render()?)?;
+    }
+    for db in &db_list {
+        let db_config_path = schema_dir.join(format!("{db}.yml"));
+        if !db_config_path.exists() {
+            let tpl = DbConfigTemplate;
+            fs_write(&db_config_path, tpl.render()?)?;
+        }
+    }
+
     let src_path = base_path.join("src");
     fs::create_dir_all(&src_path)?;
 
@@ -94,7 +122,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, force: bool) -> Result<()> {
 
     let file_path = src_path.join("db.rs");
     let mut content = if force || !file_path.exists() {
-        DbTemplate.render()?
+        DbTemplate { session }.render()?
     } else {
         fs::read_to_string(&file_path)?
     };
@@ -192,13 +220,16 @@ pub fn generate(name: &str, db_list: Vec<&str>, force: bool) -> Result<()> {
 
     let file_path = src_path.join("auto_api.rs");
     if force || !file_path.exists() {
-        let tpl = AutoApiTemplate;
+        let tpl = AutoApiTemplate { session };
         fs_write(&file_path, tpl.render()?)?;
     }
 
     let file_path = src_path.join("main.rs");
     if force || !file_path.exists() {
-        let tpl = MainTemplate { non_snake_case };
+        let tpl = MainTemplate {
+            non_snake_case,
+            session,
+        };
         fs_write(file_path, tpl.render()?)?;
     }
 
@@ -253,9 +284,10 @@ pub fn generate(name: &str, db_list: Vec<&str>, force: bool) -> Result<()> {
     Ok(())
 }
 
-fn fix_env(content: &str, name: &str) -> Result<String> {
+fn fix_env(content: &str, name: &str, session: bool, session_key: &str) -> Result<String> {
+    use std::fmt::Write;
     let re = Regex::new(r"RUST_LOG(\s*)=(.+)").unwrap();
-    let content = if let Some(caps) = re.captures(content) {
+    let mut content = if let Some(caps) = re.captures(content) {
         let sp = caps.get(1).unwrap().as_str();
         let conf = caps.get(2).unwrap().as_str();
         if !conf.contains(&format!("{}=", name)) {
@@ -267,6 +299,31 @@ fn fix_env(content: &str, name: &str) -> Result<String> {
     } else {
         content.to_owned()
     };
+    if session && !content.contains("SESSION_DB_URL") {
+        write!(
+            &mut content,
+            r#"
+SESSION_DB_URL=mysql://root:root@db/session
+SESSION_TEST_DB_URL=mysql://root:root@db/session_test
+SESSION_DB_MAX_CONNECTIONS_FOR_WRITE=10
+SESSION_DB_MAX_CONNECTIONS_FOR_READ=10
+SESSION_DB_MAX_CONNECTIONS_FOR_CACHE=10
+SESSION_SECRET_KEY={}
+"#,
+            session_key
+        )?;
+    }
+    Ok(content)
+}
+
+fn fix_build_sh(content: &str, name: &str) -> Result<String> {
+    let content = content.replace(
+        "# Do not modify this line. (Api)",
+        &format!(
+            "senax api {} -c ${}_client\n# Do not modify this line. (Api)",
+            name, name
+        ),
+    );
     Ok(content)
 }
 
@@ -289,6 +346,7 @@ impl Secret {
 #[template(path = "new_actix/_Cargo.toml", escape = "none")]
 pub struct CargoTemplate {
     pub name: String,
+    pub session: bool,
 }
 
 #[derive(Template)]
@@ -301,7 +359,9 @@ pub struct ContextTemplate;
 
 #[derive(Template)]
 #[template(path = "new_actix/src/db.rs", escape = "none")]
-pub struct DbTemplate;
+pub struct DbTemplate {
+    pub session: bool,
+}
 
 #[derive(Template)]
 #[template(path = "new_actix/src/gql_log.rs", escape = "none")]
@@ -503,12 +563,15 @@ pub struct DbCheckTemplate<'a> {
 
 #[derive(Template)]
 #[template(path = "new_actix/src/auto_api.rs", escape = "none")]
-pub struct AutoApiTemplate;
+pub struct AutoApiTemplate {
+    pub session: bool,
+}
 
 #[derive(Template)]
 #[template(path = "new_actix/src/main.rs", escape = "none")]
 pub struct MainTemplate {
     pub non_snake_case: bool,
+    pub session: bool,
 }
 
 #[derive(Template)]

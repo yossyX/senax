@@ -418,10 +418,9 @@ pub fn write_api_yml(
     crate::common::check_ascii_name(db);
     crate::common::check_ascii_name(group);
 
-    let path = Path::new(&server)
-        .join(API_SCHEMA_PATH)
-        .join(db)
-        .join(format!("{}.yml", group));
+    let path = Path::new(&server).join(API_SCHEMA_PATH).join(db);
+    fs::create_dir_all(&path)?;
+    let path = path.join(format!("{}.yml", group));
     if let Some(bk) = BACKUP.get() {
         if path.exists() {
             let content = fs::read_to_string(&path)?;

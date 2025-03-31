@@ -119,7 +119,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
         let group_def = group_def.clone().unwrap_or_default();
         let mut model_map = IndexMap::new();
         let defs: IndexMap<String, ModelDef> = if group_def.models.is_empty() {
-            let path = db_path.join(&format!("{group_name}.yml"));
+            let path = db_path.join(format!("{group_name}.yml"));
             if path.exists() {
                 parse_yml_file(&path)?
             } else {

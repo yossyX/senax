@@ -72,7 +72,7 @@ use db_@{ rel_def.db() }@::models::@{ rel_def.get_base_group_mod_var() }@ as rel
 const USE_CACHE: bool = @{ def.use_cache() }@;
 const USE_ALL_ROWS_CACHE: bool = @{ def.use_all_rows_cache() }@;
 const USE_UPDATE_NOTICE: bool = @{ def.use_update_notice() }@;
-pub@{ visibility }@ const TABLE_NAME: &str = "@{ table_name }@";
+pub const TABLE_NAME: &str = "@{ table_name }@";
 pub(crate) const TRASHED_SQL: &str = r#"@{ def.inheritance_cond(" AND ") }@"#;
 pub(crate) const NOT_TRASHED_SQL: &str = r#"@{ def.soft_delete_tpl("","deleted_at IS NULL AND ","deleted = 0 AND ")}@@{ def.inheritance_cond(" AND ") }@"#;
 pub(crate) const ONLY_TRASHED_SQL: &str = r#"@{ def.soft_delete_tpl("","deleted_at IS NOT NULL AND ","deleted != 0 AND ")}@@{ def.inheritance_cond(" AND ") }@"#;
@@ -1257,7 +1257,7 @@ fn push_delayed_db(list: &Vec<ForInsert>) -> Result<()> {
 async fn _handle_delayed_msg_save(shard_id: ShardId) {
     let mut map: BTreeMap<InnerPrimary, IndexMap<OpData, _Updater_>> = BTreeMap::new();
     while let Some(x) = SAVE_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
-        let inner_map = map.entry(InnerPrimary::from(&x)).or_insert_with(IndexMap::new);
+        let inner_map = map.entry(InnerPrimary::from(&x)).or_default();
         if let Some(old) = inner_map.get_mut(&x._op) {
             aggregate_update(&x, old);
         } else {
@@ -1326,7 +1326,7 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
         if x.will_be_deleted() {
             x.mut_deleted().set(deleted);
         }")}@
-        let inner_map = map.entry(InnerPrimary::from(&x)).or_insert_with(IndexMap::new);
+        let inner_map = map.entry(InnerPrimary::from(&x)).or_default();
         if let Some(old) = inner_map.get_mut(&x._op) {
             aggregate_update(&x, old);
         } else {
@@ -1414,7 +1414,7 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
         if x.will_be_deleted() {
             x.mut_deleted().set(deleted);
         }")}@
-        let inner_map = map.entry(InnerPrimary::from(&x)).or_insert_with(IndexMap::new);
+        let inner_map = map.entry(InnerPrimary::from(&x)).or_default();
         if let Some(old) = inner_map.get_mut(&x._op) {
             aggregate_update(&x, old);
         } else {
@@ -1490,7 +1490,7 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
 @%- if !column_def.is_displayable() %@
 #[display(fmt = "{:?}", _0)]
 @%- endif %@
-pub@{ visibility }@ struct @{ id_name }@(pub(crate) @{ column_def.get_inner_type(false, false) }@);
+pub struct @{ id_name }@(pub(crate) @{ column_def.get_inner_type(false, false) }@);
 @% endfor -%@
 @% for (name, column_def) in def.id_auto_inc_or_seq() -%@
 #[derive(Serialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, Default, JsonSchema)]
@@ -1498,7 +1498,7 @@ pub@{ visibility }@ struct @{ id_name }@(pub(crate) @{ column_def.get_inner_type
 @%- if !column_def.is_displayable() %@
 #[display(fmt = "{:?}", _0)]
 @%- endif %@
-pub@{ visibility }@ struct @{ id_name }@(
+pub struct @{ id_name }@(
     #[schemars(schema_with = "crate::seeder::id_schema")]
     pub(crate) @{ column_def.get_inner_type(true, false) }@
 );
@@ -1515,7 +1515,7 @@ impl<'de> serde::Deserialize<'de> for @{ id_name }@ {
 
         struct IdVisitor;
 
-        impl<'de> Visitor<'de> for IdVisitor {
+        impl Visitor<'_> for IdVisitor {
             type Value = @{ id_name }@;
 
             #[inline]
@@ -2931,7 +2931,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
             rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner.clone()).await?;
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
-                    map.entry(id).or_insert_with(Vec::new).push(row);
+                    map.entry(id).or_default().push(row);
                 }
             }
         }
@@ -2955,7 +2955,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         let mut map = AHashMap::default();
         for row in list {
             if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
-                map.entry(id).or_insert_with(Vec::new).push(row);
+                map.entry(id).or_default().push(row);
             }
         }
         for val in self.iter_mut() {
@@ -3012,7 +3012,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
             rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner.clone()).await?;
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._data) {
-                    map.entry(id).or_insert_with(Vec::new).push(row);
+                    map.entry(id).or_default().push(row);
                 }
             }
         }
@@ -3033,7 +3033,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
             rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner.clone()).await?;
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._data) {
-                    map.entry(id).or_insert_with(Vec::new).push(row);
+                    map.entry(id).or_default().push(row);
                 }
             }
         }
@@ -3057,7 +3057,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         let mut map = AHashMap::default();
         for row in list {
             if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._data) {
-                map.entry(id).or_insert_with(Vec::new).push(row);
+                map.entry(id).or_default().push(row);
             }
         }
         for val in self.iter_mut() {
@@ -3101,7 +3101,7 @@ impl CacheWrapper {
             let list: Vec<Arc<_>> = rel_{class_mod}::{class}::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
-                    map.entry(id).or_insert_with(Vec::new).push(row);
+                    map.entry(id).or_default().push(row);
                 }
             }
         }
@@ -3124,7 +3124,7 @@ impl CacheWrapper {
         let mut map = AHashMap::default();
         for row in list {
             if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
-                map.entry(id).or_insert_with(Vec::new).push(row);
+                map.entry(id).or_default().push(row);
             }
         }
         for val in vec.iter_mut() {
@@ -3201,7 +3201,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
             rel_{class_mod}::{class}Joiner::join(&mut list, conn, joiner.clone()).await?;
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
-                    map.entry(id).or_insert_with(Vec::new).push(row);
+                    map.entry(id).or_default().push(row);
                 }
             }
         }
@@ -3225,7 +3225,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         let mut map = AHashMap::default();
         for row in list {
             if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
-                map.entry(id).or_insert_with(Vec::new).push(row);
+                map.entry(id).or_default().push(row);
             }
         }
         for val in self.iter_mut() {
@@ -3290,8 +3290,19 @@ where@{ index.join_fields(def, "
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
-pub@{ visibility }@ enum Col_ {
+pub enum Col_ {
 @{ def.all_fields()|fmt_join("    {var},", "\n") }@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl Col_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields()|fmt_join("
+            Col_::{var} => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
 }
 @%- else %@
 pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::Col_;
@@ -3307,11 +3318,25 @@ impl ColTr for Col_ {
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
-pub@{ visibility }@ enum ColOne_ {
+pub enum ColOne_ {
 @{ def.all_fields_without_json()|fmt_join("    {var}({filter_type}),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(_@{ pascal_name }@Index_@{ index_name }@),
 @%- endfor %@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColOne_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_without_json()|fmt_join("
+            ColOne_::{var}(_) => \"{col}\",", "") }@
+            @%- for (index_name, index) in def.multi_index(false) %@
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "{name}", ", ") }@>",
+            @%- endfor %@
+            _ => unimplemented!(),
+        }
+    }
 }
 @%- else %@
 pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::ColOne_;
@@ -3354,9 +3379,20 @@ impl BindTr for ColOne_ {
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug, Hash, Serialize)]
-pub@{ visibility }@ enum ColKey_ {
+pub enum ColKey_ {
     @{- def.unique_key()|fmt_index_col("
     {var}({filter_type}),", "") }@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColKey_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.unique_key()|fmt_join("
+            ColKey_::{var}(_) => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
 }
 @%- else %@
 pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::ColKey_;
@@ -3404,11 +3440,25 @@ impl HashVal for VecColKey {
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
-pub@{ visibility }@ enum ColMany_ {
+pub enum ColMany_ {
 @{ def.all_fields_without_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(Vec<_@{ pascal_name }@Index_@{ index_name }@>),
 @%- endfor %@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColMany_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_without_json()|fmt_join("
+            ColMany_::{var}(_) => \"{col}\",", "") }@
+            @%- for (index_name, index) in def.multi_index(false) %@
+            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "{name}", ", ") }@>",
+            @%- endfor %@
+            _ => unimplemented!(),
+        }
+    }
 }
 @%- else %@
 pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::ColMany_;
@@ -3460,9 +3510,20 @@ impl BindTr for ColMany_ {
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
-pub@{ visibility }@ enum ColJson_ {
+pub enum ColJson_ {
 @{- def.all_fields_only_json()|fmt_join("
     {var}(Value),", "") }@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColJson_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_only_json()|fmt_join("
+            ColJson_::{var}(_) => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
 }
 @%- else %@
 pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::ColJson_;
@@ -3492,9 +3553,20 @@ impl BindTr for ColJson_ {
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
-pub@{ visibility }@ enum ColJsonArray_ {
+pub enum ColJsonArray_ {
 @{- def.all_fields_only_json()|fmt_join("
     {var}(Vec<Value>),", "") }@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColJsonArray_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_only_json()|fmt_join("
+            ColJsonArray_::{var}(_) => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
 }
 @%- else %@
 pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::ColJsonArray_;
@@ -3537,9 +3609,20 @@ impl BindArrayTr for ColJsonArray_ {
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
-pub@{ visibility }@ enum ColGeo_ {
+pub enum ColGeo_ {
 @{- def.all_fields_only_geo()|fmt_join("
     {var}(Value, u32),", "") }@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColGeo_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_only_geo()|fmt_join("
+            ColGeo_::{var}(_, _) => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
 }
 @%- else %@
 pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::ColGeo_;
@@ -3569,9 +3652,20 @@ impl BindTr for ColGeo_ {
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
-pub@{ visibility }@ enum ColGeoDistance_ {
+pub enum ColGeoDistance_ {
 @{- def.all_fields_only_geo()|fmt_join("
     {var}(Value, f64, u32),", "") }@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl ColGeoDistance_ {
+    fn _name(&self) -> &'static str {
+        match self {
+            @{- def.all_fields_only_geo()|fmt_join("
+            ColGeoDistance_::{var}(_, _, _) => \"{col}\",", "") }@
+            _ => unimplemented!(),
+        }
+    }
 }
 @%- else %@
 pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::ColGeoDistance_;
@@ -3601,9 +3695,36 @@ impl BindTr for ColGeoDistance_ {
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
-pub@{ visibility }@ enum ColRel_ {
+pub enum ColRel_ {
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("\n    {rel_name}(Option<Box<rel_{class_mod}::Filter_>>),", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n    {rel_name}(Option<Box<rel_{class_mod}::Filter_>>),", "") }@
+}
+#[allow(unreachable_patterns)]
+#[allow(clippy::match_single_binding)]
+impl std::fmt::Display for ColRel_ {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            @{- def.relations_one_and_belonging(false)|fmt_rel_join("
+            ColRel_::{rel_name}(v) => if let Some(v) = v {
+                write!(_f, \"{raw_rel_name}:<{}>\", v)
+            } else {
+                write!(_f, \"{raw_rel_name}\")
+            },", "") }@
+            @{- def.relations_many(false)|fmt_rel_join("
+            ColRel_::{rel_name}(v) => if let Some(v) = v {
+                write!(_f, \"{raw_rel_name}:<{}>\", v)
+            } else {
+                write!(_f, \"{raw_rel_name}\")
+            },", "") }@
+            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+            ColRel_::{rel_name}(v) => if let Some(v) = v {
+                write!(_f, \"{raw_rel_name}:<{}>\", v)
+            } else {
+                write!(_f, \"{raw_rel_name}\")
+            },", "") }@
+            _ => unimplemented!(),
+        }
+    }
 }
 @%- else %@
 pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::_base::_@{ mod_name }@::ColRel_;
@@ -3752,7 +3873,7 @@ pub fn bind_for_rel_query(filter: Option<Box<Filter_>>, query: Query<'_, DbType,
 @%- if config.excluded_from_domain %@
 
 #[derive(Clone, Debug)]
-pub@{ visibility }@ enum Filter_ {
+pub enum Filter_ {
     WithTrashed,
     OnlyTrashed,
     Match(Vec<Col_>, String),
@@ -3802,14 +3923,63 @@ impl Default for Filter_ {
         Filter_::new_and()
     }
 }
+impl std::fmt::Display for Filter_ {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Filter_::WithTrashed => write!(f, "WithTrashed"),
+            Filter_::OnlyTrashed => write!(f, "OnlyTrashed"),
+            Filter_::Match(cols, _) => write!(f, "Match:<{}>", cols.iter().map(|v| v._name()).collect::<Vec<_>>().join(",")),
+            Filter_::MatchBoolean(cols, _) => write!(f, "MatchBoolean:<{}>", cols.iter().map(|v| v._name()).collect::<Vec<_>>().join(",")),
+            Filter_::MatchExpansion(cols, _) => write!(f, "MatchExpansion:<{}>", cols.iter().map(|v| v._name()).collect::<Vec<_>>().join(",")),
+            Filter_::IsNull(col) => write!(f, "IsNull:{}", col._name()),
+            Filter_::IsNotNull(col) => write!(f, "IsNotNull:{}", col._name()),
+            Filter_::Eq(col) => write!(f, "Eq:{}", col._name()),
+            Filter_::EqKey(col) => write!(f, "EqKey:{}", col._name()),
+            Filter_::NotEq(col) => write!(f, "NotEq:{}", col._name()),
+            Filter_::Gt(col) => write!(f, "Gt:{}", col._name()),
+            Filter_::Gte(col) => write!(f, "Gte:{}", col._name()),
+            Filter_::Lt(col) => write!(f, "Lt:{}", col._name()),
+            Filter_::Lte(col) => write!(f, "Lte:{}", col._name()),
+            Filter_::Like(col) => write!(f, "Like:{}", col._name()),
+            Filter_::AllBits(col) => write!(f, "AllBits:{}", col._name()),
+            Filter_::AnyBits(col) => write!(f, "AnyBits:{}", col._name()),
+            Filter_::In(col) => write!(f, "In:{}", col._name()),
+            Filter_::NotIn(col) => write!(f, "NotIn:{}", col._name()),
+            Filter_::MemberOf(col, _) => write!(f, "MemberOf:{}", col._name()),
+            Filter_::Contains(col, _) => write!(f, "Contains:{}", col._name()),
+            Filter_::Overlaps(col, _) => write!(f, "Overlaps:{}", col._name()),
+            Filter_::JsonIn(col, _) => write!(f, "JsonIn:{}", col._name()),
+            Filter_::JsonContainsPath(col, _) => write!(f, "JsonContainsPath:{}", col._name()),
+            Filter_::JsonEq(col, _) => write!(f, "JsonEq:{}", col._name()),
+            Filter_::JsonLt(col, _) => write!(f, "JsonLt:{}", col._name()),
+            Filter_::JsonLte(col, _) => write!(f, "JsonLte:{}", col._name()),
+            Filter_::JsonGt(col, _) => write!(f, "JsonGt:{}", col._name()),
+            Filter_::JsonGte(col, _) => write!(f, "JsonGte:{}", col._name()),
+            Filter_::Within(col) => write!(f, "Within:{}", col._name()),
+            Filter_::Intersects(col) => write!(f, "Intersects:{}", col._name()),
+            Filter_::Crosses(col) => write!(f, "Crosses:{}", col._name()),
+            Filter_::DWithin(col) => write!(f, "DWithin:{}", col._name()),
+            Filter_::Not(filter) => write!(f, "Not:<{}>", filter),
+            Filter_::And(filters) => write!(f, "And:<{}>", filters.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")),
+            Filter_::Or(filters) => write!(f, "Or:<{}>", filters.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")),
+            Filter_::Exists(col_rel) => write!(f, "Exists:<{}>", col_rel),
+            Filter_::NotExists(col_rel) => write!(f, "NotExists:<{}>", col_rel),
+            Filter_::EqAny(col_rel) => write!(f, "EqAny:<{}>", col_rel),
+            Filter_::NotAll(col_rel) => write!(f, "NotAll:<{}>", col_rel),
+            Filter_::Raw(sql) => write!(f, "Raw:<{}>", sql),
+            Filter_::RawWithParam(sql, _) => write!(f, "Raw:<{}>", sql),
+            Filter_::Boolean(v) => write!(f, "Boolean:{}", v),
+        }
+    }
+}
 impl Filter_ {
-    pub@{ visibility }@ fn new_and() -> Filter_ {
+    pub fn new_and() -> Filter_ {
         Filter_::And(vec![])
     }
-    pub@{ visibility }@ fn new_or() -> Filter_ {
+    pub fn new_or() -> Filter_ {
         Filter_::Or(vec![])
     }
-    pub@{ visibility }@ fn and(mut self, filter: Filter_) -> Filter_ {
+    pub fn and(mut self, filter: Filter_) -> Filter_ {
         match self {
             Filter_::And(ref mut v) => {
                 v.push(filter);
@@ -3818,7 +3988,7 @@ impl Filter_ {
             _ => Filter_::And(vec![self, filter]),
         }
     }
-    pub@{ visibility }@ fn or(mut self, filter: Filter_) -> Filter_ {
+    pub fn or(mut self, filter: Filter_) -> Filter_ {
         match self {
             Filter_::Or(ref mut v) => {
                 v.push(filter);
@@ -3830,7 +4000,7 @@ impl Filter_ {
             _ => Filter_::Or(vec![self, filter]),
         }
     }
-    pub@{ visibility }@ fn when<F>(self, condition: bool, f: F) -> Self
+    pub fn when<F>(self, condition: bool, f: F) -> Self
     where
         F: FnOnce(Self) -> Self,
     {
@@ -3840,7 +4010,7 @@ impl Filter_ {
             self
         }
     }
-    pub@{ visibility }@ fn if_let_some<T, F>(self, value: &Option<T>, f: F) -> Self
+    pub fn if_let_some<T, F>(self, value: &Option<T>, f: F) -> Self
     where
         F: FnOnce(Self, &T) -> Self,
     {
@@ -3857,64 +4027,64 @@ pub(crate) use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_
 impl FilterTr for Filter_ {
     crate::misc::filter!(Data);
 }
-@% let filter_macro_name = "filter_{}_{}"|format(group_name, model_name) -%@
+@% let filter_macro_name = "filter_{}_{}_{}"|format(db|snake, group_name, model_name) -%@
 @% let model_path = "$crate::models::{}::_base::_{}"|format(group_name|to_var_name, mod_name) -%@
 @%- if config.excluded_from_domain %@
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_null {
 @%- for (col_name, column_def) in def.nullable() %@
     (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
 @%- endfor %@
     () => (); // For empty case
 }
-pub@{ visibility }@ use @{ filter_macro_name }@_null as filter_null;
+pub use @{ filter_macro_name }@_null as filter_null;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_text {
 @%- for (col_name, column_def) in def.text() %@
     (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
 @%- endfor %@
     () => (); // For empty case
 }
-pub@{ visibility }@ use @{ filter_macro_name }@_text as filter_text;
+pub use @{ filter_macro_name }@_text as filter_text;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_one {
 @%- for (col_name, column_def) in def.all_fields_without_json() %@
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColOne_::@{ col_name|to_var_name }@($e.clone().try_into()?));
 @%- endfor %@
 }
-pub@{ visibility }@ use @{ filter_macro_name }@_one as filter_one;
+pub use @{ filter_macro_name }@_one as filter_one;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_many {
 @%- for (col_name, column_def) in def.all_fields_without_json() %@
     (@{ col_name }@ [$($e:expr),*]) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@(vec![ $( $e.clone().try_into()? ),* ]));
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@($e.into_iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
 @%- endfor %@
 }
-pub@{ visibility }@ use @{ filter_macro_name }@_many as filter_many;
+pub use @{ filter_macro_name }@_many as filter_many;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_json {
 @%- for (col_name, column_def) in def.all_fields_only_json() %@
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJson_::@{ col_name|to_var_name }@($e.clone().try_into()?));
 @%- endfor %@
     () => ();
 }
-pub@{ visibility }@ use @{ filter_macro_name }@_json as filter_json;
+pub use @{ filter_macro_name }@_json as filter_json;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_json_array {
 @%- for (col_name, column_def) in def.all_fields_only_json() %@
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJsonArray_::@{ col_name|to_var_name }@($e.iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
 @%- endfor %@
     () => ();
 }
-pub@{ visibility }@ use @{ filter_macro_name }@_json_array as filter_json_array;
+pub use @{ filter_macro_name }@_json_array as filter_json_array;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_geo {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
     (@{ col_name }@ $e:expr, $s:expr) => (@{ model_path }@::ColGeo_::@{ col_name|to_var_name }@($e.clone().try_into()?, $s));
@@ -3922,9 +4092,9 @@ macro_rules! @{ filter_macro_name }@_geo {
 @%- endfor %@
     () => ();
 }
-pub@{ visibility }@ use @{ filter_macro_name }@_geo as filter_geo;
+pub use @{ filter_macro_name }@_geo as filter_geo;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_geo_distance {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
     (@{ col_name }@ $e:expr, $d:expr, $s:expr) => (@{ model_path }@::ColGeoDistance_::@{ col_name|to_var_name }@($e.clone().try_into()?, $d, $s));
@@ -3932,9 +4102,9 @@ macro_rules! @{ filter_macro_name }@_geo_distance {
 @%- endfor %@
     () => ();
 }
-pub@{ visibility }@ use @{ filter_macro_name }@_geo_distance as filter_geo_distance;
+pub use @{ filter_macro_name }@_geo_distance as filter_geo_distance;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@_rel {
 @%- for (model_def, col_name, rel_def) in def.relations_one_and_belonging(false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(None));
@@ -3946,9 +4116,9 @@ macro_rules! @{ filter_macro_name }@_rel {
 @%- endfor %@
     () => ();
 }
-pub@{ visibility }@ use @{ filter_macro_name }@_rel as filter_rel;
+pub use @{ filter_macro_name }@_rel as filter_rel;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ filter_macro_name }@ {
     () => (@{ model_path }@::Filter_::new_and());
 @%- for (index_name, index) in def.multi_index(false) %@
@@ -4028,12 +4198,12 @@ macro_rules! @{ filter_macro_name }@ {
     ($t1:tt AND $($t2:tt)AND+) => (@{ model_path }@::Filter_::And(vec![ @{ model_path }@::filter!($t1), $( @{ model_path }@::filter!($t2) ),* ]));
     ($t1:tt OR $($t2:tt)OR+) => (@{ model_path }@::Filter_::Or(vec![ @{ model_path }@::filter!($t1), $( @{ model_path }@::filter!($t2) ),* ]));
 }
-pub@{ visibility }@ use @{ filter_macro_name }@ as filter;
+pub use @{ filter_macro_name }@ as filter;
 @%- endif %@
 @%- if config.excluded_from_domain %@
 
 #[derive(Clone, Debug)]
-pub@{ visibility }@ enum Order_ {
+pub enum Order_ {
     Asc(Col_),
     Desc(Col_),
     IsNullAsc(Col_),
@@ -4047,16 +4217,16 @@ impl OrderTr for Order_ {
 }
 @%- if config.excluded_from_domain %@
 
-@% let order_macro_name = "order_{}_{}"|format(group_name, model_name) -%@
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+@% let order_macro_name = "order_{}_{}_{}"|format(db|snake, group_name, model_name) -%@
+#[macro_export]
 macro_rules! @{ order_macro_name }@_col {
 @%- for (col_name, column_def) in def.all_fields() %@
     (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
 @%- endfor %@
 }
-pub@{ visibility }@ use @{ order_macro_name }@_col as order_by_col;
+pub use @{ order_macro_name }@_col as order_by_col;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ order_macro_name }@_one {
     ($i:ident) => (@{ model_path }@::Order_::Asc(@{ model_path }@::order_by_col!($i)));
     ($i:ident ASC) => (@{ model_path }@::Order_::Asc(@{ model_path }@::order_by_col!($i)));
@@ -4064,19 +4234,19 @@ macro_rules! @{ order_macro_name }@_one {
     ($i:ident IS NULL ASC) => (@{ model_path }@::Order_::IsNullAsc(@{ model_path }@::order_by_col!($i)));
     ($i:ident IS NULL DESC) => (@{ model_path }@::Order_::IsNullDesc(@{ model_path }@::order_by_col!($i)));
 }
-pub@{ visibility }@ use @{ order_macro_name }@_one as order_by_one;
+pub use @{ order_macro_name }@_one as order_by_one;
 
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! @{ order_macro_name }@ {
     ($($($i:ident)+),+) => (vec![$( @{ model_path }@::order_by_one!($($i)+)),+]);
 }
-pub@{ visibility }@ use @{ order_macro_name }@ as order;
+pub use @{ order_macro_name }@ as order;
 @%- endif %@
 
 @%- if config.excluded_from_domain %@
 
 #[derive(Debug, Clone, Default)]
-pub@{ visibility }@ struct Joiner_ {
+pub struct Joiner_ {
 @{- def.relations()|fmt_rel_join("
     pub {rel_name}: Option<Box<join_{class_mod}::Joiner_>>,", "") }@
     pub _dummy: bool,
@@ -4104,24 +4274,24 @@ impl Joiner_ {
         }
     }
 }
-@%- let fetch_macro_name = "{}_{}"|format(group_name, model_name) %@
+@%- let fetch_macro_name = "{}_{}_{}"|format(db|snake, group_name, model_name) %@
 @%- let base_path = "$crate::models::{}::{}::_base::_{}"|format(db|snake|to_var_name, group_name|to_var_name, mod_name) %@
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+#[macro_export]
 macro_rules! _join_@{ fetch_macro_name }@ {
 @{- def.relations()|fmt_rel_join("
     ({rel_name}) => ($crate::models::{class_mod_var}::_{mod_name}::join!({}));
     ({rel_name}: $p:tt) => ($crate::models::{class_mod_var}::_{mod_name}::join!($p));", "") }@
     () => ();
 }
-pub@{ visibility }@ use _join_@{ fetch_macro_name }@ as _join;
-@% if config.export_db_layer %@#[macro_export]@% else %@#[allow(unused_macros)]@% endif %@
+pub use _join_@{ fetch_macro_name }@ as _join;
+#[macro_export]
 macro_rules! join_@{ fetch_macro_name }@ {
     ({$($i:ident $(: $p:tt)?),*}) => (Some(Box::new(@{ model_path }@::Joiner_ {
         $($i: @{ base_path }@::_join!($i $(: $p)?),)*
         ..Default::default()
     })));
 }
-pub@{ visibility }@ use join_@{ fetch_macro_name }@ as join;
+pub use join_@{ fetch_macro_name }@ as join;
 @%- endif %@
 
 #[derive(Debug, Clone, Default)]
@@ -4219,7 +4389,7 @@ impl QueryBuilder {
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
     {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!("filter digest:{}", filter_digest);
+        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let sql = self._sql(T::_sql_cols(), false, conn.shard_id(), &filter_digest);
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
@@ -4227,7 +4397,7 @@ impl QueryBuilder {
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(T::from_row).collect();
         Ok(result?)
@@ -4304,12 +4474,12 @@ impl QueryBuilder {
             + Unpin
             + 'static,
     {
+        let ctx_no = conn.ctx_no();
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!("filter digest:{}", filter_digest);
+        debug!(ctx = ctx_no; "filter digest:{}", filter_digest);
         let sql = self._sql(T::_sql_cols(), false, conn.shard_id(), &filter_digest);
         let (tx, rx) = mpsc::channel(1000);
         let mut executor = conn.acquire_reader().await?;
-        let ctx_no = conn.ctx_no();
         tokio::spawn(async move {
             let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = ctx_no);
@@ -4317,7 +4487,7 @@ impl QueryBuilder {
             let now = std::time::Instant::now();
             let mut result = query.fetch(executor.as_mut());
             if now.elapsed() > std::time::Duration::from_secs(1) {
-                warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+                warn!(ctx = ctx_no; "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
             }
             while let Some(v) = result.try_next().await.unwrap_or_else(|e| {
                 warn!("{}", e);
@@ -4345,7 +4515,7 @@ impl QueryBuilder {
     #[allow(clippy::if_same_then_else)]
     async fn _select_from_cache(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!("filter digest:{}", filter_digest);
+        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
@@ -4371,7 +4541,7 @@ impl QueryBuilder {
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
         let result = result?;
@@ -4391,7 +4561,7 @@ impl QueryBuilder {
 
     pub@{ visibility }@ async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!("filter digest:{}", filter_digest);
+        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let sql = self._sql(Data::_sql_cols(), !conn.wo_tx(), conn.shard_id(), &filter_digest);
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
@@ -4404,7 +4574,7 @@ impl QueryBuilder {
             query.fetch_all(conn.get_tx().await?.as_mut()).await?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
         let mut list: Vec<_Updater_> = result?
@@ -4500,7 +4670,7 @@ impl QueryBuilder {
     #[allow(clippy::if_same_then_else)]
     pub@{ visibility }@ async fn update(self, conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<u64> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!("filter digest:{}", filter_digest);
+        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         @%- if def.updated_at_conf().is_some() %@
         if obj._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
@@ -4567,7 +4737,7 @@ impl QueryBuilder {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
@@ -4597,7 +4767,7 @@ impl QueryBuilder {
     pub@{ visibility }@ async fn force_delete(self, conn: &mut DbConn) -> Result<u64> {
         @%- if def.on_delete_list.is_empty() %@
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!("filter digest:{}", filter_digest);
+        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
             r#"DELETE FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
@@ -4649,7 +4819,7 @@ impl QueryBuilder {
             query.execute(conn.get_tx().await?.as_mut()).await?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
@@ -4657,7 +4827,7 @@ impl QueryBuilder {
         Ok(result.rows_affected())
         @%- else %@
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!("filter digest:{}", filter_digest);
+        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
@@ -4687,7 +4857,7 @@ impl QueryBuilder {
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
         let ids: Vec<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> = result?.iter().map(|id| id.into()).collect();
@@ -5780,7 +5950,7 @@ impl _@{ pascal_name }@ {
         let mut conn = DbConn::_new_with_ctx(ctx_no, shard_id);
         conn.begin_cache_tx().await?;
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!("filter digest:{}", filter_digest);
+        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1{} {} {}"#,
@@ -5811,7 +5981,7 @@ impl _@{ pascal_name }@ {
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
@@ -6782,7 +6952,7 @@ impl _@{ pascal_name }@ {
             }","") }@
             query = query@{ def.primaries()|fmt_join(".bind(id.{index}{bind_as})", "") }@;
             @%- if def.versioned %@
-            query = query.bind(&obj._data.@{ version_col }@);
+            query = query.bind(obj._data.@{ version_col }@);
             @%- endif %@
             info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "update", ctx = conn.ctx_no(); "{}", &obj);
             debug!("{:?}", &obj);
@@ -7389,7 +7559,7 @@ impl _@{ pascal_name }@ {
             let mut _{rel_name} = rel_{class_mod}::{class}::___bulk_insert(conn, &_{rel_name}, ignore, replace, overwrite).await?.into_iter().fold(FxHashMap::default(), |mut map, v| {
                 for v in v {
                     map.entry(RelFk{rel_name_pascal}::get_fk(&v._data).unwrap())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(v);
                 }
                 map

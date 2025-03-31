@@ -354,6 +354,7 @@ impl Like for str {
     }
 }
 
+#[allow(dead_code)]
 fn reject_empty<T>(value: &T) -> Result<(), validator::ValidationError>
 where
     T: Default + PartialEq,

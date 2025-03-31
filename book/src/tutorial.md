@@ -296,7 +296,7 @@ async fn handler(
             date,
             counter: 0,
         }
-        .create(&conn);
+        .create();
         let _ = counter_updater.counter().add(1); // UPDATE加算
         counter_updater._upsert(); // INSERT ... ON DUPLICATE KEY UPDATE の指示
         _Counter::update_delayed(&mut conn, counter_updater).await?;

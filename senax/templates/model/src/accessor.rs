@@ -259,7 +259,7 @@ where
     pub(crate) val: &'a I,
     pub(crate) _phantom: PhantomData<O>,
 }
-impl<'a, I: Clone + Debug, O> AccessorPrimary<'a, I, O>
+impl<I: Clone + Debug, O> AccessorPrimary<'_, I, O>
 where
     O: From<I>,
 {
@@ -299,7 +299,7 @@ where
     pub(crate) update: &'a mut I,
     pub(crate) _phantom: PhantomData<O>,
 }
-impl<'a, I: Clone + Debug, O> AccessorNotNull<'a, I, O>
+impl<I: Clone + Debug, O> AccessorNotNull<'_, I, O>
 where
     I: From<O>,
     O: From<I>,
@@ -357,7 +357,7 @@ where
     pub(crate) update: &'a mut Option<I>,
     pub(crate) _phantom: PhantomData<O>,
 }
-impl<'a, I: Clone + Debug, O> AccessorNull<'a, I, O>
+impl<I: Clone + Debug, O> AccessorNull<'_, I, O>
 where
     I: From<O>,
     O: From<I>,
@@ -425,7 +425,7 @@ pub struct AccessorNotNullBool<'a> {
     pub(crate) update: &'a mut i8,
     pub(crate) _phantom: PhantomData<i8>,
 }
-impl<'a> AccessorNotNullBool<'a> {
+impl AccessorNotNullBool<'_> {
     pub fn get(&self) -> bool {
         (*self.val) == 1
     }
@@ -474,7 +474,7 @@ pub struct AccessorNullBool<'a> {
     pub(crate) update: &'a mut Option<i8>,
     pub(crate) _phantom: PhantomData<i8>,
 }
-impl<'a> AccessorNullBool<'a> {
+impl AccessorNullBool<'_> {
     pub fn get(&self) -> Option<bool> {
         self.val.map(|v| v == 1)
     }
@@ -538,7 +538,7 @@ pub struct AccessorNotNullArc<'a, I: Debug> {
     pub(crate) update: &'a mut Arc<I>,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Debug> AccessorNotNullArc<'a, I> {
+impl<I: Debug> AccessorNotNullArc<'_, I> {
     pub fn get(&self) -> Arc<I> {
         self.val.clone()
     }
@@ -588,7 +588,7 @@ pub struct AccessorNullArc<'a, I: Debug> {
     pub(crate) update: &'a mut Option<Arc<I>>,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Debug> AccessorNullArc<'a, I> {
+impl<I: Debug> AccessorNullArc<'_, I> {
     pub fn get(&self) -> Option<Arc<I>> {
         self.val.clone()
     }
@@ -652,7 +652,7 @@ pub struct AccessorNotNullJson<'a, I: Serialize + DeserializeOwned + Default> {
     pub(crate) update: &'a mut JsonBlob,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'a, I> {
+impl<I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'_, I> {
     pub fn get(&self) -> I {
         self.val._to_value().unwrap_or_default()
     }
@@ -702,7 +702,7 @@ pub struct AccessorNullJson<'a, I: Serialize + DeserializeOwned> {
     pub(crate) update: &'a mut Option<JsonBlob>,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Serialize + DeserializeOwned> AccessorNullJson<'a, I> {
+impl<I: Serialize + DeserializeOwned> AccessorNullJson<'_, I> {
     pub fn get(&self) -> Option<I> {
         self.val.as_ref().and_then(|v| v._to_value())
     }
@@ -766,7 +766,7 @@ pub struct AccessorNotNullBlob<'a> {
     pub(crate) update: &'a mut Arc<Vec<u8>>,
     pub(crate) _phantom: PhantomData<Vec<u8>>,
 }
-impl<'a> AccessorNotNullBlob<'a> {
+impl AccessorNotNullBlob<'_> {
     pub fn get(&self) -> Arc<Vec<u8>> {
         self.val.clone()
     }
@@ -816,7 +816,7 @@ pub struct AccessorNullBlob<'a> {
     pub(crate) update: &'a mut Option<Arc<Vec<u8>>>,
     pub(crate) _phantom: PhantomData<Vec<u8>>,
 }
-impl<'a> AccessorNullBlob<'a> {
+impl AccessorNullBlob<'_> {
     pub fn get(&self) -> Option<&Arc<Vec<u8>>> {
         self.val.as_ref()
     }
@@ -880,7 +880,7 @@ pub struct AccessorNotNullOrd<'a, I: Clone + Ord + Debug + Default> {
     pub(crate) update: &'a mut I,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Clone + Ord + Debug + Default> AccessorNotNullOrd<'a, I> {
+impl<I: Clone + Ord + Debug + Default> AccessorNotNullOrd<'_, I> {
     pub fn get(&self) -> I {
         self.val.clone()
     }
@@ -972,7 +972,7 @@ pub struct AccessorNullOrd<'a, I: Clone + Ord + Debug> {
     pub(crate) update: &'a mut Option<I>,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Clone + Ord + Debug> AccessorNullOrd<'a, I> {
+impl<I: Clone + Ord + Debug> AccessorNullOrd<'_, I> {
     pub fn get(&self) -> Option<I> {
         self.val.clone()
     }
@@ -1088,7 +1088,6 @@ pub struct AccessorNotNullNum<
     pub(crate) _phantom: PhantomData<I>,
 }
 impl<
-        'a,
         I: Copy
             + Ord
             + BitAnd<Output = I>
@@ -1100,7 +1099,7 @@ impl<
             + Debug
             + Display
             + ToValue,
-    > AccessorNotNullNum<'a, I>
+    > AccessorNotNullNum<'_, I>
 {
     pub fn get(&self) -> I {
         *self.val
@@ -1270,7 +1269,6 @@ pub struct AccessorNullNum<
     pub(crate) _phantom: PhantomData<I>,
 }
 impl<
-        'a,
         I: Copy
             + Ord
             + BitAnd<Output = I>
@@ -1283,7 +1281,7 @@ impl<
             + Display
             + Default
             + ToValue,
-    > AccessorNullNum<'a, I>
+    > AccessorNullNum<'_, I>
 {
     pub fn get(&self) -> Option<I> {
         *self.val
@@ -1458,7 +1456,7 @@ pub struct AccessorNotNullFloat<'a, I: Copy + PartialOrd + Float + Debug + Displ
     pub(crate) update: &'a mut I,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Copy + PartialOrd + Float + Debug + Display + ToValue> AccessorNotNullFloat<'a, I> {
+impl<I: Copy + PartialOrd + Float + Debug + Display + ToValue> AccessorNotNullFloat<'_, I> {
     pub fn get(&self) -> I {
         *self.val
     }
@@ -1571,8 +1569,8 @@ pub struct AccessorNullFloat<'a, I: Copy + PartialOrd + Float + Debug + Display 
     pub(crate) update: &'a mut Option<I>,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<'a, I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
-    AccessorNullFloat<'a, I>
+impl<I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
+    AccessorNullFloat<'_, I>
 {
     pub fn get(&self) -> Option<I> {
         *self.val
@@ -1702,7 +1700,7 @@ where
     pub(crate) name: &'static str,
     pub(crate) val: &'a mut Option<Vec<I>>,
 }
-impl<'a, I> AccessorHasOne<'a, I>
+impl<I> AccessorHasOne<'_, I>
 where
     I: Updater,
 {
@@ -1753,7 +1751,7 @@ where
     pub(crate) name: &'static str,
     pub(crate) val: &'a mut Option<Vec<I>>,
 }
-impl<'a, I> AccessorHasMany<'a, I>
+impl<I> AccessorHasMany<'_, I>
 where
     I: Updater,
 {

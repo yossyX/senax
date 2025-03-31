@@ -3,6 +3,7 @@ use crate::auto_api::{MutationRoot, QueryRoot};
 use actix_web::{test, App};
 use async_graphql::{EmptySubscription, Schema};
 use dotenvy::dotenv;
+#[allow(unused_imports)]
 use serde_json::json;
 
 #[actix_web::test]
@@ -14,8 +15,8 @@ async fn test() {
         App::new()
             .wrap_fn(|req, srv| {
                 req.extensions_mut().insert(Ctx::new());
-                if let Some(claims) = auth::retrieve_claims(req.request()) {
-                    req.extensions_mut().insert(claims);
+                if let Some(auth) = auth::retrieve_auth(req.request()) {
+                    req.extensions_mut().insert(auth);
                 }
                 srv.call(req)
             })

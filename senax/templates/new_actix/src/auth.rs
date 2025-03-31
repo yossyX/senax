@@ -100,7 +100,7 @@ fn get_cookie_string_from_header(req: &HttpRequest) -> Option<String> {
         let cookie_string = v.to_str().unwrap();
         return Some(String::from(cookie_string));
     }
-    return None;
+    None
 }
 #[cfg(debug_assertions)]
 fn get_cookie_value(key: &str, cookie_string: String) -> Option<String> {
@@ -117,7 +117,7 @@ fn get_cookie_value(key: &str, cookie_string: String) -> Option<String> {
             }
         }
     }
-    return None;
+    None
 }
 pub fn retrieve_auth(http_req: &HttpRequest) -> Option<AuthInfo> {
     #[cfg(debug_assertions)]
@@ -162,6 +162,7 @@ pub fn retrieve_auth(http_req: &HttpRequest) -> Option<AuthInfo> {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 pub fn create_jwt(username: String, role: Role) -> String {
     let exp = chrono::Utc::now()
         .checked_add_signed(chrono::Duration::hours(24))

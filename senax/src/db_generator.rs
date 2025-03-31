@@ -8,7 +8,7 @@ use std::{fs, path::Path};
 use crate::common::fs_write;
 use crate::SCHEMA_PATH;
 
-pub fn list() -> Result<Vec<String>> {
+pub fn db_list(dir_type_only: bool) -> Result<Vec<String>> {
     let schema_path = Path::new(SCHEMA_PATH);
     let mut dbs = Vec::new();
     let re = Regex::new(r"^([a-zA-Z][_a-zA-Z0-9]*)\.yml$").unwrap();
@@ -20,7 +20,7 @@ pub fn list() -> Result<Vec<String>> {
             let name = name.to_str().unwrap_or_default();
             if let Some(caps) = re.captures(name) {
                 let name = caps.get(1).unwrap().as_str();
-                if !name.eq("session") {
+                if !dir_type_only || schema_path.join(name).exists() {
                     dbs.push(name.to_owned())
                 }
             }
@@ -30,6 +30,7 @@ pub fn list() -> Result<Vec<String>> {
 }
 
 pub fn generate(db: &str) -> Result<()> {
+    anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
     let schema_path = Path::new(SCHEMA_PATH);
     fs::create_dir_all(schema_path)?;
 

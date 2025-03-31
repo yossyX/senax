@@ -18,7 +18,7 @@ pub async fn start(
     let mut uuid_node = [0u8; 6];
     rand::thread_rng().fill_bytes(&mut uuid_node);
     let uuid_node = Some(uuid_node);
-
+    @%- if session %@
     db_session::start(
         is_hot_deploy,
         exit_tx.clone(),
@@ -29,6 +29,7 @@ pub async fn start(
         &uuid_node,
     )
     .await?;
+    @%- endif %@
     // Do not modify this line. (DbStart)
     Ok(())
 }
@@ -36,24 +37,32 @@ pub async fn start(
 #[cfg(test)]
 pub async fn start_test() -> Result<Vec<tokio::sync::MutexGuard<'static, u8>>> {
     let mut guard = Vec::new();
+    @%- if session %@
     guard.push(db_session::start_test().await?);
+    @%- endif %@
     // Do not modify this line. (DbStartTest)
     Ok(guard)
 }
 
 pub fn stop() {
+    @%- if session %@
     db_session::stop();
+    @%- endif %@
     // Do not modify this line. (DbStop)
 }
 
 #[allow(dead_code)]
 pub async fn clear_local_cache() {
+    @%- if session %@
     db_session::clear_local_cache().await;
+    @%- endif %@
     // Do not modify this line. (DbClearLocalCache)
 }
 
 pub async fn clear_whole_cache() {
+    @%- if session %@
     db_session::clear_whole_cache().await;
+    @%- endif %@
     // Do not modify this line. (DbClearCache)
 }
 
@@ -102,7 +111,9 @@ impl Repositories for RepositoriesImpl {
 #[rustfmt::skip]
 pub async fn migrate(use_test: bool, clean: bool, ignore_missing: bool) -> Result<()> {
     tokio::try_join!(
+        @%- if session %@
         db_session::migrate(use_test, clean, ignore_missing),
+        @%- endif %@
         // Do not modify this line. (migrate)
     )?;
     Ok(())
@@ -115,7 +126,9 @@ pub fn gen_seed_schema() -> Result<()> {
 
 pub async fn seed(use_test: bool) -> Result<()> {
     tokio::try_join!(
+        @%- if session %@
         db_session::seeder::seed(use_test, None),
+        @%- endif %@
         // Do not modify this line. (seed)
     )?;
     Ok(())
@@ -124,7 +137,9 @@ pub async fn seed(use_test: bool) -> Result<()> {
 #[rustfmt::skip]
 pub async fn check(use_test: bool) -> Result<()> {
     tokio::try_join!(
+        @%- if session %@
         db_session::check(use_test),
+        @%- endif %@
         // Do not modify this line. (check)
     )?;
     Ok(())

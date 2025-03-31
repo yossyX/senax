@@ -12,9 +12,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use crate::api_generator::schema::{ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef, API_CONFIG};
-use crate::api_generator::template::{
-    ConfigTemplate, DbConfigTemplate, MutationRootTemplate, QueryRootTemplate,
-};
+use crate::api_generator::template::{DbConfigTemplate, MutationRootTemplate, QueryRootTemplate};
 use crate::common::{fs_write, parse_yml_file, simplify_yml};
 use crate::schema::{to_id_name, ModelDef, _to_var_name, GROUPS};
 use crate::{model_generator, API_SCHEMA_PATH};
@@ -58,10 +56,6 @@ pub fn generate(
     fs::create_dir_all(&schema_dir)?;
 
     let config_path = schema_dir.join("_config.yml");
-    if !config_path.exists() {
-        let tpl = ConfigTemplate;
-        fs_write(&config_path, tpl.render()?)?;
-    }
     let config: ApiConfigDef = parse_yml_file(&config_path)?;
     API_CONFIG.write().unwrap().replace(config.clone());
 
@@ -216,7 +210,7 @@ pub fn generate(
     }
     fs::create_dir_all(&db_base_path)?;
     for group_route in &group_routes {
-        let schema_path = schema_dir.join(&format!("{group_route}.yml"));
+        let schema_path = schema_dir.join(format!("{group_route}.yml"));
         let mut api_model_map: IndexMap<String, Option<ApiModelDef>> = if schema_path.exists() {
             parse_yml_file(&schema_path)?
         } else {
@@ -904,4 +898,21 @@ fn write_relation(
     }
     buf.push_str(&relation_buf.replace('\n', &format!("\n{}", " ".repeat(indent))));
     Ok(())
+}
+
+pub fn api_db_list(server: &Path) -> Result<Vec<String>> {
+    let mut list = Vec::new();
+    for entry in fs::read_dir(server.join(API_SCHEMA_PATH))? {
+        let entry = entry?;
+        let path = entry.path();
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default();
+        if path.is_file() && !name.eq_ignore_ascii_case("_config.yml") && name.ends_with(".yml") {
+            list.push(name.trim_end_matches(".yml").to_string());
+        }
+    }
+    Ok(list)
 }

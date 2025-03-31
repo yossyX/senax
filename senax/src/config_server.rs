@@ -30,6 +30,7 @@ use tokio::sync::Semaphore;
 use tower_http::compression::CompressionLayer;
 use validator::Validate;
 
+use crate::api_generator::api_db_list;
 use crate::api_generator::schema::{
     ApiConfigDef, ApiConfigJson, ApiDbDef, ApiDbJson, ApiModelDef, ApiModelJson,
 };
@@ -49,6 +50,7 @@ pub async fn start(
     backup: &Option<PathBuf>,
     read_only: bool,
 ) -> anyhow::Result<()> {
+    anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
     if let Some(backup) = backup.clone() {
         ensure!(backup.is_dir(), "Specify a directory for backup");
         crate::common::BACKUP.set(backup).unwrap();
@@ -266,7 +268,7 @@ fn file_response(
 
 async fn get_db() -> impl IntoResponse {
     let _semaphore = SEMAPHORE.acquire().await;
-    let result = crate::db_generator::list();
+    let result = crate::db_generator::db_list(true);
     json_response(result)
 }
 
@@ -639,15 +641,7 @@ async fn get_api_server_db(AxumPath(path): AxumPath<String>) -> impl IntoRespons
     let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let server = check_ascii_name(&path)?;
-        let mut list = Vec::new();
-        for entry in fs::read_dir(Path::new(server).join(API_SCHEMA_PATH))? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                list.push(path.file_name().unwrap().to_string_lossy().to_string());
-            }
-        }
-        Ok(list)
+        api_db_list(Path::new(server))
     }
     .await;
     json_response(result)
@@ -760,6 +754,7 @@ async fn save_api_server_db_config(
                 let old_config: ApiDbDef = parse_yml(&content)?;
                 let set: HashSet<_> = data.groups.iter().filter_map(|v| v._name.clone()).collect();
                 let dir = Path::new(server).join(API_SCHEMA_PATH).join(db_path);
+                fs::create_dir_all(&dir)?;
                 for (group_name, _) in &old_config.groups {
                     if !set.contains(group_name) {
                         check_ascii_name(group_name)?;
