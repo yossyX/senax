@@ -97,6 +97,12 @@ impl PartialEq for Column {
     }
 }
 
+impl Column {
+    pub fn has_query(&self) -> bool {
+        self.constraint.query.is_some()
+    }
+}
+
 fn comp_literal(value: &Option<Literal>, other: &Option<Literal>) -> bool {
     if let Some(value) = value {
         if let Some(other) = other {
@@ -157,6 +163,8 @@ impl PartialEq for Constraint {
             && self.primary_key == other.primary_key
             && self.unique == other.unique
             && self.srid == other.srid
+            && self.query.is_none() == other.query.is_none()
+            && self.query.clone().unwrap_or_default().1 == other.query.clone().unwrap_or_default().1
     }
 }
 

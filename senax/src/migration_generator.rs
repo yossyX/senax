@@ -578,21 +578,25 @@ fn make_ddl(
                             && old_table.columns.contains_key(old_name)
                             && !old_table.columns.contains_key(name)
                         {
-                            history
-                                .entry(Type::RenameColumn)
-                                .or_default()
-                                .entry(table_name.clone())
-                                .or_default()
-                                .push(name.clone());
-                            writeln!(
-                                &mut result,
-                                "ALTER TABLE {} RENAME COLUMN {} TO {};",
-                                &escape(table_name),
-                                &escape(old_name),
-                                &escape(name),
-                            )?;
-                            let column = old_table.columns.remove(old_name).unwrap();
-                            old_table.columns.insert(name.clone(), column);
+                            if !new_field.has_query()
+                                && !old_table.columns.get(old_name).unwrap().has_query()
+                            {
+                                history
+                                    .entry(Type::RenameColumn)
+                                    .or_default()
+                                    .entry(table_name.clone())
+                                    .or_default()
+                                    .push(name.clone());
+                                writeln!(
+                                    &mut result,
+                                    "ALTER TABLE {} RENAME COLUMN {} TO {};",
+                                    &escape(table_name),
+                                    &escape(old_name),
+                                    &escape(name),
+                                )?;
+                                let column = old_table.columns.remove(old_name).unwrap();
+                                old_table.columns.insert(name.clone(), column);
+                            }
                             new_field.old_name = None;
                             found = true;
                         }
@@ -606,7 +610,7 @@ fn make_ddl(
                 if let Some(old_name) = &new_field.old_name {
                     if name != old_name {
                         anyhow::bail!(
-                            "A illegal  rename of columns in the {} table was detected.",
+                            "A illegal rename of columns in the {} table was detected.",
                             table_name
                         );
                     }
