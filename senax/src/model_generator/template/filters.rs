@@ -714,13 +714,13 @@ pub fn strum_props4(def: &FieldDef) -> ::askama::Result<String> {
 pub fn auto_opt<T: std::fmt::Display>(s: &Option<T>) -> ::askama::Result<String> {
     match s {
         None => Ok("".to_owned()),
-        Some(ref s) => Ok(format!("{}", s)),
+        Some(s) => Ok(format!("{}", s)),
     }
 }
 pub fn disp_opt<T: std::fmt::Debug>(s: &Option<T>) -> ::askama::Result<String> {
     match s {
         None => Ok("None".to_owned()),
-        Some(ref s) => Ok(format!("Some({:?})", s)),
+        Some(s) => Ok(format!("Some({:?})", s)),
     }
 }
 // pub fn if_then_else<T: std::fmt::Display>(wh: bool, th: T, el: T) -> ::askama::Result<T> {

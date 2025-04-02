@@ -1,7 +1,7 @@
 [package]
 name = "senax-mysql-parser"
 version = "0.1.7"
-edition = "2021"
+edition = "2024"
 authors = ["yossyX"]
 license = "MIT"
 description = "MySQL parser for Senax. This library is forked from https://github.com/ms705/nom-sql ."

@@ -1,7 +1,7 @@
 [package]
 name = "senax-actix-session"
 version = "0.4.2"
-edition = "2021"
+edition = "2024"
 authors = ["yossyX"]
 description = "Senax actix session library"
 repository = "https://github.com/yossyX/senax"

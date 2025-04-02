@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use schemars::gen::SchemaSettings;
+use schemars::r#gen::SchemaSettings;
 use serde_json::Value;
 
 use crate::schema::SchemaDef;
@@ -25,8 +25,8 @@ pub fn whole_schema() -> Result<String, anyhow::Error> {
         s.option_nullable = false;
         s.option_add_null_type = true;
     });
-    let gen = settings.into_generator();
-    let schema = gen.into_root_schema_for::<SchemaDef>();
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<SchemaDef>();
     let schema = serde_json::to_string(&schema)?;
     let schema = schema.replace(r#""additionalProperties":{"#,
         r#""propertyNames":{"pattern":"^\\p{XID_Start}\\p{XID_Continue}*(?<!_)$"},"additionalProperties":{"#);
@@ -201,8 +201,8 @@ pub fn json_config_schema() -> Result<RootSchema, anyhow::Error> {
         s.option_nullable = true;
         s.option_add_null_type = false;
     });
-    let gen = settings.into_generator();
-    let schema = gen.into_root_schema_for::<ConfigJson>();
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<ConfigJson>();
     Ok(schema)
 }
 
@@ -212,8 +212,8 @@ pub fn json_model_schema() -> Result<RootSchema, anyhow::Error> {
         s.option_nullable = true;
         s.option_add_null_type = false;
     });
-    let gen = settings.into_generator();
-    let schema = gen.into_root_schema_for::<ModelJson>();
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<ModelJson>();
     Ok(schema)
 }
 
@@ -223,8 +223,8 @@ pub fn json_simple_vo_schema() -> Result<RootSchema, anyhow::Error> {
         s.option_nullable = true;
         s.option_add_null_type = false;
     });
-    let gen = settings.into_generator();
-    let schema = gen.into_root_schema_for::<ValueObjectJson>();
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<ValueObjectJson>();
     Ok(schema)
 }
 
@@ -234,8 +234,8 @@ pub fn json_api_config_schema() -> Result<RootSchema, anyhow::Error> {
         s.option_nullable = true;
         s.option_add_null_type = false;
     });
-    let gen = settings.into_generator();
-    let schema = gen.into_root_schema_for::<ApiConfigJson>();
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<ApiConfigJson>();
     Ok(schema)
 }
 
@@ -245,8 +245,8 @@ pub fn json_api_db_schema() -> Result<RootSchema, anyhow::Error> {
         s.option_nullable = true;
         s.option_add_null_type = false;
     });
-    let gen = settings.into_generator();
-    let schema = gen.into_root_schema_for::<ApiDbJson>();
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<ApiDbJson>();
     Ok(schema)
 }
 
@@ -256,7 +256,7 @@ pub fn json_api_schema() -> Result<RootSchema, anyhow::Error> {
         s.option_nullable = true;
         s.option_add_null_type = false;
     });
-    let gen = settings.into_generator();
-    let schema = gen.into_root_schema_for::<ApiModelJson>();
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<ApiModelJson>();
     Ok(schema)
 }

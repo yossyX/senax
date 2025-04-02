@@ -60,9 +60,9 @@ impl fmt::Display for ColumnConstraint {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ColumnConstraint::NotNull => write!(f, "NOT NULL"),
-            ColumnConstraint::CharacterSet(ref charset) => write!(f, "CHARACTER SET {}", charset),
-            ColumnConstraint::Collation(ref collation) => write!(f, "COLLATE {}", collation),
-            ColumnConstraint::DefaultValue(ref literal) => {
+            ColumnConstraint::CharacterSet(charset) => write!(f, "CHARACTER SET {}", charset),
+            ColumnConstraint::Collation(collation) => write!(f, "COLLATE {}", collation),
+            ColumnConstraint::DefaultValue(literal) => {
                 write!(f, "DEFAULT {}", literal.to_string())
             }
             ColumnConstraint::AutoIncrement => write!(f, "AUTO_INCREMENT"),

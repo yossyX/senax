@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Result};
 use regex::Regex;
-use schemars::gen::SchemaSettings;
+use schemars::r#gen::SchemaSettings;
 use schemars::schema::{InstanceType, Schema, SchemaObject, SingleOrVec};
 use schemars::JsonSchema;
 use senax_common::types::blob::FILES;
@@ -54,8 +54,8 @@ pub fn gen_seed_schema() -> Result<()> {
         s.option_nullable = false;
         s.option_add_null_type = true;
     });
-    let gen = settings.into_generator();
-    let schema = gen.into_root_schema_for::<SeedSchema>();
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<SeedSchema>();
     let schema = serde_json::to_string_pretty(&schema)?;
     let path = std::path::Path::new(file!())
         .parent()
@@ -156,7 +156,7 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
 }
 
 #[allow(dead_code)]
-pub(crate) fn id_schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {
+pub(crate) fn id_schema(_: &mut schemars::r#gen::SchemaGenerator) -> Schema {
     let schema = SchemaObject {
         instance_type: Some(SingleOrVec::Vec(vec![
             InstanceType::String,

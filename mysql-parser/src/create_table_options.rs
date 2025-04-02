@@ -22,9 +22,9 @@ pub enum TableOption {
 impl fmt::Display for TableOption {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TableOption::Comment(ref comment) => write!(f, "COMMENT={}", comment.to_string()),
-            TableOption::Collation(ref collation) => write!(f, "COLLATE={}", collation),
-            TableOption::Engine(ref engine) => write!(f, "ENGINE={}", engine),
+            TableOption::Comment(comment) => write!(f, "COMMENT={}", comment.to_string()),
+            TableOption::Collation(collation) => write!(f, "COLLATE={}", collation),
+            TableOption::Engine(engine) => write!(f, "ENGINE={}", engine),
             TableOption::Another => Ok(()),
         }
     }

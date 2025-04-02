@@ -36,7 +36,7 @@ pub struct Inheritance {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key_value: Option<Value>,
 }
-fn key_value_schema(_: &mut schemars::gen::SchemaGenerator) -> Schema {
+fn key_value_schema(_: &mut schemars::r#gen::SchemaGenerator) -> Schema {
     let schema = SchemaObject {
         instance_type: Some(SingleOrVec::Vec(vec![
             InstanceType::String,

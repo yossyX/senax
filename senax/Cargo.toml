@@ -1,7 +1,7 @@
 [package]
 name = "senax"
 version = "0.3.22"
-edition = "2021"
+edition = "2024"
 authors = ["yossyX"]
 license = "MIT OR Apache-2.0"
 description = "Senax Web Server Code Generator"
@@ -41,7 +41,7 @@ proc-macro2 = "1.0.76"
 rand = "0.8"
 regex = "1"
 rquickjs = { version = "0.4.3", features = ["rust-alloc"], default-features = false }
-schemars = { version = "0.8.10", features = ["indexmap1", "preserve_order"] }
+schemars = { version = "0.8.22", features = ["indexmap1", "preserve_order"] }
 semver = "1.0.22"
 senax-inflector = "0.1.0"
 senax-mysql-parser = "=0.1.7"

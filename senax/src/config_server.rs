@@ -208,7 +208,7 @@ async fn root_handler(headers: HeaderMap) -> impl IntoResponse {
 async fn file_handler(
     AxumPath(mut path): AxumPath<String>,
     headers: HeaderMap,
-) -> impl IntoResponse {
+) -> impl IntoResponse + use<> {
     if path.is_empty() || path.ends_with('/') {
         path.push_str("index.html");
     }
@@ -224,7 +224,7 @@ fn file_response(
     tpl: (Compression, Cow<'static, [u8]>),
     mime: MimeGuess,
     req_headers: &HeaderMap,
-) -> impl IntoResponse {
+) -> impl IntoResponse + use<> {
     static TIME: Lazy<HttpDate> = Lazy::new(|| HttpDate::from(SystemTime::now()));
 
     let is_gzip_request = req_headers

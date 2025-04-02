@@ -54,12 +54,12 @@ fn generator(derive_input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let struct_name = &derive_input.ident;
     let (impl_generics, ty_generics, where_clause) = &derive_input.generics.split_for_impl();
 
-    let gen = quote! {
+    let result = quote! {
         impl #impl_generics senax_common::SqlColumns for #struct_name #ty_generics #where_clause {
             fn _sql_cols() -> &'static str {
                 #sql_cols
             }
         }
     };
-    Ok(gen.into())
+    Ok(result.into())
 }

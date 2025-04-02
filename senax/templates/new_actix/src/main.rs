@@ -448,7 +448,9 @@ fn take_listener(ports: &[&str]) -> Result<HashMap<String, TcpListener>> {
             env_str.push(format!("{}={}", port, fd));
         }
     }
-    env::set_var(SERVER_STARTER_PORT, env_str.join(";"));
+    unsafe {
+        env::set_var(SERVER_STARTER_PORT, env_str.join(";"));
+    }
     Ok(results)
 }
 
@@ -480,7 +482,9 @@ async fn handle_signals() {
                     let args = env::args()
                         .map(|arg| CString::new(arg).unwrap())
                         .collect::<Vec<CString>>();
-                    env::set_var(KILL_PARENT, "true");
+                    unsafe {
+                        env::set_var(KILL_PARENT, "true");
+                    }
                     unistd::execv(&args[0], &args).expect("execution failed.");
                     unreachable!()
                 }
@@ -513,7 +517,7 @@ fn output_pid_file(file: &Option<String>) -> Result<()> {
     use std::fs::File;
     use std::io::Write;
 
-    if let Some(ref file) = file {
+    if let Some(file) = file {
         let mut file = File::create(file)?;
         write!(file, "{}", unistd::getpid())?;
         file.flush()?;

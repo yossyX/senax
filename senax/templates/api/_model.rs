@@ -372,12 +372,12 @@ fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: R
 #[allow(unused_variables)]
 pub fn gen_json_schema(dir: &std::path::Path) -> anyhow::Result<()> {
     @%- if !api_def.disable_mutation %@
-    let settings = schemars::gen::SchemaSettings::draft07().with(|s| {
+    let settings = schemars::r#gen::SchemaSettings::draft07().with(|s| {
         s.option_nullable = true;
         s.option_add_null_type = false;
     });
-    let gen = settings.into_generator();
-    let schema = gen.into_root_schema_for::<ReqObj>();
+    let generator = settings.into_generator();
+    let schema = generator.into_root_schema_for::<ReqObj>();
     crate::auto_api::write_json_schema(
         &dir.join("@{ model_name }@.tsx"),
         serde_json::to_string_pretty(&schema)?,

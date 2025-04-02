@@ -59,7 +59,9 @@ unsafe impl IoBufMut for IoBytesMut {
 
     unsafe fn set_init(&mut self, init_len: usize) {
         if self.0.len() < init_len + self.1 {
-            self.0.set_len(init_len + self.1);
+            unsafe {
+                self.0.set_len(init_len + self.1);
+            }
         }
     }
 }

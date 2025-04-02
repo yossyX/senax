@@ -436,7 +436,7 @@ macro_rules! filter {
         ) -> String {
             let mut s = String::with_capacity(100);
             s.push_str("WHERE ");
-            if let Some(ref c) = filter {
+            if let Some(c) = filter {
                 c.write(&mut s, 1, &mut trash_mode, shard_id, false);
             }
             if trash_mode == TrashMode::Not {
@@ -484,7 +484,7 @@ macro_rules! order {
                 return format!("ORDER BY {}", raw_order);
             }
             match order {
-                Some(ref v) if !v.is_empty() => {
+                Some(v) if !v.is_empty() => {
                     let mut s = String::with_capacity(100);
                     s.push_str("ORDER BY ");
                     for o in v {

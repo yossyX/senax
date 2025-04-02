@@ -1,7 +1,7 @@
 [package]
 name = "senax-logger"
 version = "0.2.5"
-edition = "2021"
+edition = "2024"
 authors = ["yossyX"]
 license = "MIT OR Apache-2.0"
 description = "Senax logger"
