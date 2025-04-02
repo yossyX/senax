@@ -185,8 +185,16 @@ pub async fn migrate(use_test: bool, clean: bool, ignore_missing: bool) -> Resul
     for shard_id in DbConn::shard_num_range() {
         join_set.spawn_local(async move { models::exec_migrate(shard_id, ignore_missing).await });
     }
+    let mut error = None;
     while let Some(res) = join_set.join_next().await {
-        res??;
+        if let Err(e) = res? {
+            if let Some(e) = error.replace(e) {
+                log::error!("{}", e);
+            }
+        }
+    }
+    if let Some(e) = error {
+        return Err(e);
     }
     Ok(())
 }

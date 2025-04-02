@@ -101,10 +101,20 @@ impl Repositories for RepositoriesImpl {
 
 #[rustfmt::skip]
 pub async fn migrate(use_test: bool, clean: bool, ignore_missing: bool) -> Result<()> {
-    tokio::try_join!(
-        db_session::migrate(use_test, clean, ignore_missing),
-        // Do not modify this line. (migrate)
-    )?;
+    let mut join_set = tokio::task::JoinSet::new();
+    join_set.spawn_local(db_session::migrate(use_test, clean, ignore_missing));
+    // Do not modify this line. (migrate)
+    let mut error = None;
+    while let Some(res) = join_set.join_next().await {
+        if let Err(e) = res? {
+            if let Some(e) = error.replace(e) {
+                log::error!("{}", e);
+            }
+        }
+    }
+    if let Some(e) = error {
+        return Err(e);
+    }
     Ok(())
 }
 
@@ -114,10 +124,8 @@ pub fn gen_seed_schema() -> Result<()> {
 }
 
 pub async fn seed(use_test: bool) -> Result<()> {
-    tokio::try_join!(
-        db_session::seeder::seed(use_test, None),
-        // Do not modify this line. (seed)
-    )?;
+    db_session::seeder::seed(use_test, None).await?;
+    // Do not modify this line. (seed)
     Ok(())
 }
 
