@@ -516,8 +516,8 @@ pub struct DbRepoImplRollbackTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-        db_@{ db|snake }@::migrate(use_test, clean, ignore_missing),
-        // Do not modify this line. (migrate)"###,
+    join_set.spawn_local(db_@{ db|snake }@::migrate(use_test, clean, ignore_missing));
+    // Do not modify this line. (migrate)"###,
     ext = "txt",
     escape = "none"
 )]
@@ -540,8 +540,8 @@ pub struct DbGenSeedSchemaTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-        db_@{ db|snake }@::seeder::seed(use_test, None),
-        // Do not modify this line. (seed)"###,
+    db_@{ db|snake }@::seeder::seed(use_test, None).await?;
+    // Do not modify this line. (seed)"###,
     ext = "txt",
     escape = "none"
 )]
