@@ -9,6 +9,6 @@ repository = "https://github.com/yossyX/senax"
 keywords = ["senax"]
 
 [dependencies]
-derive_more = "2"
+derive_more = { version = "2", features = ["display"] }
 nom = "8"
 serde = { version = "1.0", features = ["derive", "rc"] }
