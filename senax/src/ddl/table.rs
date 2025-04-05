@@ -1,8 +1,9 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use indexmap::IndexMap;
+use senax_mysql_parser::NomErr;
 use senax_mysql_parser::column::ColumnConstraint;
 use senax_mysql_parser::common::{Literal, SqlType, TableKey};
-use senax_mysql_parser::create::{creation, CreateTableStatement};
+use senax_mysql_parser::create::{CreateTableStatement, creation};
 use senax_mysql_parser::create_table_options::TableOption;
 use senax_mysql_parser::keywords::escape;
 use serde::{Deserialize, Serialize};
@@ -303,7 +304,7 @@ fn conv(def: CreateTableStatement) -> Table {
             }
         }
         for name in table.constraints.keys() {
-            table.indexes.remove(name);
+            table.indexes.swap_remove(name);
         }
     }
     for option in def.options {
@@ -337,16 +338,16 @@ pub async fn parse(database_url: &str) -> Result<IndexMap<String, Table>> {
         let def = match creation(def.as_bytes()) {
             Ok((_, o)) => o,
             Err(e) => match e {
-                nom::Err::Incomplete(_e) => {
+                NomErr::Incomplete(_e) => {
                     bail!(format!("failed to incomplete query:\n{}", def));
                 }
-                nom::Err::Error(e) => {
+                NomErr::Error(e) => {
                     bail!(format!(
                         "failed to parse query:\n{}",
                         String::from_utf8(e.input.to_vec()).unwrap()
                     ));
                 }
-                nom::Err::Failure(e) => {
+                NomErr::Failure(e) => {
                     bail!(format!(
                         "failed to parse query:\n{}",
                         String::from_utf8(e.input.to_vec()).unwrap()

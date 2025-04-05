@@ -2,16 +2,16 @@ use ahash::AHashMap;
 use anyhow::Result;
 use chrono::{Local, Utc};
 use colored::Colorize;
-use env_logger::filter::{Builder, Filter};
-use log::kv::{source::Visitor, Key, Value};
+use env_logger::Builder;
+use log::kv::{Key, Value, source::Visitor};
 use log::{Level, Metadata, Record};
 use once_cell::sync::OnceCell;
 use std::env;
 use time::UtcOffset;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
-use crate::log_writer::LogWriter;
 use crate::Rotation;
+use crate::log_writer::LogWriter;
 
 const FILTER_ENV: &str = "RUST_LOG";
 
@@ -56,7 +56,7 @@ pub fn init(
 }
 
 struct Logger {
-    inner: Filter,
+    inner: env_logger::Logger,
     use_local: bool,
 }
 

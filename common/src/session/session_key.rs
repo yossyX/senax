@@ -1,4 +1,4 @@
-use rand::{distributions::Alphanumeric, Rng as _};
+use rand::{Rng as _, distr::Alphanumeric};
 use std::convert::TryFrom;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -52,7 +52,7 @@ impl SessionKey {
         Self::generate(SystemTime::now().checked_sub(ttl).unwrap())
     }
     fn generate(time: SystemTime) -> SessionKey {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let value = std::iter::repeat(())
             .map(|()| rng.sample(Alphanumeric))
             .take(KEY_LENGTH)

@@ -1,20 +1,20 @@
-use actix_utils::future::{ready, Ready};
+use actix_utils::future::{Ready, ready};
 use actix_web::{
+    HttpResponse,
     body::MessageBody,
     cookie::{Cookie, CookieJar, Key},
-    dev::{forward_ready, ResponseHead, Service, ServiceRequest, ServiceResponse, Transform},
+    dev::{ResponseHead, Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
     http::header::{HeaderValue, SET_COOKIE},
-    HttpResponse,
 };
-use senax_common::session::interface::SessionStore;
 use senax_common::session::SessionKey;
+use senax_common::session::interface::SessionStore;
 use std::{convert::TryInto, fmt, future::Future, pin::Pin, rc::Rc, sync::Arc};
 
 use crate::{
+    Session, SessionStatus,
     config::{
         self, Configuration, CookieConfiguration, CookieContentSecurity, SessionMiddlewareBuilder,
     },
-    Session, SessionStatus,
 };
 
 #[derive(Clone)]

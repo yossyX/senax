@@ -1,4 +1,4 @@
-use anyhow::{bail, ensure, Context as _, Result};
+use anyhow::{Context as _, Result, bail, ensure};
 use compact_str::CompactString;
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
@@ -28,15 +28,15 @@ pub use selector::*;
 pub mod json_schema;
 
 use crate::api_generator::schema::{ApiConfigDef, ApiDbDef, ApiModelDef};
-use crate::common::{parse_yml_file, to_singular, DEFAULT_SRID};
+use crate::common::{DEFAULT_SRID, parse_yml_file, to_singular};
 use crate::{SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE};
 
-static CREATED_AT: RwLock<CompactString> = RwLock::new(CompactString::new_inline(""));
-static UPDATED_AT: RwLock<CompactString> = RwLock::new(CompactString::new_inline(""));
-static DELETED_AT: RwLock<CompactString> = RwLock::new(CompactString::new_inline(""));
-static DELETED: RwLock<CompactString> = RwLock::new(CompactString::new_inline(""));
-static AGGREGATION_TYPE: RwLock<CompactString> = RwLock::new(CompactString::new_inline(""));
-static VERSION: RwLock<CompactString> = RwLock::new(CompactString::new_inline(""));
+static CREATED_AT: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
+static UPDATED_AT: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
+static DELETED_AT: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
+static DELETED: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
+static AGGREGATION_TYPE: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
+static VERSION: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
 
 pub static CONFIG: RwLock<Option<ConfigDef>> = RwLock::new(None);
 #[allow(clippy::type_complexity)]
@@ -491,8 +491,11 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                                         || column_def.length != id.length
                                         || column_def.signed != id.signed
                                     {
-                                        bail!("The field type of the {} relation in the {} model is incorrect.",
-                                        rel_name, cur_model_name);
+                                        bail!(
+                                            "The field type of the {} relation in the {} model is incorrect.",
+                                            rel_name,
+                                            cur_model_name
+                                        );
                                     }
                                 }
                                 column_def.rel = Some((rel_name.clone(), rel_def.clone()));
@@ -506,15 +509,21 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         let local_ids = rel_def.get_local_id(rel_name);
                         if !local_ids.is_empty() {
                             if model.full_name().eq(&rel_def.model) {
-                                ensure!(local_ids.len() == model.primaries().len(),
+                                ensure!(
+                                    local_ids.len() == model.primaries().len(),
                                     "There is an anomaly in the number of fields in the local property of the {} relation of the {} model.",
-                                    rel_name, cur_model_name);
+                                    rel_name,
+                                    cur_model_name
+                                );
                             } else {
                                 let rel_model =
                                     get_model(&rel_def.model, cur_group_name, &groups).borrow();
-                                ensure!(local_ids.len() == rel_model.primaries().len(),
+                                ensure!(
+                                    local_ids.len() == rel_model.primaries().len(),
                                     "There is an anomaly in the number of fields in the local property of the {} relation of the {} model.",
-                                    rel_name, cur_model_name);
+                                    rel_name,
+                                    cur_model_name
+                                );
                             }
                         }
                     }
@@ -541,16 +550,22 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         let rel_def = model.merged_relations.get(rel_name).unwrap();
                         let foreign_ids = rel_def.get_foreign_id(&model);
                         if !foreign_ids.is_empty() {
-                            ensure!(foreign_ids.len() == model.primaries().len(),
+                            ensure!(
+                                foreign_ids.len() == model.primaries().len(),
                                 "There is an anomaly in the number of fields in the foreign property of the {} relation of the {} model.",
-                                rel_name, cur_model_name);
+                                rel_name,
+                                cur_model_name
+                            );
                         }
                     }
                 }
                 for (k, v) in &model.merged_fields {
-                    ensure!(v.data_type != DataType::AutoFk,
-                            "There is no definition of belongs_to relation corresponding to auto_fk in the {} column of the {} model.",
-                            k, model.name);
+                    ensure!(
+                        v.data_type != DataType::AutoFk,
+                        "There is no definition of belongs_to relation corresponding to auto_fk in the {} column of the {} model.",
+                        k,
+                        model.name
+                    );
                 }
             }
             {

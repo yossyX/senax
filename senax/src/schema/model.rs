@@ -3,8 +3,8 @@ use convert_case::{Case, Casing};
 use fancy_regex::Regex;
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
-use schemars::schema::{InstanceType, Schema, SchemaObject, SingleOrVec};
 use schemars::JsonSchema;
+use schemars::schema::{InstanceType, Schema, SchemaObject, SingleOrVec};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::HashSet;
@@ -781,6 +781,7 @@ impl ModelDef {
                     Value::String(s) => format!("{:?}", s),
                     Value::Sequence(_) => panic!("invalid key_value"),
                     Value::Mapping(_) => panic!("invalid key_value"),
+                    Value::Tagged(_) => panic!("invalid key_value"),
                 };
                 format!(
                     "\"{}\"={}{}",
@@ -806,6 +807,7 @@ impl ModelDef {
                     Value::String(s) => format!("{:?}.to_string()", s),
                     Value::Sequence(_) => panic!("invalid key_value"),
                     Value::Mapping(_) => panic!("invalid key_value"),
+                    Value::Tagged(_) => panic!("invalid key_value"),
                 };
                 format!(
                     "self._data.r#{} = {};",
@@ -830,6 +832,7 @@ impl ModelDef {
                     Value::String(s) => format!("{:?}", s),
                     Value::Sequence(_) => panic!("invalid key_value"),
                     Value::Mapping(_) => panic!("invalid key_value"),
+                    Value::Tagged(_) => panic!("invalid key_value"),
                 };
                 format!(
                     "r#{} == {}",

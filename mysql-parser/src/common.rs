@@ -1,8 +1,8 @@
+use nom::IResult;
 use nom::branch::alt;
 use nom::character::complete::{digit1, line_ending, multispace0, multispace1};
-use nom::character::is_alphanumeric;
 use nom::combinator::{map, not, peek};
-use nom::{IResult, InputLength};
+use nom::{AsChar, Parser};
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt;
@@ -15,7 +15,7 @@ use nom::bytes::complete::{is_not, tag, tag_no_case, take, take_while1};
 use nom::combinator::opt;
 use nom::error::{ErrorKind, ParseError};
 use nom::multi::{fold_many0, many0};
-use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::sequence::{delimited, pair, preceded, terminated};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SqlType {
@@ -249,15 +249,15 @@ pub enum TableKey {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize, derive_more::Display)]
 pub enum ReferenceOption {
-    #[display(fmt = "RESTRICT")]
+    #[display("RESTRICT")]
     Restrict,
-    #[display(fmt = "CASCADE")]
+    #[display("CASCADE")]
     Cascade,
-    #[display(fmt = "SET NULL")]
+    #[display("SET NULL")]
     SetNull,
-    #[display(fmt = "NO ACTION")]
+    #[display("NO ACTION")]
     NoAction,
-    #[display(fmt = "SET DEFAULT")]
+    #[display("SET DEFAULT")]
     SetDefault,
 }
 
@@ -268,7 +268,8 @@ pub fn reference_option(i: &[u8]) -> IResult<&[u8], ReferenceOption> {
         map(tag_no_case("SET NULL"), |_| ReferenceOption::SetNull),
         map(tag_no_case("NO ACTION"), |_| ReferenceOption::NoAction),
         map(tag_no_case("SET DEFAULT"), |_| ReferenceOption::SetDefault),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 impl fmt::Display for TableKey {
@@ -380,7 +381,7 @@ impl fmt::Display for TableKey {
 
 #[inline]
 pub fn is_sql_identifier(chr: u8) -> bool {
-    is_alphanumeric(chr) || chr == b'_' || chr == b'@'
+    AsChar::is_alphanum(chr) || chr == b'_' || chr == b'@'
 }
 
 #[inline]
@@ -417,39 +418,41 @@ pub fn len_as_u32(len: &[u8]) -> u32 {
 }
 
 fn precision_helper(i: &[u8]) -> IResult<&[u8], (u16, Option<u16>)> {
-    let (remaining_input, (m, d)) = tuple((
+    let (remaining_input, (m, d)) = (
         digit1,
         opt(preceded(tag(","), preceded(multispace0, digit1))),
-    ))(i)?;
+    )
+        .parse(i)?;
 
     Ok((remaining_input, (len_as_u16(m), d.map(len_as_u16))))
 }
 
 pub fn precision(i: &[u8]) -> IResult<&[u8], (u16, Option<u16>)> {
-    delimited(tag("("), precision_helper, tag(")"))(i)
+    delimited(tag("("), precision_helper, tag(")")).parse(i)
 }
 
 fn opt_signed(i: &[u8]) -> IResult<&[u8], Option<&[u8]>> {
-    opt(alt((tag_no_case("unsigned"), tag_no_case("signed"))))(i)
+    opt(alt((tag_no_case("unsigned"), tag_no_case("signed")))).parse(i)
 }
 
 fn opt_unsigned(i: &[u8]) -> IResult<&[u8], Option<&[u8]>> {
-    opt(tag_no_case("unsigned"))(i)
+    opt(tag_no_case("unsigned")).parse(i)
 }
 
 fn delim_digit(i: &[u8]) -> IResult<&[u8], &[u8]> {
-    delimited(tag("("), digit1, tag(")"))(i)
+    delimited(tag("("), digit1, tag(")")).parse(i)
 }
 
 // TODO: rather than copy paste these functions, should create a function that returns a parser
 // based on the sql int type, just like nom does
 fn tiny_int(i: &[u8]) -> IResult<&[u8], SqlType> {
-    let (remaining_input, (_, _len, _, signed)) = tuple((
+    let (remaining_input, (_, _len, _, signed)) = (
         tag_no_case("tinyint"),
         opt(delim_digit),
         multispace0,
         opt_signed,
-    ))(i)?;
+    )
+        .parse(i)?;
 
     match signed {
         Some(sign) => {
@@ -469,12 +472,13 @@ fn tiny_int(i: &[u8]) -> IResult<&[u8], SqlType> {
 // TODO: rather than copy paste these functions, should create a function that returns a parser
 // based on the sql int type, just like nom does
 fn big_int(i: &[u8]) -> IResult<&[u8], SqlType> {
-    let (remaining_input, (_, _len, _, signed)) = tuple((
+    let (remaining_input, (_, _len, _, signed)) = (
         tag_no_case("bigint"),
         opt(delim_digit),
         multispace0,
         opt_signed,
-    ))(i)?;
+    )
+        .parse(i)?;
 
     match signed {
         Some(sign) => {
@@ -494,12 +498,13 @@ fn big_int(i: &[u8]) -> IResult<&[u8], SqlType> {
 // TODO: rather than copy paste these functions, should create a function that returns a parser
 // based on the sql int type, just like nom does
 fn sql_int_type(i: &[u8]) -> IResult<&[u8], SqlType> {
-    let (remaining_input, (_, _len, _, signed)) = tuple((
+    let (remaining_input, (_, _len, _, signed)) = (
         alt((tag_no_case("integer"), tag_no_case("int"))),
         opt(delim_digit),
         multispace0,
         opt_signed,
-    ))(i)?;
+    )
+        .parse(i)?;
 
     match signed {
         Some(sign) => {
@@ -516,12 +521,13 @@ fn sql_int_type(i: &[u8]) -> IResult<&[u8], SqlType> {
     }
 }
 fn small_int_type(i: &[u8]) -> IResult<&[u8], SqlType> {
-    let (remaining_input, (_, _len, _, signed)) = tuple((
+    let (remaining_input, (_, _len, _, signed)) = (
         tag_no_case("smallint"),
         opt(delim_digit),
         multispace0,
         opt_signed,
-    ))(i)?;
+    )
+        .parse(i)?;
 
     match signed {
         Some(sign) => {
@@ -542,12 +548,13 @@ fn small_int_type(i: &[u8]) -> IResult<&[u8], SqlType> {
 // former has "at least" M precision, the latter "exactly".
 // See https://dev.mysql.com/doc/refman/5.7/en/precision-math-decimal-characteristics.html
 fn decimal_or_numeric(i: &[u8]) -> IResult<&[u8], SqlType> {
-    let (remaining_input, (_, precision, _, _unsigned)) = tuple((
+    let (remaining_input, (_, precision, _, _unsigned)) = (
         alt((tag_no_case("decimal"), tag_no_case("numeric"))),
         opt(precision),
         multispace0,
         opt_unsigned,
-    ))(i)?;
+    )
+        .parse(i)?;
 
     match precision {
         None => Ok((remaining_input, SqlType::Decimal(32, 0))),
@@ -564,12 +571,12 @@ fn type_identifier_first_half(i: &[u8]) -> IResult<&[u8], SqlType> {
         small_int_type,
         map(tag_no_case("bool"), |_| SqlType::Bool),
         map(
-            tuple((
+            (
                 tag_no_case("char"),
                 delim_digit,
                 multispace0,
                 opt(tag_no_case("binary")),
-            )),
+            ),
             |t| SqlType::Char(len_as_u32(t.1)),
         ),
         map(preceded(tag_no_case("datetime"), opt(delim_digit)), |fsp| {
@@ -589,10 +596,9 @@ fn type_identifier_first_half(i: &[u8]) -> IResult<&[u8], SqlType> {
             },
         ),
         map(tag_no_case("time"), |_| SqlType::Time),
-        map(
-            tuple((tag_no_case("double"), multispace0, opt_unsigned)),
-            |_| SqlType::Double,
-        ),
+        map((tag_no_case("double"), multispace0, opt_unsigned), |_| {
+            SqlType::Double
+        }),
         map(
             terminated(
                 preceded(
@@ -614,42 +620,41 @@ fn type_identifier_first_half(i: &[u8]) -> IResult<&[u8], SqlType> {
             SqlType::Set,
         ),
         map(
-            tuple((
+            (
                 tag_no_case("float"),
                 multispace0,
                 opt(precision),
                 multispace0,
                 opt_unsigned,
-            )),
+            ),
             |_| SqlType::Float,
         ),
-        map(
-            tuple((tag_no_case("real"), multispace0, opt_unsigned)),
-            |_| SqlType::Real,
-        ),
+        map((tag_no_case("real"), multispace0, opt_unsigned), |_| {
+            SqlType::Real
+        }),
         map(tag_no_case("text"), |_| SqlType::Text),
         map(
-            tuple((
+            (
                 tag_no_case("varchar"),
                 delim_digit,
                 multispace0,
                 opt(tag_no_case("binary")),
-            )),
+            ),
             |t| SqlType::Varchar(len_as_u32(t.1)),
         ),
         map(tag_no_case("json"), |_| SqlType::Json),
         map(tag_no_case("point"), |_| SqlType::Point),
         map(tag_no_case("geometry"), |_| SqlType::Geometry),
         decimal_or_numeric,
-    ))(i)
+    ))
+    .parse(i)
 }
 
 fn type_identifier_second_half(i: &[u8]) -> IResult<&[u8], SqlType> {
     alt((
-        map(
-            tuple((tag_no_case("binary"), delim_digit, multispace0)),
-            |t| SqlType::Binary(len_as_u16(t.1)),
-        ),
+        map((tag_no_case("binary"), delim_digit, multispace0), |t| {
+            SqlType::Binary(len_as_u16(t.1))
+        }),
         map(tag_no_case("blob"), |_| SqlType::Blob),
         map(tag_no_case("longblob"), |_| SqlType::Longblob),
         map(tag_no_case("mediumblob"), |_| SqlType::Mediumblob),
@@ -657,22 +662,22 @@ fn type_identifier_second_half(i: &[u8]) -> IResult<&[u8], SqlType> {
         map(tag_no_case("longtext"), |_| SqlType::Longtext),
         map(tag_no_case("tinyblob"), |_| SqlType::Tinyblob),
         map(tag_no_case("tinytext"), |_| SqlType::Tinytext),
-        map(
-            tuple((tag_no_case("varbinary"), delim_digit, multispace0)),
-            |t| SqlType::Varbinary(len_as_u16(t.1)),
-        ),
-    ))(i)
+        map((tag_no_case("varbinary"), delim_digit, multispace0), |t| {
+            SqlType::Varbinary(len_as_u16(t.1))
+        }),
+    ))
+    .parse(i)
 }
 
 // A SQL type specifier.
 pub fn type_identifier(i: &[u8]) -> IResult<&[u8], SqlType> {
-    alt((type_identifier_first_half, type_identifier_second_half))(i)
+    alt((type_identifier_first_half, type_identifier_second_half)).parse(i)
 }
 
 // Parses a SQL column identifier in the table.column format
 pub fn column_identifier_no_alias(i: &[u8]) -> IResult<&[u8], Column> {
     let (remaining_input, (column, len)) =
-        tuple((sql_identifier, opt(delimited(tag("("), digit1, tag(")")))))(i)?;
+        (sql_identifier, opt(delimited(tag("("), digit1, tag(")")))).parse(i)?;
     Ok((
         remaining_input,
         Column {
@@ -685,7 +690,7 @@ pub fn column_identifier_no_alias(i: &[u8]) -> IResult<&[u8], Column> {
 }
 pub fn column_identifier_query(i: &[u8]) -> IResult<&[u8], Column> {
     let (remaining_input, query) =
-        delimited(tag("("), take_until_unbalanced('(', ')'), tag(")"))(i)?;
+        delimited(tag("("), take_until_unbalanced('(', ')'), tag(")")).parse(i)?;
     Ok((
         remaining_input,
         Column {
@@ -703,7 +708,8 @@ pub fn sql_identifier(i: &[u8]) -> IResult<&[u8], &[u8]> {
         preceded(not(peek(sql_keyword)), take_while1(is_sql_identifier)),
         delimited(tag("`"), take_while1(is_quoted_sql_identifier), tag("`")),
         delimited(tag("["), take_while1(is_quoted_sql_identifier), tag("]")),
-    ))(i)
+    ))
+    .parse(i)
 }
 pub fn take_until_unbalanced(
     opening_bracket: char,
@@ -742,7 +748,7 @@ pub fn take_until_unbalanced(
     }
 }
 
-pub(crate) fn eof<I: Copy + InputLength, E: ParseError<I>>(input: I) -> IResult<I, I, E> {
+pub(crate) fn eof<I: Copy + nom::Input, E: ParseError<I>>(input: I) -> IResult<I, I, E> {
     if input.input_len() == 0 {
         Ok((input, input))
     } else {
@@ -753,23 +759,23 @@ pub(crate) fn eof<I: Copy + InputLength, E: ParseError<I>>(input: I) -> IResult<
 // Parse a terminator that ends a SQL statement.
 pub fn statement_terminator(i: &[u8]) -> IResult<&[u8], ()> {
     let (remaining_input, _) =
-        delimited(multispace0, alt((tag(";"), line_ending, eof)), multispace0)(i)?;
+        delimited(multispace0, alt((tag(";"), line_ending, eof)), multispace0).parse(i)?;
 
     Ok((remaining_input, ()))
 }
 
 pub(crate) fn ws_sep_comma(i: &[u8]) -> IResult<&[u8], &[u8]> {
-    delimited(multispace0, tag(","), multispace0)(i)
+    delimited(multispace0, tag(","), multispace0).parse(i)
 }
 
 pub(crate) fn ws_sep_equals<'a, I>(i: I) -> IResult<I, I>
 where
-    I: nom::InputTakeAtPosition + nom::InputTake + nom::Compare<&'a str>,
+    I: nom::Input + nom::Compare<&'a str>,
     // Compare required by tag
-    <I as nom::InputTakeAtPosition>::Item: nom::AsChar + Clone,
+    <I as nom::Input>::Item: nom::AsChar + Clone,
     // AsChar and Clone required by multispace0
 {
-    delimited(multispace0, tag("="), multispace0)(i)
+    delimited(multispace0, tag("="), multispace0).parse(i)
 }
 
 // Integer literal value
@@ -780,7 +786,8 @@ pub fn integer_literal(i: &[u8]) -> IResult<&[u8], Literal> {
             intval *= -1;
         }
         Literal::Integer(intval)
-    })(i)
+    })
+    .parse(i)
 }
 
 fn unpack(v: &[u8]) -> i32 {
@@ -789,7 +796,7 @@ fn unpack(v: &[u8]) -> i32 {
 
 // Floating point literal value
 pub fn float_literal(i: &[u8]) -> IResult<&[u8], Literal> {
-    map(tuple((opt(tag("-")), digit1, tag("."), digit1)), |tup| {
+    map((opt(tag("-")), digit1, tag("."), digit1), |tup| {
         Literal::FixedPoint(Real {
             integral: if (tup.0).is_some() {
                 -unpack(tup.1)
@@ -798,7 +805,8 @@ pub fn float_literal(i: &[u8]) -> IResult<&[u8], Literal> {
             },
             fractional: unpack(tup.3),
         })
-    })(i)
+    })
+    .parse(i)
 }
 
 /// String literal value
@@ -813,11 +821,7 @@ fn raw_string_quoted(input: &[u8], is_single_quote: bool) -> IResult<&[u8], Vec<
             alt((
                 is_not(backslash_quote),
                 map(tag(double_quote_slice), |_| -> &[u8] {
-                    if is_single_quote {
-                        b"\'"
-                    } else {
-                        b"\""
-                    }
+                    if is_single_quote { b"\'" } else { b"\"" }
                 }),
                 map(tag("\\\\"), |_| &b"\\"[..]),
                 map(tag("\\b"), |_| &b"\x7f"[..]),
@@ -835,7 +839,8 @@ fn raw_string_quoted(input: &[u8], is_single_quote: bool) -> IResult<&[u8], Vec<
             },
         ),
         tag(quote_slice),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn raw_string_single_quoted(i: &[u8]) -> IResult<&[u8], Vec<u8>> {
@@ -853,7 +858,8 @@ pub fn string_literal(i: &[u8]) -> IResult<&[u8], Literal> {
             Ok(s) => Literal::String(s),
             Err(err) => Literal::Blob(err.into_bytes()),
         },
-    )(i)
+    )
+    .parse(i)
 }
 
 // Any literal value.
@@ -879,19 +885,21 @@ pub fn literal(i: &[u8]) -> IResult<&[u8], Literal> {
             let value = i32::from_str(str::from_utf8(num).unwrap()).unwrap();
             Literal::Placeholder(ItemPlaceholder::DollarNumber(value))
         }),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 // Parse a list of values (e.g., for INSERT syntax).
 pub fn value_list(i: &[u8]) -> IResult<&[u8], Vec<Literal>> {
-    many0(delimited(multispace0, literal, opt(ws_sep_comma)))(i)
+    many0(delimited(multispace0, literal, opt(ws_sep_comma))).parse(i)
 }
 
 // Parse a reference to a named schema.table, with an optional alias
 pub fn schema_table_reference(i: &[u8]) -> IResult<&[u8], String> {
     map(sql_identifier, |tup| {
         String::from(str::from_utf8(tup).unwrap())
-    })(i)
+    })
+    .parse(i)
 }
 
 // Parse rule for a comment part.
@@ -899,5 +907,6 @@ pub fn parse_comment(i: &[u8]) -> IResult<&[u8], Literal> {
     preceded(
         delimited(multispace0, tag_no_case("comment"), multispace1),
         string_literal,
-    )(i)
+    )
+    .parse(i)
 }

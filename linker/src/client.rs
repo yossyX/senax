@@ -1,25 +1,26 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{Result, anyhow, bail};
 use bytes::{BufMut, BytesMut};
-use quinn::{Endpoint, TransportConfig};
+use quinn::{Endpoint, TransportConfig, crypto::rustls::QuicClientConfig};
 use sha2::{Digest, Sha512};
 use std::{fs, net::ToSocketAddrs, path::PathBuf, sync::Arc, time::Duration};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use zstd::Encoder;
 
 use crate::common::{
-    Pack, ALPN_QUIC_HTTP, LINKER_VER, LINKER_VER_ERROR, PASSWORD_ERROR, ZSTD_LEVEL,
+    ALPN_QUIC_HTTP, LINKER_VER, LINKER_VER_ERROR, PASSWORD_ERROR, Pack, ZSTD_LEVEL,
 };
 
 pub fn client_endpoint(ca_path: PathBuf) -> Result<Endpoint> {
     let mut roots = rustls::RootCertStore::empty();
-    roots.add(&rustls::Certificate(fs::read(ca_path)?))?;
-    let mut client_crypto = rustls::ClientConfig::builder()
-        .with_safe_defaults()
+    roots.add(rustls_pki_types::CertificateDer::from_slice(&fs::read(
+        ca_path,
+    )?))?;
+    let mut client_crypto = rustls::client::ClientConfig::builder()
         .with_root_certificates(roots)
         .with_no_client_auth();
     client_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
     let mut endpoint = quinn::Endpoint::client("[::]:0".parse().unwrap())?;
-    let mut config = quinn::ClientConfig::new(Arc::new(client_crypto));
+    let mut config = quinn::ClientConfig::new(Arc::new(QuicClientConfig::try_from(client_crypto)?));
     let mut transport = TransportConfig::default();
     transport
         .keep_alive_interval(Some(Duration::from_secs(3)))
@@ -89,7 +90,6 @@ async fn handle_connection(
         let buf = writer.into_inner().to_vec();
         send.write_all(&buf).await?;
         send.finish()
-            .await
             .map_err(|e| anyhow!("failed to shutdown stream: {}", e))?;
     }
     conn.close(0u32.into(), b"done");
@@ -118,7 +118,6 @@ async fn send_password(
         .await
         .map_err(|e| anyhow!("failed to send request: {}", e))?;
     send.finish()
-        .await
         .map_err(|e| anyhow!("failed to shutdown stream: {}", e))?;
     let resp = recv
         .read_to_end(1)

@@ -756,8 +756,8 @@ impl DbConn {
             indexes.push(i);
         }
         use rand::seq::SliceRandom;
-        use rand::thread_rng;
-        indexes.shuffle(&mut thread_rng());
+        use rand::rng;
+        indexes.shuffle(&mut rng());
         let mut join = JoinSet::new();
         for (i, (pool, _)) in std::iter::zip(indexes, pools) {
             join.spawn(async move {

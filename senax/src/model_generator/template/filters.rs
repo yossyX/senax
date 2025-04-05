@@ -362,7 +362,9 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
             format!("rel_{class_mod}::Order_::{asc}(rel_{class_mod}::Col_::{col})"),
             format!("l.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
             format!("l.sort_by(|v1, v2| v1._data.{col}.cmp(&v2._data.{col}){list_order});"),
-            format!("cache.{rel_name}.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
+            format!(
+                "cache.{rel_name}.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"
+            ),
         )
     } else {
         let tmpl1 = format!("rel_{class_mod}::Order_::{asc}(rel_{class_mod}::Col_::{{var}})");

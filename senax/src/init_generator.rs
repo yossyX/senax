@@ -1,12 +1,12 @@
 use anyhow::Result;
 use askama::Template;
-use rand::distributions::{Alphanumeric, DistString};
+use rand::distr::{Alphanumeric, SampleString};
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 
-use crate::{common::fs_write, DOMAIN_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE};
+use crate::{DOMAIN_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE, common::fs_write};
 
 pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     let base_path: PathBuf = if let Some(name) = name {
@@ -22,7 +22,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     let file_path = base_path.join(".env.example");
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let tpl = EnvTemplate {
         tz: std::env::var("TZ").unwrap_or_default(),
         secret_key: Alphanumeric.sample_string(&mut rng, 40),

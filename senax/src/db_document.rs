@@ -1,4 +1,4 @@
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use askama::Template;
 use chrono::DateTime;
 use chrono::Local;
@@ -22,12 +22,12 @@ use std::sync::Arc;
 use tera::Filter;
 use tera::{Context, Tera};
 
+use crate::DB_PATH;
 use crate::schema::FieldDef;
 use crate::schema::IndexDef;
-use crate::schema::RelDef;
 use crate::schema::MODELS;
-use crate::schema::{self, GroupDef, ModelDef, CONFIG, GROUPS};
-use crate::DB_PATH;
+use crate::schema::RelDef;
+use crate::schema::{self, CONFIG, GROUPS, GroupDef, ModelDef};
 
 #[derive(Debug, Serialize, Clone)]
 struct Group<'a> {

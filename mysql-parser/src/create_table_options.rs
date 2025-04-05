@@ -1,15 +1,16 @@
+use nom::IResult;
+use nom::Parser;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case};
 use nom::character::complete::{alphanumeric1, multispace0, multispace1};
 use nom::combinator::{map, opt};
 use nom::multi::separated_list0;
-use nom::sequence::{delimited, preceded, tuple};
-use nom::IResult;
+use nom::sequence::{delimited, preceded};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use super::common::{integer_literal, string_literal, ws_sep_comma, ws_sep_equals};
-use crate::common::{sql_identifier, Literal};
+use crate::common::{Literal, sql_identifier};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TableOption {
@@ -31,11 +32,11 @@ impl fmt::Display for TableOption {
 }
 
 pub fn table_options(i: &[u8]) -> IResult<&[u8], Vec<TableOption>> {
-    separated_list0(table_options_separator, create_option)(i)
+    separated_list0(table_options_separator, create_option).parse(i)
 }
 
 fn table_options_separator(i: &[u8]) -> IResult<&[u8], ()> {
-    map(alt((multispace1, ws_sep_comma)), |_| ())(i)
+    map(alt((multispace1, ws_sep_comma)), |_| ()).parse(i)
 }
 
 fn create_option(i: &[u8]) -> IResult<&[u8], TableOption> {
@@ -52,7 +53,8 @@ fn create_option(i: &[u8]) -> IResult<&[u8], TableOption> {
         create_option_avg_row_length,
         create_option_row_format,
         create_option_key_block_size,
-    ))(i)
+    ))
+    .parse(i)
 }
 
 /// Helper to parse equals-separated create option pairs.
@@ -64,8 +66,8 @@ pub fn create_option_equals_pair<'a, I, O1, O2, F, G>(
 where
     F: FnMut(I) -> IResult<I, O1>,
     G: FnMut(I) -> IResult<I, O2>,
-    I: nom::InputTakeAtPosition + nom::InputTake + nom::Compare<&'a str>,
-    <I as nom::InputTakeAtPosition>::Item: nom::AsChar + Clone,
+    I: nom::Input + nom::Compare<&'a str>,
+    <I as nom::Input>::Item: nom::AsChar + Clone,
 {
     move |i: I| {
         let (i, _o1) = first(i)?;
@@ -79,8 +81,12 @@ fn create_option_type(i: &[u8]) -> IResult<&[u8], TableOption> {
     create_option_equals_pair(tag_no_case("type"), alphanumeric1)(i)
 }
 
+pub fn pack_keys_literal(i: &[u8]) -> IResult<&[u8], &[u8]> {
+    alt((tag("0"), tag("1"))).parse(i)
+}
+
 fn create_option_pack_keys(i: &[u8]) -> IResult<&[u8], TableOption> {
-    create_option_equals_pair(tag_no_case("pack_keys"), alt((tag("0"), tag("1"))))(i)
+    create_option_equals_pair(tag_no_case("pack_keys"), pack_keys_literal)(i)
 }
 
 fn create_option_engine(i: &[u8]) -> IResult<&[u8], TableOption> {
@@ -90,25 +96,28 @@ fn create_option_engine(i: &[u8]) -> IResult<&[u8], TableOption> {
             sql_identifier,
         ),
         |s| TableOption::Engine(String::from_utf8_lossy(s).to_string()),
-    )(i)
+    )
+    .parse(i)
 }
 
 fn create_option_auto_increment(i: &[u8]) -> IResult<&[u8], TableOption> {
     create_option_equals_pair(tag_no_case("auto_increment"), integer_literal)(i)
 }
 
+pub fn charset_literal(i: &[u8]) -> IResult<&[u8], &[u8]> {
+    alt((
+        tag("utf8mb4"),
+        tag("utf8"),
+        tag("binary"),
+        tag("big5"),
+        tag("ucs2"),
+        tag("latin1"),
+    ))
+    .parse(i)
+}
+
 fn create_option_default_charset(i: &[u8]) -> IResult<&[u8], TableOption> {
-    create_option_equals_pair(
-        tag_no_case("default charset"),
-        alt((
-            tag("utf8mb4"),
-            tag("utf8"),
-            tag("binary"),
-            tag("big5"),
-            tag("ucs2"),
-            tag("latin1"),
-        )),
-    )(i)
+    create_option_equals_pair(tag_no_case("default charset"), charset_literal)(i)
 }
 
 fn create_option_collate(i: &[u8]) -> IResult<&[u8], TableOption> {
@@ -118,7 +127,8 @@ fn create_option_collate(i: &[u8]) -> IResult<&[u8], TableOption> {
             sql_identifier,
         ),
         |s| TableOption::Collation(String::from_utf8_lossy(s).to_string()),
-    )(i)
+    )
+    .parse(i)
 }
 
 fn create_option_quoted_collate(i: &[u8]) -> IResult<&[u8], TableOption> {
@@ -128,7 +138,8 @@ fn create_option_quoted_collate(i: &[u8]) -> IResult<&[u8], TableOption> {
             string_literal,
         ),
         |s| TableOption::Collation(s.to_raw_string()),
-    )(i)
+    )
+    .parse(i)
 }
 
 fn create_option_comment(i: &[u8]) -> IResult<&[u8], TableOption> {
@@ -138,7 +149,8 @@ fn create_option_comment(i: &[u8]) -> IResult<&[u8], TableOption> {
             string_literal,
         ),
         TableOption::Comment,
-    )(i)
+    )
+    .parse(i)
 }
 
 fn create_option_max_rows(i: &[u8]) -> IResult<&[u8], TableOption> {
@@ -150,7 +162,7 @@ fn create_option_avg_row_length(i: &[u8]) -> IResult<&[u8], TableOption> {
 }
 
 fn create_option_row_format(i: &[u8]) -> IResult<&[u8], TableOption> {
-    let (remaining_input, (_, _, _, _, _)) = tuple((
+    let (remaining_input, (_, _, _, _, _)) = (
         tag_no_case("row_format"),
         multispace0,
         opt(tag("=")),
@@ -163,17 +175,19 @@ fn create_option_row_format(i: &[u8]) -> IResult<&[u8], TableOption> {
             tag_no_case("REDUNDANT"),
             tag_no_case("COMPACT"),
         )),
-    ))(i)?;
+    )
+        .parse(i)?;
     Ok((remaining_input, TableOption::Another))
 }
 
 fn create_option_key_block_size(i: &[u8]) -> IResult<&[u8], TableOption> {
-    let (remaining_input, (_, _, _, _, _)) = tuple((
+    let (remaining_input, (_, _, _, _, _)) = (
         tag_no_case("key_block_size"),
         multispace0,
         opt(tag("=")),
         multispace0,
         integer_literal,
-    ))(i)?;
+    )
+        .parse(i)?;
     Ok((remaining_input, TableOption::Another))
 }

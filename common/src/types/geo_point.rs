@@ -10,6 +10,11 @@ use std::{convert::TryInto, fmt::Display, str::FromStr};
     derive(graphql6::SimpleObject, graphql6::InputObject)
 )]
 #[cfg_attr(feature = "graphql6", graphql(input_name = "GeoPointInput"))]
+#[cfg_attr(
+    feature = "graphql7",
+    derive(graphql7::SimpleObject, graphql7::InputObject)
+)]
+#[cfg_attr(feature = "graphql7", graphql(input_name = "GeoPointInput"))]
 #[cfg_attr(feature = "utoipa5", derive(utoipa5::ToSchema))]
 #[cfg_attr(feature = "utoipa5", schema(as = GeoPointInput))]
 pub struct GeoPoint {

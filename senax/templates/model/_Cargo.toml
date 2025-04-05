@@ -33,7 +33,7 @@ futures.workspace = true
 fxhash = "0.2"
 hickory-resolver = { version = "0.24.1", optional = true }
 includedir = "0.6.0"
-indexmap = "1.9.1"
+indexmap = "2"
 log.workspace = true
 num-traits = "0.2"
 once_cell.workspace = true
@@ -60,7 +60,7 @@ url = "2.2.2"
 utoipa.workspace = true
 uuid.workspace = true
 validator.workspace = true
-zstd = "0.12"
+zstd = "0.13"
 
 [build-dependencies]
 includedir_codegen = "0.6.0"

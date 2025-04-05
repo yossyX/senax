@@ -26,7 +26,7 @@ pub mod consts {
 #[derive(serde::Deserialize, serde::Serialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ derive_more::Display, Debug, Default)]
 #[serde(transparent)]
 @%- if !column_def.is_displayable() %@
-#[display(fmt = "{:?}", _0)]
+#[display("{:?}", _0)]
 @%- endif %@
 #[derive(utoipa::ToSchema)]
 #[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ id_name }@)]
@@ -717,7 +717,7 @@ pub struct @{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     @%- endif %@
     @%- if filter_def.has_default() %@
-    #[validate(custom = "crate::models::reject_empty")]
+    #[validate(custom(function = "crate::models::reject_empty"))]
     @%- endif %@
     pub @{ filter|to_var_name }@: @{ filter_def.type_str(filter, pascal_name, selector, filter_map.pascal_name) }@,
     @%- endfor %@

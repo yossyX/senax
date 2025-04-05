@@ -3,8 +3,8 @@ use nom::bytes::complete::{tag, tag_no_case, take_until};
 use nom::character::complete::{digit1, multispace0, multispace1};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, many1};
-use nom::sequence::{delimited, preceded, terminated, tuple};
-use nom::IResult;
+use nom::sequence::{delimited, preceded, terminated};
+use nom::{IResult, Parser};
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt;
@@ -13,13 +13,13 @@ use std::str::FromStr;
 
 use super::column::{Column, ColumnConstraint, ColumnSpecification};
 use super::common::{
-    column_identifier_no_alias, column_identifier_query, parse_comment, reference_option,
-    schema_table_reference, sql_identifier, statement_terminator, type_identifier, ws_sep_comma,
-    Literal, Real, SqlType, TableKey,
+    Literal, Real, SqlType, TableKey, column_identifier_no_alias, column_identifier_query,
+    parse_comment, reference_option, schema_table_reference, sql_identifier, statement_terminator,
+    type_identifier, ws_sep_comma,
 };
 use super::create_table_options::table_options;
 use super::keywords::escape;
-use super::order::{order_type, OrderType};
+use super::order::{OrderType, order_type};
 use crate::common::take_until_unbalanced;
 use crate::create_table_options::TableOption;
 
@@ -64,13 +64,14 @@ impl fmt::Display for CreateTableStatement {
 
 // MySQL grammar element for index column definition (§13.1.18, index_col_name)
 pub fn index_col_name(i: &[u8]) -> IResult<&[u8], (Column, Option<OrderType>)> {
-    let (remaining_input, (mut column, order)) = tuple((
+    let (remaining_input, (mut column, order)) = (
         terminated(
             alt((column_identifier_no_alias, column_identifier_query)),
             multispace0,
         ),
         opt(order_type),
-    ))(i)?;
+    )
+        .parse(i)?;
     column.desc = order == Some(OrderType::OrderDescending);
     Ok((remaining_input, (column, order)))
 }
@@ -81,7 +82,8 @@ pub fn index_col_list(i: &[u8]) -> IResult<&[u8], Vec<Column>> {
         terminated(index_col_name, opt(ws_sep_comma)),
         // XXX(malte): ignores length and order
         |e| e.0,
-    ))(i)
+    ))
+    .parse(i)
 }
 
 // Parse rule for an individual key specification.
@@ -93,11 +95,12 @@ pub fn key_specification(i: &[u8]) -> IResult<&[u8], TableKey> {
         key_or_index,
         spatial,
         constraint,
-    ))(i)
+    ))
+    .parse(i)
 }
 
 fn full_text_key(i: &[u8]) -> IResult<&[u8], TableKey> {
-    let (remaining_input, (_, _, _, _, name, _, columns, _, parser, _)) = tuple((
+    let (remaining_input, (_, _, _, _, name, _, columns, _, parser, _)) = (
         tag_no_case("fulltext"),
         multispace1,
         alt((tag_no_case("key"), tag_no_case("index"))),
@@ -116,7 +119,8 @@ fn full_text_key(i: &[u8]) -> IResult<&[u8], TableKey> {
             tag("*/"),
         )),
         multispace0,
-    ))(i)?;
+    )
+        .parse(i)?;
 
     let name = String::from_utf8(name.to_vec()).unwrap();
     let parser = parser.map(|v| String::from_utf8(v.to_vec()).unwrap());
@@ -127,7 +131,7 @@ fn full_text_key(i: &[u8]) -> IResult<&[u8], TableKey> {
 }
 
 fn primary_key(i: &[u8]) -> IResult<&[u8], TableKey> {
-    let (remaining_input, (_, _, columns, _, _, _)) = tuple((
+    let (remaining_input, (_, _, columns, _, _, _)) = (
         tag_no_case("primary key"),
         multispace0,
         delimited(
@@ -141,14 +145,15 @@ fn primary_key(i: &[u8]) -> IResult<&[u8], TableKey> {
         )),
         multispace0,
         opt(tag_no_case("USING BTREE")),
-    ))(i)?;
+    )
+        .parse(i)?;
 
     Ok((remaining_input, TableKey::PrimaryKey(columns)))
 }
 
 fn unique(i: &[u8]) -> IResult<&[u8], TableKey> {
     // TODO: add branching to correctly parse whitespace after `unique`
-    let (remaining_input, (_, _, _, name, _, columns, _, _)) = tuple((
+    let (remaining_input, (_, _, _, name, _, columns, _, _)) = (
         tag_no_case("unique"),
         opt(preceded(
             multispace1,
@@ -164,14 +169,15 @@ fn unique(i: &[u8]) -> IResult<&[u8], TableKey> {
         ),
         multispace0,
         opt(tag_no_case("USING BTREE")),
-    ))(i)?;
+    )
+        .parse(i)?;
 
     let n = String::from_utf8(name.to_vec()).unwrap();
     Ok((remaining_input, TableKey::UniqueKey(n, columns)))
 }
 
 fn key_or_index(i: &[u8]) -> IResult<&[u8], TableKey> {
-    let (remaining_input, (_, _, name, _, columns, _, _)) = tuple((
+    let (remaining_input, (_, _, name, _, columns, _, _)) = (
         alt((tag_no_case("key"), tag_no_case("index"))),
         multispace0,
         sql_identifier,
@@ -183,14 +189,15 @@ fn key_or_index(i: &[u8]) -> IResult<&[u8], TableKey> {
         ),
         multispace0,
         opt(tag_no_case("USING BTREE")),
-    ))(i)?;
+    )
+        .parse(i)?;
 
     let n = String::from_utf8(name.to_vec()).unwrap();
     Ok((remaining_input, TableKey::Key(n, columns)))
 }
 
 fn spatial(i: &[u8]) -> IResult<&[u8], TableKey> {
-    let (remaining_input, (_, _, _, name, _, columns)) = tuple((
+    let (remaining_input, (_, _, _, name, _, columns)) = (
         tag_no_case("spatial"),
         opt(preceded(
             multispace1,
@@ -204,7 +211,8 @@ fn spatial(i: &[u8]) -> IResult<&[u8], TableKey> {
             delimited(multispace0, index_col_list, multispace0),
             tag(")"),
         ),
-    ))(i)?;
+    )
+        .parse(i)?;
 
     let n = String::from_utf8(name.to_vec()).unwrap();
     Ok((remaining_input, TableKey::SpatialKey(n, columns)))
@@ -231,7 +239,7 @@ fn constraint(i: &[u8]) -> IResult<&[u8], TableKey> {
             on_update,
             on_delete2,
         ),
-    ) = tuple((
+    ) = (
         tag_no_case("CONSTRAINT"),
         multispace1,
         sql_identifier,
@@ -253,25 +261,26 @@ fn constraint(i: &[u8]) -> IResult<&[u8], TableKey> {
             delimited(multispace0, index_col_list, multispace0),
             tag(")"),
         ),
-        opt(tuple((
+        opt((
             multispace1,
             tag_no_case("ON DELETE"),
             multispace1,
             reference_option,
-        ))),
-        opt(tuple((
+        )),
+        opt((
             multispace1,
             tag_no_case("ON UPDATE"),
             multispace1,
             reference_option,
-        ))),
-        opt(tuple((
+        )),
+        opt((
             multispace1,
             tag_no_case("ON DELETE"),
             multispace1,
             reference_option,
-        ))),
-    ))(i)?;
+        )),
+    )
+        .parse(i)?;
 
     let name = String::from_utf8(name.to_vec()).unwrap();
     let table = String::from_utf8(table.to_vec()).unwrap();
@@ -298,17 +307,18 @@ fn constraint(i: &[u8]) -> IResult<&[u8], TableKey> {
 
 // Parse rule for a comma-separated list.
 pub fn key_specification_list(i: &[u8]) -> IResult<&[u8], Vec<TableKey>> {
-    many1(terminated(key_specification, opt(ws_sep_comma)))(i)
+    many1(terminated(key_specification, opt(ws_sep_comma))).parse(i)
 }
 
 fn field_specification(i: &[u8]) -> IResult<&[u8], ColumnSpecification> {
-    let (remaining_input, (column, field_type, constraints, comment, _)) = tuple((
+    let (remaining_input, (column, field_type, constraints, comment, _)) = (
         column_identifier_no_alias,
         opt(delimited(multispace1, type_identifier, multispace0)),
         many0(column_constraint),
         opt(parse_comment),
         opt(ws_sep_comma),
-    ))(i)?;
+    )
+        .parse(i)?;
 
     let sql_type = match field_type {
         None => SqlType::Text,
@@ -327,7 +337,7 @@ fn field_specification(i: &[u8]) -> IResult<&[u8], ColumnSpecification> {
 
 // Parse rule for a comma-separated list.
 pub fn field_specification_list(i: &[u8]) -> IResult<&[u8], Vec<ColumnSpecification>> {
-    many1(field_specification)(i)
+    many1(field_specification).parse(i)
 }
 
 // Parse rule for a column definition constraint.
@@ -373,18 +383,18 @@ pub fn column_constraint(i: &[u8]) -> IResult<&[u8], Option<ColumnConstraint>> {
         },
     );
     let srid = map(
-        tuple((
+        (
             multispace0,
             tag_no_case("/*!80003 SRID "),
             digit1,
             tag_no_case(" */"),
             multispace0,
-        )),
+        ),
         |t| Some(ColumnConstraint::Srid(super::common::len_as_u32(t.2))),
     );
 
     let generated = map(
-        tuple((
+        (
             multispace0,
             tag_no_case("GENERATED ALWAYS AS"),
             multispace1,
@@ -394,7 +404,7 @@ pub fn column_constraint(i: &[u8]) -> IResult<&[u8], Option<ColumnConstraint>> {
             multispace1,
             alt((tag_no_case("VIRTUAL"), tag_no_case("STORED"))),
             multispace0,
-        )),
+        ),
         |t| {
             let query = str::from_utf8(t.4).unwrap().to_owned();
             let stored = str::from_utf8(t.7).unwrap().eq_ignore_ascii_case("STORED");
@@ -413,11 +423,12 @@ pub fn column_constraint(i: &[u8]) -> IResult<&[u8], Option<ColumnConstraint>> {
         collate,
         srid,
         generated,
-    ))(i)
+    ))
+    .parse(i)
 }
 
 fn fixed_point(i: &[u8]) -> IResult<&[u8], Literal> {
-    let (remaining_input, (i, _, f)) = tuple((digit1, tag("."), digit1))(i)?;
+    let (remaining_input, (i, _, f)) = (digit1, tag("."), digit1).parse(i)?;
 
     Ok((
         remaining_input,
@@ -429,7 +440,7 @@ fn fixed_point(i: &[u8]) -> IResult<&[u8], Literal> {
 }
 
 fn default(i: &[u8]) -> IResult<&[u8], Option<ColumnConstraint>> {
-    let (remaining_input, (_, _, _, def, _)) = tuple((
+    let (remaining_input, (_, _, _, def, _)) = (
         multispace0,
         tag_no_case("default"),
         multispace1,
@@ -455,7 +466,8 @@ fn default(i: &[u8]) -> IResult<&[u8], Option<ColumnConstraint>> {
             map(tag_no_case("(now())"), |_| Literal::CurrentTimestamp),
         )),
         multispace0,
-    ))(i)?;
+    )
+        .parse(i)?;
     if def == Literal::Null {
         return Ok((remaining_input, None));
     }
@@ -464,25 +476,25 @@ fn default(i: &[u8]) -> IResult<&[u8], Option<ColumnConstraint>> {
 
 // Parse rule for a SQL CREATE TABLE query.
 pub fn creation(i: &[u8]) -> IResult<&[u8], CreateTableStatement> {
-    let (remaining_input, (_, _, _, _, table, _, _, _, fields, _, keys, _, _, _, options, _)) =
-        tuple((
-            tag_no_case("create"),
-            multispace1,
-            tag_no_case("table"),
-            multispace1,
-            schema_table_reference,
-            multispace0,
-            tag("("),
-            multispace0,
-            field_specification_list,
-            multispace0,
-            opt(key_specification_list),
-            multispace0,
-            tag(")"),
-            multispace0,
-            table_options,
-            statement_terminator,
-        ))(i)?;
+    let (remaining_input, (_, _, _, _, table, _, _, _, fields, _, keys, _, _, _, options, _)) = (
+        tag_no_case("create"),
+        multispace1,
+        tag_no_case("table"),
+        multispace1,
+        schema_table_reference,
+        multispace0,
+        tag("("),
+        multispace0,
+        field_specification_list,
+        multispace0,
+        opt(key_specification_list),
+        multispace0,
+        tag(")"),
+        multispace0,
+        table_options,
+        statement_terminator,
+    )
+        .parse(i)?;
     Ok((
         remaining_input,
         CreateTableStatement {

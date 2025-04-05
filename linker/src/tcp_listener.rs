@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use sha2::{Digest, Sha512};
 use std::net::SocketAddr;
@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender};
 use tokio_uring::buf::IoBuf;
 use tokio_uring::net::{TcpListener, TcpStream};
 
-use crate::common::{IoBytesMut, Pack, CONN_NO, LINKER_VER, RECEIVER, SENDER};
+use crate::common::{CONN_NO, IoBytesMut, LINKER_VER, Pack, RECEIVER, SENDER};
 
 pub fn run(
     tx_end: broadcast::Sender<i32>,
@@ -60,10 +60,9 @@ pub fn run(
                 }
                 Ok(())
             })
-            .map_err(|e| {
+            .inspect_err(|e| {
                 log::error!("{}", &e);
                 let _ = tx_end.send(1);
-                e
             })
         })
 }

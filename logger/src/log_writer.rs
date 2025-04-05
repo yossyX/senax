@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use bytes::{BufMut, BytesMut};
 use log::error;
 use std::convert::TryInto;
@@ -6,7 +6,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::thread;
-use time::{format_description, Duration, OffsetDateTime, Time, UtcOffset};
+use time::{Duration, OffsetDateTime, Time, UtcOffset, format_description};
 use tokio::sync::mpsc::{self, UnboundedSender};
 use tokio::task::LocalSet;
 use zstd::Encoder;
@@ -15,11 +15,7 @@ use zstd::Encoder;
 
 macro_rules! if_then_else {
     ( $if:expr, $then:expr, $else:expr ) => {
-        if $if {
-            $then
-        } else {
-            $else
-        }
+        if $if { $then } else { $else }
     };
 }
 

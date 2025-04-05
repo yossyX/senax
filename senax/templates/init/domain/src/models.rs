@@ -89,7 +89,7 @@ pub trait MarkForDelete {
 }
 
 #[derive(Deserialize, Serialize, Display, Copy, Clone, Debug, Default, PartialEq, schemars::JsonSchema)]
-#[display(fmt = "{},{}", x, y)]
+#[display("{},{}", x, y)]
 #[derive(async_graphql::SimpleObject, async_graphql::InputObject)]
 #[graphql(input_name = "PointInput")]
 #[derive(utoipa::ToSchema)]
@@ -128,7 +128,7 @@ impl ToPoint for (f64, f64) {
 }
 
 #[derive(Deserialize, Serialize, Display, Copy, Clone, Debug, Default, PartialEq, schemars::JsonSchema)]
-#[display(fmt = "{},{}", lat, lng)]
+#[display("{},{}", lat, lng)]
 #[derive(async_graphql::SimpleObject, async_graphql::InputObject)]
 #[graphql(input_name = "GeoPointInput")]
 #[derive(utoipa::ToSchema)]

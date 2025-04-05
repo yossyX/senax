@@ -1,6 +1,6 @@
 use includedir_codegen::Compression;
 use std::io::Write;
-use std::process::{exit, Command};
+use std::process::{Command, exit};
 use std::{env, io};
 
 fn main() {

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::common::to_singular;
 use crate::schema::_to_var_name;
 
-use super::{domain_mode, to_id_name, FieldDef, ModelDef, GROUPS, MODELS};
+use super::{FieldDef, GROUPS, MODELS, ModelDef, domain_mode, to_id_name};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -24,14 +24,14 @@ pub enum RelationsType {
 #[serde(rename_all = "snake_case")]
 /// ### 参照オプション
 pub enum ReferenceOption {
-    #[display(fmt = "restrict")]
+    #[display("restrict")]
     Restrict,
-    #[display(fmt = "cascade")]
+    #[display("cascade")]
     Cascade,
-    #[display(fmt = "set_null")]
+    #[display("set_null")]
     SetNull,
     // NoAction,
-    #[display(fmt = "set_zero")]
+    #[display("set_zero")]
     SetZero,
 }
 

@@ -31,7 +31,7 @@ clap.workspace = true
 derive_more.workspace = true
 domain = { path = "../1_domain" }
 dotenvy.workspace = true
-env_logger = "0.10"
+env_logger = "0.11"
 futures.workspace = true
 jsonwebtoken = "9.1.0"
 log.workspace = true
@@ -41,7 +41,7 @@ obfstr = "0.4.3"
 once_cell.workspace = true
 rand.workspace = true
 regex.workspace = true
-rquickjs = { version = "0.4.3", features = ["rust-alloc"], default-features = false, optional = true }
+rquickjs = { version = "0.9", features = ["rust-alloc"], default-features = false, optional = true }
 rust_decimal.workspace = true
 rust_decimal_macros.workspace = true
 schemars.workspace = true
@@ -59,14 +59,13 @@ tokio.workspace = true
 tracing.workspace = true
 utoipa = { workspace = true, features = ["actix_extras"] }
 utoipa-actix-web = "0.1"
-utoipa-swagger-ui = { version = "=8.1.0", features = ["actix-web"] }
-zip = { package = "zip", version = "=2.4.2" } # for utoipa-swagger-ui build.rs:105:49
+utoipa-swagger-ui = { version = "9.0.1", features = ["actix-web"] }
 uuid.workspace = true
-v8 = { version = "0.79.2", optional = true }
+v8 = { version = "136.0.0", optional = true }
 validator.workspace = true
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.24"
+nix = { version = "0.29", features = ["process", "signal", "fs"] }
 signal-hook = "0.3.14"
 signal-hook-tokio = { version = "0.3.1", features = ["futures-v0_3"] }
 @{-"\n"}@

@@ -1,5 +1,5 @@
-use anyhow::{bail, Context as _, Result};
-use serde::{de::DeserializeOwned, Serialize};
+use anyhow::{Context as _, Result, bail};
+use serde::{Serialize, de::DeserializeOwned};
 use std::marker::PhantomData;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 

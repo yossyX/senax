@@ -1,22 +1,23 @@
 use anyhow::Result;
 use byte_unit::Byte;
-use downcast_rs::{impl_downcast, DowncastSync};
+use downcast_rs::{DowncastSync, impl_downcast};
 use fxhash::FxBuildHasher;
 use log::error;
 use moka::{future::Cache, notification::RemovalCause};
+use std::str::FromStr;
 use std::{
     fs,
     path::Path,
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
 };
 
 use crate::ShardId;
 use crate::{cache::fast_cache::FastCache, cache::storage_cache::StorageCache};
 
-use super::msec::{get_cache_time, MSec, MSEC_SHR};
+use super::msec::{MSEC_SHR, MSec, get_cache_time};
 
 const MOKA_BASE_MEMORY: u32 = 400;
 const DEFAULT_FAST_CACHE_INDEX_SIZE: &str = "1MiB";
@@ -55,11 +56,11 @@ pub trait HashVal: Send + Sync {
 
 fn get_fast_cache(name: &str, time_to_live: u64) -> FastCache {
     let index_size = Byte::from_str(
-        std::env::var(format!("{}_FAST_CACHE_INDEX_SIZE", name))
+        &std::env::var(format!("{}_FAST_CACHE_INDEX_SIZE", name))
             .unwrap_or_else(|_| DEFAULT_FAST_CACHE_INDEX_SIZE.to_owned()),
     )
     .unwrap_or_else(|e| panic!("{}_FAST_CACHE_INDEX_SIZE has an error:{:?}", name, e))
-    .get_bytes();
+    .as_u64();
     FastCache::new(index_size, time_to_live)
 }
 
@@ -68,11 +69,11 @@ fn get_short_cache(
     short_cache_evicted: Arc<AtomicU64>,
 ) -> Cache<u128, Arc<dyn CacheVal>, FxBuildHasher> {
     let capacity = Byte::from_str(
-        std::env::var(format!("{}_SHORT_CACHE_CAPACITY", name))
+        &std::env::var(format!("{}_SHORT_CACHE_CAPACITY", name))
             .unwrap_or_else(|_| DEFAULT_SHORT_CACHE_CAPACITY.to_owned()),
     )
     .unwrap_or_else(|e| panic!("{}_SHORT_CACHE_CAPACITY has an error:{:?}", name, e))
-    .get_bytes();
+    .as_u64();
 
     let time_to_live = std::env::var(format!("{}_SHORT_CACHE_TIME", name))
         .unwrap_or_else(|_| DEFAULT_SHORT_CACHE_TIME.to_owned())
@@ -86,7 +87,7 @@ fn get_short_cache(
         .max_capacity(capacity)
         .time_to_live(std::time::Duration::from_secs(time_to_live))
         .support_invalidation_closures()
-        .eviction_listener_with_queued_delivery_mode(move |_k, _v, cause| {
+        .eviction_listener(move |_k, _v, cause| {
             if cause == RemovalCause::Size {
                 short_cache_evicted.fetch_add(1, Ordering::Relaxed);
             }
@@ -100,11 +101,11 @@ fn get_long_cache(
     storage_cache: Option<Arc<StorageCache>>,
 ) -> Cache<u128, Arc<dyn CacheVal>, FxBuildHasher> {
     let capacity = Byte::from_str(
-        std::env::var(format!("{}_LONG_CACHE_CAPACITY", name))
+        &std::env::var(format!("{}_LONG_CACHE_CAPACITY", name))
             .unwrap_or_else(|_| DEFAULT_LONG_CACHE_CAPACITY.to_owned()),
     )
     .unwrap_or_else(|e| panic!("{}_LONG_CACHE_CAPACITY has an error:{:?}", name, e))
-    .get_bytes();
+    .as_u64();
 
     let time_to_live = std::env::var(format!("{}_LONG_CACHE_TIME", name))
         .unwrap_or_else(|_| DEFAULT_LONG_CACHE_TIME.to_owned())
@@ -124,7 +125,7 @@ fn get_long_cache(
         .time_to_live(std::time::Duration::from_secs(time_to_live))
         .time_to_idle(std::time::Duration::from_secs(time_to_idle))
         .support_invalidation_closures()
-        .eviction_listener_with_queued_delivery_mode(move |k, v, cause| {
+        .eviction_listener(move |k, v, cause| {
             if cause == RemovalCause::Size {
                 long_cache_evicted.fetch_add(1, Ordering::Relaxed);
             }
@@ -146,11 +147,11 @@ fn get_storage_cache(
     time_to_live: u64,
 ) -> Result<StorageCache> {
     let index_size = Byte::from_str(
-        std::env::var(format!("{}_DISK_CACHE_INDEX_SIZE", name))
+        &std::env::var(format!("{}_DISK_CACHE_INDEX_SIZE", name))
             .unwrap_or_else(|_| DEFAULT_DISK_CACHE_INDEX_SIZE.to_owned()),
     )
     .unwrap_or_else(|e| panic!("{}_DISK_CACHE_INDEX_SIZE has an error:{:?}", name, e))
-    .get_bytes();
+    .as_u64();
 
     let file_num = std::env::var(format!("{}_DISK_CACHE_FILE_NUM", name))
         .unwrap_or_else(|_| DEFAULT_DISK_CACHE_FILE_NUM.to_owned())
@@ -158,11 +159,11 @@ fn get_storage_cache(
         .unwrap_or_else(|e| panic!("{}_DISK_CACHE_FILE_NUM has an error:{:?}", name, e));
 
     let file_size = Byte::from_str(
-        std::env::var(format!("{}_DISK_CACHE_FILE_SIZE", name))
+        &std::env::var(format!("{}_DISK_CACHE_FILE_SIZE", name))
             .unwrap_or_else(|_| DEFAULT_DISK_CACHE_FILE_SIZE.to_owned()),
     )
     .unwrap_or_else(|e| panic!("{}_DISK_CACHE_FILE_SIZE has an error:{:?}", name, e))
-    .get_bytes();
+    .as_u64();
 
     if !is_hot_deploy && path.is_dir() {
         for entry in path.read_dir()? {
@@ -319,6 +320,7 @@ impl DbCache {
         let val = self
             .long_cache
             .get(&hash)
+            .await
             .filter(|v| v._shard_id() == shard_id)
             .map(|v| v.downcast_arc::<T>().ok())
             .unwrap_or(None);
@@ -338,6 +340,7 @@ impl DbCache {
         let val = self
             .short_cache
             .get(&hash)
+            .await
             .filter(|v| v._shard_id() == shard_id)
             .map(|v| v.downcast_arc::<T>().ok())
             .unwrap_or(None);
@@ -378,6 +381,7 @@ impl DbCache {
     {
         self.version_cache
             .get(&hash)
+            .await
             .filter(|v| v._shard_id() == shard_id)
             .map(|v| v.downcast_arc::<T>().ok())
             .unwrap_or(None)

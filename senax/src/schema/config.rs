@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use strum_macros::{AsRefStr, EnumString};
 
-use super::{ModelDef, AGGREGATION_TYPE, CREATED_AT, DELETED, DELETED_AT, UPDATED_AT, VERSION};
+use super::{AGGREGATION_TYPE, CREATED_AT, DELETED, DELETED_AT, ModelDef, UPDATED_AT, VERSION};
 
 /// ### データベース設定
 #[derive(Debug, Serialize, Deserialize, Clone, Default, JsonSchema)]
@@ -559,7 +559,7 @@ pub struct GroupJson {
 
 impl From<GroupDef> for GroupJson {
     fn from(value: GroupDef) -> Self {
-        use crc::{Crc, CRC_64_ECMA_182};
+        use crc::{CRC_64_ECMA_182, Crc};
         pub const CRC64: Crc<u64> = Crc::<u64>::new(&CRC_64_ECMA_182);
 
         Self {

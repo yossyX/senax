@@ -1,4 +1,4 @@
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use axum::extract::Path as AxumPath;
 use axum::http::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_TYPE};
 use axum::http::{HeaderMap, StatusCode};
@@ -7,8 +7,8 @@ use axum::response::Response;
 use axum::routing::delete;
 use axum::routing::put;
 use axum::{
-    routing::{get, post},
     Json, Router,
+    routing::{get, post},
 };
 use chrono::Local;
 use derive_more::Display;
@@ -35,8 +35,8 @@ use crate::api_generator::schema::{
     ApiConfigDef, ApiConfigJson, ApiDbDef, ApiDbJson, ApiModelDef, ApiModelJson,
 };
 use crate::common::{
-    parse_yml, parse_yml_file, read_api_yml, read_group_yml, read_simple_vo_yml, set_api_config,
-    simplify_yml, write_api_yml, write_group_yml, write_simple_vo_yml, BACKUP, READ_ONLY,
+    BACKUP, READ_ONLY, parse_yml, parse_yml_file, read_api_yml, read_group_yml, read_simple_vo_yml,
+    set_api_config, simplify_yml, write_api_yml, write_group_yml, write_simple_vo_yml,
 };
 use crate::schema::{self, ConfigDef, ConfigJson, FieldDef, ModelDef, ModelJson, ValueObjectJson};
 use crate::{API_SCHEMA_PATH, SCHEMA_PATH};
@@ -510,7 +510,7 @@ async fn delete_model(AxumPath(path): AxumPath<(String, String, String)>) -> imp
     let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut models = read_group_yml(&path.0, &path.1)?;
-        models.remove(&path.2);
+        models.swap_remove(&path.2);
         write_group_yml(&path.0, &path.1, &models)?;
         Ok(true)
     }
@@ -612,7 +612,7 @@ async fn delete_simple_vo(AxumPath(path): AxumPath<String>) -> impl IntoResponse
     let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut vo_list = read_simple_vo_yml()?;
-        vo_list.remove(&path);
+        vo_list.swap_remove(&path);
         write_simple_vo_yml(&vo_list)?;
         Ok(true)
     }
@@ -991,7 +991,7 @@ async fn delete_api_server_model(
     let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let mut map = read_api_yml(&path.0, &path.1, &path.2)?;
-        map.remove(&path.3);
+        map.swap_remove(&path.3);
         write_api_yml(&path.0, &path.1, &path.2, &map)?;
         Ok(true)
     }

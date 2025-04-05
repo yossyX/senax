@@ -18,11 +18,11 @@ chrono.workspace = true
 ciborium.workspace = true
 derive_more.workspace = true
 derive-new.workspace = true
-downcast-rs = "1.2.0"
+downcast-rs = "2"
 dyn-clone = "1.0.11"
 futures.workspace = true
 like = "0.3.1"
-mockall = {version = "0.11", optional = true}
+mockall = {version = "0.13", optional = true}
 once_cell.workspace = true
 rust_decimal.workspace = true
 schemars.workspace = true
@@ -37,5 +37,5 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
-mockall = "0.11"
+mockall = "0.13"
 @{-"\n"}@

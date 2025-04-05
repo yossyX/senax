@@ -1,11 +1,11 @@
 use convert_case::{Case, Casing};
 use schemars::{
-    schema::{InstanceType, Schema, SchemaObject, SingleOrVec},
     JsonSchema,
+    schema::{InstanceType, Schema, SchemaObject, SingleOrVec},
 };
 use serde::{
-    de::{self, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
+    de::{self, MapAccess, Visitor},
 };
 use std::{borrow::Cow, fmt};
 
@@ -15,7 +15,7 @@ use crate::{
     migration_generator::UTF8_BYTE_LEN,
 };
 
-use super::{TimeZone, _to_var_name, domain_mode, to_id_name, CONFIG};
+use super::{_to_var_name, CONFIG, TimeZone, domain_mode, to_id_name};
 
 pub const DEFAULT_VARCHAR_LENGTH: u32 = 255;
 pub const DEFAULT_PRECISION: u16 = 36;
@@ -3586,11 +3586,7 @@ impl FieldDef {
     }
 
     pub fn clone_str(&self) -> &'static str {
-        if self.is_copyable() {
-            ""
-        } else {
-            ".clone()"
-        }
+        if self.is_copyable() { "" } else { ".clone()" }
     }
 
     pub fn clone_for_outer_str(&self) -> &'static str {
@@ -3603,11 +3599,7 @@ impl FieldDef {
             } else {
                 true
             };
-        if copyable {
-            ""
-        } else {
-            ".clone()"
-        }
+        if copyable { "" } else { ".clone()" }
     }
 
     pub fn is_cascade_on_delete(&self) -> bool {

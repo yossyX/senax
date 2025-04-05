@@ -1,4 +1,4 @@
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use inflector::Inflector;
@@ -7,12 +7,12 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::api_generator::schema::{ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef, API_CONFIG};
+use crate::API_SCHEMA_PATH;
+use crate::api_generator::schema::{API_CONFIG, ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef};
 use crate::common::parse_yml_file;
 use crate::schema::{
-    DataType, FilterDef, FilterSortDirection, FilterType, ModelDef, CONFIG, GROUPS,
+    CONFIG, DataType, FilterDef, FilterSortDirection, FilterType, GROUPS, ModelDef,
 };
-use crate::API_SCHEMA_PATH;
 
 use super::schema::{ApiRelationDef, ApiRoleDef, JsUpdaterDef, RelationVisibility};
 

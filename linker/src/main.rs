@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Parser;
 use client::client_endpoint;
 use common::Pack;
@@ -68,13 +68,13 @@ async fn main() -> Result<()> {
     let arg: AppArg = AppArg::parse();
     if arg.cert {
         let cert = generate_simple_self_signed(vec![host])?;
-        let pem_serialized = cert.serialize_pem()?;
-        let der_serialized = pem::parse(&pem_serialized).unwrap().contents;
+        let pem_serialized = cert.cert.pem();
+        let pem = pem::parse(&pem_serialized).unwrap();
         std::fs::create_dir_all("certs/")?;
         fs::write("certs/cert.pem", pem_serialized.as_bytes())?;
-        fs::write("certs/cert.der", der_serialized)?;
-        fs::write("certs/key.pem", cert.serialize_private_key_pem().as_bytes())?;
-        // fs::write("certs/key.der", &cert.serialize_private_key_der())?;
+        fs::write("certs/cert.der", pem.contents())?;
+        fs::write("certs/key.pem", cert.key_pair.serialize_pem().as_bytes())?;
+        // fs::write("certs/key.der", cert.key_pair.serialized_der())?;
         return Ok(());
     }
 

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::model_generator::template::filters::_to_db_col;
 
-use super::{ConfigDef, FieldDef, ModelDef, StringOrArray, _to_var_name};
+use super::{_to_var_name, ConfigDef, FieldDef, ModelDef, StringOrArray};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -91,9 +91,9 @@ impl From<IndexFieldJson> for IndexFieldDef {
 #[serde(rename_all = "snake_case")]
 /// ### パーサー
 pub enum Parser {
-    #[display(fmt = "ngram")]
+    #[display("ngram")]
     Ngram,
-    #[display(fmt = "mecab")]
+    #[display("mecab")]
     Mecab,
 }
 

@@ -2,8 +2,8 @@ use anyhow::{Context as _, Result};
 use askama::Template;
 use convert_case::{Case, Casing};
 use rand::{
-    distributions::{Alphanumeric, DistString},
     RngCore,
+    distr::{Alphanumeric, SampleString},
 };
 use regex::Regex;
 use std::{
@@ -11,11 +11,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::{API_SCHEMA_PATH, common::fs_write};
 use crate::{
     api_generator::template::{ConfigTemplate, DbConfigTemplate},
     schema::CONFIG,
 };
-use crate::{common::fs_write, API_SCHEMA_PATH};
 
 pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> Result<()> {
     anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
@@ -42,7 +42,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         }
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let session_key = Alphanumeric.sample_string(&mut rng, 80);
 
     let mut file_path = PathBuf::from("./.env");
@@ -331,13 +331,13 @@ struct Secret;
 
 impl Secret {
     pub fn secret_key(_dummy: usize) -> String {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let len = rng.next_u32() % 10 + 10;
         Alphanumeric.sample_string(&mut rng, len as usize)
     }
 
     pub fn secret_no(_dummy: usize) -> u64 {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         rng.next_u64()
     }
 }

@@ -1,16 +1,17 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Result, anyhow, bail};
 use bytes::BufMut;
 use futures_util::TryFutureExt;
 use log::{error, info};
-use quinn::ServerConfig;
+use quinn::{ServerConfig, crypto::rustls::QuicServerConfig};
+use rustls_pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
 use sha2::{Digest, Sha512};
-use std::{fs, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::sync::mpsc::UnboundedSender;
 use zstd::Decoder;
 
 use crate::common::{
-    Pack, ALPN_QUIC_HTTP, CMD_RESET, CONNECTION_SUCCESS, LINKER_VER, LINKER_VER_ERROR,
-    PASSWORD_ERROR,
+    ALPN_QUIC_HTTP, CMD_RESET, CONNECTION_SUCCESS, LINKER_VER, LINKER_VER_ERROR, PASSWORD_ERROR,
+    Pack,
 };
 
 pub async fn run(
@@ -34,43 +35,15 @@ pub async fn run(
 }
 
 fn make_server(key_path: &PathBuf, cert_path: &PathBuf) -> Result<ServerConfig> {
-    let key = fs::read(key_path).context("failed to read private key")?;
-    let key = if key_path.extension().map_or(false, |x| x == "der") {
-        rustls::PrivateKey(key)
-    } else {
-        let pkcs8 = rustls_pemfile::pkcs8_private_keys(&mut &*key)
-            .context("malformed PKCS #8 private key")?;
-        match pkcs8.into_iter().next() {
-            Some(x) => rustls::PrivateKey(x),
-            None => {
-                let rsa = rustls_pemfile::rsa_private_keys(&mut &*key)
-                    .context("malformed PKCS #1 private key")?;
-                match rsa.into_iter().next() {
-                    Some(x) => rustls::PrivateKey(x),
-                    None => {
-                        anyhow::bail!("no private keys found");
-                    }
-                }
-            }
-        }
-    };
-    let cert_chain = fs::read(cert_path).context("failed to read certificate chain")?;
-    let certs = if cert_path.extension().map_or(false, |x| x == "der") {
-        vec![rustls::Certificate(cert_chain)]
-    } else {
-        rustls_pemfile::certs(&mut &*cert_chain)
-            .context("invalid PEM-encoded certificate")?
-            .into_iter()
-            .map(rustls::Certificate)
-            .collect()
-    };
-
+    let key = PrivateKeyDer::from_pem_file(key_path)?;
+    let certs: Result<Vec<_>, _> = CertificateDer::pem_file_iter(cert_path)?.collect();
     let mut server_crypto = rustls::ServerConfig::builder()
-        .with_safe_defaults()
+        // .with_safe_defaults()
         .with_no_client_auth()
-        .with_single_cert(certs, key)?;
+        .with_single_cert(certs?, key)?;
     server_crypto.alpn_protocols = ALPN_QUIC_HTTP.iter().map(|&x| x.into()).collect();
-    let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(server_crypto));
+    let mut server_config =
+        quinn::ServerConfig::with_crypto(Arc::new(QuicServerConfig::try_from(server_crypto)?));
     Arc::get_mut(&mut server_config.transport)
         .unwrap()
         .keep_alive_interval(Some(Duration::from_secs(3)))
@@ -80,7 +53,7 @@ fn make_server(key_path: &PathBuf, cert_path: &PathBuf) -> Result<ServerConfig> 
 }
 
 async fn handle_connection(
-    conn: quinn::Connecting,
+    conn: quinn::Incoming,
     to_local: UnboundedSender<Pack>,
     pw: String,
 ) -> Result<()> {
@@ -156,7 +129,6 @@ async fn send_response(mut send: quinn::SendStream, code: u8) -> Result<()> {
         .await
         .map_err(|e| anyhow!("failed to send response: {}", e))?;
     send.finish()
-        .await
         .map_err(|e| anyhow!("failed to shutdown stream: {}", e))?;
     Ok(())
 }

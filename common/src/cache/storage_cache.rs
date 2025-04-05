@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use arc_swap::ArcSwapOption;
 use bytes::{Buf, BufMut, BytesMut};
 use futures::future;

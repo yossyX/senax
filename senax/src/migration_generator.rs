@@ -14,8 +14,8 @@ use std::str::FromStr;
 
 use crate::common::fs_write;
 use crate::ddl::table::{Column, Constraint, Table};
-use crate::schema::{self, AutoGeneration, SoftDelete, SortDirection, CONFIG, GROUPS, MODELS};
-use crate::{ddl, DB_PATH};
+use crate::schema::{self, AutoGeneration, CONFIG, GROUPS, MODELS, SoftDelete, SortDirection};
+use crate::{DB_PATH, ddl};
 
 pub const UTF8_BYTE_LEN: u32 = 4;
 
@@ -524,7 +524,7 @@ fn make_ddl(
                         &escape(old_name),
                         &escape(table_name)
                     )?;
-                    let table = old_tables.remove(old_name).unwrap();
+                    let table = old_tables.swap_remove(old_name).unwrap();
                     old_tables.insert(table_name.clone(), table);
                     new_table.old_name = None;
                     found = true;
@@ -594,7 +594,7 @@ fn make_ddl(
                                     &escape(old_name),
                                     &escape(name),
                                 )?;
-                                let column = old_table.columns.remove(old_name).unwrap();
+                                let column = old_table.columns.swap_remove(old_name).unwrap();
                                 old_table.columns.insert(name.clone(), column);
                             }
                             new_field.old_name = None;

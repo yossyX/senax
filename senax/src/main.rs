@@ -1,4 +1,4 @@
-use anyhow::{ensure, Context as _, Result};
+use anyhow::{Context as _, Result, ensure};
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 use dotenvy::dotenv;

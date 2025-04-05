@@ -1,10 +1,10 @@
 use anyhow::Result;
 use base64::alphabet;
 use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
-use base64::{engine::general_purpose, Engine as _};
+use base64::{Engine as _, engine::general_purpose};
 use once_cell::sync::OnceCell;
-use schemars::schema::{InstanceType, Schema, SchemaObject};
 use schemars::JsonSchema;
+use schemars::schema::{InstanceType, Schema, SchemaObject};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -34,7 +34,7 @@ impl<'de> serde::Deserialize<'de> for Blob {
 
         struct IdVisitor;
 
-        impl<'de> Visitor<'de> for IdVisitor {
+        impl Visitor<'_> for IdVisitor {
             type Value = Blob;
 
             #[inline]

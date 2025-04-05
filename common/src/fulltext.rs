@@ -1,11 +1,11 @@
 use nom::{
+    Err, IResult, Input, Parser,
     branch::alt,
     character::complete::char,
     combinator::map,
     error::ErrorKind,
     multi::many0,
     sequence::{delimited, preceded, terminated},
-    Err, IResult, InputTakeAtPosition,
 };
 
 pub enum Word {
@@ -54,7 +54,7 @@ pub fn parse(i: &str) -> Query {
     let w = parse_words(i).unwrap();
     let mut v = w.1;
     if !w.0.is_empty() {
-        let i = w.0.replace(|c| c == '"' || c == '(' || c == ')', " ");
+        let i = w.0.replace(['"', '(', ')'], " ");
         for r in parse_words(&i).unwrap().1 {
             v.push(r);
         }
@@ -63,27 +63,29 @@ pub fn parse(i: &str) -> Query {
 }
 
 fn parse_words(i: &str) -> IResult<&str, Vec<Word>> {
-    preceded(space, many0(parse_query))(i)
+    preceded(space, many0(parse_query)).parse(i)
 }
 
 fn parse_query(i: &str) -> IResult<&str, Word> {
-    terminated(alt((parse_not, parse_and, parse_or, parse_word)), space)(i)
+    terminated(alt((parse_not, parse_and, parse_or, parse_word)), space).parse(i)
 }
 
 fn parse_word(i: &str) -> IResult<&str, Word> {
-    map(alt((quoted, word)), |w| Word::And(w.to_string()))(i)
+    map(alt((quoted, word)), |w| Word::And(w.to_string())).parse(i)
 }
 
 fn parse_and(i: &str) -> IResult<&str, Word> {
     map(preceded(char('+'), alt((quoted, word))), |w| {
         Word::And(w.to_string())
-    })(i)
+    })
+    .parse(i)
 }
 
 fn parse_not(i: &str) -> IResult<&str, Word> {
     map(preceded(char('-'), alt((quoted, word))), |w| {
         Word::Not(w.to_string())
-    })(i)
+    })
+    .parse(i)
 }
 
 fn parse_or(i: &str) -> IResult<&str, Word> {
@@ -102,7 +104,8 @@ fn parse_or(i: &str) -> IResult<&str, Word> {
             char(')'),
         ),
         |w| Word::Or(w.iter().map(|v| v.to_string()).collect()),
-    )(i)
+    )
+    .parse(i)
 }
 
 // https://docs.rs/parse-hyperlinks/0.23.3/src/parse_hyperlinks/lib.rs.html#41
@@ -145,7 +148,7 @@ pub fn take_until_unbalanced(
 }
 
 fn quoted(i: &str) -> IResult<&str, &str> {
-    delimited(char('"'), quoted_word, char('"'))(i)
+    delimited(char('"'), quoted_word, char('"')).parse(i)
 }
 
 fn word(input: &str) -> IResult<&str, &str> {

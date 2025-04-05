@@ -12,21 +12,21 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Mutex,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use crate::{
-    schema::{self, ConfigDef, ModelDef, BAD_KEYWORDS},
     DOMAIN_PATH, SCHEMA_PATH,
+    schema::{self, BAD_KEYWORDS, ConfigDef, ModelDef},
 };
 
 #[cfg(feature = "config")]
 use crate::{
-    api_generator::schema::{ApiConfigDef, ApiModelDef, API_CONFIG},
-    schema::FieldDef,
     API_SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE,
+    api_generator::schema::{API_CONFIG, ApiConfigDef, ApiModelDef},
+    schema::FieldDef,
 };
 
 pub const DEFAULT_SRID: u32 = 4326;
@@ -99,11 +99,7 @@ pub fn check_ascii_name(name: &str) -> &str {
 
 macro_rules! if_then_else {
     ( $if:expr, $then:expr, $else:expr ) => {
-        if $if {
-            $then
-        } else {
-            $else
-        }
+        if $if { $then } else { $else }
     };
 }
 pub(crate) use if_then_else;
@@ -139,6 +135,7 @@ pub fn yaml_value_to_str(value: &serde_yaml::Value) -> anyhow::Result<String> {
         serde_yaml::Value::String(v) => Ok(v.to_string()),
         serde_yaml::Value::Sequence(_) => anyhow::bail!("yaml_value_to_str error!"),
         serde_yaml::Value::Mapping(_) => anyhow::bail!("yaml_value_to_str error!"),
+        serde_yaml::Value::Tagged(_) => anyhow::bail!("Tag is not supported!"),
     }
 }
 
@@ -227,6 +224,7 @@ fn output_yml(
                 }
             }
         }
+        serde_yaml::Value::Tagged(_) => panic!("Tag is not supported!"),
     }
 }
 
@@ -263,11 +261,24 @@ pub fn trim_yml_comment(v: &str) -> String {
     RE.replace_all(v, "").trim().to_string()
 }
 
+fn conv_yml_error(e: serde_yaml::Error) -> format_serde_error::ErrorTypes {
+    match e.location() {
+        None => (Box::new(e) as Box<dyn std::error::Error>, None, None),
+        Some(location) => (
+            Box::new(e) as Box<dyn std::error::Error>,
+            Some(location.line()),
+            Some(location.column() - 1),
+        ),
+    }
+    .into()
+}
+
 #[cfg(feature = "config")]
 pub fn parse_yml<T: DeserializeOwned + Default>(content: &str) -> Result<T> {
     if !trim_yml_comment(content).is_empty() {
-        Ok(serde_yaml::from_str(content)
-            .map_err(|err| format_serde_error::SerdeError::new(content.to_string(), err))?)
+        Ok(serde_yaml::from_str(content).map_err(|err| {
+            format_serde_error::SerdeError::new(content.to_string(), conv_yml_error(err))
+        })?)
     } else {
         Ok(T::default())
     }
@@ -277,8 +288,9 @@ pub fn parse_yml_file<T: DeserializeOwned + Default>(path: &Path) -> Result<T> {
     let content =
         fs::read_to_string(path).with_context(|| format!("Cannot read file: {:?}", path))?;
     if !trim_yml_comment(&content).is_empty() {
-        Ok(serde_yaml::from_str(&content)
-            .map_err(|err| format_serde_error::SerdeError::new(content.to_string(), err))?)
+        Ok(serde_yaml::from_str(&content).map_err(|err| {
+            format_serde_error::SerdeError::new(content.to_string(), conv_yml_error(err))
+        })?)
     } else {
         Ok(T::default())
     }
@@ -298,7 +310,6 @@ pub fn check_js(script: &str) -> anyhow::Result<()> {
     use rquickjs::{Context, Error::Exception, Runtime};
     let rt = Runtime::new()?;
     let ctx = Context::full(&rt)?;
-    ctx.enable_big_num_ext(true);
     ctx.with(|ctx| match ctx.eval::<(), _>(script) {
         Ok(_) => Ok(()),
         Err(Exception) => anyhow::bail!("js_update error::{:?}", ctx.catch()),

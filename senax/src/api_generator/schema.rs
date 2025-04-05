@@ -1,8 +1,8 @@
 use crate::{common::yaml_value_to_str, schema::ModelDef};
 use indexmap::IndexMap;
 use schemars::{
-    schema::{InstanceType, Schema, SchemaObject, SingleOrVec},
     JsonSchema,
+    schema::{InstanceType, Schema, SchemaObject, SingleOrVec},
 };
 use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, RwLock};
@@ -606,17 +606,17 @@ pub struct ApiModelJson {
     pub deletable_roles: Vec<String>,
     /// ### 閲覧権限フィルタ式
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[validate(custom = "validate_filter")]
+    #[validate(custom(function = "validate_filter"))]
     pub readable_filter: Option<String>,
     /// ### 更新権限フィルタ式
     /// 省略時は閲覧権限フィルタ式が適用される
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[validate(custom = "validate_filter")]
+    #[validate(custom(function = "validate_filter"))]
     pub updatable_filter: Option<String>,
     /// ### 削除権限フィルタ式
     /// 省略時は更新権限フィルタ式が適用される
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[validate(custom = "validate_filter")]
+    #[validate(custom(function = "validate_filter"))]
     pub deletable_filter: Option<String>,
     /// ### フィールド
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -626,7 +626,7 @@ pub struct ApiModelJson {
     pub relations: Vec<ApiRelationJson>,
     /// ### セレクタ
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[validate]
+    #[validate(nested)]
     pub selector: Vec<ApiSelectorJson>,
 }
 fn validate_filter(filter: &str) -> Result<(), ValidationError> {
@@ -1218,7 +1218,7 @@ pub struct ApiSelectorJson {
     pub name: String,
     /// ### JavaScriptによる更新
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[validate]
+    #[validate(nested)]
     pub js_updater: Vec<JsUpdaterJson>,
     /// ### オペレータによる更新に使用する
     /// MongoDBの$currentDate, $inc, $min, $max, $mul, $rename, $set, $unset, $addToSet, $pop, $push, $pullAll, $bit相当に対応
@@ -1347,7 +1347,7 @@ pub struct JsUpdaterJson {
     /// NULLを返した場合は更新されない。
     /// APIの呼び出し時にcreateIfEmptyにtrueを指定した場合は、対象オブジェクトが存在しない場合にobjがNULLで渡される。
     #[schemars(example = "default_script")]
-    #[validate(custom = "validate_script")]
+    #[validate(custom(function = "validate_script"))]
     pub script: String,
 }
 

@@ -1,4 +1,4 @@
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use askama::Template;
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
@@ -11,9 +11,9 @@ use std::sync::Arc;
 
 use crate::schema::{ConfigDef, StringOrArray, VALUE_OBJECTS};
 use crate::{
-    common::fs_write,
-    schema::{self, set_domain_mode, to_id_name, ModelDef, CONFIG, GROUPS, MODELS},
     DB_PATH, DOMAIN_PATH,
+    common::fs_write,
+    schema::{self, CONFIG, GROUPS, MODELS, ModelDef, set_domain_mode, to_id_name},
 };
 
 pub mod template;
@@ -674,7 +674,7 @@ fn write_domain_entity(
     let model_id: u64 = if let Some(model_id) = def.model_id {
         model_id
     } else {
-        use crc::{Crc, CRC_64_ECMA_182};
+        use crc::{CRC_64_ECMA_182, Crc};
         pub const CRC64: Crc<u64> = Crc::<u64>::new(&CRC_64_ECMA_182);
         CRC64.checksum(format!("{db}:{group_name}:{mod_name}").as_bytes())
     };

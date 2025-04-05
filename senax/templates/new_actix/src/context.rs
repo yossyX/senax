@@ -4,7 +4,6 @@ use anyhow::{Context as _, Result};
 use chrono::{DateTime, Utc};
 use log::info;
 use once_cell::sync::OnceCell;
-use rand::prelude::*;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
@@ -100,7 +99,7 @@ fn get_ctx_no() -> u64 {
     static CTX_NO: OnceCell<AtomicU64> = OnceCell::new();
     CTX_NO
         .get_or_init(|| {
-            let mut x: u32 = random::<u32>();
+            let mut x: u32 = rand::random::<u32>();
             if x == 0 {
                 x = 1;
             }

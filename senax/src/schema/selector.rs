@@ -6,7 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use super::{FieldDef, ModelDef, _to_var_name};
+use super::{_to_var_name, FieldDef, ModelDef};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]

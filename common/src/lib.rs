@@ -17,11 +17,7 @@ pub type ShardId = u16;
 #[macro_export]
 macro_rules! if_then_else {
     ( $if:expr, $then:expr, $else:expr ) => {
-        if $if {
-            $then
-        } else {
-            $else
-        }
+        if $if { $then } else { $else }
     };
 }
 

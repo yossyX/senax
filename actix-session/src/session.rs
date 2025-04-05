@@ -1,13 +1,13 @@
-use actix_utils::future::{ready, Ready};
+use actix_utils::future::{Ready, ready};
 use actix_web::{
+    FromRequest, HttpMessage, HttpRequest,
     dev::{Extensions, Payload, ServiceRequest, ServiceResponse},
     error::Error,
-    FromRequest, HttpMessage, HttpRequest,
 };
-use anyhow::{bail, Context, Result};
-use senax_common::session::interface::{SaveError, SessionData, SessionStore};
+use anyhow::{Context, Result, bail};
 use senax_common::session::SessionKey;
-use serde::{de::DeserializeOwned, Serialize};
+use senax_common::session::interface::{SaveError, SessionData, SessionStore};
+use serde::{Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
 use std::{collections::HashMap, mem, sync::Arc, sync::Mutex};
 use time::Duration;
@@ -321,7 +321,8 @@ impl<Store: SessionStore + 'static> Session<Store> {
     /// Update session key.
     /// The old session will not be deleted for the following reasons:
     /// * If there are simultaneous accesses, the access that comes after the renew will create a new session and cancel the previous cookie.
-    /// * When the modified cookie cannot be received due to a communication error
+    /// * Consider cases where modified cookies cannot be received due to communication errors.
+    ///
     /// Thus, since previous session data is not deleted, RENEW should not be used for logout.
     pub async fn renew<F, R>(&self, f: F) -> Result<R>
     where

@@ -49,7 +49,7 @@ pub fn calc_mem_size(size: usize) -> usize {
         return (size + 4095) / 4096 * 4096;
     }
     let uintptr_t = std::mem::size_of::<usize>();
-    let mut wsize: usize = (size + uintptr_t - 1) / uintptr_t;
+    let mut wsize = size.div_ceil(uintptr_t);
     if wsize <= 1 {
         return 8;
     }

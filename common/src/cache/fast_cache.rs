@@ -1,10 +1,10 @@
 use crossbeam::epoch::{self, Atomic, Owned, Shared};
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
     Arc,
+    atomic::{AtomicU64, Ordering},
 };
 
-use super::msec::{get_cache_time, MSec};
+use super::msec::{MSec, get_cache_time};
 use crate::cache::db_cache::CacheVal;
 
 const SET_ASSOCIATIVE: u64 = 16;

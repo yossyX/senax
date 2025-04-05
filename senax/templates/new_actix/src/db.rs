@@ -16,7 +16,7 @@ pub async fn start(
     pw: &Option<String>,
 ) -> Result<()> {
     let mut uuid_node = [0u8; 6];
-    rand::thread_rng().fill_bytes(&mut uuid_node);
+    rand::rng().fill_bytes(&mut uuid_node);
     let uuid_node = Some(uuid_node);
     @%- if session %@
     db_session::start(

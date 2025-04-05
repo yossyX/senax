@@ -1,4 +1,4 @@
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use askama::Template;
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
@@ -8,14 +8,14 @@ use std::ffi::OsString;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
-use crate::api_generator::schema::{ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef, API_CONFIG};
+use crate::api_generator::schema::{API_CONFIG, ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef};
 use crate::api_generator::template::{DbConfigTemplate, MutationRootTemplate, QueryRootTemplate};
 use crate::common::{fs_write, parse_yml_file, simplify_yml};
-use crate::schema::{to_id_name, ModelDef, _to_var_name, GROUPS};
-use crate::{model_generator, API_SCHEMA_PATH};
+use crate::schema::{_to_var_name, GROUPS, ModelDef, to_id_name};
+use crate::{API_SCHEMA_PATH, model_generator};
 
 use self::schema::{ApiRelationDef, RelationVisibility};
 
@@ -118,7 +118,7 @@ pub fn generate(
         &file_path
     );
     let buf = if config.default_role.is_none() {
-        String::from("    #[display(fmt = \"\")]\n    #[default]\n    _None,\n")
+        String::from("    #[display(\"\")]\n    #[default]\n    _None,\n")
     } else {
         String::new()
     };
@@ -130,14 +130,16 @@ pub fn generate(
         }
         if let Some(def) = role.1 {
             if let Some(alias) = &def.alias {
-                writeln!(&mut buf, "    #[display(fmt = {:?})]", alias).unwrap();
+                writeln!(&mut buf, "    #[display({:?})]", alias).unwrap();
                 writeln!(&mut buf, "    #[serde(rename = {:?})]", alias).unwrap();
             }
         }
         writeln!(&mut buf, "    {},", _to_var_name(role.0)).unwrap();
         buf
     });
-    let tpl = format!("// Do not modify below this line. (RoleStart)\n{roles}    // Do not modify up to this line. (RoleEnd)");
+    let tpl = format!(
+        "// Do not modify below this line. (RoleStart)\n{roles}    // Do not modify up to this line. (RoleEnd)"
+    );
     let content = re.replace(&content, tpl);
 
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ImplRoleStart\).+// Do not modify up to this line. \(ImplRoleEnd\)").unwrap();
@@ -156,7 +158,9 @@ pub fn generate(
         .unwrap();
         buf
     });
-    let tpl = format!("// Do not modify below this line. (ImplRoleStart)\n{roles}    // Do not modify up to this line. (ImplRoleEnd)");
+    let tpl = format!(
+        "// Do not modify below this line. (ImplRoleStart)\n{roles}    // Do not modify up to this line. (ImplRoleEnd)"
+    );
     let content = re.replace(&content, tpl);
 
     fs_write(file_path, &*content)?;

@@ -352,11 +352,11 @@ impl CacheOp {
                 }
                 CacheOp::BulkUpsert { .. } => {},
                 CacheOp::Delete { id, .. } => {
-                    map.remove(id);
+                    map.swap_remove(id);
                 }
                 CacheOp::DeleteMany { ids, .. } => {
                     for id in ids {
-                        map.remove(id);
+                        map.swap_remove(id);
                     }
                 }
                 CacheOp::DeleteAll { .. } => {},
@@ -1488,7 +1488,7 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
 #[derive(Deserialize, Serialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, Default, JsonSchema)]
 #[serde(transparent)]
 @%- if !column_def.is_displayable() %@
-#[display(fmt = "{:?}", _0)]
+#[display("{:?}", _0)]
 @%- endif %@
 pub struct @{ id_name }@(pub(crate) @{ column_def.get_inner_type(false, false) }@);
 @% endfor -%@
@@ -1496,7 +1496,7 @@ pub struct @{ id_name }@(pub(crate) @{ column_def.get_inner_type(false, false) }
 #[derive(Serialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, Default, JsonSchema)]
 #[serde(transparent)]
 @%- if !column_def.is_displayable() %@
-#[display(fmt = "{:?}", _0)]
+#[display("{:?}", _0)]
 @%- endif %@
 pub struct @{ id_name }@(
     #[schemars(schema_with = "crate::seeder::id_schema")]

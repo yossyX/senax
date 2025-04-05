@@ -1,9 +1,10 @@
 use super::common::eof;
+use nom::IResult;
+use nom::Parser;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, tag_no_case};
 use nom::combinator::peek;
 use nom::sequence::terminated;
-use nom::IResult;
 
 // NOTE: Each keyword_$start_letter_to_$end_letter function uses `alt`,
 // which is implemented for tuples sizes up to 21. Because of this constraint
@@ -20,7 +21,8 @@ fn keyword_follow_char(i: &[u8]) -> IResult<&[u8], &[u8]> {
         tag(","),
         tag("="),
         eof,
-    )))(i)
+    )))
+    .parse(i)
 }
 
 fn keyword_a_to_c(i: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -46,7 +48,8 @@ fn keyword_a_to_c(i: &[u8]) -> IResult<&[u8], &[u8]> {
         terminated(tag_no_case("CAST"), keyword_follow_char),
         terminated(tag_no_case("CHECK"), keyword_follow_char),
         terminated(tag_no_case("COLLATE"), keyword_follow_char),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 fn keyword_c_to_e(i: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -72,7 +75,8 @@ fn keyword_c_to_e(i: &[u8]) -> IResult<&[u8], &[u8]> {
         terminated(tag_no_case("EACH"), keyword_follow_char),
         terminated(tag_no_case("ELSE"), keyword_follow_char),
         terminated(tag_no_case("END"), keyword_follow_char),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 fn keyword_e_to_i(i: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -98,7 +102,8 @@ fn keyword_e_to_i(i: &[u8]) -> IResult<&[u8], &[u8]> {
         terminated(tag_no_case("INDEX"), keyword_follow_char),
         terminated(tag_no_case("INDEXED"), keyword_follow_char),
         terminated(tag_no_case("INITIALLY"), keyword_follow_char),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 fn keyword_i_to_o(i: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -124,7 +129,8 @@ fn keyword_i_to_o(i: &[u8]) -> IResult<&[u8], &[u8]> {
         terminated(tag_no_case("NULL"), keyword_follow_char),
         terminated(tag_no_case("OF"), keyword_follow_char),
         terminated(tag_no_case("OFFSET"), keyword_follow_char),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 fn keyword_o_to_s(i: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -150,7 +156,8 @@ fn keyword_o_to_s(i: &[u8]) -> IResult<&[u8], &[u8]> {
         terminated(tag_no_case("ROW"), keyword_follow_char),
         terminated(tag_no_case("SAVEPOINT"), keyword_follow_char),
         terminated(tag_no_case("SELECT"), keyword_follow_char),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 fn keyword_s_to_z(i: &[u8]) -> IResult<&[u8], &[u8]> {
@@ -176,7 +183,8 @@ fn keyword_s_to_z(i: &[u8]) -> IResult<&[u8], &[u8]> {
         terminated(tag_no_case("WHERE"), keyword_follow_char),
         terminated(tag_no_case("WITH"), keyword_follow_char),
         terminated(tag_no_case("WITHOUT"), keyword_follow_char),
-    ))(i)
+    ))
+    .parse(i)
 }
 
 // Matches any SQL reserved keyword
@@ -188,7 +196,8 @@ pub fn sql_keyword(i: &[u8]) -> IResult<&[u8], &[u8]> {
         keyword_i_to_o,
         keyword_o_to_s,
         keyword_s_to_z,
-    ))(i)
+    ))
+    .parse(i)
 }
 
 pub fn escape(s: &str) -> String {

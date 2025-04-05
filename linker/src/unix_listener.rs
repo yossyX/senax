@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use sha2::{Digest, Sha512};
 use std::fs;
@@ -10,7 +10,7 @@ use tokio::sync::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender};
 use tokio_uring::buf::IoBuf;
 use tokio_uring::net::{UnixListener, UnixStream};
 
-use crate::common::{IoBytesMut, Pack, CONN_NO, LINKER_VER, RECEIVER, SENDER};
+use crate::common::{CONN_NO, IoBytesMut, LINKER_VER, Pack, RECEIVER, SENDER};
 
 pub fn run(
     tx_end: broadcast::Sender<i32>,
@@ -72,10 +72,9 @@ pub fn run(
                 let _ = std::fs::remove_file(sock_file);
                 Ok(())
             })
-            .map_err(|e| {
+            .inspect_err(|e| {
                 log::error!("{}", &e);
                 let _ = tx_end.send(1);
-                e
             })
         })
 }

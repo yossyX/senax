@@ -95,7 +95,7 @@ pub trait SessionStore {
 }
 
 #[derive(Display)]
-#[display(fmt = "")]
+#[display("")]
 pub enum SaveError {
     Retryable,
     RetryableWithData(SessionData),

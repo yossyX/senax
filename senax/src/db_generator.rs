@@ -5,8 +5,8 @@ use regex::Regex;
 use std::fmt::Write;
 use std::{fs, path::Path};
 
-use crate::common::fs_write;
 use crate::SCHEMA_PATH;
+use crate::common::fs_write;
 
 pub fn db_list(dir_type_only: bool) -> Result<Vec<String>> {
     let schema_path = Path::new(SCHEMA_PATH);
