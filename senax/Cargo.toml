@@ -23,7 +23,7 @@ clap = { version = "~4.5.7", features = ["derive"] }
 compact_str = "0.9"
 convert_case = "0.8"
 crc = "3.0.1"
-derive_more = "2"
+derive_more = { version = "2", features = ["display"] }
 dialoguer = "0.11"
 dotenvy = "0.15.0"
 fancy-regex = "0.14.0"
@@ -42,7 +42,7 @@ regex = "1"
 rquickjs = { version = "0.9", features = ["rust-alloc"], default-features = false }
 schemars = { version = "0.8.22", features = ["indexmap2", "preserve_order"] }
 semver = "1.0.22"
-senax-inflector = "0.1.0"
+senax-inflector = "0.1.1"
 senax-mysql-parser = "=0.1.8"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
