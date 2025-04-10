@@ -46,7 +46,7 @@ rust_decimal.workspace = true
 rust_decimal_macros.workspace = true
 schemars.workspace = true
 @%- if session %@
-senax-actix-session = "0.4.3"
+senax-actix-session = "=0.4.3"
 @%- endif %@
 senax-common.workspace = true
 senax-logger = "=0.2.6"

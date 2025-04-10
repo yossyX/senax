@@ -14,7 +14,7 @@ $ cd example
 
 ## DBテンプレート生成
 ```
-$ senax init-db data
+$ senax new-db data
 ```
 スキーマに data.yml を生成し、 data という名前のDBを使用することを設定します。
 
@@ -124,8 +124,7 @@ note モデルは tag と紐づいていますが、 relations の type が many
 ## モデル生成
 senaxのコマンドで db/data, db/session 下にクレートを生成します。  
 ```
-$ senax model data
-$ senax model session
+$ senax model -c
 ```
 生成されたファイルの note.rs 等はカスタマイズ用で、 _note.rs が本体です。再度モデル生成を実行すると note.rs は上書きされず、 _note.rs は常に上書きされます。  
 モデル名が _Tags のようにアンダースコアが付くのは他のライブラリと被らないようにそのような命名規則になっています。  

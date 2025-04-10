@@ -4380,7 +4380,7 @@ dependencies = [
  "schemars",
  "semver",
  "senax-inflector 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "senax-mysql-parser 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "senax-mysql-parser",
  "serde",
  "serde_json",
  "serde_yaml 0.9.34+deprecated",
@@ -4410,7 +4410,7 @@ dependencies = [
  "ciborium",
  "derive_more",
  "log",
- "senax-common 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "senax-common",
  "serde",
  "sha2",
  "time",
@@ -4456,45 +4456,6 @@ dependencies = [
  "tokio",
  "tokio-uring 0.5.0",
  "utoipa",
- "zstd",
-]
-
-[[package]]
-name = "senax-common"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d2a0dadc571ad0de13f0d221cec735579c27ed70ed5190d2d6c49a4f50daa9b"
-dependencies = [
- "anyhow",
- "arc-swap",
- "async-trait",
- "base64 0.22.1",
- "bincode 2.0.1",
- "byte-unit",
- "bytes",
- "chrono",
- "ciborium",
- "crc32fast",
- "crossbeam",
- "derive_more",
- "downcast-rs",
- "futures",
- "fxhash",
- "hex",
- "log",
- "lz4_flex",
- "moka",
- "nom 8.0.0",
- "once_cell",
- "rand 0.9.0",
- "regex",
- "schemars",
- "serde",
- "serde_bytes",
- "serde_json",
- "sha2",
- "time",
- "tokio",
  "zstd",
 ]
 
@@ -4580,17 +4541,6 @@ dependencies = [
 [[package]]
 name = "senax-mysql-parser"
 version = "0.1.8"
-dependencies = [
- "derive_more",
- "nom 8.0.0",
- "serde",
-]
-
-[[package]]
-name = "senax-mysql-parser"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5ecd64a579306b300fccce656a9c34a36e9616464eea7c0be1ad6951d723d1e"
 dependencies = [
  "derive_more",
  "nom 8.0.0",
