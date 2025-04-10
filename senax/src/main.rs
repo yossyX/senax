@@ -43,6 +43,7 @@ mod db_generator;
 mod init_generator;
 mod migration_generator;
 mod model_generator;
+mod schema_generator;
 pub(crate) mod schema;
 mod schema_md;
 
@@ -219,6 +220,19 @@ enum Commands {
         #[clap(short, long)]
         template: Option<PathBuf>,
     },
+    /// generate a schema yml file from DB
+    GenSchemaFromDb {
+        /// Specify the db
+        db: String,
+        #[clap(long)]
+        db_url: Option<String>,
+        #[clap(long)]
+        use_label_as_sql_comment: bool,
+        #[clap(long)]
+        ignore_timestampable: bool,
+        #[clap(long)]
+        interpret_tinyint_as_boolean: bool,
+    },
     SenaxSchema {
         #[clap(short, long)]
         doc: bool,
@@ -382,6 +396,23 @@ async fn exec(cli: Cli) -> Result<()> {
             ensure!(db_re.is_match(db), "bad db name!");
             let def = api_generator::serialize::generate(path, db, group)?;
             api_document::generate(def, output, template)?;
+        }
+        Commands::GenSchemaFromDb {
+            db,
+            db_url,
+            use_label_as_sql_comment,
+            ignore_timestampable,
+            interpret_tinyint_as_boolean,
+        } => {
+            ensure!(db_re.is_match(db), "bad db name!");
+            schema_generator::generate(
+                db,
+                db_url,
+                *use_label_as_sql_comment,
+                *ignore_timestampable,
+                *interpret_tinyint_as_boolean,
+            )
+            .await?;
         }
         Commands::SenaxSchema { doc } => {
             if *doc {

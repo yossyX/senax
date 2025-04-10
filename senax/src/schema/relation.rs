@@ -68,6 +68,13 @@ impl StringOrArray {
             None
         }
     }
+    #[allow(dead_code)]
+    pub fn last(&self) -> &str {
+        match self {
+            StringOrArray::One(v) => v,
+            StringOrArray::Many(v) => v.last().unwrap(),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, JsonSchema)]
