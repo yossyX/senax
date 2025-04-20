@@ -8,33 +8,16 @@ publish = false
 mock = ["mockall"]
 
 [dependencies]
+base_domain = { path = "base_domain" }
 anyhow.workspace = true
-async-graphql.workspace = true
-async-stream.workspace = true
 async-trait.workspace = true
-base64.workspace = true
-cbc = { version = "0.1.2", features = ["std"] }
-chrono.workspace = true
-ciborium.workspace = true
-derive_more.workspace = true
-derive-new.workspace = true
-downcast-rs = "2"
-dyn-clone = "1.0.11"
 futures.workspace = true
-like = "0.3.1"
 mockall = {version = "0.13", optional = true}
 once_cell.workspace = true
-rust_decimal.workspace = true
-schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_repr.workspace = true
-strum.workspace = true
-strum_macros.workspace = true
 tokio.workspace = true
-utoipa.workspace = true
-uuid.workspace = true
-validator.workspace = true
 
 [dev-dependencies]
 mockall = "0.13"

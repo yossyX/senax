@@ -66,7 +66,6 @@ pub async fn generate(
             .collect();
         let base_path = Path::new(DB_PATH).join(db);
         let ddl_path = base_path.join("migrations");
-        fs::create_dir_all(&ddl_path)?;
         let dt = Utc::now();
         let file_prefix = dt.format("%Y%m%d%H%M%S").to_string();
         let file_path = ddl_path.join(format!("{}_{}.sql", file_prefix, description));

@@ -5,8 +5,9 @@ use regex::Regex;
 use std::fmt::Write;
 use std::{fs, path::Path};
 
-use crate::SCHEMA_PATH;
 use crate::common::fs_write;
+use crate::{DOMAIN_PATH, SCHEMA_PATH};
+use crate::filters;
 
 pub fn db_list(dir_type_only: bool) -> Result<Vec<String>> {
     let schema_path = Path::new(SCHEMA_PATH);
@@ -29,11 +30,17 @@ pub fn db_list(dir_type_only: bool) -> Result<Vec<String>> {
     Ok(dbs)
 }
 
-pub fn generate(db: &str) -> Result<()> {
+pub fn generate(db: &str, exclude_from_domain: bool) -> Result<()> {
     anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
     let schema_path = Path::new(SCHEMA_PATH);
-    fs::create_dir_all(schema_path)?;
 
+    #[derive(Template)]
+    #[template(path = "db.yml", escape = "none")]
+    struct DbTemplate {
+        pub db_id: u64,
+        pub exclude_from_domain: bool,
+    }
+    
     let file_path = schema_path.join(format!("{}.yml", db));
     if !file_path.exists() {
         let tpl = DbTemplate {
@@ -41,11 +48,9 @@ pub fn generate(db: &str) -> Result<()> {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_micros() as u64,
+            exclude_from_domain,
         };
         fs_write(file_path, tpl.render()?)?;
-
-        let file_path = schema_path.join(db);
-        fs::create_dir_all(file_path)?;
     }
 
     let file_path = Path::new("./.env");
@@ -59,6 +64,76 @@ pub fn generate(db: &str) -> Result<()> {
         let content = fs::read_to_string(file_path)?;
         fs_write(file_path, fix_env(&content, db)?)?;
     }
+
+    if !exclude_from_domain {
+        let domain_path = Path::new(DOMAIN_PATH);
+        let file_path = domain_path.join("Cargo.toml");
+        if file_path.exists() {
+            let mut content = fs::read_to_string(&file_path)?;
+    
+            let db = &db.to_case(Case::Snake);
+            content = content.replace(
+                "\"mockall\"",
+                &format!("\"mockall\",\"repository_{}/mock\"", db),
+            );
+            content = content.replace(
+                "[dependencies]",
+                &format!(
+                    "[dependencies]\nrepository_{} = {{ path = \"repositories/{}\" }}",
+                    db, db
+                ),
+            );
+            content = content.replace(
+                "[dev-dependencies]",
+                &format!(
+                    "[dev-dependencies]\nrepository_{} = {{ path = \"repositories/{}\", features = [\"mock\"] }}",
+                    db, db
+                ),
+            );
+            fs_write(file_path, &*content)?;
+        }
+    
+        repositories(&domain_path.join("repositories").join(db), db)?;
+    }
+    Ok(())
+}
+
+#[derive(Template)]
+#[template(path = "init/domain/db_repositories/src/lib.rs", escape = "none")]
+pub struct DomainDbLibTemplate<'a> {
+    pub db: &'a str,
+}
+
+fn repositories(path: &Path, db: &str) -> Result<()> {
+
+    #[derive(Template)]
+    #[template(path = "init/domain/db_repositories/_Cargo.toml", escape = "none")]
+    struct DomainCargoTemplate<'a> {
+        db: &'a str,
+    }
+
+    let file_path = path.join("Cargo.toml");
+    let tpl = DomainCargoTemplate { db };
+    fs_write(file_path, tpl.render()?)?;
+
+    // #[derive(Template)]
+    // #[template(path = "init/domain/db_repositories/src/lib.rs", escape = "none")]
+    // struct DomainLibTemplate<'a> {
+    //     db: &'a str,
+    // }
+
+    let file_path = path.join("src/lib.rs");
+    let tpl = DomainDbLibTemplate { db };
+    fs_write(file_path, tpl.render()?)?;
+
+    // #[derive(Template)]
+    // #[template(path = "init/domain/db_repositories/src/repositories.rs", escape = "none")]
+    // struct DomainRepositoriesTemplate;
+
+    // let file_path = path.join("src/repositories.rs");
+    // let tpl = DomainRepositoriesTemplate;
+    // fs_write(file_path, tpl.render()?)?;
+
     Ok(())
 }
 
@@ -93,10 +168,4 @@ fn fix_env(content: &str, db: &str) -> Result<String> {
         upper, db, upper, db, upper, upper, upper
     )?;
     Ok(content)
-}
-
-#[derive(Template)]
-#[template(path = "db.yml", escape = "none")]
-pub struct DbTemplate {
-    pub db_id: u64,
 }

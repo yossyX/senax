@@ -144,7 +144,7 @@ pub fn updater_joiner() -> Option<Box<_domain_::Joiner_>> {
 
 use serde::{Deserialize, Serialize};
 use crate::auth::AuthInfo;
-use crate::db::RepositoriesImpl;
+use crate::db::RepositoryImpl;
 
 @{ def.label|label0 -}@
 #[derive(Debug, async_graphql::InputObject, validator::Validate, Serialize, Deserialize, schemars::JsonSchema)]
@@ -202,7 +202,7 @@ impl From<&mut dyn _domain_::@{ pascal_name }@Updater> for ReqObj@{ rel_name|pas
 #[allow(clippy::let_and_return)]
 #[allow(unused_mut)]
 #[allow(unused_variables)]
-pub fn create_entity(input: ReqObj@{ rel_name|pascal }@, repo: &RepositoriesImpl, auth: &AuthInfo) -> Box<dyn _domain_::@{ pascal_name }@Updater> {
+pub fn create_entity(input: ReqObj@{ rel_name|pascal }@, repo: &RepositoryImpl, auth: &AuthInfo) -> Box<dyn _domain_::@{ pascal_name }@Updater> {
     let mut obj = _domain_::@{ pascal_name }@Factory {
 @{- def.non_auto_primary_for_factory()|fmt_join_with_foreign_default("
         {var}: {from_api_rel_type},", "", rel_id) }@
@@ -222,7 +222,7 @@ pub fn create_entity(input: ReqObj@{ rel_name|pascal }@, repo: &RepositoriesImpl
 
 pub fn create_list(
     data_list: Vec<ReqObj@{ rel_name|pascal }@>,
-    repo: &RepositoriesImpl,
+    repo: &RepositoryImpl,
     auth: &AuthInfo,
 ) -> Vec<Box<dyn _domain_::@{ pascal_name }@Updater>> {
     data_list.into_iter().map(|v| create_entity(v, repo, auth)).collect()
@@ -231,7 +231,7 @@ pub fn create_list(
 pub fn update_list(
     list: Vec<Box<dyn _domain_::@{ pascal_name }@Updater>>,
     data_list: Vec<ReqObj@{ rel_name|pascal }@>,
-    repo: &RepositoriesImpl,
+    repo: &RepositoryImpl,
     auth: &AuthInfo,
 ) -> anyhow::Result<Vec<Box<dyn _domain_::@{ pascal_name }@Updater>>> {
     let mut map: HashMap<_, _> = list
@@ -275,7 +275,7 @@ pub fn update_list(
 pub fn update_updater(
     updater: &mut dyn _domain_::@{ pascal_name }@Updater,
     input: ReqObj@{ rel_name|pascal }@,
-    repo: &RepositoriesImpl,
+    repo: &RepositoryImpl,
     auth: &AuthInfo,
 ) -> anyhow::Result<()> {
 @{- def.for_api_request_except_without_primary(rel_id)|fmt_join("

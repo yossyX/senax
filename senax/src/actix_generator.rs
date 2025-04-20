@@ -24,7 +24,6 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         crate::common::check_ascii_name(db);
     }
     let name = crate::common::check_ascii_name(name).to_string();
-    fs::create_dir_all(&name)?;
     let base_path: PathBuf = name.parse()?;
 
     let file_path = Path::new("./Cargo.toml");
@@ -91,7 +90,6 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     fs_write(file_path, &*content)?;
 
     let schema_dir = base_path.join(API_SCHEMA_PATH);
-    fs::create_dir_all(&schema_dir)?;
     let config_path = schema_dir.join("_config.yml");
     if !config_path.exists() {
         let tpl = ConfigTemplate;
@@ -106,8 +104,6 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     }
 
     let src_path = base_path.join("src");
-    fs::create_dir_all(&src_path)?;
-
     let file_path = src_path.join("auth.rs");
     if force || !file_path.exists() {
         let tpl = AuthTemplate;
@@ -131,6 +127,11 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         if !reg.is_match(&content) {
             crate::schema::parse(db, false, false)?;
             let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
+            let tpl = DbInitTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (DbInit)",
+                tpl.render()?.trim_start(),
+            );
             let tpl = DbStartTemplate { db };
             content = content.replace(
                 "// Do not modify this line. (DbStart)",
@@ -156,7 +157,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
                 "// Do not modify this line. (DbClearCache)",
                 tpl.render()?.trim_start(),
             );
-            if !config.excluded_from_domain {
+            if !config.exclude_from_domain {
                 let tpl = DbRepoTemplate { db };
                 content = content.replace(
                     "// Do not modify this line. (Repo)",
@@ -264,8 +265,6 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     }
 
     let routes_path = src_path.join("routes");
-    fs::create_dir_all(&routes_path)?;
-
     let file_path = routes_path.join("root.rs");
     if force || !file_path.exists() {
         let tpl = RootTemplate;
@@ -273,8 +272,6 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     }
 
     let root_path = routes_path.join("root");
-    fs::create_dir_all(&root_path)?;
-
     let file_path = root_path.join("index.rs");
     if force || !file_path.exists() {
         let tpl = IndexTemplate;
@@ -366,6 +363,18 @@ pub struct DbTemplate {
 #[derive(Template)]
 #[template(path = "new_actix/src/gql_log.rs", escape = "none")]
 pub struct GqlLogTemplate;
+
+#[derive(Template)]
+#[template(
+    source = r###"
+    crate::auto_api::@{ db|snake|to_var_name }@::init();
+    // Do not modify this line. (DbInit)"###,
+    ext = "txt",
+    escape = "none"
+)]
+pub struct DbInitTemplate<'a> {
+    pub db: &'a str,
+}
 
 #[derive(Template)]
 #[template(
@@ -463,11 +472,11 @@ pub struct DbRepoNewTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    fn @{ db|snake }@_repository(&self) -> Box<dyn domain::models::@{ db|snake|to_var_name }@::@{ db|pascal }@Repositories> {
-        Box::new(db_@{ db|snake }@::impl_domain::@{ db|pascal }@RepositoriesImpl::new(self.@{ db|snake|to_var_name }@.clone()))
+    fn @{ db|snake }@_repository(&self) -> Box<dyn domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository> {
+        Box::new(db_@{ db|snake }@::impl_domain::@{ db|pascal }@RepositoryImpl::new(self.@{ db|snake|to_var_name }@.clone()))
     }
-    fn @{ db|snake }@_query(&self) -> Box<dyn domain::models::@{ db|snake|to_var_name }@::@{ db|pascal }@Queries> {
-        Box::new(db_@{ db|snake }@::impl_domain::@{ db|pascal }@RepositoriesImpl::new(self.@{ db|snake|to_var_name }@.clone()))
+    fn @{ db|snake }@_query(&self) -> Box<dyn domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@QueryService> {
+        Box::new(db_@{ db|snake }@::impl_domain::@{ db|pascal }@RepositoryImpl::new(self.@{ db|snake|to_var_name }@.clone()))
     }
     // Do not modify this line. (RepoImpl)"###,
     ext = "txt",

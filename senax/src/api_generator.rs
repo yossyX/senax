@@ -14,6 +14,7 @@ use std::sync::atomic::Ordering;
 use crate::api_generator::schema::{API_CONFIG, ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef};
 use crate::api_generator::template::{DbConfigTemplate, MutationRootTemplate, QueryRootTemplate};
 use crate::common::{fs_write, parse_yml_file, simplify_yml};
+use crate::filters;
 use crate::schema::{_to_var_name, GROUPS, ModelDef, to_id_name};
 use crate::{API_SCHEMA_PATH, model_generator};
 
@@ -53,8 +54,6 @@ pub fn generate(
     crate::schema::set_domain_mode(true);
     let groups = GROUPS.read().unwrap().as_ref().unwrap().clone();
 
-    fs::create_dir_all(&schema_dir)?;
-
     let config_path = schema_dir.join("_config.yml");
     let config: ApiConfigDef = parse_yml_file(&config_path)?;
     API_CONFIG.write().unwrap().replace(config.clone());
@@ -65,9 +64,8 @@ pub fn generate(
     }
     let mut db_config: ApiDbDef = parse_yml_file(&db_config_path)?;
     db_config.fix();
-    model_generator::template::filters::SHOW_LABEL.store(db_config.with_label(), Ordering::SeqCst);
-    model_generator::template::filters::SHOW_COMMNET
-        .store(db_config.with_comment(), Ordering::SeqCst);
+    filters::SHOW_LABEL.store(db_config.with_label(), Ordering::SeqCst);
+    filters::SHOW_COMMNET.store(db_config.with_comment(), Ordering::SeqCst);
 
     let src_path = server_path.join("src");
     let file_path = src_path.join("auto_api.rs");
@@ -166,8 +164,6 @@ pub fn generate(
     fs_write(file_path, &*content)?;
 
     let schema_dir = schema_dir.join(db_route);
-    fs::create_dir_all(&schema_dir)?;
-
     let ts_dir = if let Some(ts_dir) = ts_dir {
         if ts_dir.is_dir() {
             Some(
@@ -212,7 +208,6 @@ pub fn generate(
             };
         }
     }
-    fs::create_dir_all(&db_base_path)?;
     for group_route in &group_routes {
         let schema_path = schema_dir.join(format!("{group_route}.yml"));
         let mut api_model_map: IndexMap<String, Option<ApiModelDef>> = if schema_path.exists() {
@@ -237,6 +232,23 @@ pub fn generate(
             .unwrap_or_else(|| panic!("The {db} DB does not have {group_name} group."));
         let group_route_mod_name = group_route.to_case(Case::Snake);
         let group_mod_name = group_name.to_case(Case::Snake);
+
+        let file_path = server_path.join("Cargo.toml");
+        if file_path.exists() {
+            let mut content = fs::read_to_string(&file_path)?;
+            let db = &db.to_case(Case::Snake);
+            let reg = Regex::new(&format!(r"(?m)^db_{}_{}\s*=", db, group_mod_name))?;
+            if !reg.is_match(&content) {
+                content = content.replace(
+                    "[dependencies]",
+                    &format!(
+                        "[dependencies]\ndb_{}_{} = {{ path = \"../2_db/{}/repositories/{}\" }}",
+                        db, group_mod_name, db, group_mod_name
+                    ),
+                );
+            }
+            fs_write(file_path, &*content)?;
+        }
 
         let model_routes = if let Some(route) = model_route {
             vec![route.clone()]
@@ -387,6 +399,8 @@ fn write_db_file(
     let all = all.iter().cloned().collect::<Vec<_>>().join(",");
     let tpl = template::DbModTemplate { all, add_groups };
     let content = re.replace(&content, tpl.render()?);
+    let tpl = template::DbInitTemplate { db, add_groups };
+    let content = content.replace("\n    // Do not modify this line. (DbInit)", &tpl.render()?);
     let tpl = template::DbQueryTemplate {
         db_route,
         add_groups,
@@ -466,7 +480,23 @@ fn write_group_file(
         all.insert(v.clone());
     });
     let all = all.iter().cloned().collect::<Vec<_>>().join(",");
-    let tpl = template::GroupModTemplate { all, add_models };
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
+@%- for name in add_models %@
+pub mod @{ name|snake|to_var_name }@;
+@%- endfor %@
+// Do not modify this line. (GqlMod:@{ all }@)"###,
+        ext = "txt",
+        escape = "none"
+    )]
+    pub struct GroupModTemplate<'a> {
+        pub all: String,
+        pub add_models: &'a BTreeSet<String>,
+    }
+
+    let tpl = GroupModTemplate { all, add_models };
     let mut content = re.replace(&content, tpl.render()?).to_string();
     let tpl = template::GroupImplTemplate {
         db: db_route,
@@ -550,7 +580,6 @@ fn write_model_file(
         group_route.to_case(Case::Pascal),
         model_route.to_case(Case::Pascal)
     );
-    fs::create_dir_all(path)?;
     let file_path = path.join(format!("{}.rs", &model_route_mod_name));
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
@@ -618,7 +647,6 @@ fn write_model_file(
 
     if let Some(ts_dir) = ts_dir {
         let ts_dir = ts_dir.join(group_route);
-        fs::create_dir_all(&ts_dir)?;
         let file_path = ts_dir.join(format!("{}.tsx", model_name));
         use inflector::Inflector;
         let db_case = if config.camel_case() {

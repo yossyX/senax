@@ -1,0 +1,23 @@
+[package]
+name = "repository_@{ db|snake }@"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+mock = ["mockall"]
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+mockall = {version = "0.13", optional = true}
+once_cell.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_repr.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+mockall = "0.13"
+@{-"\n"}@

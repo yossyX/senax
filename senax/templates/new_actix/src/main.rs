@@ -11,7 +11,7 @@ use anyhow::{ensure, Context, Result};
 use async_graphql::{EmptySubscription, Schema};
 use clap::{Parser, Subcommand};
 @%- if session %@
-use db_session::models::session::session::_SessionStore;
+use db_session_session::repositories::session::session::_SessionStore;
 @%- endif %@
 use dotenvy::dotenv;
 use mimalloc::MiMalloc;

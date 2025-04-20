@@ -1339,7 +1339,12 @@ impl ModelDef {
     pub fn equivalence_cache_fields_without_json(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
-            .filter(|(_k, v)| v.is_equivalence() && !v.exclude_from_cache())
+            .filter(|(k, v)| {
+                v.is_equivalence()
+                    && !v.exclude_from_cache()
+                    && !ConfigDef::version().eq(&**k)
+                    && !ConfigDef::aggregation_type().eq(&**k)
+            })
             .filter(|(_k, v)| {
                 !(v.data_type == DataType::ArrayInt
                     || v.data_type == DataType::ArrayString
@@ -1353,7 +1358,12 @@ impl ModelDef {
     pub fn comparable_cache_fields_without_json(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
-            .filter(|(_k, v)| v.is_comparable() && !v.exclude_from_cache())
+            .filter(|(k, v)| {
+                v.is_comparable()
+                    && !v.exclude_from_cache()
+                    && !ConfigDef::version().eq(&**k)
+                    && !ConfigDef::aggregation_type().eq(&**k)
+            })
             .filter(|(_k, v)| {
                 !(v.data_type == DataType::ArrayInt
                     || v.data_type == DataType::ArrayString
@@ -1367,7 +1377,12 @@ impl ModelDef {
     pub fn string_cache_fields(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
-            .filter(|(_k, v)| v.is_comparable() && !v.exclude_from_cache())
+            .filter(|(k, v)| {
+                v.is_comparable()
+                    && !v.exclude_from_cache()
+                    && !ConfigDef::version().eq(&**k)
+                    && !ConfigDef::aggregation_type().eq(&**k)
+            })
             .filter(|(_k, v)| {
                 v.data_type == DataType::Char
                     || v.data_type == DataType::Varchar

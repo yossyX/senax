@@ -1,11 +1,18 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use domain::models::Repositories;
+use domain::repository::Repository;
 use rand::RngCore;
 use std::{path::Path, sync::Arc};
 use tokio::sync::{mpsc, Mutex};
 
 use crate::context::Ctx;
+
+fn init() {
+    @%- if session %@
+    db_session_session::init();
+    @%- endif %@
+    // Do not modify this line. (DbInit)
+}
 
 pub async fn start(
     is_hot_deploy: bool,
@@ -15,6 +22,7 @@ pub async fn start(
     linker_port: &Option<String>,
     pw: &Option<String>,
 ) -> Result<()> {
+    init();
     let mut uuid_node = [0u8; 6];
     rand::rng().fill_bytes(&mut uuid_node);
     let uuid_node = Some(uuid_node);
@@ -36,6 +44,7 @@ pub async fn start(
 
 #[cfg(test)]
 pub async fn start_test() -> Result<Vec<tokio::sync::MutexGuard<'static, u8>>> {
+    init();
     let mut guard = Vec::new();
     @%- if session %@
     guard.push(db_session::start_test().await?);
@@ -67,18 +76,18 @@ pub async fn clear_whole_cache() {
 }
 
 #[derive(Clone)]
-pub struct RepositoriesImpl {
+pub struct RepositoryImpl {
     // Do not modify this line. (Repo)
 }
 
-impl Default for RepositoriesImpl {
+impl Default for RepositoryImpl {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[rustfmt::skip]
-impl RepositoriesImpl {
+impl RepositoryImpl {
     pub fn new() -> Self {
         let ctx = Ctx::new();
         Self::new_with_ctx(&ctx)
@@ -92,7 +101,7 @@ impl RepositoriesImpl {
 
 #[rustfmt::skip]
 #[async_trait]
-impl Repositories for RepositoriesImpl {
+impl Repository for RepositoryImpl {
     // Do not modify this line. (RepoImpl)
     async fn begin(&self) -> Result<()> {
         // Do not modify this line. (RepoImplStart)

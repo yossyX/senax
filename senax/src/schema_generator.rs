@@ -729,7 +729,6 @@ pub async fn generate(
             .insert(model.name.clone(), model);
     }
     let path = Path::new(SCHEMA_PATH).join(db);
-    fs::create_dir_all(&path)?;
     for (group, defs) in groups {
         let file_path = path.join(format!("{}.yml", group));
         let mut buf =

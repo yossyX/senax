@@ -1,15 +1,15 @@
-use crate::models::Repositories;
+use crate::repository::Repository;
 use futures::future::BoxFuture;
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub type Handler<T> =
-    Box<dyn Fn(Arc<dyn Repositories>, T) -> BoxFuture<'static, anyhow::Result<T>> + Send + Sync>;
+    Box<dyn Fn(Arc<dyn Repository>, T) -> BoxFuture<'static, anyhow::Result<T>> + Send + Sync>;
 
 struct DomainEvent<T>(Arc<RwLock<Vec<Handler<T>>>>);
 impl<T> DomainEvent<T> {
-    pub async fn publish(&self, repo: Arc<dyn Repositories>, mut event: T) -> anyhow::Result<T> {
+    pub async fn publish(&self, repo: Arc<dyn Repository>, mut event: T) -> anyhow::Result<T> {
         for f in self.0.read().await.iter() {
             event = f(repo.clone(), event).await?;
         }
@@ -25,7 +25,7 @@ macro_rules! event {
         static $i: Lazy<DomainEvent<$t>> =
             Lazy::new(|| DomainEvent(Arc::new(RwLock::new(Vec::new()))));
         impl $t {
-            pub async fn publish(self, repo: Arc<dyn Repositories>) -> anyhow::Result<Self> {
+            pub async fn publish(self, repo: Arc<dyn Repository>) -> anyhow::Result<Self> {
                 $i.publish(repo.clone(), self).await
             }
             pub async fn subscribe(f: Handler<$t>) {
@@ -40,7 +40,7 @@ macro_rules! event_with_inner_handler {
         static $i: Lazy<DomainEvent<$t>> =
             Lazy::new(|| DomainEvent(Arc::new(RwLock::new(Vec::new()))));
         impl $t {
-            pub async fn publish(self, repo: Arc<dyn Repositories>) -> anyhow::Result<Self> {
+            pub async fn publish(self, repo: Arc<dyn Repository>) -> anyhow::Result<Self> {
                 let event = self.pre_handle(repo.clone()).await?;
                 let event = $i.publish(repo.clone(), event).await?;
                 event.post_handle(repo).await
@@ -60,10 +60,10 @@ pub struct UserRegistered {
 }
 impl UserRegistered {
     // Events in the domain are written here because there is no initializer
-    async fn pre_handle(self, _repo: Arc<dyn Repositories>) -> anyhow::Result<Self> {
+    async fn pre_handle(self, _repo: Arc<dyn Repository>) -> anyhow::Result<Self> {
         Ok(self)
     }
-    async fn post_handle(self, _repo: Arc<dyn Repositories>) -> anyhow::Result<Self> {
+    async fn post_handle(self, _repo: Arc<dyn Repository>) -> anyhow::Result<Self> {
         Ok(self)
     }
 }
@@ -84,7 +84,7 @@ mod tests {
             .boxed()
         }))
         .await;
-        let repo = Arc::new(crate::models::MockRepositories::new());
+        let repo = Arc::new(crate::repository::MockRepository::new());
         UserRegistered {
             user_id: 1,
             name: "John Doe".to_string(),

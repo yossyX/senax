@@ -111,7 +111,7 @@ pub struct ConfigDef {
     pub preserve_column_order: bool,
     /// ### ドメイン生成から除外
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub excluded_from_domain: bool,
+    pub exclude_from_domain: bool,
     /// ### DB層のモデルの公開範囲をpublicにする
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub export_db_layer: bool,
@@ -262,7 +262,7 @@ pub struct ConfigJson {
     pub preserve_column_order: bool,
     /// ### ドメイン生成から除外
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub excluded_from_domain: bool,
+    pub exclude_from_domain: bool,
     /// ### DB層のモデルの公開範囲をpublicにする
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub export_db_layer: bool,
@@ -345,7 +345,7 @@ impl From<ConfigDef> for ConfigJson {
             // character_set: value.character_set,
             collation: value.collation,
             preserve_column_order: value.preserve_column_order,
-            excluded_from_domain: value.excluded_from_domain,
+            exclude_from_domain: value.exclude_from_domain,
             export_db_layer: value.export_db_layer,
             use_label_as_sql_comment: value.use_label_as_sql_comment,
             rename_created_at: value.rename_created_at,
@@ -410,7 +410,7 @@ impl From<ConfigJson> for ConfigDef {
             // character_set: value.character_set,
             collation: value.collation,
             preserve_column_order: value.preserve_column_order,
-            excluded_from_domain: value.excluded_from_domain,
+            exclude_from_domain: value.exclude_from_domain,
             export_db_layer: value.export_db_layer,
             use_label_as_sql_comment: value.use_label_as_sql_comment,
             rename_created_at: value.rename_created_at,

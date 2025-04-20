@@ -7,7 +7,7 @@ timestamp_time_zone: local
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read
 use_cache: true
-excluded_from_domain: true
+exclude_from_domain: true
 groups:
   session:
     models:

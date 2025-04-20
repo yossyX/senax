@@ -3204,15 +3204,15 @@ impl FieldDef {
     }
 
     pub fn get_bind_as_for_filter(&self) -> &'static str {
-        let excluded_from_domain = CONFIG
+        let exclude_from_domain = CONFIG
             .read()
             .unwrap()
             .as_ref()
             .unwrap()
-            .excluded_from_domain;
+            .exclude_from_domain;
         if let Some(ref _class) = self.enum_class {
             if self.is_integer() {
-                if excluded_from_domain {
+                if exclude_from_domain {
                     return "";
                 } else {
                     return ".inner()";
@@ -3224,9 +3224,9 @@ impl FieldDef {
         if self.id_class.is_some()
             || self.rel.is_some()
             || self.outer_db_rel.is_some()
-            || (self.value_object.is_some() && !excluded_from_domain)
+            || (self.value_object.is_some() && !exclude_from_domain)
         {
-            let s = if excluded_from_domain {
+            let s = if exclude_from_domain {
                 ".0.as_ref().to_owned()"
             } else {
                 ".inner().as_ref().to_owned()"

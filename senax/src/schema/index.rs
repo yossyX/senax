@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::model_generator::template::filters::_to_db_col;
+use crate::filters::_to_db_col;
 
 use super::{_to_var_name, ConfigDef, FieldDef, ModelDef, StringOrArray};
 

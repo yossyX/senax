@@ -3,9 +3,11 @@
 
 use crate::connection::{DbConn, DbType};
 use ::anyhow::Result;
+use ::async_trait::async_trait;
 use ::futures::TryStreamExt;
 use ::fxhash::FxHashMap;
 use ::log::error;
+use ::once_cell::sync::OnceCell;
 use ::senax_common::ShardId;
 use ::serde::{Deserialize, Serialize};
 use ::std::collections::BTreeMap;
@@ -13,12 +15,9 @@ use ::std::path::Path;
 use ::std::sync::Arc;
 use ::tokio::sync::{Mutex, RwLock, Semaphore};
 
-
-#[allow(dead_code)]
-pub(crate) const USE_FAST_CACHE: bool = @{ config.use_fast_cache() }@;
-#[allow(dead_code)]
-pub(crate) const USE_STORAGE_CACHE: bool = @{ config.use_storage_cache }@;
-pub(crate) static CACHE_UPDATE_LOCK: RwLock<()> = RwLock::const_new(());
+pub const USE_FAST_CACHE: bool = @{ config.use_fast_cache() }@;
+pub const USE_STORAGE_CACHE: bool = @{ config.use_storage_cache }@;
+pub static CACHE_UPDATE_LOCK: RwLock<()> = RwLock::const_new(());
 @{-"\n"}@
 @%- for (name, defs) in groups %@
 pub mod @{ name|snake|to_var_name }@;
@@ -50,14 +49,18 @@ pub enum TableName {
 
 pub(crate) async fn start(db_dir: &Path) -> Result<()> {
 @%- for (name, defs) in groups %@
-    @{ name|snake|to_var_name }@::start(Some(db_dir)).await?;
+    if let Some(g) = @{ name|upper }@_CTRL.get() {
+        g.start(db_dir).await?;
+    }
 @%- endfor %@
     Ok(())
 }
 
 pub(crate) async fn start_test() -> Result<()> {
 @%- for (name, defs) in groups %@
-    @{ name|snake|to_var_name }@::start(None).await?;
+    if let Some(g) = @{ name|upper }@_CTRL.get() {
+        g.start_test().await?;
+    }
 @%- endfor %@
     Ok(())
 }
@@ -65,11 +68,11 @@ pub(crate) async fn start_test() -> Result<()> {
 #[rustfmt::skip]
 pub(crate) async fn check() -> Result<()> {
     for shard_id in DbConn::shard_num_range() {
-        tokio::try_join!(
-            @%- for (name, defs) in groups %@
-            @{ name|snake|to_var_name }@::check(shard_id),
-            @%- endfor %@
-        )?;
+        @%- for (name, defs) in groups %@
+        if let Some(g) = @{ name|upper }@_CTRL.get() {
+            g.check(shard_id).await?;
+        }
+        @%- endfor %@
     }
     Ok(())
 }
@@ -77,11 +80,11 @@ pub(crate) async fn check() -> Result<()> {
 pub(crate) struct CacheActor;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub(crate) struct CacheMsg(pub(crate) Vec<CacheOp>, pub(crate) FxHashMap<ShardId, u64>);
+pub struct CacheMsg(pub Vec<CacheOp>, pub FxHashMap<ShardId, u64>);
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub(crate) enum CacheOp {
+pub enum CacheOp {
 @%- for (name, defs) in groups %@
     @{ name|to_pascal_name }@(@{ name|snake|to_var_name }@::CacheOp),
 @%- endfor %@
@@ -93,18 +96,17 @@ impl CacheMsg {
         let _lock = CACHE_UPDATE_LOCK.write().await;
         let _sync_map = Arc::new(self.1);
         #[cfg(not(feature = "cache_update_only"))]
-        for op in self.0.into_iter() {
-            match op {
+        {
 @%- for (name, defs) in groups %@
-                CacheOp::@{ name|to_pascal_name }@(op) => op.handle_cache_msg(Arc::clone(&_sync_map)).await,
+            if let Some(g) = @{ name|upper }@_CTRL.get() {
+                g.handle_cache_msg(self.0.clone(), Arc::clone(&_sync_map)).await;
+            }
 @%- endfor %@
-                CacheOp::_AllClear => _clear_cache(&_sync_map, false).await,
-            };
         }
         DbConn::_publish_update_notice().await;
     }
 
-    pub(crate) async fn do_send(self) {
+    pub async fn do_send(self) {
         if !crate::is_test_mode() {
             CacheActor::handle(self);
         } else {
@@ -112,7 +114,7 @@ impl CacheMsg {
         }
     }
 
-    pub(crate) async fn do_send_to_internal(self) {
+    pub async fn do_send_to_internal(self) {
         self.handle_cache_msg().await;
     }
 }
@@ -143,12 +145,16 @@ pub(crate) async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, clear_test
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                 @%- for (name, defs) in groups %@
-                @{ name|snake|to_var_name }@::_clear_cache(shard_id, 0, clear_test).await;
+                if let Some(g) = @{ name|upper }@_CTRL.get() {
+                    g._clear_cache(shard_id, 0, clear_test).await;
+                }
                 @%- endfor %@
             });
         }
         @%- for (name, defs) in groups %@
-        @{ name|snake|to_var_name }@::_clear_cache(*shard_id, *sync, clear_test).await;
+        if let Some(g) = @{ name|upper }@_CTRL.get() {
+            g._clear_cache(*shard_id, *sync, clear_test).await;
+        }
         @%- endfor %@
     }
 @%- endif %@
@@ -216,5 +222,29 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
         .run(writer.as_mut())
         .await?;
     Ok(())
+}
+@% for (name, defs) in groups %@
+pub(crate) static @{ name|upper }@_CTRL: OnceCell<Box<dyn Controller + Send + Sync>> = OnceCell::new();
+pub fn set_@{ name|snake }@(tr: Box<dyn Controller + Send + Sync>) {
+    let _ = @{ name|upper }@_CTRL.set(tr);
+}
+@%- endfor %@
+
+#[async_trait]
+pub trait Controller {
+    async fn start(&self, db_dir: &Path) -> Result<()>;
+    async fn start_test(&self) -> Result<()>;
+    async fn check(&self, shard_id: ShardId) -> Result<()>;
+    #[cfg(not(feature="cache_update_only"))]
+    async fn handle_cache_msg(&self, op: Vec<CacheOp>, sync_map: Arc<FxHashMap<ShardId, u64>>);
+    #[cfg(not(feature="cache_update_only"))]
+    async fn _clear_cache(&self, shard_id: ShardId, sync: u64, clear_test: bool);
+    async fn seed(&self, seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()>;
+}
+
+pub trait ModelTr<_Self, CacheOp> {
+    fn __before_delete(_conn: &mut DbConn, _list: &[_Self]) -> impl std::future::Future<Output = Result<()>> + Send;
+    fn __after_delete(_list: &[_Self]) -> impl std::future::Future<Output = ()> + Send;
+    fn __receive_update_notice(msg: &CacheOp) -> impl std::future::Future<Output = ()> + Send;
 }
 @{-"\n"}@

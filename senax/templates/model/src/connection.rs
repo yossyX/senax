@@ -507,7 +507,7 @@ pub async fn init_test() -> Result<()> {
 }
 
 #[rustfmt::skip]
-pub(crate) async fn reset_database(is_test: bool, clean: bool) -> Result<()> {
+pub async fn reset_database(is_test: bool, clean: bool) -> Result<()> {
     #[cfg(feature = "etcd")]
     let etcd = senax_common::etcd::map("db/").await?;
     #[cfg(not(feature = "etcd"))]
@@ -559,13 +559,13 @@ pub struct DbConn {
     cache_internal_op_list: Vec<(ShardId, CacheOp)>,
     cache_op_list: Vec<(ShardId, CacheOp)>,
     callback_list: VecDeque<Box<dyn FnOnce() -> BoxFuture<'static, ()> + Send + Sync>>,
-    pub(crate) clear_whole_cache: bool,
+    pub clear_whole_cache: bool,
     has_tx: bool,
     wo_tx: usize,
     has_read_tx: usize,
     lock_list: Vec<DbLock>,
     @%- for db in config.outer_db() %@
-    pub(crate) _@{ db }@_db: ::db_@{ db }@::connection::DbConn,
+    pub _@{ db }@_db: ::db_@{ db }@::connection::DbConn,
     @%- endfor %@
 }
 
@@ -584,11 +584,11 @@ impl DbConn {
         DbConn::__new(ctx_no, time, 0)
     }
 
-    pub(crate) fn _new(shard_id: ShardId) -> DbConn {
+    pub fn _new(shard_id: ShardId) -> DbConn {
         DbConn::__new(0, SystemTime::now(), shard_id)
     }
 
-    pub(crate) fn _new_with_ctx(ctx_no: u64, shard_id: ShardId) -> DbConn {
+    pub fn _new_with_ctx(ctx_no: u64, shard_id: ShardId) -> DbConn {
         DbConn::__new(ctx_no, SystemTime::now(), shard_id)
     }
 
@@ -668,7 +668,7 @@ impl DbConn {
 
     /// Cache transaction synchronization
     #[allow(dead_code)]
-    pub(crate) fn cache_sync(&self) -> u64 {
+    pub fn cache_sync(&self) -> u64 {
         self.cache_tx.get(&self.shard_id).map(|v| v.0).unwrap_or(0)
     }
 
@@ -871,11 +871,11 @@ impl DbConn {
         Ok(())
     }
 
-    pub async fn end_of_without_transaction(&mut self) -> Result<()> {
+    pub async fn end_without_transaction(&mut self) -> Result<()> {
         ensure!(self.wo_tx > 0, "No without transaction is active.");
         self.wo_tx -= 1;
         @%- for db in config.outer_db() %@
-        self._@{ db }@_db.end_of_without_transaction().await?;
+        self._@{ db }@_db.end_without_transaction().await?;
         @%- endfor %@
         Ok(())
     }
@@ -910,7 +910,7 @@ impl DbConn {
         self.has_tx
     }
 
-    pub(crate) fn wo_tx(&self) -> bool {
+    pub fn wo_tx(&self) -> bool {
         !self.has_tx && self.wo_tx > 0
     }
 
@@ -931,7 +931,7 @@ impl DbConn {
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn push_cache_op(&mut self, op: CacheOp) {
+    pub async fn push_cache_op(&mut self, op: CacheOp) {
         if self.has_tx() {
             self.cache_op_list.push((self.shard_id(), op));
         } else {
@@ -946,7 +946,7 @@ impl DbConn {
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn push_cache_op_to(&mut self, op: CacheOp, internal: bool) {
+    pub async fn push_cache_op_to(&mut self, op: CacheOp, internal: bool) {
         if internal {
             if self.has_tx() {
                 self.cache_internal_op_list.push((self.shard_id(), op));
@@ -965,7 +965,7 @@ impl DbConn {
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn push_callback(
+    pub async fn push_callback(
         &mut self,
         cb: Box<dyn FnOnce() -> BoxFuture<'static, ()> + Send + Sync>,
     ) {
@@ -1113,7 +1113,7 @@ impl DbConn {
     @%- if !config.force_disable_cache %@
 
     #[allow(dead_code)]
-    pub(crate) async fn begin_cache_tx(&mut self) -> Result<()> {
+    pub async fn begin_cache_tx(&mut self) -> Result<()> {
         if self.cache_tx.is_empty() {
             let mut tx = Self::acquire_cache_tx(self.shard_id).await?;
             set_read_tx_isolation(&mut tx).await?;
@@ -1125,12 +1125,12 @@ impl DbConn {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn has_cache_tx(&self) -> bool {
+    pub fn has_cache_tx(&self) -> bool {
         !self.cache_tx.is_empty()
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn get_cache_tx(&mut self) -> Result<&mut sqlx::Transaction<'static, DbType>> {
+    pub async fn get_cache_tx(&mut self) -> Result<&mut sqlx::Transaction<'static, DbType>> {
         ensure!(!self.cache_tx.is_empty(), "No transaction is active");
         match self.cache_tx.entry(self.shard_id) {
             Entry::Occupied(tx) => Ok(&mut tx.into_mut().1),
@@ -1145,7 +1145,7 @@ impl DbConn {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn release_cache_tx(&mut self) {
+    pub fn release_cache_tx(&mut self) {
         self.cache_tx.clear();
     }
     @%- endif %@
@@ -1190,7 +1190,7 @@ impl DbConn {
     }
     @%- endif %@
 
-    pub(crate) async fn inc_all_cache_sync() -> FxHashMap<ShardId, u64> {
+    pub async fn inc_all_cache_sync() -> FxHashMap<ShardId, u64> {
         let mut sync_map = FxHashMap::default();
         for shard_id in DbConn::shard_num_range() {
             sync_map.insert(shard_id, Self::inc_cache_sync(shard_id).await);
@@ -1225,7 +1225,7 @@ impl DbConn {
         }
     }
 
-    pub(crate) async fn inc_cache_sync(shard_id: ShardId) -> u64 {
+    pub async fn inc_cache_sync(shard_id: ShardId) -> u64 {
         static CACHE_SYNC: Lazy<Vec<Mutex<()>>> =
             Lazy::new(|| DbConn::shard_num_range().map(|_| Mutex::new(())).collect());
         static CACHE_SYNC_QUEUE: Lazy<Vec<SegQueue<Arc<AtomicU64>>>> =
@@ -1249,7 +1249,7 @@ impl DbConn {
     }
     @%- else %@
 
-    pub(crate) async fn inc_cache_sync(_shard_id: ShardId) -> u64 {
+    pub async fn inc_cache_sync(_shard_id: ShardId) -> u64 {
         0
     }
     @%- endif %@
@@ -1264,10 +1264,10 @@ impl DbConn {
         MAX_CONNECTIONS_FOR_CACHE.load(Ordering::Relaxed)
     }
 
-    pub(crate) fn _has_update_notice() -> bool {
+    pub fn _has_update_notice() -> bool {
         NOTIFY_RECEIVER_COUNT.load(Ordering::Relaxed) > 0
     }
-    pub(crate) async fn _push_update_notice(
+    pub async fn _push_update_notice(
         table: TableName,
         op: NotifyOp,
         id: &impl serde::Serialize,
@@ -1285,7 +1285,7 @@ impl DbConn {
         }
         notify_list.replace(list);
     }
-    pub(crate) async fn _publish_update_notice() {
+    pub async fn _publish_update_notice() {
         let list = NOTIFY_LIST.write().await.take();
         if let Some(list) = list {
             for f in NOTIFY_RECEIVER.read().await.iter() {
@@ -1752,7 +1752,9 @@ async fn reset_writer_pool(
                             if let Ok(pool) = new_pool.acquire().await {
                                 let sync = DbConn::___inc_cache_sync(pool).await.unwrap_or(0);
                                 @%- for (name, defs) in groups %@
-                                models::@{ name|snake|to_var_name }@::_clear_cache(idx as ShardId, sync, false).await;
+                                if let Some(g) = models::@{ name|upper }@_CTRL.get() {
+                                    g._clear_cache(idx as ShardId, sync, false).await;
+                                }
                                 @%- endfor %@
                             }
                         });
@@ -1977,7 +1979,7 @@ async fn reader_connect_with(
 }
 
 #[allow(dead_code)]
-pub(crate) fn _is_retryable_error<T>(result: Result<T>, table: &str) -> bool {
+pub fn _is_retryable_error<T>(result: Result<T>, table: &str) -> bool {
     if let Err(err) = result {
         if let Some(err) = err.downcast_ref::<sqlx::Error>() {
             match err {

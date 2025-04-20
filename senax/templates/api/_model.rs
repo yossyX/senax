@@ -1,6 +1,9 @@
 #[allow(unused_imports)]
 #[rustfmt::skip]
 use domain::models::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ mod_name|to_var_name }@::{self as _domain_, @{ pascal_name }@Updater as _, @{ pascal_name }@UpdaterBase as _};
+use domain::repository::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ mod_name|to_var_name }@ as _repository_;
+use domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository as _Repository;
+use domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@QueryService as _QueryService;
 
 fn query_guard() -> impl async_graphql::Guard {
     @{ api_def.readable_roles(config, group)|to_gql_guard }@
@@ -58,19 +61,19 @@ fn api_delete_guard(auth: &AuthInfo) -> Option<bool> {
 #@
 
 #[allow(unused_variables)]
-pub fn readable_filter(auth: &AuthInfo) -> anyhow::Result<_domain_::Filter_> {
-    Ok(_domain_::filter!(@{ api_def.readable_filter() }@))
+pub fn readable_filter(auth: &AuthInfo) -> anyhow::Result<_repository_::Filter_> {
+    Ok(_repository_::filter!(@{ api_def.readable_filter() }@))
 }
 @%- if !api_def.disable_mutation %@
 
 #[allow(unused_variables)]
-pub fn updatable_filter(auth: &AuthInfo) -> anyhow::Result<_domain_::Filter_> {
-    Ok(_domain_::filter!(@{ api_def.updatable_filter() }@))
+pub fn updatable_filter(auth: &AuthInfo) -> anyhow::Result<_repository_::Filter_> {
+    Ok(_repository_::filter!(@{ api_def.updatable_filter() }@))
 }
 
 #[allow(unused_variables)]
-pub fn deletable_filter(auth: &AuthInfo) -> anyhow::Result<_domain_::Filter_> {
-    Ok(_domain_::filter!(@{ api_def.deletable_filter() }@))
+pub fn deletable_filter(auth: &AuthInfo) -> anyhow::Result<_repository_::Filter_> {
+    Ok(_repository_::filter!(@{ api_def.deletable_filter() }@))
 }
 @%- endif %@
 
@@ -184,8 +187,8 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@Cache> for ResObj {
 #[rustfmt::skip]
 #[allow(unused_mut)]
 #[allow(clippy::needless_update)]
-fn joiner(_look_ahead: async_graphql::Lookahead<'_>, _auth: &AuthInfo) -> anyhow::Result<Option<Box<_domain_::Joiner_>>> {
-    let mut joiner = Some(Box::new(_domain_::Joiner_ {
+fn joiner(_look_ahead: async_graphql::Lookahead<'_>, _auth: &AuthInfo) -> anyhow::Result<Option<Box<_repository_::Joiner_>>> {
+    let mut joiner = Some(Box::new(_repository_::Joiner_ {
         @%- if camel_case %@
         @{- def.relations_one_for_api_response()|fmt_rel_join("
         {rel_name}: _{raw_rel_name}::joiner(_look_ahead.field(\"{rel_name_camel}\")),", "") }@
@@ -205,10 +208,10 @@ fn joiner(_look_ahead: async_graphql::Lookahead<'_>, _auth: &AuthInfo) -> anyhow
     }));
     @%- if !api_def.disable_mutation %@
     if _look_ahead.field("_updatable").exists() {
-        joiner = _domain_::Joiner_::merge(joiner, updatable_filter(_auth)?.joiner()); 
+        joiner = _repository_::Joiner_::merge(joiner, updatable_filter(_auth)?.joiner()); 
     }
     if _look_ahead.field("_deletable").exists() {
-        joiner = _domain_::Joiner_::merge(joiner, deletable_filter(_auth)?.joiner()); 
+        joiner = _repository_::Joiner_::merge(joiner, deletable_filter(_auth)?.joiner()); 
     }
     @%- endif %@
     Ok(joiner)
@@ -217,8 +220,8 @@ fn joiner(_look_ahead: async_graphql::Lookahead<'_>, _auth: &AuthInfo) -> anyhow
 #[allow(unused_mut)]
 #[allow(dead_code)]
 #[allow(clippy::needless_update)]
-fn reader_joiner() -> Option<Box<_domain_::Joiner_>> {
-    let joiner = _domain_::Joiner_ {
+fn reader_joiner() -> Option<Box<_repository_::Joiner_>> {
+    let joiner = _repository_::Joiner_ {
         @{- def.relations_one_for_api_response()|fmt_rel_join("
         {rel_name}: _{raw_rel_name}::reader_joiner(),", "") }@
         @{- def.relations_many_for_api_response()|fmt_rel_join("
@@ -233,8 +236,8 @@ fn reader_joiner() -> Option<Box<_domain_::Joiner_>> {
 
 #[allow(unused_mut)]
 #[allow(clippy::needless_update)]
-fn updater_joiner() -> Option<Box<_domain_::Joiner_>> {
-    let joiner = _domain_::Joiner_ {
+fn updater_joiner() -> Option<Box<_repository_::Joiner_>> {
+    let joiner = _repository_::Joiner_ {
         @{- def.relations_one_for_api_request()|fmt_rel_join("
         {rel_name}: _{raw_rel_name}::updater_joiner(),", "") }@
         @{- def.relations_many_for_api_request()|fmt_rel_join("
@@ -314,12 +317,12 @@ impl From<&mut dyn _domain_::@{ pascal_name }@Updater> for ReqObj {
 #[allow(clippy::needless_if)]
 #[allow(unused_mut)]
 #[allow(unused_variables)]
-fn create_entity(input: ReqObj, repo: &RepositoriesImpl, auth: &AuthInfo) -> Box<dyn _domain_::@{ pascal_name }@Updater> {
-    let mut obj = _domain_::@{ pascal_name }@Factory {
+fn create_entity(input: ReqObj, repo: &dyn _Repository, auth: &AuthInfo) -> Box<dyn _domain_::@{ pascal_name }@Updater> {
+    let mut obj = _repository_::@{ pascal_name }@Factory {
 @{- def.non_auto_primary_for_factory()|fmt_join("
         {var}: {from_api_type},", "") }@
     }
-    .create(repo);
+    .create(repo.@{ group|to_var_name }@().as_ref());
     @{- def.relations_one_for_api_request()|fmt_rel_join("
     if let Some(input) = input.{rel_name} {
         obj.set_{raw_rel_name}(_{raw_rel_name}::create_entity(input, repo, auth));
@@ -334,7 +337,7 @@ fn create_entity(input: ReqObj, repo: &RepositoriesImpl, auth: &AuthInfo) -> Box
 #[allow(dead_code)]
 pub fn create_list(
     data_list: Vec<ReqObj>,
-    repo: &RepositoriesImpl,
+    repo: &dyn _Repository,
     auth: &AuthInfo,
 ) -> Vec<Box<dyn _domain_::@{ pascal_name }@Updater>> {
     data_list
@@ -345,7 +348,7 @@ pub fn create_list(
 
 #[rustfmt::skip]
 #[allow(unused_variables)]
-fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: ReqObj, repo: &RepositoriesImpl, auth: &AuthInfo) -> anyhow::Result<()> {
+fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: ReqObj, repo: &RepositoryImpl, auth: &AuthInfo) -> anyhow::Result<()> {
 @{- def.for_api_update_updater()|fmt_join("
     updater.set_{raw_var}({from_api_type_for_update});", "") }@
 @{- def.relations_one_for_api_request_with_replace_type(true)|fmt_rel_join("

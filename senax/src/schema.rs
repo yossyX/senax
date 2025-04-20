@@ -835,7 +835,7 @@ pub fn to_id_name(name: &str) -> String {
 pub fn _to_var_name(s: &str) -> String {
     let name = s;
     if BAD_KEYWORDS.iter().any(|&x| x == name) {
-        error_exit!("{} is not supported", name);
+        format!("_{}", name)
     } else if KEYWORDS.iter().any(|&x| x == name) {
         format!("r#{}", name)
     } else {
@@ -848,6 +848,6 @@ static KEYWORDS: &[&str] = &[
     "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return",
     "self", "Self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use", "where",
     "while", "async", "await", "dyn", "abstract", "become", "box", "do", "final", "macro",
-    "override", "priv", "typeof", "unsized", "virtual", "yield", "try",
+    "override", "priv", "typeof", "unsized", "virtual", "yield", "try", "gen",
 ];
 pub static BAD_KEYWORDS: &[&str] = &["super", "self", "Self", "extern", "crate"];

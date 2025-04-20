@@ -1,22 +1,25 @@
 use anyhow::{Context, Result, ensure};
 use askama::Template;
+use compact_str::CompactString;
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use regex::Regex;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::ffi::OsString;
+use std::collections::{BTreeSet, HashSet};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::schema::{ConfigDef, StringOrArray, VALUE_OBJECTS};
+use crate::filters;
+use crate::schema::{ConfigDef, StringOrArray, Timestampable};
+use crate::{BASE_DOMAIN_PATH, DOMAIN_REPOSITORIES_PATH};
 use crate::{
     DB_PATH, DOMAIN_PATH,
     common::fs_write,
-    schema::{self, CONFIG, GROUPS, MODELS, ModelDef, set_domain_mode, to_id_name},
+    schema::{self, CONFIG, GROUPS, MODELS, ModelDef, to_id_name},
 };
 
-pub mod template;
+mod db;
+mod domain;
 
 pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) -> Result<()> {
     if !skip_version_check {
@@ -26,16 +29,25 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     schema::parse(db, false, false)?;
 
     let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
-    let exclude_domain = config.excluded_from_domain;
+    let exclude_from_domain = config.exclude_from_domain;
     let groups = GROUPS.read().unwrap().as_ref().unwrap().clone();
     let model_dir = Path::new(DB_PATH).join(db.to_case(Case::Snake));
-    fs::create_dir_all(&model_dir)?;
+    let db_repositories_dir = model_dir.join("repositories");
     let domain_src_dir = Path::new(DOMAIN_PATH).join("src");
-    fs::create_dir_all(&domain_src_dir)?;
+    let base_domain_src_dir = Path::new(BASE_DOMAIN_PATH).join("src");
+    let domain_repositories_dir = Path::new(DOMAIN_REPOSITORIES_PATH).join(db);
+    let domain_repositories_src_dir = domain_repositories_dir.join("src");
 
     let file_path = model_dir.join("Cargo.toml");
     if force || !file_path.exists() {
-        let tpl = template::CargoTemplate {
+        #[derive(Template)]
+        #[template(path = "model/_Cargo.toml", escape = "none")]
+        struct CargoTemplate<'a> {
+            pub db: &'a str,
+            pub config: &'a ConfigDef,
+        }
+
+        let tpl = CargoTemplate {
             db,
             config: &config,
         };
@@ -44,16 +56,26 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
 
     let file_path = model_dir.join("build.rs");
     if force || !file_path.exists() {
-        let tpl = template::BuildTemplate {};
+        #[derive(Template)]
+        #[template(path = "model/build.rs", escape = "none")]
+        struct BuildTemplate {}
+
+        let tpl = BuildTemplate {};
         fs_write(file_path, tpl.render()?)?;
     }
 
     let model_src_dir = model_dir.join("src");
-    fs::create_dir_all(&model_src_dir)?;
-
     let file_path = model_src_dir.join("lib.rs");
     if force || !file_path.exists() {
-        let tpl = template::LibTemplate {
+        #[derive(Template)]
+        #[template(path = "model/src/lib.rs", escape = "none")]
+        struct LibTemplate<'a> {
+            pub db: &'a str,
+            pub config: &'a ConfigDef,
+            pub non_snake_case: bool,
+        }
+
+        let tpl = LibTemplate {
             db,
             config: &config,
             non_snake_case,
@@ -62,67 +84,34 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     }
 
     let file_path = model_src_dir.join("models.rs");
-    let tpl = template::ModelsTemplate {
+
+    #[derive(Template)]
+    #[template(path = "model/src/models.rs", escape = "none")]
+    struct ModelsTemplate<'a> {
+        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub config: &'a ConfigDef,
+    }
+
+    let tpl = ModelsTemplate {
         groups: &groups,
         config: &config,
     };
     fs_write(file_path, tpl.render()?)?;
 
-    let mod_names: BTreeMap<_, _> = VALUE_OBJECTS
-        .read()
-        .unwrap()
-        .as_ref()
-        .unwrap()
-        .iter()
-        .map(|(name, _def)| (name.to_case(Case::Snake), name.to_case(Case::Pascal)))
-        .collect();
-    let file_path = domain_src_dir.join("value_objects.rs");
-    write_value_objects_rs(&file_path, &mod_names)?;
-
-    let value_objects_dir = domain_src_dir.join("value_objects");
-    let value_objects_base_dir = value_objects_dir.join("_base");
     let mut remove_files = HashSet::new();
-    if clean && value_objects_dir.exists() {
-        for entry in glob::glob(&format!("{}/**/*.rs", value_objects_dir.display()))? {
-            match entry {
-                Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
-                Err(_) => false,
-            };
-        }
-    }
-    fs::create_dir_all(&value_objects_base_dir)?;
-    for (name, def) in VALUE_OBJECTS.read().unwrap().as_ref().unwrap() {
-        let mod_name = name.to_case(Case::Snake);
-        let mod_name = &mod_name;
-        let file_path = value_objects_base_dir.join(format!("_{}.rs", mod_name));
-        remove_files.remove(file_path.as_os_str());
-        let tpl = template::DomainValueObjectBaseTemplate {
-            mod_name,
-            pascal_name: &name.to_case(Case::Pascal),
-            def,
-        }
-        .render()?;
-        fs_write(file_path, tpl)?;
+    domain::base_domain::write_value_objects_rs(
+        &base_domain_src_dir,
+        &mut remove_files,
+        clean,
+        force,
+    )?;
 
-        let file_path = value_objects_dir.join(format!("{}.rs", mod_name));
-        remove_files.remove(file_path.as_os_str());
-        let tpl = template::DomainValueObjectWrapperTemplate {
-            mod_name,
-            pascal_name: &name.to_case(Case::Pascal),
-        }
-        .render()?;
-        if force || !file_path.exists() {
-            fs_write(file_path, tpl)?;
-        }
+    if !exclude_from_domain {
+        db::impl_domain::write_impl_domain_rs(&model_src_dir, db, &groups, force)?;
     }
-
-    if !exclude_domain {
-        write_impl_domain_db_rs(&model_src_dir, db, &groups, force)?;
-    }
-    let domain_models_dir = domain_src_dir.join("models");
+    let domain_models_dir = base_domain_src_dir.join("models");
     let impl_domain_dir = model_src_dir.join("impl_domain");
-    if !exclude_domain {
-        fs::create_dir_all(&domain_models_dir)?;
+    if !exclude_from_domain {
         if clean && impl_domain_dir.exists() {
             for entry in glob::glob(&format!("{}/**/*.rs", impl_domain_dir.display()))? {
                 match entry {
@@ -131,38 +120,75 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 };
             }
         }
-        fs::create_dir_all(&impl_domain_dir)?;
-        write_domain_db_rs(&domain_models_dir, db, &groups, force)?;
+        domain::base_domain::write_models_db_rs(&domain_models_dir, db, &groups, force)?;
+        domain::repositories::write_lib_rs(&domain_repositories_src_dir, db, &groups, force)?;
+        domain::repositories::write_cargo_toml(&domain_repositories_dir, db, &groups, force)?;
     }
 
     let file_path = model_src_dir.join("main.rs");
     if force || !file_path.exists() {
-        let tpl = template::MainTemplate { db };
+        #[derive(Template)]
+        #[template(path = "model/src/main.rs", escape = "none")]
+        struct MainTemplate<'a> {
+            pub db: &'a str,
+        }
+
+        let tpl = MainTemplate { db };
         fs_write(file_path, tpl.render()?)?;
     }
 
+    #[derive(Template)]
+    #[template(path = "model/src/seeder.rs", escape = "none")]
+    struct SeederTemplate<'a> {
+        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    }
+
     let file_path = model_src_dir.join("seeder.rs");
-    let tpl = template::SeederTemplate { groups: &groups };
+    let tpl = SeederTemplate { groups: &groups };
     fs_write(file_path, tpl.render()?)?;
 
+    #[derive(Template)]
+    #[template(path = "model/src/accessor.rs", escape = "none")]
+    struct AccessorTemplate {}
+
     let file_path = model_src_dir.join("accessor.rs");
-    let tpl = template::AccessorTemplate {};
+    let tpl = AccessorTemplate {};
     fs_write(file_path, tpl.render()?)?;
+
+    #[derive(Template)]
+    #[template(path = "model/src/cache.rs", escape = "none")]
+    struct CacheTemplate {}
 
     let file_path = model_src_dir.join("cache.rs");
     if !config.force_disable_cache {
-        let tpl = template::CacheTemplate {};
+        let tpl = CacheTemplate {};
         fs_write(file_path, tpl.render()?)?;
     } else if file_path.exists() {
         fs::remove_file(&file_path)?;
     }
 
+    #[derive(Template)]
+    #[template(path = "model/src/misc.rs", escape = "none")]
+    struct MiscTemplate<'a> {
+        pub config: &'a ConfigDef,
+    }
+
     let file_path = model_src_dir.join("misc.rs");
-    let tpl = template::MiscTemplate { config: &config };
+    let tpl = MiscTemplate { config: &config };
     fs_write(file_path, tpl.render()?)?;
 
+    #[derive(Template)]
+    #[template(path = "model/src/connection.rs", escape = "none")]
+    struct ConnectionTemplate<'a> {
+        pub db: &'a str,
+        pub config: &'a ConfigDef,
+        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub tx_isolation: Option<&'a str>,
+        pub read_tx_isolation: Option<&'a str>,
+    }
+
     let file_path = model_src_dir.join("connection.rs");
-    let tpl = template::ConnectionTemplate {
+    let tpl = ConnectionTemplate {
         db,
         config: &config,
         groups: &groups,
@@ -173,14 +199,12 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
 
     let path = model_dir.join("migrations");
     if !path.exists() {
-        fs::create_dir_all(&path)?;
         let file_path = path.join(".gitkeep");
         fs_write(file_path, "")?;
     }
 
     let path = model_dir.join("seeds");
     if !path.exists() {
-        fs::create_dir_all(&path)?;
         let file_path = path.join(".gitkeep");
         fs_write(file_path, "")?;
     }
@@ -194,10 +218,9 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             };
         }
     }
-    fs::create_dir_all(&model_models_dir)?;
 
     let domain_db_dir = domain_models_dir.join(db.to_case(Case::Snake));
-    if !exclude_domain {
+    if !exclude_from_domain {
         if clean && domain_db_dir.exists() {
             for entry in glob::glob(&format!("{}/**/*.rs", domain_db_dir.display()))? {
                 match entry {
@@ -206,7 +229,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 };
             }
         }
-        fs::create_dir_all(&domain_db_dir)?;
     }
 
     for (group_name, defs) in &groups {
@@ -221,15 +243,21 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             .collect();
 
         let model_group_dir = model_models_dir.join(group_name);
-        fs::create_dir_all(&model_group_dir)?;
-
         let model_group_base_dir = model_group_dir.join("_base");
-        fs::create_dir_all(&model_group_base_dir)?;
-
         let file_path = model_models_dir.join(format!("{}.rs", group_name));
         remove_files.remove(file_path.as_os_str());
         let concrete_models = defs.iter().filter(|(_k, v)| !v.abstract_mode).collect();
-        let tpl = template::GroupTemplate {
+
+        #[derive(Template)]
+        #[template(path = "model/src/group.rs", escape = "none")]
+        struct GroupTemplate<'a> {
+            pub group_name: &'a str,
+            pub mod_names: &'a BTreeSet<String>,
+            pub models: IndexMap<&'a String, &'a Arc<ModelDef>>,
+            pub config: &'a ConfigDef,
+        }
+
+        let tpl = GroupTemplate {
             group_name,
             mod_names: &mod_names,
             models: concrete_models,
@@ -237,8 +265,19 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         };
         fs_write(file_path, tpl.render()?)?;
 
-        if !exclude_domain {
-            write_domain_group_rs(
+        db::repositories::write_group_files(
+            &db_repositories_dir,
+            db,
+            group_name,
+            &groups,
+            &config,
+            force,
+            exclude_from_domain,
+            &mut remove_files,
+        )?;
+
+        if !exclude_from_domain {
+            domain::base_domain::write_group_rs(
                 &domain_db_dir,
                 group_name,
                 &entities_mod_names,
@@ -246,7 +285,17 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 force,
                 &mut remove_files,
             )?;
-            write_impl_domain_group_rs(
+            domain::repositories::write_group_files(
+                &domain_repositories_dir,
+                db,
+                group_name,
+                &entities_mod_names,
+                &groups,
+                force,
+                &mut remove_files,
+            )?;
+            MODELS.write().unwrap().replace(defs.clone());
+            db::impl_domain::write_group_rs(
                 &impl_domain_dir,
                 db,
                 group_name,
@@ -254,11 +303,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 force,
                 &mut remove_files,
             )?;
-        }
-
-        let domain_group_dir = domain_db_dir.join(group_name);
-        if !exclude_domain {
-            fs::create_dir_all(&domain_group_dir)?;
         }
         let visibility = if config.export_db_layer {
             ""
@@ -274,7 +318,20 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 let file_path = model_group_dir.join(format!("{}.rs", mod_name));
                 remove_files.remove(file_path.as_os_str());
                 if force || !file_path.exists() {
-                    let tpl = template::GroupAbstractTemplate {
+                    #[derive(Template)]
+                    #[template(path = "model/src/group/abstract.rs", escape = "none")]
+                    struct GroupAbstractTemplate<'a> {
+                        pub db: &'a str,
+                        pub group_name: &'a str,
+                        pub mod_name: &'a str,
+                        pub name: &'a str,
+                        pub pascal_name: &'a str,
+                        pub def: &'a Arc<ModelDef>,
+                        pub config: &'a ConfigDef,
+                        pub visibility: &'a str,
+                    }
+
+                    let tpl = GroupAbstractTemplate {
                         db,
                         group_name,
                         mod_name,
@@ -289,7 +346,23 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
 
                 let file_path = model_group_base_dir.join(format!("_{}.rs", mod_name));
                 remove_files.remove(file_path.as_os_str());
-                let tpl = template::GroupBaseAbstractTemplate {
+
+                #[derive(Template)]
+                #[template(path = "model/src/group/base/_abstract.rs", escape = "none")]
+                struct GroupBaseAbstractTemplate<'a> {
+                    pub db: &'a str,
+                    pub group_name: &'a str,
+                    pub mod_name: &'a str,
+                    pub name: &'a str,
+                    pub pascal_name: &'a str,
+                    pub id_name: &'a str,
+                    pub table_name: &'a str,
+                    pub def: &'a Arc<ModelDef>,
+                    pub config: &'a ConfigDef,
+                    pub visibility: &'a str,
+                }
+
+                let tpl = GroupBaseAbstractTemplate {
                     db,
                     group_name,
                     mod_name,
@@ -303,8 +376,8 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 };
                 fs_write(file_path, tpl.render()?)?;
 
-                if !exclude_domain {
-                    write_domain_abstract(
+                if !exclude_from_domain {
+                    domain::base_domain::write_abstract(
                         &domain_db_dir,
                         db,
                         group_name,
@@ -319,7 +392,21 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 let file_path = model_group_dir.join(format!("{}.rs", mod_name));
                 remove_files.remove(file_path.as_os_str());
                 if force || !file_path.exists() {
-                    let tpl = template::GroupTableTemplate {
+                    #[derive(Template)]
+                    #[template(path = "model/src/group/table.rs", escape = "none")]
+                    struct GroupTableTemplate<'a> {
+                        pub db: &'a str,
+                        pub group_name: &'a str,
+                        pub mod_name: &'a str,
+                        pub model_name: &'a str,
+                        pub pascal_name: &'a str,
+                        pub id_name: &'a str,
+                        pub def: &'a Arc<ModelDef>,
+                        pub config: &'a ConfigDef,
+                        pub visibility: &'a str,
+                    }
+
+                    let tpl = GroupTableTemplate {
                         db,
                         group_name,
                         mod_name,
@@ -355,11 +442,29 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                             cond.push(format!("!filter_digest.contains({:?})", v));
                         }
                         let idx = idx_map.get(index_name).unwrap();
-                        let idx = format!("{:?}", template::filters::_to_db_col(idx, true));
+                        let idx = format!("{:?}", filters::_to_db_col(idx, true));
                         force_indexes.push((cond.join(" && "), idx));
                     }
                 }
-                let tpl = template::GroupBaseTableTemplate {
+
+                #[derive(Template)]
+                #[template(path = "model/src/group/base/_table.rs", escape = "none")]
+                struct GroupBaseTableTemplate<'a> {
+                    pub db: &'a str,
+                    pub group_name: &'a str,
+                    pub mod_name: &'a str,
+                    pub model_name: &'a str,
+                    pub pascal_name: &'a str,
+                    pub id_name: &'a str,
+                    pub table_name: &'a str,
+                    pub def: &'a Arc<ModelDef>,
+                    pub force_indexes: Vec<(String, String)>,
+                    pub config: &'a ConfigDef,
+                    pub version_col: CompactString,
+                    pub visibility: &'a str,
+                }
+
+                let tpl = GroupBaseTableTemplate {
                     db,
                     group_name,
                     mod_name,
@@ -375,8 +480,8 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 };
                 fs_write(file_path, tpl.render()?)?;
 
-                if !exclude_domain {
-                    write_domain_entity(
+                if !exclude_from_domain {
+                    domain::base_domain::write_entity(
                         &domain_db_dir,
                         db,
                         group_name,
@@ -386,7 +491,17 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         def,
                         &mut remove_files,
                     )?;
-                    write_impl_domain_entity(
+                    domain::repositories::write_entity(
+                        &domain_repositories_dir,
+                        db,
+                        group_name,
+                        mod_name,
+                        force,
+                        model_name,
+                        def,
+                        &mut remove_files,
+                    )?;
+                    db::impl_domain::write_entity(
                         &impl_domain_dir,
                         db,
                         &config,
@@ -401,8 +516,9 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             }
         }
     }
-    if !exclude_domain {
-        write_domain_models_rs(&domain_src_dir, db)?;
+    if !exclude_from_domain {
+        domain::base_domain::write_models_rs(&base_domain_src_dir, db)?;
+        domain::write_repositories_rs(&domain_src_dir, db)?;
     }
     for file in &remove_files {
         println!("REMOVE:{}", file.to_string_lossy());
@@ -418,483 +534,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             }
         }
     }
-    Ok(())
-}
-
-fn write_value_objects_rs(file_path: &Path, mod_names: &BTreeMap<String, String>) -> Result<()> {
-    let tpl = template::DomainValueObjectModsTemplate { mod_names }.render()?;
-    let tpl = tpl.trim_start();
-    if file_path.exists() {
-        let content = fs::read_to_string(file_path)?;
-        let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
-        ensure!(
-            re.is_match(&content),
-            "File contents are invalid.: {:?}",
-            &file_path
-        );
-        let content = re.replace(&content, tpl);
-        fs_write(file_path, &*content)?;
-    } else {
-        fs_write(file_path, tpl)?;
-    }
-    Ok(())
-}
-
-fn write_domain_models_rs(domain_src_dir: &Path, db: &str) -> Result<()> {
-    let file_path = domain_src_dir.join("models.rs");
-    let mut content = if !file_path.exists() {
-        template::DomainModelsTemplate.render()?
-    } else {
-        fs::read_to_string(&file_path)?
-    };
-    let re = Regex::new(r"// Do not modify this line\. \(Mod:([_a-zA-Z0-9,]*)\)").unwrap();
-    let caps = re
-        .captures(&content)
-        .with_context(|| format!("Illegal file content:{}", &file_path.to_string_lossy()))?;
-    let mut all: BTreeSet<String> = caps
-        .get(1)
-        .unwrap()
-        .as_str()
-        .split(',')
-        .filter(|v| !v.is_empty())
-        .map(|v| v.to_string())
-        .collect();
-    if !all.contains(db) {
-        all.insert(db.to_string());
-        let all = all.iter().cloned().collect::<Vec<_>>().join(",");
-        let tpl = template::DomainModelsModTemplate { all, db }.render()?;
-        content = re.replace(&content, tpl.trim_start()).to_string();
-
-        let re = Regex::new(r"// Do not modify this line\. \(UseRepo\)").unwrap();
-        let tpl = template::DomainModelsUseRepoTemplate { db }.render()?;
-        content = re.replace(&content, tpl.trim_start()).to_string();
-
-        let re = Regex::new(r"// Do not modify this line\. \(Repo\)").unwrap();
-        let tpl = template::DomainModelsRepoTemplate { db }.render()?;
-        content = re.replace(&content, tpl.trim_start()).to_string();
-
-        let re = Regex::new(r"// Do not modify this line\. \(EmuRepo\)").unwrap();
-        let tpl = template::DomainModelsEmuRepoTemplate { db }.render()?;
-        content = re.replace(&content, tpl.trim_start()).to_string();
-
-        let re = Regex::new(r"// Do not modify this line\. \(EmuImpl\)").unwrap();
-        let tpl = template::DomainModelsEmuImplTemplate { db }.render()?;
-        content = re.replace(&content, tpl.trim_start()).to_string();
-
-        let re = Regex::new(r"// Do not modify this line\. \(EmuImplStart\)").unwrap();
-        let tpl = template::DomainModelsEmuImplStartTemplate { db }.render()?;
-        content = re.replace(&content, tpl.trim_start()).to_string();
-
-        let re = Regex::new(r"// Do not modify this line\. \(EmuImplCommit\)").unwrap();
-        let tpl = template::DomainModelsEmuImplCommitTemplate { db }.render()?;
-        content = re.replace(&content, tpl.trim_start()).to_string();
-
-        let re = Regex::new(r"// Do not modify this line\. \(EmuImplRollback\)").unwrap();
-        let tpl = template::DomainModelsEmuImplRollbackTemplate { db }.render()?;
-        content = re.replace(&content, tpl.trim_start()).to_string();
-    }
-
-    fs_write(&file_path, &*content)?;
-    Ok(())
-}
-
-fn write_domain_db_rs(
-    domain_models_dir: &Path,
-    db: &str,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
-    force: bool,
-) -> Result<()> {
-    let file_path = domain_models_dir.join(format!("{}.rs", &db.to_case(Case::Snake)));
-    let content = if force || !file_path.exists() {
-        template::DomainDbTemplate { db }.render()?
-    } else {
-        fs::read_to_string(&file_path)?
-    };
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainDbModTemplate { groups }.render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify up to this line. \(RepoEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainDbRepoTemplate { groups }.render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(QueriesStart\).+// Do not modify up to this line. \(QueriesEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::QueriesDbQueriesTemplate { groups }.render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuRepoStart\).+// Do not modify up to this line. \(EmuRepoEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainDbEmuRepoTemplate { groups }.render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuQueriesStart\).+// Do not modify up to this line. \(EmuQueriesEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainDbEmuQueriesTemplate { groups }.render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    fs_write(file_path, &*content)?;
-    Ok(())
-}
-
-fn write_impl_domain_db_rs(
-    model_src_dir: &Path,
-    db: &str,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
-    force: bool,
-) -> Result<()> {
-    let file_path = model_src_dir.join("impl_domain.rs");
-    let content = if force || !file_path.exists() {
-        template::ImplDomainDbTemplate { db }.render()?
-    } else {
-        fs::read_to_string(&file_path)?
-    };
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainDbModTemplate { groups }.render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify up to this line. \(RepoEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::ImplDomainDbRepoTemplate { groups }.render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(QueriesStart\).+// Do not modify up to this line. \(QueriesEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::ImplDomainDbQueriesTemplate { groups }.render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    fs_write(file_path, &*content)?;
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn write_domain_abstract(
-    domain_db_dir: &Path,
-    db: &str,
-    group_name: &String,
-    mod_name: &str,
-    force: bool,
-    model_name: &String,
-    def: &Arc<ModelDef>,
-    remove_files: &mut HashSet<OsString>,
-) -> Result<(), anyhow::Error> {
-    set_domain_mode(true);
-    let domain_group_dir = domain_db_dir.join(group_name);
-    fs::create_dir_all(&domain_group_dir)?;
-    let file_path = domain_group_dir.join(format!("{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
-    let pascal_name = &model_name.to_case(Case::Pascal);
-    if force || !file_path.exists() {
-        let tpl = template::DomainAbstractTemplate {
-            mod_name,
-            pascal_name,
-            def,
-        };
-        fs_write(file_path, tpl.render()?)?;
-    }
-    let domain_group_base_dir = domain_group_dir.join("_base");
-    fs::create_dir_all(&domain_group_base_dir)?;
-    let file_path = domain_group_base_dir.join(format!("_{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
-    let tpl = template::DomainBaseAbstractTemplate {
-        db,
-        group_name,
-        mod_name,
-        pascal_name,
-        def,
-    };
-    fs_write(file_path, tpl.render()?)?;
-    set_domain_mode(false);
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn write_domain_entity(
-    domain_db_dir: &Path,
-    db: &str,
-    group_name: &String,
-    mod_name: &str,
-    force: bool,
-    model_name: &String,
-    def: &Arc<ModelDef>,
-    remove_files: &mut HashSet<OsString>,
-) -> Result<(), anyhow::Error> {
-    set_domain_mode(true);
-    let domain_group_dir = domain_db_dir.join(group_name);
-    fs::create_dir_all(&domain_group_dir)?;
-    let file_path = domain_group_dir.join(format!("{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
-    let pascal_name = &model_name.to_case(Case::Pascal);
-    let id_name = &to_id_name(model_name);
-    let model_id: u64 = if let Some(model_id) = def.model_id {
-        model_id
-    } else {
-        use crc::{CRC_64_ECMA_182, Crc};
-        pub const CRC64: Crc<u64> = Crc::<u64>::new(&CRC_64_ECMA_182);
-        CRC64.checksum(format!("{db}:{group_name}:{mod_name}").as_bytes())
-    };
-    if force || !file_path.exists() {
-        let tpl = template::DomainEntityTemplate {
-            db,
-            group_name,
-            mod_name,
-            pascal_name,
-            id_name,
-            def,
-            model_id,
-        };
-        fs_write(file_path, tpl.render()?)?;
-    }
-    let domain_group_base_dir = domain_group_dir.join("_base");
-    fs::create_dir_all(&domain_group_base_dir)?;
-    let file_path = domain_group_base_dir.join(format!("_{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
-    let tpl = template::DomainBaseEntityTemplate {
-        db,
-        group_name,
-        mod_name,
-        model_name,
-        pascal_name,
-        id_name,
-        def,
-    };
-    fs_write(file_path, tpl.render()?)?;
-    set_domain_mode(false);
-    Ok(())
-}
-
-fn write_domain_group_rs(
-    domain_db_dir: &Path,
-    group_name: &String,
-    entities_mod_names: &BTreeSet<(String, &String)>,
-    mod_names: &BTreeSet<String>,
-    force: bool,
-    remove_files: &mut HashSet<OsString>,
-) -> Result<()> {
-    let file_path = domain_db_dir.join(format!("{}.rs", group_name));
-    remove_files.remove(file_path.as_os_str());
-    let content = if force || !file_path.exists() {
-        template::DomainGroupTemplate { group_name }.render()?
-    } else {
-        fs::read_to_string(&file_path)?
-    };
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainGroupModTemplate { mod_names }.render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify up to this line. \(RepoEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainGroupRepoTemplate {
-        mod_names: entities_mod_names,
-    }
-    .render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(QueriesStart\).+// Do not modify up to this line. \(QueriesEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainGroupQueriesTemplate {
-        mod_names: entities_mod_names,
-    }
-    .render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuRepoStart\).+// Do not modify up to this line. \(EmuRepoEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainGroupEmuRepoTemplate {
-        mod_names: entities_mod_names,
-    }
-    .render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuQueriesStart\).+// Do not modify up to this line. \(EmuQueriesEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainGroupEmuQueriesTemplate {
-        mod_names: entities_mod_names,
-    }
-    .render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    fs_write(file_path, &*content)?;
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn write_impl_domain_entity(
-    impl_domain_dir: &Path,
-    db: &str,
-    config: &ConfigDef,
-    group_name: &String,
-    mod_name: &str,
-    force: bool,
-    model_name: &String,
-    def: &Arc<ModelDef>,
-    remove_files: &mut HashSet<OsString>,
-) -> Result<(), anyhow::Error> {
-    set_domain_mode(true);
-    let impl_domain_group_dir = impl_domain_dir.join(group_name);
-    fs::create_dir_all(&impl_domain_group_dir)?;
-    let file_path = impl_domain_group_dir.join(format!("{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
-    let pascal_name = &model_name.to_case(Case::Pascal);
-    let id_name = &to_id_name(model_name);
-    if force || !file_path.exists() {
-        let tpl = template::ImplDomainEntityTemplate {
-            db,
-            group_name,
-            mod_name,
-            pascal_name,
-            id_name,
-            def,
-        };
-        fs_write(file_path, tpl.render()?)?;
-    }
-    let path = impl_domain_group_dir.join("_base");
-    fs::create_dir_all(&path)?;
-    let file_path = path.join(format!("_{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
-    let tpl = template::ImplDomainBaseEntityTemplate {
-        db,
-        config,
-        group_name,
-        mod_name,
-        pascal_name,
-        id_name,
-        def,
-    };
-    fs_write(file_path, tpl.render()?)?;
-    set_domain_mode(false);
-    Ok(())
-}
-
-fn write_impl_domain_group_rs(
-    impl_domain_dir: &Path,
-    db: &str,
-    group_name: &String,
-    entities_mod_names: &BTreeSet<(String, &String)>,
-    force: bool,
-    remove_files: &mut HashSet<OsString>,
-) -> Result<()> {
-    let file_path = impl_domain_dir.join(format!("{}.rs", group_name));
-    remove_files.remove(file_path.as_os_str());
-    let content = if force || !file_path.exists() {
-        template::ImplDomainGroupTemplate { db, group_name }.render()?
-    } else {
-        fs::read_to_string(&file_path)?
-    };
-
-    let mod_names: BTreeSet<String> = entities_mod_names.iter().map(|v| v.0.clone()).collect();
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::DomainGroupModTemplate {
-        mod_names: &mod_names,
-    }
-    .render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify up to this line. \(RepoEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::ImplDomainGroupRepoTemplate {
-        mod_names: entities_mod_names,
-    }
-    .render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(QueriesStart\).+// Do not modify up to this line. \(QueriesEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-    let tpl = template::ImplDomainGroupQueriesTemplate {
-        mod_names: entities_mod_names,
-    }
-    .render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
-
-    fs_write(file_path, &*content)?;
     Ok(())
 }
 

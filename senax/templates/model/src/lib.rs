@@ -22,14 +22,14 @@ use tokio::{
 };
 
 #[rustfmt::skip]
-mod accessor;
+pub mod accessor;
 @%- if !config.force_disable_cache %@
 #[rustfmt::skip]
 pub mod cache;
 @%- endif %@
 #[rustfmt::skip]
 pub mod connection;
-@%- if !config.excluded_from_domain %@
+@%- if !config.exclude_from_domain %@
 #[allow(clippy::module_inception)]
 pub mod impl_domain;
 @%- endif %@
@@ -41,42 +41,36 @@ pub mod models;
 #[rustfmt::skip]
 pub mod seeder;
 
-pub(crate) use models::{CacheMsg, CacheOp};
+pub use models::{CacheMsg, CacheOp};
 
 @% if !config.force_disable_cache -%@
 use cache::Cache;
 @%- endif %@
 pub use connection::DbConn;
 
-#[allow(dead_code)]
-const DB_NAME: &str = "@{ db }@";
-#[allow(dead_code)]
-const DB_UPPER_NAME: &str = "@{ db|upper_snake }@";
-#[allow(dead_code)]
-const DB_ID: u64 = @{ config.db_id() }@;
-const IN_CONDITION_LIMIT: usize = 500;
-const UNION_LIMIT: usize = 100;
-#[allow(dead_code)]
-const STREAM_CHUNK_SIZE: usize = 50;
+pub const DB_NAME: &str = "@{ db }@";
+pub const DB_UPPER_NAME: &str = "@{ db|upper_snake }@";
+pub const DB_ID: u64 = @{ config.db_id() }@;
+pub const IN_CONDITION_LIMIT: usize = 500;
+pub const UNION_LIMIT: usize = 100;
+pub const STREAM_CHUNK_SIZE: usize = 50;
 @%- if !config.force_disable_cache %@
-#[allow(dead_code)]
-const CACHE_DB_DIR: &str = "cache/@{ db|snake }@";
+pub const CACHE_DB_DIR: &str = "cache/@{ db|snake }@";
 @%- endif %@
-const DELAYED_DB_DIR: &str = "delayed/@{ db|snake }@";
-const DEFAULT_DB_MAX_CONNECTIONS_FOR_WRITE: &str = "50";
-const DEFAULT_DB_MAX_CONNECTIONS_FOR_READ: &str = "100";
-const DEFAULT_DB_MAX_CONNECTIONS_FOR_CACHE: &str = "50";
-#[allow(dead_code)]
-const DEFAULT_SEQUENCE_FETCH_NUM: &str = "1000";
-const CONNECT_CHECK_INTERVAL: u64 = 10;
-const CHECK_CONNECTION_TIMEOUT: u64 = 8;
-const ACQUIRE_CONNECTION_WAIT_TIME: u64 = 10;
+pub const DELAYED_DB_DIR: &str = "delayed/@{ db|snake }@";
+pub const DEFAULT_DB_MAX_CONNECTIONS_FOR_WRITE: &str = "50";
+pub const DEFAULT_DB_MAX_CONNECTIONS_FOR_READ: &str = "100";
+pub const DEFAULT_DB_MAX_CONNECTIONS_FOR_CACHE: &str = "50";
+pub const DEFAULT_SEQUENCE_FETCH_NUM: &str = "1000";
+pub const CONNECT_CHECK_INTERVAL: u64 = 10;
+pub const CHECK_CONNECTION_TIMEOUT: u64 = 8;
+pub const ACQUIRE_CONNECTION_WAIT_TIME: u64 = 10;
 
 static SHUTDOWN_GUARD: OnceCell<Weak<mpsc::Sender<u8>>> = OnceCell::new();
 static EXIT: OnceCell<mpsc::Sender<i32>> = OnceCell::new();
 static SYS_STOP: AtomicBool = AtomicBool::new(false);
 static TEST_MODE: AtomicBool = AtomicBool::new(false);
-static BULK_INSERT_MAX_SIZE: OnceCell<usize> = OnceCell::new();
+pub static BULK_INSERT_MAX_SIZE: OnceCell<usize> = OnceCell::new();
 static LINKER_SENDER: OnceCell<linker::Sender<CacheMsg>> = OnceCell::new();
 static UUID_NODE: OnceCell<[u8; 6]> = OnceCell::new();
 
@@ -216,12 +210,11 @@ pub fn stop() {
     @%- endif %@
 }
 
-#[allow(dead_code)]
-pub(crate) fn is_stopped() -> bool {
+pub fn is_stopped() -> bool {
     SYS_STOP.load(Ordering::SeqCst)
 }
 
-pub(crate) fn get_shutdown_guard() -> Option<Arc<mpsc::Sender<u8>>> {
+pub fn get_shutdown_guard() -> Option<Arc<mpsc::Sender<u8>>> {
     if let Some(guard) = SHUTDOWN_GUARD.get() {
         guard.upgrade()
     } else {

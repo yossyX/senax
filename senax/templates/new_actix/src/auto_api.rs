@@ -5,7 +5,7 @@ use anyhow::{ensure, Context};
 use async_graphql::http::GraphiQLSource;
 use async_graphql::{EmptySubscription, Error, ErrorExtensions, Object, Schema};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
-use domain::models::Repositories;
+use domain::repository::Repository;
 use regex::Regex;
 use std::collections::BTreeMap;
 #[allow(unused_imports)]
@@ -14,14 +14,14 @@ use validator::ValidationErrors;
 @%- if session %@
 
 #[allow(unused_imports)]
-pub use db_session::models::session::session::{_SessionStore, SESSION_ROLE};
+pub use db_session_session::repositories::session::session::{_SessionStore, SESSION_ROLE};
 #[allow(unused_imports)]
 pub use senax_actix_session::Session;
 @%- endif %@
 
 use crate::auth::{AuthInfo, Role};
 use crate::context::Ctx;
-use crate::db::RepositoriesImpl;
+use crate::db::RepositoryImpl;
 
 // Do not modify this line. (ApiDbMod)
 
@@ -211,7 +211,7 @@ pub async fn graphql(
     let result: anyhow::Result<async_graphql::Response> = async move {
         let auth = AuthInfo::retrieve(&http_req).unwrap_or_default();
         let ctx = Ctx::get(&http_req);
-        let repo = RepositoriesImpl::new_with_ctx(&ctx);
+        let repo = RepositoryImpl::new_with_ctx(&ctx);
         repo.begin().await?;
         let request = req.into_inner().data(repo.clone()).data(ctx).data(auth);
         let res = schema.execute(request).await;

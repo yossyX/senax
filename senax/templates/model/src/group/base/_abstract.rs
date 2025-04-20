@@ -56,7 +56,7 @@ impl From<Option<_@{ name|pascal }@>> for BindValue {
         Self::Enum(val.map(|t| t.inner() as i64))
     }
 }
-@%- if !config.excluded_from_domain %@
+@%- if !config.exclude_from_domain %@
 @%- let a = crate::schema::set_domain_mode(true) %@
 impl From<@{ column_def.get_filter_type(true) }@> for _@{ name|pascal }@ {
     fn from(v: @{ column_def.get_filter_type(true) }@) -> Self {
@@ -99,7 +99,7 @@ impl _@{ name|pascal }@ {
     }
 @%- endfor %@
 }
-@%- if !config.excluded_from_domain %@
+@%- if !config.exclude_from_domain %@
 @%- let a = crate::schema::set_domain_mode(true) %@
 impl From<@{ column_def.get_filter_type(true) }@> for _@{ name|pascal }@ {
     fn from(v: @{ column_def.get_filter_type(true) }@) -> Self {

@@ -298,7 +298,7 @@ fn make_model(
         },
         gql_name,
         label: def.label.clone(),
-        pk: crate::model_generator::template::filters::fmt_join(
+        pk: crate::filters::fmt_join(
             def.primaries(),
             "{var}: {gql_type}",
             ",",

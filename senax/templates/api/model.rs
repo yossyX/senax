@@ -7,7 +7,7 @@ use async_graphql::types::connection as graphql_conn;
 use async_graphql::ErrorExtensions as _;
 #[allow(unused_imports)]
 use async_graphql::GuardExt as _;
-use domain::models::Repositories as _;
+use domain::repository::Repository as _;
 #[allow(unused_imports)]
 use domain::value_objects;
 #[allow(unused_imports)]
@@ -19,7 +19,7 @@ use std::collections::HashMap;
 #[allow(unused_imports)]
 use validator::Validate as _;
 
-use crate::db::RepositoriesImpl;
+use crate::db::RepositoryImpl;
 use crate::{auth::AuthInfo, auto_api::GqlError};
 #[allow(unused_imports)]
 use crate::{
@@ -32,32 +32,30 @@ use crate::{
 
 async fn find(
     gql_ctx: &async_graphql::Context<'_>,
-    repo: &RepositoriesImpl,
+    repo: &dyn _QueryService,
     auth: &AuthInfo,
     primary: &_domain_::@{ pascal_name }@Primary,
 ) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
-    let @{ db|snake }@_query = repo.@{ db|snake }@_query();
-    @{ db|snake }@_query.begin_read_tx().await?;
-    let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+    repo.begin_read_tx().await?;
+    let @{ mod_name }@_repo = repo.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
     let result = @{ mod_name }@_repo
         .find(primary.clone().into())
         .join(joiner(gql_ctx.look_ahead(), auth)?)
         .filter(readable_filter(auth)?)
         .query()
         .await;
-    @{ db|snake }@_query.release_read_tx().await?;
+    repo.release_read_tx().await?;
     result
 }
 @#-
 
 async fn find_for_update(
     gql_ctx: &async_graphql::Context<'_>,
-    repo: &RepositoriesImpl,
+    repo: &dyn _Repository,
     auth: &AuthInfo,
     primary: &_domain_::@{ pascal_name }@Primary,
 ) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@>>> {
-    let @{ db|snake }@_query = repo.@{ db|snake }@_repository();
-    let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
     @{ mod_name }@_repo
         .find(primary.clone().into())
         .join(joiner(gql_ctx.look_ahead(), auth)?)
@@ -68,15 +66,15 @@ async fn find_for_update(
 #@
 
 async fn delete(
-    repo: &RepositoriesImpl,
+    repo: &dyn _Repository,
     auth: &AuthInfo,
     primary: _domain_::@{ mod_name|pascal }@Primary,
 ) -> anyhow::Result<()> {
-    let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
     let mut query = @{ mod_name }@_repo.find(primary.into());
     query = query.filter(deletable_filter(auth)?);
     let obj = query.query_for_update().await?;
-    _domain_::delete(repo, obj).await?;
+    _repository_::delete(repo.@{ group|to_var_name }@().as_ref(), obj).await?;
     Ok(())
 }
 
@@ -120,7 +118,7 @@ impl GqlQuery@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
     ) -> async_graphql::Result<Vec<ResObj>> {
-        let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
+        let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let @{ db|snake }@_query = repo.@{ db|snake }@_query();
         @{ db|snake }@_query.begin_read_tx().await?;
@@ -150,10 +148,10 @@ impl GqlQuery@{ graphql_name }@ {
         #[graphql(name = \"{raw_var}\")] {var}: {inner},", "") }@
         @%- endif %@
     ) -> async_graphql::Result<ResObj> {
-        let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
+        let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, repo.@{ db|snake }@_query().as_ref(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -163,10 +161,10 @@ impl GqlQuery@{ graphql_name }@ {
         gql_ctx: &async_graphql::Context<'_>,
         #[graphql(name = "_id")] _id: async_graphql::ID,
     ) -> async_graphql::Result<ResObj> {
-        let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
+        let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, repo.@{ db|snake }@_query().as_ref(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
@@ -204,7 +202,7 @@ impl GqlQuery@{ graphql_name }@ {
         #[allow(clippy::let_unit_value)]
         async fn _fetch(
             gql_ctx: &async_graphql::Context<'_>,
-            repo: &RepositoriesImpl,
+            repo: &RepositoryImpl,
             auth: &AuthInfo,
             after: &Option<String>,
             before: &Option<String>,
@@ -306,7 +304,7 @@ impl GqlQuery@{ graphql_name }@ {
             first,
             last,
             |after: Option<String>, before: Option<String>, first, last| async move {
-                let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
+                let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
                 let auth: &AuthInfo = gql_ctx.data()?;
                 let order = order.unwrap_or_default();
                 let (mut list, previous, limit) = crate::gql_@{ db_route|snake }@_selector!(
@@ -360,11 +358,11 @@ impl GqlQuery@{ graphql_name }@ {
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
         }
         @%- endif %@
-        let repo = RepositoriesImpl::new_with_ctx(gql_ctx.data()?);
+        let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         
         async fn _count(
-            repo: &RepositoriesImpl,
+            repo: &RepositoryImpl,
             auth: &AuthInfo,
             @%- if selector_def.filter_is_required() %@
             filter: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
@@ -415,7 +413,7 @@ impl GqlMutation@{ graphql_name }@ {
         #[graphql(name = \"{raw_var}\")] {var}: {inner},", "") }@
         @%- endif %@
     ) -> async_graphql::Result<ResObj> {
-        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
         crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
@@ -428,7 +426,7 @@ impl GqlMutation@{ graphql_name }@ {
         gql_ctx: &async_graphql::Context<'_>,
         #[graphql(name = "_id")] _id: async_graphql::ID,
     ) -> async_graphql::Result<ResObj> {
-        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
         crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
@@ -442,11 +440,11 @@ impl GqlMutation@{ graphql_name }@ {
         gql_ctx: &async_graphql::Context<'_>,
         data: ReqObj,
     ) -> async_graphql::Result<ResObj> {
-        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         data.validate()
             .map_err(|e| GqlError::ValidationError(e).extend())?;
-        let obj = _domain_::create(repo, create_entity(data, repo, auth))
+        let obj = _repository_::create(repo.@{ db|snake }@_repository().@{ group|to_var_name }@().as_ref(), create_entity(data, repo.@{ db|snake }@_repository().as_ref(), auth))
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(ResObj::try_from_(&*obj, auth, None)?)
@@ -463,7 +461,7 @@ impl GqlMutation@{ graphql_name }@ {
         option: Option<domain::models::ImportOption>,
         @%- endif %@
     ) -> async_graphql::Result<bool> {
-        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let mut errors = std::collections::BTreeMap::new();
         for (idx, data) in list.iter().enumerate() {
@@ -519,7 +517,7 @@ impl GqlMutation@{ graphql_name }@ {
         gql_ctx: &async_graphql::Context<'_>,
         data: ReqObj,
     ) -> async_graphql::Result<ResObj> {
-        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         data.validate()
             .map_err(|e| GqlError::ValidationError(e).extend())?;
@@ -540,7 +538,7 @@ impl GqlMutation@{ graphql_name }@ {
             .query_for_update()
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-        let obj = _domain_::update(repo, obj, |obj| update_updater(&mut *obj, data, repo, auth))
+        let obj = _repository_::update(repo.@{ db|snake }@_repository().@{ group|to_var_name }@().as_ref(), obj, |obj| update_updater(&mut *obj, data, repo, auth))
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(ResObj::try_from_(&*obj, auth, None)?)
@@ -559,9 +557,9 @@ impl GqlMutation@{ graphql_name }@ {
         #[graphql(name = \"{raw_var}\")] {var}: {inner},", "") }@
         @%- endif %@
     ) -> async_graphql::Result<bool> {
-        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        delete(repo, auth, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into()).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
+        delete(repo.@{ db|snake }@_repository().as_ref(), auth, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into()).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(true)
     }
     @%- endif %@
@@ -572,9 +570,9 @@ impl GqlMutation@{ graphql_name }@ {
         gql_ctx: &async_graphql::Context<'_>,
         #[graphql(name = "_id")] _id: async_graphql::ID,
     ) -> async_graphql::Result<bool> {
-        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        delete(repo, auth, (&_id).try_into()?).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
+        delete(repo.@{ db|snake }@_repository().as_ref(), auth, (&_id).try_into()?).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(true)
     }
     @%- for (selector, selector_def) in def.selectors %@
@@ -603,7 +601,7 @@ impl GqlMutation@{ graphql_name }@ {
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
         }
         @%- endif %@
-        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let repo: &RepositoryImpl = gql_ctx.data()?;
         if create_if_empty {
             repo.@{ db|snake }@_repository()
                 .lock(&format!("@{ group }@.@{ mod_name }@.{}", serde_json::to_string(&filter)?), 10)
@@ -695,7 +693,7 @@ impl GqlMutation@{ graphql_name }@ {
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
         }
         @%- endif %@
-        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let ctx: &crate::context::Ctx = gql_ctx.data()?;
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
@@ -750,7 +748,7 @@ impl GqlMutation@{ graphql_name }@ {
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
         }
         @%- endif %@
-        let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
@@ -839,7 +837,7 @@ async fn @{ selector }@_handler(
 
     #[allow(clippy::let_unit_value)]
     async fn _fetch(
-        repo: &RepositoriesImpl,
+        repo: &RepositoryImpl,
         auth: &AuthInfo,
         data: &@{ selector|pascal }@Request,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> + Send>>>
@@ -901,7 +899,7 @@ async fn @{ selector }@_handler(
                 .map_err(ApiError::ValidationError)?;
         }
         @%- endif %@
-        let repo = RepositoriesImpl::new_with_ctx(&ctx);
+        let repo = RepositoryImpl::new_with_ctx(&ctx);
         let stream = crate::api_@{ db_route|snake }@_selector!(_fetch(&repo, &auth, &data), repo);
         let order = data.order.unwrap_or_default();
         let stream = stream.map(move |obj| {
@@ -932,7 +930,7 @@ async fn count_@{ selector }@_handler(
     use crate::response::ApiError;
 
     async fn _count(
-        repo: &RepositoriesImpl,
+        repo: &RepositoryImpl,
         auth: &AuthInfo,
         @%- if selector_def.filter_is_required() %@
         filter: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
@@ -971,7 +969,7 @@ async fn count_@{ selector }@_handler(
                 .map_err(ApiError::ValidationError)?;
         }
         @%- endif %@
-        let repo = RepositoriesImpl::new_with_ctx(&ctx);
+        let repo = RepositoryImpl::new_with_ctx(&ctx);
         Ok(crate::api_@{ db_route|snake }@_selector!(_count(&repo, &auth, &filter), repo))
     }
     .await;

@@ -6,16 +6,10 @@ use crate::common::fs_write;
 pub fn generate(name: &str, server: &str, _force: bool) -> Result<()> {
     anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
     let name = crate::common::check_ascii_name(name).to_string();
-    fs::create_dir_all(&name)?;
 
     for f in crate::TEMPLATES.file_names() {
         if f.starts_with("templates/client/") {
             let path = Path::new(&name).join(f.trim_start_matches("templates/client/"));
-            if let Some(parent) = path.parent() {
-                if !parent.eq(Path::new("")) {
-                    fs::create_dir_all(parent)?;
-                }
-            }
             let buf = crate::TEMPLATES.get(f)?;
             if f.eq("templates/client/package.json") {
                 let buf = std::str::from_utf8(buf.as_ref())?;

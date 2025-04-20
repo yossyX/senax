@@ -113,6 +113,11 @@ pub fn fs_write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<
             true
         };
         if update {
+            if let Some(parent) = path.parent() {
+                if !parent.eq(Path::new("")) && !parent.exists() {
+                    fs::create_dir_all(parent)?;
+                }
+            }
             let mut last_path = LAST_PATH.lock().unwrap();
             let path_str = path.display().to_string();
             if !path_str.eq(last_path.as_str()) {
@@ -443,7 +448,7 @@ pub fn write_api_yml(
         "# yaml-language-server: $schema=../../../senax-schema.json#properties/api_model\n\n"
             .to_string();
     buf.push_str(&simplify_yml(serde_yaml::to_string(&data)?)?);
-    fs::write(path, &buf)?;
+    fs_write(path, &buf)?;
     Ok(())
 }
 

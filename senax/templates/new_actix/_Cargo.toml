@@ -14,6 +14,7 @@ graphiql = []
 
 [dependencies]
 @%- if session %@
+db_session_session = { path = "../2_db/session/repositories/session" }
 db_session = { path = "../2_db/session" }
 @%- endif %@
 

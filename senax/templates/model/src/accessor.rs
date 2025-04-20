@@ -2,12 +2,12 @@
 
 #![allow(dead_code)]
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use derive_more::Display;
 use log::kv::ToValue;
 use num_traits::{CheckedAdd, CheckedSub, Float, SaturatingAdd, SaturatingSub};
 use rust_decimal::Decimal;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::borrow::Borrow;
 use std::fmt::Debug;
@@ -21,7 +21,7 @@ use crate::misc::{JsonBlob, ToJsonBlob as _, Updater};
     Serialize_repr, Deserialize_repr, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash,
 )]
 #[repr(u8)]
-pub(crate) enum Op {
+pub enum Op {
     #[default]
     None,
     Skip,
@@ -171,28 +171,17 @@ impl Op {
     }
 }
 
-#[allow(unused_macros)]
-macro_rules! assign_sql_no_cache_update {
-    ( $obj:ident, $vec:ident, $col:ident, $name:expr, $nullable:expr, $ph:expr ) => {
-        if $obj._op.$col != Op::None && $obj._op.$col != Op::Skip {
-            $vec.push($obj._op.$col.get_sql($name, $nullable, $ph));
-        }
-    };
+pub trait AccessorForDb<I> {
+    fn _set(op: Op, prop: &mut I, update: &I);
+    fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result;
+    fn _write_update(
+        f: &mut fmt::Formatter<'_>,
+        comma: &str,
+        col: &str,
+        op: Op,
+        value: &I,
+    ) -> fmt::Result;
 }
-#[allow(unused_imports)]
-pub(crate) use assign_sql_no_cache_update;
-
-#[allow(unused_macros)]
-macro_rules! assign_sql {
-    ( $obj:ident, $vec:ident, $col:ident, $name:expr, $nullable:expr, $update_cache: ident, $ph:expr ) => {
-        if $obj._op.$col != Op::None && $obj._op.$col != Op::Skip {
-            $vec.push($obj._op.$col.get_sql($name, $nullable, $ph));
-            $update_cache = true;
-        }
-    };
-}
-#[allow(unused_imports)]
-pub(crate) use assign_sql;
 
 pub(crate) struct Empty;
 impl Empty {
@@ -268,17 +257,19 @@ where
     }
     pub fn mark_for_skip(&self) {}
     pub fn mark_for_set(&mut self) {}
-
-    pub(crate) fn _write_insert(
-        f: &mut fmt::Formatter<'_>,
-        comma: &str,
-        col: &str,
-        value: &I,
-    ) -> fmt::Result {
+}
+impl<I: Clone + Debug, O> AccessorForDb<I> for AccessorPrimary<'_, I, O>
+where
+    O: From<I>,
+{
+    fn _set(_op: Op, _prop: &mut I, _update: &I) {
+        unimplemented!("_set is unimplemented")
+    }
+    fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result {
         write!(f, "{comma}{col}: {:?}", value)
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -319,22 +310,23 @@ where
         *self.val = val.clone();
         *self.update = val;
     }
-    pub(crate) fn _set(op: Op, prop: &mut I, update: &I) {
+}
+impl<I: Clone + Debug, O> AccessorForDb<I> for AccessorNotNull<'_, I, O>
+where
+    I: From<O>,
+    O: From<I>,
+{
+    fn _set(op: Op, prop: &mut I, update: &I) {
         if op == Op::Set {
             *prop = update.clone();
         }
     }
 
-    pub(crate) fn _write_insert(
-        f: &mut fmt::Formatter<'_>,
-        comma: &str,
-        col: &str,
-        value: &I,
-    ) -> fmt::Result {
+    fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result {
         write!(f, "{comma}{col}: {:?}", value)
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -347,6 +339,7 @@ where
         Ok(())
     }
 }
+
 pub struct AccessorNull<'a, I: Clone + Debug, O>
 where
     I: From<O>,
@@ -382,13 +375,19 @@ where
         *self.val = None;
         *self.update = None;
     }
-    pub(crate) fn _set(op: Op, prop: &mut Option<I>, update: &Option<I>) {
+}
+impl<I: Clone + Debug, O> AccessorForDb<Option<I>> for AccessorNull<'_, I, O>
+where
+    I: From<O>,
+    O: From<I>,
+{
+    fn _set(op: Op, prop: &mut Option<I>, update: &Option<I>) {
         if op == Op::Set {
             prop.clone_from(update);
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -401,7 +400,7 @@ where
         }
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -440,13 +439,15 @@ impl AccessorNotNullBool<'_> {
         *self.val = val.into();
         *self.update = val.into();
     }
-    pub(crate) fn _set(op: Op, prop: &mut i8, update: &i8) {
+}
+impl AccessorForDb<i8> for AccessorNotNullBool<'_> {
+    fn _set(op: Op, prop: &mut i8, update: &i8) {
         if op == Op::Set {
             *prop = *update;
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -455,7 +456,7 @@ impl AccessorNotNullBool<'_> {
         write!(f, "{comma}{col}: {:?}", value)
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -468,6 +469,7 @@ impl AccessorNotNullBool<'_> {
         Ok(())
     }
 }
+
 pub struct AccessorNullBool<'a> {
     pub(crate) op: &'a mut Op,
     pub(crate) val: &'a mut Option<i8>,
@@ -495,13 +497,15 @@ impl AccessorNullBool<'_> {
         *self.val = None;
         *self.update = None;
     }
-    pub(crate) fn _set(op: Op, prop: &mut Option<i8>, update: &Option<i8>) {
+}
+impl AccessorForDb<Option<i8>> for AccessorNullBool<'_> {
+    fn _set(op: Op, prop: &mut Option<i8>, update: &Option<i8>) {
         if op == Op::Set {
             *prop = *update;
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -514,7 +518,7 @@ impl AccessorNullBool<'_> {
         }
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -554,13 +558,15 @@ impl<I: Debug> AccessorNotNullArc<'_, I> {
         *self.val = v.clone();
         *self.update = v;
     }
-    pub(crate) fn _set(op: Op, prop: &mut Arc<I>, update: &Arc<I>) {
+}
+impl<I: Debug> AccessorForDb<Arc<I>> for AccessorNotNullArc<'_, I> {
+    fn _set(op: Op, prop: &mut Arc<I>, update: &Arc<I>) {
         if op == Op::Set {
             *prop = update.clone();
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -569,7 +575,7 @@ impl<I: Debug> AccessorNotNullArc<'_, I> {
         write!(f, "{comma}{col}: {:?}", value.as_ref())
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -582,6 +588,7 @@ impl<I: Debug> AccessorNotNullArc<'_, I> {
         Ok(())
     }
 }
+
 pub struct AccessorNullArc<'a, I: Debug> {
     pub(crate) op: &'a mut Op,
     pub(crate) val: &'a mut Option<Arc<I>>,
@@ -609,13 +616,15 @@ impl<I: Debug> AccessorNullArc<'_, I> {
         *self.val = None;
         *self.update = None;
     }
-    pub(crate) fn _set(op: Op, prop: &mut Option<Arc<I>>, update: &Option<Arc<I>>) {
+}
+impl<I: Debug> AccessorForDb<Option<Arc<I>>> for AccessorNullArc<'_, I> {
+    fn _set(op: Op, prop: &mut Option<Arc<I>>, update: &Option<Arc<I>>) {
         if op == Op::Set {
             prop.clone_from(update);
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -628,7 +637,7 @@ impl<I: Debug> AccessorNullArc<'_, I> {
         }
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -668,13 +677,17 @@ impl<I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'_, I> {
         *self.val = v.clone();
         *self.update = v;
     }
-    pub(crate) fn _set(op: Op, prop: &mut JsonBlob, update: &JsonBlob) {
+}
+impl<I: Serialize + DeserializeOwned + Default> AccessorForDb<JsonBlob>
+    for AccessorNotNullJson<'_, I>
+{
+    fn _set(op: Op, prop: &mut JsonBlob, update: &JsonBlob) {
         if op == Op::Set {
             *prop = update.clone();
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -683,7 +696,7 @@ impl<I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'_, I> {
         write!(f, "{comma}{col}: {:?}", value)
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -696,6 +709,7 @@ impl<I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'_, I> {
         Ok(())
     }
 }
+
 pub struct AccessorNullJson<'a, I: Serialize + DeserializeOwned> {
     pub(crate) op: &'a mut Op,
     pub(crate) val: &'a mut Option<JsonBlob>,
@@ -723,13 +737,15 @@ impl<I: Serialize + DeserializeOwned> AccessorNullJson<'_, I> {
         *self.val = None;
         *self.update = None;
     }
-    pub(crate) fn _set(op: Op, prop: &mut Option<JsonBlob>, update: &Option<JsonBlob>) {
+}
+impl<I: Serialize + DeserializeOwned> AccessorForDb<Option<JsonBlob>> for AccessorNullJson<'_, I> {
+    fn _set(op: Op, prop: &mut Option<JsonBlob>, update: &Option<JsonBlob>) {
         if op == Op::Set {
             prop.clone_from(update);
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -742,7 +758,7 @@ impl<I: Serialize + DeserializeOwned> AccessorNullJson<'_, I> {
         }
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -782,13 +798,15 @@ impl AccessorNotNullBlob<'_> {
         *self.val = v.clone();
         *self.update = v;
     }
-    pub(crate) fn _set(op: Op, prop: &mut Arc<Vec<u8>>, update: &Arc<Vec<u8>>) {
+}
+impl AccessorForDb<Arc<Vec<u8>>> for AccessorNotNullBlob<'_> {
+    fn _set(op: Op, prop: &mut Arc<Vec<u8>>, update: &Arc<Vec<u8>>) {
         if op == Op::Set {
             *prop = update.clone();
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -797,7 +815,7 @@ impl AccessorNotNullBlob<'_> {
         write!(f, "{comma}{col}: BLOB")
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -810,6 +828,7 @@ impl AccessorNotNullBlob<'_> {
         Ok(())
     }
 }
+
 pub struct AccessorNullBlob<'a> {
     pub(crate) op: &'a mut Op,
     pub(crate) val: &'a mut Option<Arc<Vec<u8>>>,
@@ -837,13 +856,15 @@ impl AccessorNullBlob<'_> {
         *self.val = None;
         *self.update = None;
     }
-    pub(crate) fn _set(op: Op, prop: &mut Option<Arc<Vec<u8>>>, update: &Option<Arc<Vec<u8>>>) {
+}
+impl AccessorForDb<Option<Arc<Vec<u8>>>> for AccessorNullBlob<'_> {
+    fn _set(op: Op, prop: &mut Option<Arc<Vec<u8>>>, update: &Option<Arc<Vec<u8>>>) {
         if op == Op::Set {
             prop.clone_from(update);
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -856,7 +877,7 @@ impl AccessorNullBlob<'_> {
         }
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -890,10 +911,6 @@ impl<I: Clone + Ord + Debug + Default> AccessorNotNullOrd<'_, I> {
     pub fn mark_for_set(&mut self) {
         *self.op = Op::Set;
     }
-    pub(crate) fn skip_and_empty(&mut self) {
-        *self.op = Op::Skip;
-        *self.update = I::default();
-    }
     pub fn set(&mut self, val: I) {
         *self.op = Op::Set;
         *self.val = val.clone();
@@ -925,7 +942,9 @@ impl<I: Clone + Ord + Debug + Default> AccessorNotNullOrd<'_, I> {
             panic!("operation error!");
         }
     }
-    pub(crate) fn _set(op: Op, prop: &mut I, update: &I) {
+}
+impl<I: Clone + Ord + Debug + Default> AccessorForDb<I> for AccessorNotNullOrd<'_, I> {
+    fn _set(op: Op, prop: &mut I, update: &I) {
         match op {
             Op::Set => {
                 *prop = update.clone();
@@ -944,16 +963,11 @@ impl<I: Clone + Ord + Debug + Default> AccessorNotNullOrd<'_, I> {
         }
     }
 
-    pub(crate) fn _write_insert(
-        f: &mut fmt::Formatter<'_>,
-        comma: &str,
-        col: &str,
-        value: &I,
-    ) -> fmt::Result {
+    fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result {
         write!(f, "{comma}{col}: {:?}", value)
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -966,6 +980,7 @@ impl<I: Clone + Ord + Debug + Default> AccessorNotNullOrd<'_, I> {
         Ok(())
     }
 }
+
 pub struct AccessorNullOrd<'a, I: Clone + Ord + Debug> {
     pub(crate) op: &'a mut Op,
     pub(crate) val: &'a mut Option<I>,
@@ -1018,7 +1033,9 @@ impl<I: Clone + Ord + Debug> AccessorNullOrd<'_, I> {
             panic!("operation error!");
         }
     }
-    pub(crate) fn _set(op: Op, prop: &mut Option<I>, update: &Option<I>) {
+}
+impl<I: Clone + Ord + Debug> AccessorForDb<Option<I>> for AccessorNullOrd<'_, I> {
+    fn _set(op: Op, prop: &mut Option<I>, update: &Option<I>) {
         match op {
             Op::Set => {
                 prop.clone_from(update);
@@ -1037,7 +1054,7 @@ impl<I: Clone + Ord + Debug> AccessorNullOrd<'_, I> {
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -1050,7 +1067,7 @@ impl<I: Clone + Ord + Debug> AccessorNullOrd<'_, I> {
         }
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -1088,18 +1105,18 @@ pub struct AccessorNotNullNum<
     pub(crate) _phantom: PhantomData<I>,
 }
 impl<
-        I: Copy
-            + Ord
-            + BitAnd<Output = I>
-            + BitOr<Output = I>
-            + CheckedAdd
-            + SaturatingAdd
-            + CheckedSub
-            + SaturatingSub
-            + Debug
-            + Display
-            + ToValue,
-    > AccessorNotNullNum<'_, I>
+    I: Copy
+        + Ord
+        + BitAnd<Output = I>
+        + BitOr<Output = I>
+        + CheckedAdd
+        + SaturatingAdd
+        + CheckedSub
+        + SaturatingSub
+        + Debug
+        + Display
+        + ToValue,
+> AccessorNotNullNum<'_, I>
 {
     pub fn get(&self) -> I {
         *self.val
@@ -1195,7 +1212,22 @@ impl<
             panic!("operation error!");
         }
     }
-    pub(crate) fn _set(op: Op, prop: &mut I, update: &I) {
+}
+impl<
+    I: Copy
+        + Ord
+        + BitAnd<Output = I>
+        + BitOr<Output = I>
+        + CheckedAdd
+        + SaturatingAdd
+        + CheckedSub
+        + SaturatingSub
+        + Debug
+        + Display
+        + ToValue,
+> AccessorForDb<I> for AccessorNotNullNum<'_, I>
+{
+    fn _set(op: Op, prop: &mut I, update: &I) {
         match op {
             Op::Set => {
                 *prop = *update;
@@ -1226,16 +1258,11 @@ impl<
         }
     }
 
-    pub(crate) fn _write_insert(
-        f: &mut fmt::Formatter<'_>,
-        comma: &str,
-        col: &str,
-        value: &I,
-    ) -> fmt::Result {
+    fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result {
         write!(f, "{comma}{col}: {:?}", value)
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -1269,19 +1296,19 @@ pub struct AccessorNullNum<
     pub(crate) _phantom: PhantomData<I>,
 }
 impl<
-        I: Copy
-            + Ord
-            + BitAnd<Output = I>
-            + BitOr<Output = I>
-            + CheckedAdd
-            + SaturatingAdd
-            + CheckedSub
-            + SaturatingSub
-            + Debug
-            + Display
-            + Default
-            + ToValue,
-    > AccessorNullNum<'_, I>
+    I: Copy
+        + Ord
+        + BitAnd<Output = I>
+        + BitOr<Output = I>
+        + CheckedAdd
+        + SaturatingAdd
+        + CheckedSub
+        + SaturatingSub
+        + Debug
+        + Display
+        + Default
+        + ToValue,
+> AccessorNullNum<'_, I>
 {
     pub fn get(&self) -> Option<I> {
         *self.val
@@ -1382,7 +1409,23 @@ impl<
             panic!("operation error!");
         }
     }
-    pub(crate) fn _set(op: Op, prop: &mut Option<I>, update: &Option<I>) {
+}
+impl<
+    I: Copy
+        + Ord
+        + BitAnd<Output = I>
+        + BitOr<Output = I>
+        + CheckedAdd
+        + SaturatingAdd
+        + CheckedSub
+        + SaturatingSub
+        + Debug
+        + Display
+        + Default
+        + ToValue,
+> AccessorForDb<Option<I>> for AccessorNullNum<'_, I>
+{
+    fn _set(op: Op, prop: &mut Option<I>, update: &Option<I>) {
         match op {
             Op::Set => {
                 *prop = *update;
@@ -1419,7 +1462,7 @@ impl<
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -1432,7 +1475,7 @@ impl<
         }
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -1515,7 +1558,11 @@ impl<I: Copy + PartialOrd + Float + Debug + Display + ToValue> AccessorNotNullFl
             panic!("operation error!");
         }
     }
-    pub(crate) fn _set(op: Op, prop: &mut I, update: &I) {
+}
+impl<I: Copy + PartialOrd + Float + Debug + Display + ToValue> AccessorForDb<I>
+    for AccessorNotNullFloat<'_, I>
+{
+    fn _set(op: Op, prop: &mut I, update: &I) {
         match op {
             Op::Set => {
                 *prop = *update;
@@ -1540,16 +1587,11 @@ impl<I: Copy + PartialOrd + Float + Debug + Display + ToValue> AccessorNotNullFl
         }
     }
 
-    pub(crate) fn _write_insert(
-        f: &mut fmt::Formatter<'_>,
-        comma: &str,
-        col: &str,
-        value: &I,
-    ) -> fmt::Result {
+    fn _write_insert(f: &mut fmt::Formatter<'_>, comma: &str, col: &str, value: &I) -> fmt::Result {
         write!(f, "{comma}{col}: {:?}", value)
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -1569,9 +1611,7 @@ pub struct AccessorNullFloat<'a, I: Copy + PartialOrd + Float + Debug + Display 
     pub(crate) update: &'a mut Option<I>,
     pub(crate) _phantom: PhantomData<I>,
 }
-impl<I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
-    AccessorNullFloat<'_, I>
-{
+impl<I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue> AccessorNullFloat<'_, I> {
     pub fn get(&self) -> Option<I> {
         *self.val
     }
@@ -1637,7 +1677,11 @@ impl<I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
             panic!("operation error!");
         }
     }
-    pub(crate) fn _set(op: Op, prop: &mut Option<I>, update: &Option<I>) {
+}
+impl<I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue> AccessorForDb<Option<I>>
+    for AccessorNullFloat<'_, I>
+{
+    fn _set(op: Op, prop: &mut Option<I>, update: &Option<I>) {
         match op {
             Op::Set => {
                 *prop = *update;
@@ -1662,7 +1706,7 @@ impl<I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
         }
     }
 
-    pub(crate) fn _write_insert(
+    fn _write_insert(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
@@ -1675,7 +1719,7 @@ impl<I: Copy + PartialOrd + Float + Debug + Display + Default + ToValue>
         }
     }
 
-    pub(crate) fn _write_update(
+    fn _write_update(
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,

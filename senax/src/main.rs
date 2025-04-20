@@ -34,6 +34,7 @@ mod db_document;
 pub(crate) mod ddl {
     pub mod table;
 }
+pub(crate) mod filters;
 mod actix_generator;
 mod api_generator;
 mod client_generator;
@@ -49,6 +50,8 @@ mod schema_md;
 
 pub const SCHEMA_PATH: &str = "0_schema";
 pub const DOMAIN_PATH: &str = "1_domain";
+pub const BASE_DOMAIN_PATH: &str = "1_domain/base_domain";
+pub const DOMAIN_REPOSITORIES_PATH: &str = "1_domain/repositories";
 pub const DB_PATH: &str = "2_db";
 pub const SIMPLE_VALUE_OBJECTS_FILE: &str = "_simple_value_objects.yml";
 pub const DEFAULT_CONFIG_HOST: &str = "0.0.0.0";
@@ -83,6 +86,8 @@ enum Commands {
     NewDb {
         /// DB name
         db: String,
+        #[clap(long)]
+        exclude_from_domain: bool,
     },
     /// Generate an web server
     NewServer {
@@ -276,9 +281,9 @@ async fn exec(cli: Cli) -> Result<()> {
         } => {
             init_generator::generate(name, *non_snake_case)?;
         }
-        Commands::NewDb { db } => {
+        Commands::NewDb { db, exclude_from_domain } => {
             ensure!(db_re.is_match(db), "bad db name!");
-            db_generator::generate(db)?;
+            db_generator::generate(db, *exclude_from_domain)?;
         }
         Commands::NewServer {
             name,
@@ -453,7 +458,6 @@ fn generate_seed_file(db: &str, description: &str) -> Result<()> {
         })
         .collect();
     let path = Path::new(DB_PATH).join(db).join("seeds");
-    fs::create_dir_all(&path)?;
     let dt = Utc::now();
     let file_prefix = dt.format("%Y%m%d%H%M%S").to_string();
     let file_path = path.join(format!("{}_{}.yml", file_prefix, description));

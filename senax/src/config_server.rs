@@ -35,8 +35,7 @@ use crate::api_generator::schema::{
     ApiConfigDef, ApiConfigJson, ApiDbDef, ApiDbJson, ApiModelDef, ApiModelJson,
 };
 use crate::common::{
-    BACKUP, READ_ONLY, parse_yml, parse_yml_file, read_api_yml, read_group_yml, read_simple_vo_yml,
-    set_api_config, simplify_yml, write_api_yml, write_group_yml, write_simple_vo_yml,
+    fs_write, parse_yml, parse_yml_file, read_api_yml, read_group_yml, read_simple_vo_yml, set_api_config, simplify_yml, write_api_yml, write_group_yml, write_simple_vo_yml, BACKUP, READ_ONLY
 };
 use crate::schema::{self, ConfigDef, ConfigJson, FieldDef, ModelDef, ModelJson, ValueObjectJson};
 use crate::{API_SCHEMA_PATH, SCHEMA_PATH};
@@ -299,7 +298,7 @@ async fn save_db_config(
             let content = fs::read_to_string(&path)?;
             if let Some(bk) = BACKUP.get() {
                 let dir = bk.join(format!("db_config-{db}-{}.yml", Local::now()));
-                fs::write(dir, &content)?;
+                fs_write(dir, &content)?;
             }
             let old_config: ConfigDef = parse_yml(&content)?;
             let set: HashSet<_> = data.groups.iter().filter_map(|v| v._name.clone()).collect();
@@ -331,7 +330,7 @@ async fn save_db_config(
                 "# yaml-language-server: $schema=../senax-schema.json#definitions/ConfigDef\n\n"
                     .to_string();
             buf.push_str(&simplify_yml(serde_yaml::to_string(&config)?)?);
-            fs::write(path, &buf)?;
+            fs_write(path, &buf)?;
         }
         Ok(true)
     }
@@ -675,7 +674,7 @@ async fn save_api_server_config(
                 if path.exists() {
                     let content = fs::read_to_string(&path)?;
                     let dir = bk.join(format!("api_server-{server}-_config-{}.yml", Local::now()));
-                    fs::write(dir, content)?;
+                    fs_write(dir, content)?;
                 }
             }
             let config: ApiConfigDef = data.into();
@@ -683,7 +682,7 @@ async fn save_api_server_config(
                 "# yaml-language-server: $schema=../../senax-schema.json#definitions/ApiConfigDef\n\n"
                     .to_string();
             buf.push_str(&simplify_yml(serde_yaml::to_string(&config)?)?);
-            fs::write(path, &buf)?;
+            fs_write(path, &buf)?;
         }
         Ok(true)
     }
@@ -748,7 +747,7 @@ async fn save_api_server_db_config(
                         "api_server-{server}-{db_path}-{}.yml",
                         Local::now()
                     ));
-                    fs::write(dir, &content)?;
+                    fs_write(dir, &content)?;
                 }
 
                 let old_config: ApiDbDef = parse_yml(&content)?;
@@ -777,7 +776,7 @@ async fn save_api_server_db_config(
                 "# yaml-language-server: $schema=../../senax-schema.json#definitions/ApiDbDef\n\n"
                     .to_string();
             buf.push_str(&simplify_yml(serde_yaml::to_string(&config)?)?);
-            fs::write(path, &buf)?;
+            fs_write(path, &buf)?;
         }
         Ok(true)
     }
