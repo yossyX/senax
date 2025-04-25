@@ -40,10 +40,8 @@ pub enum NotifyOp {
 #[allow(non_camel_case_types)]
 #[allow(dead_code)]
 pub enum TableName {
-    @%- for (_, defs) in groups %@
-    @%- for (_, def) in defs %@
-    @{ def.table_name() }@,
-    @%- endfor %@
+    @%- for table_name in table_names %@
+    @{ table_name|to_var_name }@,
     @%- endfor %@
 }
 
@@ -136,24 +134,24 @@ impl CacheActor {
     }
 }
 
-pub(crate) async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, clear_test: bool) {
+pub(crate) async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, _clear_test: bool) {
 @%- if !config.force_disable_cache %@
     #[cfg(not(feature = "cache_update_only"))]
     for (shard_id, sync) in _sync_map.iter() {
-        if *sync == 0 && !clear_test {
+        if *sync == 0 && !_clear_test {
             let shard_id = *shard_id;
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                 @%- for (name, defs) in groups %@
                 if let Some(g) = @{ name|upper }@_CTRL.get() {
-                    g._clear_cache(shard_id, 0, clear_test).await;
+                    g._clear_cache(shard_id, 0, _clear_test).await;
                 }
                 @%- endfor %@
             });
         }
         @%- for (name, defs) in groups %@
         if let Some(g) = @{ name|upper }@_CTRL.get() {
-            g._clear_cache(*shard_id, *sync, clear_test).await;
+            g._clear_cache(*shard_id, *sync, _clear_test).await;
         }
         @%- endfor %@
     }

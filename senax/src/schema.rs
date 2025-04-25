@@ -42,7 +42,6 @@ pub static CONFIG: RwLock<Option<ConfigDef>> = RwLock::new(None);
 #[allow(clippy::type_complexity)]
 pub static GROUPS: RwLock<Option<IndexMap<String, IndexMap<String, Arc<ModelDef>>>>> =
     RwLock::new(None);
-pub static MODELS: RwLock<Option<IndexMap<String, Arc<ModelDef>>>> = RwLock::new(None);
 pub static VALUE_OBJECTS: RwLock<Option<HashMap<String, FieldDef>>> = RwLock::new(None);
 pub static DOMAIN_MODE: AtomicBool = AtomicBool::new(false);
 
@@ -578,10 +577,9 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                             let mut model =
                                 get_model(&rel_def.model, cur_group_name, &groups).borrow_mut();
                             model.on_delete_list.insert(format!(
-                                "{}::_base::_{}::_{}",
-                                &_to_var_name(cur_group_name),
-                                &cur_model_name.to_case(Case::Snake),
-                                &cur_model_name.to_case(Case::Pascal)
+                                "{}::_base::_{}",
+                                &_to_var_name(&cur_group_name.to_case(Case::Snake)),
+                                &cur_model_name.to_case(Case::Snake)
                             ));
                         }
                         if rel_def.in_cache {
@@ -596,7 +594,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                                 ref_model.cache_owners.push((
                                     format!(
                                         "{}::_base::_{}",
-                                        &_to_var_name(cur_group_name),
+                                        &_to_var_name(&cur_group_name.to_case(Case::Snake)),
                                         &cur_model_name.to_case(Case::Snake)
                                     ),
                                     cur_model_name.to_string(),

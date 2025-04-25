@@ -17,12 +17,12 @@ pub use super::_base::_@{ mod_name }@::{
 @%- if config.exclude_from_domain %@
 // pub use super::_base::_@{ mod_name }@::{filter, order};
 @%- else %@
-// pub use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name|to_var_name }@::{filter, order};
+// pub use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{filter, order};
 @%- endif %@
 @%- if config.exclude_from_domain %@
 // pub use super::_base::_@{ mod_name }@::{join, Joiner_};
 @%- else %@
-// pub use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name|to_var_name }@::{join, Joiner_};
+// pub use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{join, Joiner_};
 @%- endif %@
 @%- if def.act_as_job_queue() %@
 pub use super::_base::_@{ mod_name }@::QUEUE_NOTIFIER;

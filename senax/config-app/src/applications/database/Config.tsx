@@ -152,6 +152,7 @@ function Config() {
               <AutoField name="use_update_delayed" {...formData} />
               <AutoField name="use_upsert_delayed" {...formData} />
               <AutoField name="disable_update" {...formData} />
+              <AutoField name="disable_delete" {...formData} />
               <AutoField name="use_sequence" {...formData} />
               <AutoField name="tx_isolation" {...formData} />
               <AutoField name="read_tx_isolation" {...formData} />

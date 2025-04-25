@@ -288,12 +288,11 @@ impl Like for str {
     }
 }
 
-#[allow(dead_code)]
-fn reject_empty<T>(value: &T) -> Result<(), validator::ValidationError>
+pub fn reject_empty_filter<T>(value: &&T) -> Result<(), validator::ValidationError>
 where
     T: Default + PartialEq,
 {
-    if value.eq(&Default::default()) {
+    if (*value).eq(&Default::default()) {
         Err(validator::ValidationError::new(
             "Empty filters are not allowed.",
         ))

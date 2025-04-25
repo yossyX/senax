@@ -447,7 +447,7 @@ fn write_group_file(
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
-    let file_path = path.join(format!("{}.rs", group_route));
+    let file_path = path.join(format!("{}.rs", group_route.to_case(Case::Snake)));
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         template::GroupTemplate {

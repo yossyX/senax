@@ -546,20 +546,20 @@ impl FilterDef {
             FilterType::Exists => {
                 let relation = self.relation.as_deref().unwrap_or(name);
                 let _relation = _to_var_name(relation);
-                let group = _to_var_name(&model.group_name);
+                let group = _to_var_name(&model.group_name.to_case(Case::Snake));
                 let mod_name = model.name.to_case(Case::Snake);
                 if self.relation_fields.is_empty() {
                     format!(
             "
     {prefix}
-        fltr = fltr.and(crate::models::{group}::_base::_{mod_name}::Filter_::Exists(crate::models::{group}::_base::_{mod_name}::ColRel_::{_relation}(None)));
+        fltr = fltr.and(crate::repositories::{group}::_base::_{mod_name}::Filter_::Exists(crate::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(None)));
     }}"
             )
                 } else {
                     format!(
             "
     {prefix}
-        fltr = fltr.and(crate::models::{group}::_base::_{mod_name}::Filter_::Exists(crate::models::{group}::_base::_{mod_name}::ColRel_::{_relation}(Some(Box::new(_filter{suffix}_{name}(f)?)))));
+        fltr = fltr.and(crate::repositories::{group}::_base::_{mod_name}::Filter_::Exists(crate::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(Some(Box::new(_filter{suffix}_{name}(f)?)))));
     }}"
             )
                 }
@@ -567,20 +567,20 @@ impl FilterDef {
             FilterType::EqAny => {
                 let relation = self.relation.as_deref().unwrap_or(name);
                 let _relation = _to_var_name(relation);
-                let group = _to_var_name(&model.group_name);
+                let group = _to_var_name(&model.group_name.to_case(Case::Snake));
                 let mod_name = model.name.to_case(Case::Snake);
                 if self.relation_fields.is_empty() {
                     format!(
             "
     {prefix}
-        fltr = fltr.and(crate::models::{group}::_base::_{mod_name}::Filter_::EqAny(crate::models::{group}::_base::_{mod_name}::ColRel_::{_relation}(None)));
+        fltr = fltr.and(crate::repositories::{group}::_base::_{mod_name}::Filter_::EqAny(crate::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(None)));
     }}"
             )
                 } else {
                     format!(
             "
     {prefix}
-        fltr = fltr.and(crate::models::{group}::_base::_{mod_name}::Filter_::EqAny(crate::models::{group}::_base::_{mod_name}::ColRel_::{_relation}(Some(Box::new(_filter{suffix}_{name}(f)?)))));
+        fltr = fltr.and(crate::repositories::{group}::_base::_{mod_name}::Filter_::EqAny(crate::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(Some(Box::new(_filter{suffix}_{name}(f)?)))));
     }}"
             )
                 }
@@ -935,12 +935,12 @@ impl OrderDef {
         if self.direction == Some(FilterSortDirection::Desc) {
             format!(
                 "
-                        models::Cursor::After(f) => {{{n_chk}
+                        domain::models::Cursor::After(f) => {{{n_chk}
                             if {cmp} != std::cmp::Ordering::Less {{
                                 return false;
                             }}
                         }}
-                        models::Cursor::Before(f) => {{{n_chk}
+                        domain::models::Cursor::Before(f) => {{{n_chk}
                             if {cmp} != std::cmp::Ordering::Greater {{
                                 return false;
                             }}
@@ -949,12 +949,12 @@ impl OrderDef {
         } else {
             format!(
                 "
-                        models::Cursor::After(f) => {{{n_chk}
+                        domain::models::Cursor::After(f) => {{{n_chk}
                             if {cmp} != std::cmp::Ordering::Greater {{
                                 return false;
                             }}
                         }}
-                        models::Cursor::Before(f) => {{{n_chk}
+                        domain::models::Cursor::Before(f) => {{{n_chk}
                             if {cmp} != std::cmp::Ordering::Less {{
                                 return false;
                             }}
@@ -980,20 +980,20 @@ impl OrderDef {
         if self.direction == Some(FilterSortDirection::Desc) {
             format!(
                 "
-                        models::Cursor::After(f) => {{
+                        domain::models::Cursor::After(f) => {{
                             fltr = fltr.and(filter!({cols} < f));
                         }}
-                        models::Cursor::Before(f) => {{
+                        domain::models::Cursor::Before(f) => {{
                             fltr = fltr.and(filter!({cols} > f));
                         }}"
             )
         } else {
             format!(
                 "
-                        models::Cursor::After(f) => {{
+                        domain::models::Cursor::After(f) => {{
                             fltr = fltr.and(filter!({cols} > f));
                         }}
-                        models::Cursor::Before(f) => {{
+                        domain::models::Cursor::Before(f) => {{
                             fltr = fltr.and(filter!({cols} < f));
                         }}"
             )

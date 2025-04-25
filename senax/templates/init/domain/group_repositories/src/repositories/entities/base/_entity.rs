@@ -6,7 +6,7 @@ use validator::Validate as _;
 
 #[allow(unused_imports)]
 use base_domain as domain;
-use base_domain::models::{@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name }@::{@{ pascal_name }@, @{ pascal_name }@Cache, @{ pascal_name }@Common, @{ pascal_name }@Updater as _Updater}, Check_};
+use base_domain::models::{@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{@{ pascal_name }@, @{ pascal_name }@Cache, @{ pascal_name }@Common, @{ pascal_name }@Updater as _Updater}, Check_};
 #[allow(unused_imports)]
 use base_domain::models::{self, ToGeoPoint as _, ToPoint as _};
 #[allow(unused_imports)]
@@ -21,7 +21,7 @@ pub use base_domain::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() 
 pub use repository_@{ rel_def.db() }@::repositories as _@{ rel_def.db() }@_repository_;
 @%- endfor %@
 #[cfg(any(feature = "mock", test))]
-use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name }@::@{ pascal_name }@Entity;
+use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Entity;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -119,15 +119,15 @@ pub trait _@{ pascal_name }@Repository: Send + Sync {
     fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn _Updater>;
     #[deprecated(note = "This method should not be used outside the domain.")]
     async fn save(&self, obj: Box<dyn _Updater>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>>;
-    @%- if !def.disable_update() %@
+@%- if !def.disable_update() %@
     #[deprecated(note = "This method should not be used outside the domain.")]
     async fn import(&self, list: Vec<Box<dyn _Updater>>, option: Option<base_domain::models::ImportOption>) -> anyhow::Result<()>;
-    @%- endif %@
-    @%- if def.use_insert_delayed() %@
+@%- endif %@
+@%- if def.use_insert_delayed() %@
     #[deprecated(note = "This method should not be used outside the domain.")]
     async fn insert_delayed(&self, obj: Box<dyn _Updater>) -> anyhow::Result<()>;
-    @%- endif %@
-@%- if !def.disable_update() %@
+@%- endif %@
+@%- if !def.disable_delete() %@
     #[deprecated(note = "This method should not be used outside the domain.")]
     async fn delete(&self, obj: Box<dyn _Updater>) -> anyhow::Result<()>;
     @%- if def.primaries().len() == 1 %@
@@ -184,18 +184,18 @@ pub struct @{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     @%- endif %@
     @%- if filter_def.has_default() %@
-    #[validate(custom(function = "crate::models::reject_empty"))]
+    #[validate(custom(function = "base_domain::models::reject_empty_filter"))]
     @%- endif %@
     pub @{ filter|to_var_name }@: @{ filter_def.type_str(filter, pascal_name, selector, filter_map.pascal_name) }@,
     @%- endfor %@
     #[graphql(name = "_and")]
     #[schema(no_recursion)]
-    #[validate]
+    #[validate(nested)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub _and: Option<Vec<@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter>>,
     #[graphql(name = "_or")]
     #[schema(no_recursion)]
-    #[validate]
+    #[validate(nested)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub _or: Option<Vec<@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter>>,
 }
@@ -531,6 +531,7 @@ impl ColMany_ {
             _ => unimplemented!(),
         }
     }
+    #[allow(bindings_with_variant_name)]
     pub fn check_in<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
         match self {
             @{- def.equivalence_cache_fields_without_json()|fmt_join("
@@ -963,8 +964,8 @@ impl Check_<dyn @{ pascal_name }@> for Filter_ {
     }
 }
 
-@% let filter_macro_name = "filter_{}_{}_{}"|format(db|snake, group_name, model_name) -%@
-@% let model_path = "$crate::repositories::{}::_base::_{}"|format(group_name|to_var_name, mod_name) -%@
+@% let filter_macro_name = "filter_{}_{}_{}"|format(db|snake, group_name|snake, model_name) -%@
+@% let model_path = "$crate::repositories::{}::_base::_{}"|format(group_name|snake|to_var_name, mod_name) -%@
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_null {
 @%- for (col_name, column_def) in def.nullable() %@
@@ -1305,7 +1306,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
         Ok(())
     }
     @%- endif %@
-    @%- if !def.disable_update() %@
+    @%- if !def.disable_delete() %@
     async fn delete(&self, obj: Box<dyn _Updater>) -> anyhow::Result<()> {
         let mut map = self.0.lock().unwrap();
         map.remove(&@{- def.primaries()|fmt_join_with_paren("obj.{var}(){clone}", ", ") }@);

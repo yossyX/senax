@@ -16,9 +16,7 @@ use ::std::path::Path;
 use ::std::sync::Arc;
 use ::std::time::Duration;
 
-use db::{models::@{ group_name|to_var_name }@::CacheOp, DbConn, DELAYED_DB_DIR};
-
-use super::GroupCacheOpTr;
+use db::{models::@{ group_name|snake|to_var_name }@::CacheOp, DbConn, DELAYED_DB_DIR};
 
 #[rustfmt::skip]
 #[allow(clippy::map_identity)]
@@ -78,27 +76,29 @@ pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
 
 #[rustfmt::skip]
 #[cfg(not(feature="cache_update_only"))]
-impl GroupCacheOpTr for CacheOp {
-    async fn handle_cache_msg(self, sync_map: Arc<FxHashMap<ShardId, u64>>) {
+impl super::GroupCacheOpTr for CacheOp {
+    async fn handle_cache_msg(self, _sync_map: Arc<FxHashMap<ShardId, u64>>) {
+        @%- if !config.force_disable_cache %@
         use super::CacheOpTr as _;
 
         match self {
 @%- for (name, def) in models %@
-            CacheOp::@{ name|to_pascal_name }@(msg) => msg.handle_cache_msg(sync_map).await,
+            CacheOp::@{ name|to_pascal_name }@(msg) => msg.handle_cache_msg(_sync_map).await,
 @%- endfor %@
         };
+        @%- endif %@
     }
 }
-@%- if !config.force_disable_cache %@
 
 #[cfg(not(feature="cache_update_only"))]
 #[rustfmt::skip]
-pub(crate) async fn _clear_cache(shard_id: ShardId, sync: u64, clear_test: bool) {
+pub(crate) async fn _clear_cache(_shard_id: ShardId, _sync: u64, _clear_test: bool) {
+@%- if !config.force_disable_cache %@
 @%- for (name, def) in models %@
-    _base::_@{ def.mod_name() }@::_clear_cache(shard_id, sync, clear_test).await;
+    _base::_@{ def.mod_name() }@::__clear_cache(_shard_id, _sync, _clear_test).await;
 @%- endfor %@
-}
 @%- endif %@
+}
 
 #[rustfmt::skip]
 #[allow(clippy::single_match)]

@@ -14,6 +14,7 @@ use ::std::{
 #[allow(clippy::collapsible_if)]
 // Do not modify below this line. (ModStart)
 // Do not modify up to this line. (ModEnd)
+pub use crate::repositories as _super;
 
 #[rustfmt::skip]
 #[cfg_attr(any(feature = "mock", test), mockall::automock)]

@@ -15,7 +15,7 @@ use crate::{BASE_DOMAIN_PATH, DOMAIN_REPOSITORIES_PATH};
 use crate::{
     DB_PATH, DOMAIN_PATH,
     common::fs_write,
-    schema::{self, CONFIG, GROUPS, MODELS, ModelDef, to_id_name},
+    schema::{self, CONFIG, GROUPS, ModelDef, to_id_name},
 };
 
 mod db;
@@ -90,11 +90,19 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     struct ModelsTemplate<'a> {
         pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
         pub config: &'a ConfigDef,
+        pub table_names: BTreeSet<String>,
     }
 
+    let mut table_names = BTreeSet::default();
+    for (_, defs) in &groups {
+        for (_, def) in defs {
+            table_names.insert(def.table_name());
+        }
+    }
     let tpl = ModelsTemplate {
         groups: &groups,
         config: &config,
+        table_names,
     };
     fs_write(file_path, tpl.render()?)?;
 
@@ -232,9 +240,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     }
 
     for (group_name, defs) in &groups {
-        let group_name = group_name.to_case(Case::Snake);
-        let group_name = &group_name;
-        MODELS.write().unwrap().replace(defs.clone());
         let mod_names: BTreeSet<String> = defs.iter().map(|(_, d)| d.mod_name()).collect();
         let entities_mod_names: BTreeSet<(String, &String)> = defs
             .iter()
@@ -242,9 +247,9 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             .map(|(model_name, def)| (def.mod_name(), model_name))
             .collect();
 
-        let model_group_dir = model_models_dir.join(group_name);
+        let model_group_dir = model_models_dir.join(group_name.to_case(Case::Snake));
         let model_group_base_dir = model_group_dir.join("_base");
-        let file_path = model_models_dir.join(format!("{}.rs", group_name));
+        let file_path = model_models_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
         remove_files.remove(file_path.as_os_str());
         let concrete_models = defs.iter().filter(|(_k, v)| !v.abstract_mode).collect();
 
@@ -289,12 +294,10 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 &domain_repositories_dir,
                 db,
                 group_name,
-                &entities_mod_names,
                 &groups,
                 force,
                 &mut remove_files,
             )?;
-            MODELS.write().unwrap().replace(defs.clone());
             db::impl_domain::write_group_rs(
                 &impl_domain_dir,
                 db,
@@ -483,16 +486,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 if !exclude_from_domain {
                     domain::base_domain::write_entity(
                         &domain_db_dir,
-                        db,
-                        group_name,
-                        mod_name,
-                        force,
-                        model_name,
-                        def,
-                        &mut remove_files,
-                    )?;
-                    domain::repositories::write_entity(
-                        &domain_repositories_dir,
                         db,
                         group_name,
                         mod_name,

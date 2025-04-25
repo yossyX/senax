@@ -329,7 +329,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
     let class_mod = rel.get_group_mod_name();
     let rel_name = _to_var_name(name);
     let additional_filter = if let Some(additional_filter) = &rel.additional_filter {
-        format!(".and(rel_{}::filter!({}))", class_mod, additional_filter)
+        format!(".and(join_{}::filter!({}))", class_mod, additional_filter)
     } else {
         "".to_string()
     };
@@ -359,7 +359,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         };
         let col = _to_var_name(&col);
         (
-            format!("rel_{class_mod}::Order_::{asc}(rel_{class_mod}::Col_::{col})"),
+            format!("repo_{class_mod}::Order_::{asc}(repo_{class_mod}::Col_::{col})"),
             format!("l.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
             format!("l.sort_by(|v1, v2| v1._data.{col}.cmp(&v2._data.{col}){list_order});"),
             format!(
@@ -367,7 +367,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
             ),
         )
     } else {
-        let tmpl1 = format!("rel_{class_mod}::Order_::{asc}(rel_{class_mod}::Col_::{{var}})");
+        let tmpl1 = format!("repo_{class_mod}::Order_::{asc}(repo_{class_mod}::Col_::{{var}})");
         let tmpl2 = "(v1._inner.{var}.cmp(&v2._inner.{var}))".to_string();
         let tmpl3 = "(v1._data.{var}.cmp(&v2._data.{var}))".to_string();
         (
@@ -514,6 +514,7 @@ fn _fmt_rel_outer_db(
     f.replace("{rel_name}", &_to_var_name(name))
         .replace("{raw_rel_name}", name)
         .replace("{raw_db}", rel.db())
+        .replace("{db_mod_var}", &_to_var_name(rel.db()))
         .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
         .replace("{rel_name_camel}", &name.to_case(Case::Camel))
         .replace("{rel_hash}", &rel_hash.to_string())

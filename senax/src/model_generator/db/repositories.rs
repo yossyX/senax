@@ -160,11 +160,12 @@ pub fn write_group_files(
     #[template(path = "model/repositories/src/repositories.rs", escape = "none")]
     struct RepositoriesTemplate<'a> {
         pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub config: &'a ConfigDef,
     }
 
     let file_path = src_dir.join("repositories.rs");
     remove_files.remove(file_path.as_os_str());
-    let tpl = RepositoriesTemplate { groups };
+    let tpl = RepositoriesTemplate { groups, config };
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
@@ -182,6 +183,7 @@ pub fn write_group_files(
         impl_domain::write_impl_domain_rs(&src_dir, db, &groups, force)?;
     }
 
+    let base_group_name = group;
     for (group_name, defs) in groups {
         let model_models_dir = src_dir.join("repositories");
         let mod_names: BTreeSet<String> = defs
@@ -195,7 +197,7 @@ pub fn write_group_files(
             .map(|(model_name, def)| (def.mod_name(), model_name))
             .collect();
 
-        let file_path = model_models_dir.join(format!("{}.rs", group_name));
+        let file_path = model_models_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
         remove_files.remove(file_path.as_os_str());
         let concrete_models = defs.iter().filter(|(_k, v)| !v.abstract_mode).collect();
 
@@ -221,6 +223,7 @@ pub fn write_group_files(
             impl_domain::write_group_rs(
                 &impl_domain_dir,
                 db,
+                base_group_name,
                 group_name,
                 &entities_mod_names,
                 force,
@@ -233,7 +236,7 @@ pub fn write_group_files(
         } else {
             "(crate)"
         };
-        let model_group_dir = model_models_dir.join(group_name);
+        let model_group_dir = model_models_dir.join(group_name.to_case(Case::Snake));
         let model_group_base_dir = model_group_dir.join("_base");
         for (model_name, def) in defs {
             let table_name = def.table_name();
@@ -247,6 +250,7 @@ pub fn write_group_files(
                     #[template(path = "model/repositories/src/group/table.rs", escape = "none")]
                     struct GroupTableTemplate<'a> {
                         pub db: &'a str,
+                        pub base_group_name: &'a str,
                         pub group_name: &'a str,
                         pub mod_name: &'a str,
                         pub model_name: &'a str,
@@ -259,6 +263,7 @@ pub fn write_group_files(
 
                     let tpl = GroupTableTemplate {
                         db,
+                        base_group_name,
                         group_name,
                         mod_name,
                         model_name,
@@ -302,6 +307,7 @@ pub fn write_group_files(
                 #[template(path = "model/repositories/src/group/base/_table.rs", escape = "none")]
                 struct GroupBaseTableTemplate<'a> {
                     pub db: &'a str,
+                    pub base_group_name: &'a str,
                     pub group_name: &'a str,
                     pub mod_name: &'a str,
                     pub model_name: &'a str,
@@ -317,6 +323,7 @@ pub fn write_group_files(
 
                 let tpl = GroupBaseTableTemplate {
                     db,
+                    base_group_name,
                     group_name,
                     mod_name,
                     model_name,
@@ -336,6 +343,7 @@ pub fn write_group_files(
                         &impl_domain_dir,
                         db,
                         &config,
+                        base_group_name,
                         group_name,
                         mod_name,
                         force,

@@ -12,18 +12,18 @@ pub@{ visibility }@ use super::_base::_@{ mod_name }@::_@{ enum_name|pascal }@;
 @% endfor -%@
 #[rustfmt::skip]
 pub@{ visibility }@ use super::_base::_@{ mod_name }@::{
-    _@{ pascal_name }@,@% if !config.force_disable_cache %@ _@{ pascal_name }@Cache,@% endif %@ _@{ pascal_name }@Factory, _@{ pascal_name }@Updater,
-    @% for id in def.id() %@@{ id_name }@, @{ id_name }@Fetcher, @% endfor %@_@{ pascal_name }@Joiner, _@{ pascal_name }@Getter, UnionBuilder as _@{ pascal_name }@UnionBuilder,
+    _@{ pascal_name }@, _@{ pascal_name }@_,@% if !config.force_disable_cache %@ _@{ pascal_name }@Cache, _@{ pascal_name }@Cache_,@% endif %@ _@{ pascal_name }@Factory, _@{ pascal_name }@Updater,
+    @% for id in def.id() %@@{ id_name }@, @% endfor %@_@{ pascal_name }@Joiner, _@{ pascal_name }@Getter, UnionBuilder as _@{ pascal_name }@UnionBuilder,
 };
 @%- if config.exclude_from_domain %@
 pub@{ visibility }@ use super::_base::_@{ mod_name }@::{Joiner_, join};
 @%- else %@
-pub@{ visibility }@ use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name|to_var_name }@::{Joiner_, join};
+pub@{ visibility }@ use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{Joiner_, join};
 @%- endif %@
 @%- if config.exclude_from_domain %@
 pub@{ visibility }@ use super::_base::_@{ mod_name }@::{filter, order};
 @%- else %@
-pub@{ visibility }@ use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name|to_var_name }@::{filter, order};
+pub@{ visibility }@ use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{filter, order};
 @%- endif %@
 @%- if def.act_as_job_queue() %@
 pub use super::_base::_@{ mod_name }@::QUEUE_NOTIFIER;
@@ -45,7 +45,7 @@ use fxhash::FxHashMap;
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::repositories::ModelTr;
+use crate::repositories::ModelTrWithCache;
 
 pub struct SaveData {
     is_new: bool,

@@ -1,16 +1,19 @@
 use async_trait::async_trait;
+#[allow(unused_imports)]
 use base_domain as domain;
+#[allow(unused_imports)]
+use base_domain::models::@{ db|snake|to_var_name }@ as _model_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
 #[allow(unused_imports)]
 pub use base_domain::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
 @%- endfor %@
 @%- for (enum_name, column_def) in def.num_enums(true) %@
 #[rustfmt::skip]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name }@::@{ enum_name|pascal }@;
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ enum_name|pascal }@;
 @%- endfor %@
 @%- for (enum_name, column_def) in def.str_enums(true) %@
 #[rustfmt::skip]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name }@::@{ enum_name|pascal }@;
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ enum_name|pascal }@;
 @%- endfor %@
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::{join, Joiner_};
@@ -18,21 +21,21 @@ pub use super::_base::_@{ mod_name }@::{join, Joiner_};
 pub use super::_base::_@{ mod_name }@::{filter, order, Filter_};
 pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Factory;
 use super::_base::_@{ mod_name }@::{_@{ pascal_name }@QueryService, _@{ pascal_name }@Repository};
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name }@::consts;
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::consts;
 #[rustfmt::skip]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name }@::{
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{
     @{ pascal_name }@, @{ pascal_name }@Cache, @{ pascal_name }@Common, @{ pascal_name }@Updater,
 };
 @%- for id in def.id() %@
 #[rustfmt::skip]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name }@::@{ id_name }@;
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ id_name }@;
 @%- endfor %@
 #[rustfmt::skip]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name }@::@{ pascal_name }@Primary;
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Primary;
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::{_@{ pascal_name }@QueryFindBuilder, _@{ pascal_name }@RepositoryFindBuilder};
 #[cfg(any(feature = "mock", test))]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name }@::@{ pascal_name }@Entity;
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Entity;
 @%- for (selector, selector_def) in def.selectors %@
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Repository@{ selector|pascal }@Builder;
@@ -45,11 +48,6 @@ pub use super::_base::_@{ mod_name }@::{@{ pascal_name }@Query@{ selector|pascal
 pub use self::{MockQueryService_ as Mock@{ pascal_name }@QueryService, MockRepository_ as Mock@{ pascal_name }@Repository};
 #[cfg(any(feature = "mock", test))]
 pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
-
-@%- for parent in def.parents() %@
-#[cfg(any(feature = "mock", test))]
-impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater for @{ pascal_name }@Entity {}
-@%- endfor %@
 
 pub async fn create(
     repo: &dyn super::@{ group_name|pascal }@Repository,
@@ -86,6 +84,8 @@ where
     let res = @{ mod_name }@_repo.save(obj).await?;
     Ok(res.unwrap())
 }
+@%- endif %@
+@%- if !def.disable_delete() %@
 
 pub async fn delete(
     repo: &dyn super::@{ group_name|pascal }@Repository,
@@ -119,7 +119,7 @@ mockall::mock! {
         @%- if def.use_insert_delayed() %@
         async fn insert_delayed(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()>;
         @%- endif %@
-        @%- if !def.disable_update() %@
+        @%- if !def.disable_delete() %@
         async fn delete(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()>;
         @%- if def.primaries().len() == 1 %@
         async fn delete_by_ids(&self, ids: &[@{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@]) -> anyhow::Result<u64>;

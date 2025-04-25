@@ -14,7 +14,7 @@ use std::str::FromStr;
 
 use crate::common::fs_write;
 use crate::ddl::table::{Column, Constraint, Table};
-use crate::schema::{self, AutoGeneration, CONFIG, GROUPS, MODELS, SoftDelete, SortDirection};
+use crate::schema::{self, AutoGeneration, CONFIG, GROUPS, SoftDelete, SortDirection};
 use crate::{DB_PATH, ddl};
 
 pub const UTF8_BYTE_LEN: u32 = 4;
@@ -30,7 +30,6 @@ pub async fn generate(
     let groups = GROUPS.read().unwrap().as_ref().unwrap().clone();
     let mut new_tables = IndexMap::new();
     for (_group_name, defs) in &groups {
-        MODELS.write().unwrap().replace(defs.clone());
         for (_model_name, def) in defs {
             if def.has_table() {
                 let (table_name, table, _) = make_table_def(def, &config)?;

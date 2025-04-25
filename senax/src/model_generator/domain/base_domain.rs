@@ -237,7 +237,7 @@ pub fn write_abstract(
     remove_files: &mut HashSet<OsString>,
 ) -> Result<(), anyhow::Error> {
     set_domain_mode(true);
-    let domain_group_dir = domain_db_dir.join(group_name);
+    let domain_group_dir = domain_db_dir.join(group_name.to_case(Case::Snake));
     let file_path = domain_group_dir.join(format!("{}.rs", mod_name));
     remove_files.remove(file_path.as_os_str());
     let pascal_name = &model_name.to_case(Case::Pascal);
@@ -301,7 +301,7 @@ pub fn write_entity(
     remove_files: &mut HashSet<OsString>,
 ) -> Result<(), anyhow::Error> {
     set_domain_mode(true);
-    let domain_group_dir = domain_db_dir.join(group_name);
+    let domain_group_dir = domain_db_dir.join(group_name.to_case(Case::Snake));
     let file_path = domain_group_dir.join(format!("{}.rs", mod_name));
     remove_files.remove(file_path.as_os_str());
     let pascal_name = &model_name.to_case(Case::Pascal);
@@ -382,7 +382,7 @@ pub fn write_group_rs(
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
-    let file_path = domain_db_dir.join(format!("{}.rs", group_name));
+    let file_path = domain_db_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]

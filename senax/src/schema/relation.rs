@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::common::to_singular;
 use crate::schema::_to_var_name;
 
-use super::{FieldDef, GROUPS, MODELS, ModelDef, domain_mode, to_id_name};
+use super::{FieldDef, GROUPS, ModelDef, domain_mode, to_id_name};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -717,10 +717,10 @@ impl RelDef {
         to_id_name(&self.get_foreign_model_name().1)
     }
     pub fn get_group_var(&self) -> String {
-        _to_var_name(&self.get_group_name())
+        _to_var_name(&self.get_group_name().to_case(Case::Snake))
     }
     pub fn get_mod_name(&self) -> String {
-        self.get_foreign_model_name().0
+        self.get_foreign_model_name().0.to_case(Case::Snake)
     }
     pub fn get_group_mod_name(&self) -> String {
         if let Some(db) = &self.db {
@@ -792,7 +792,7 @@ impl RelDef {
 
     pub fn get_foreign_model(&self) -> Arc<ModelDef> {
         let (group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
-        get_model(Some(group_name), stem_name)
+        get_model(group_name, stem_name)
     }
 
     pub fn get_foreign_model_name(&self) -> (String, String) {
@@ -801,20 +801,20 @@ impl RelDef {
             (stem_name.to_case(Case::Snake), stem_name.to_string())
         } else {
             let (group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
-            get_model_name(Some(group_name), stem_name)
+            get_model_name(group_name, stem_name)
         }
     }
 
-    pub fn get_model_by_name(name: &str, cur_group_name: Option<String>) -> Arc<ModelDef> {
+    pub fn get_model_by_name(name: &str, cur_group_name: &str) -> Arc<ModelDef> {
         let (group_name, stem_name) = if name.contains(MODEL_NAME_SPLITTER) {
             let (group_name, stem_name) = name.split_once(MODEL_NAME_SPLITTER).unwrap();
             crate::common::check_name(group_name);
             crate::common::check_name(stem_name);
-            (Some(group_name.to_string()), stem_name)
+            (group_name, stem_name)
         } else {
             (cur_group_name, name)
         };
-        get_model(group_name.as_deref(), stem_name)
+        get_model(group_name, stem_name)
     }
 
     pub fn get_group_name(&self) -> String {
@@ -828,80 +828,51 @@ impl RelDef {
     }
 }
 
-fn get_model(group_name: Option<&str>, stem_name: &str) -> Arc<ModelDef> {
-    if let Some(group_name) = group_name {
-        if let Some(model) = GROUPS
-            .read()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .get(group_name)
-            .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-            .get(stem_name)
-        {
-            return model.clone();
-        }
-        let singular_name = to_singular(stem_name);
-        GROUPS
-            .read()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .get(group_name)
-            .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-            .get(&singular_name)
-            .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name))
-            .clone()
-    } else {
-        if let Some(model) = MODELS.read().unwrap().as_ref().unwrap().get(stem_name) {
-            return model.clone();
-        }
-        let singular_name = to_singular(stem_name);
-        MODELS
-            .read()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .get(&singular_name)
-            .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name))
-            .clone()
+fn get_model(group_name: &str, stem_name: &str) -> Arc<ModelDef> {
+    if let Some(model) = GROUPS
+        .read()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .get(group_name)
+        .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
+        .get(stem_name)
+    {
+        return model.clone();
     }
+    let singular_name = to_singular(stem_name);
+    GROUPS
+        .read()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .get(group_name)
+        .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
+        .get(&singular_name)
+        .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name))
+        .clone()
 }
 
-fn get_model_name(group_name: Option<&str>, stem_name: &str) -> (String, String) {
-    if let Some(group_name) = group_name {
-        if let Some(model) = GROUPS
-            .read()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .get(group_name)
-            .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-            .get(stem_name)
-        {
-            return (model.mod_name().to_string(), model.name.clone());
-        }
-        let singular_name = to_singular(stem_name);
-        let group_lock = GROUPS.read().unwrap();
-        let model = group_lock
-            .as_ref()
-            .unwrap()
-            .get(group_name)
-            .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-            .get(&singular_name)
-            .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name));
-        (model.mod_name().to_string(), model.name.clone())
-    } else {
-        if let Some(model) = MODELS.read().unwrap().as_ref().unwrap().get(stem_name) {
-            return (model.mod_name().to_string(), model.name.clone());
-        }
-        let singular_name = to_singular(stem_name);
-        let models_lock = MODELS.read().unwrap();
-        let model = models_lock
-            .as_ref()
-            .unwrap()
-            .get(&singular_name)
-            .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name));
-        (model.mod_name().to_string(), model.name.clone())
+fn get_model_name(group_name: &str, stem_name: &str) -> (String, String) {
+    if let Some(model) = GROUPS
+        .read()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .get(group_name)
+        .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
+        .get(stem_name)
+    {
+        return (model.mod_name().to_string(), model.name.clone());
     }
+    let singular_name = to_singular(stem_name);
+    let group_lock = GROUPS.read().unwrap();
+    let model = group_lock
+        .as_ref()
+        .unwrap()
+        .get(group_name)
+        .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
+        .get(&singular_name)
+        .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name));
+    (model.mod_name().to_string(), model.name.clone())
 }

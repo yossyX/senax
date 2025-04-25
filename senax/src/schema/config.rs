@@ -88,6 +88,9 @@ pub struct ConfigDef {
     /// ### デフォルトで更新を無効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_update: bool,
+    /// ### デフォルトで削除を無効化する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_delete: bool,
     /// ### シーケンスを使用する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_sequence: bool,
@@ -239,6 +242,9 @@ pub struct ConfigJson {
     /// ### デフォルトで更新を無効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_update: bool,
+    /// ### デフォルトで削除を無効化する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_delete: bool,
     /// ### シーケンスを使用する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_sequence: bool,
@@ -338,6 +344,7 @@ impl From<ConfigDef> for ConfigJson {
             use_update_delayed: value.use_update_delayed,
             use_upsert_delayed: value.use_upsert_delayed,
             disable_update: value.disable_update,
+            disable_delete: value.disable_delete,
             use_sequence: value.use_sequence,
             tx_isolation: value.tx_isolation,
             read_tx_isolation: value.read_tx_isolation,
@@ -403,6 +410,7 @@ impl From<ConfigJson> for ConfigDef {
             use_update_delayed: value.use_update_delayed,
             use_upsert_delayed: value.use_upsert_delayed,
             disable_update: value.disable_update,
+            disable_delete: value.disable_delete,
             use_sequence: value.use_sequence,
             tx_isolation: value.tx_isolation,
             read_tx_isolation: value.read_tx_isolation,

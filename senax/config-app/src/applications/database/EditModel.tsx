@@ -231,6 +231,7 @@ function EditModel() {
                 hidden={!detail}
               />
               <AutoField name="disable_update" {...formData} hidden={!detail} />
+              <AutoField name="disable_delete" {...formData} hidden={!detail} />
               <AutoField
                 name="disable_insert_cache_propagation"
                 {...formData}

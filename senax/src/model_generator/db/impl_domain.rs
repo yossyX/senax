@@ -124,7 +124,7 @@ pub fn write_group_rs(
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
-    let file_path = impl_domain_dir.join(format!("{}.rs", group_name));
+    let file_path = impl_domain_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]
@@ -179,15 +179,15 @@ pub fn write_entity(
     impl_domain_dir: &Path,
     db: &str,
     config: &ConfigDef,
-    group_name: &String,
+    group_name: &str,
     mod_name: &str,
     force: bool,
-    model_name: &String,
+    model_name: &str,
     def: &Arc<ModelDef>,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<(), anyhow::Error> {
     set_domain_mode(true);
-    let impl_domain_group_dir = impl_domain_dir.join(group_name);
+    let impl_domain_group_dir = impl_domain_dir.join(group_name.to_case(Case::Snake));
     let file_path = impl_domain_group_dir.join(format!("{}.rs", mod_name));
     remove_files.remove(file_path.as_os_str());
     let pascal_name = &model_name.to_case(Case::Pascal);

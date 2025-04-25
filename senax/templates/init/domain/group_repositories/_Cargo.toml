@@ -10,18 +10,23 @@ mock = ["mockall", "base_domain/mock"]
 [dependencies]
 base_domain = { path = "../../../../base_domain" }
 anyhow.workspace = true
+async-graphql.workspace = true
 async-stream.workspace = true
 async-trait.workspace = true
+base64.workspace = true
 chrono.workspace = true
 ciborium.workspace = true
 derive-new.workspace = true
 futures.workspace = true
 mockall = {version = "0.13", optional = true}
 rust_decimal.workspace = true
+schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+utoipa.workspace = true
 uuid.workspace = true
+validator.workspace = true
 
 [dev-dependencies]
 mockall = "0.13"

@@ -261,6 +261,9 @@ pub struct ModelDef {
     /// ### 更新を無効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_update: Option<bool>,
+    /// ### 削除を無効化する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disable_delete: Option<bool>,
     /// ### insertされたデータのキャッシュを他のサーバに通知しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_insert_cache_propagation: bool,
@@ -412,6 +415,9 @@ pub struct ModelJson {
     /// ### 更新を無効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_update: Option<bool>,
+    /// ### 削除を無効化する
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disable_delete: Option<bool>,
     /// ### insertされたデータのキャッシュを他のサーバに通知しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_insert_cache_propagation: bool,
@@ -503,6 +509,7 @@ impl From<ModelDef> for ModelJson {
             use_update_delayed: value.use_update_delayed,
             use_upsert_delayed: value.use_upsert_delayed,
             disable_update: value.disable_update,
+            disable_delete: value.disable_delete,
             disable_insert_cache_propagation: value.disable_insert_cache_propagation,
             use_on_delete_fn: value.use_on_delete_fn,
             abstract_mode: value.abstract_mode,
@@ -619,6 +626,7 @@ impl TryFrom<ModelJson> for ModelDef {
             use_update_delayed: value.use_update_delayed,
             use_upsert_delayed: value.use_upsert_delayed,
             disable_update: value.disable_update,
+            disable_delete: value.disable_delete,
             disable_insert_cache_propagation: value.disable_insert_cache_propagation,
             use_on_delete_fn: value.use_on_delete_fn,
             abstract_mode: value.abstract_mode,
@@ -804,7 +812,7 @@ impl ModelDef {
                     Value::Null => "null".to_owned(),
                     Value::Bool(b) => if_then_else!(*b, "true", "false").to_owned(),
                     Value::Number(n) => format!("{}", n),
-                    Value::String(s) => format!("{:?}.to_string()", s),
+                    Value::String(s) => format!("{:?}.to_string().into()", s),
                     Value::Sequence(_) => panic!("invalid key_value"),
                     Value::Mapping(_) => panic!("invalid key_value"),
                     Value::Tagged(_) => panic!("invalid key_value"),
@@ -825,20 +833,16 @@ impl ModelDef {
     pub fn inheritance_check(&self) -> String {
         if let Some(ref inheritance) = self.inheritance {
             if inheritance._type == InheritanceType::ColumnAggregation {
-                let key_value = match inheritance.key_value.as_ref().unwrap() {
+                let k = inheritance.key_field.as_ref().unwrap();
+                match inheritance.key_value.as_ref().unwrap() {
                     Value::Null => "null".to_owned(),
-                    Value::Bool(b) => if_then_else!(*b, "true", "false").to_owned(),
-                    Value::Number(n) => format!("{}", n),
-                    Value::String(s) => format!("{:?}", s),
+                    Value::Bool(b) => format!("r#{k} == {}", if_then_else!(*b, "true", "false")),
+                    Value::Number(n) => format!("r#{k} == {}", n),
+                    Value::String(s) => format!("r#{k}.as_str() == {:?}", s),
                     Value::Sequence(_) => panic!("invalid key_value"),
                     Value::Mapping(_) => panic!("invalid key_value"),
                     Value::Tagged(_) => panic!("invalid key_value"),
-                };
-                format!(
-                    "r#{} == {}",
-                    inheritance.key_field.as_ref().unwrap(),
-                    key_value,
-                )
+                }
             } else {
                 "".to_owned()
             }
@@ -853,7 +857,7 @@ impl ModelDef {
     }
 
     pub fn use_all_rows_cache(&self) -> bool {
-        self.use_all_rows_cache
+        self.use_cache() && self.use_all_rows_cache
             .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_all_rows_cache)
     }
 
@@ -916,6 +920,11 @@ impl ModelDef {
     pub fn disable_update(&self) -> bool {
         self.disable_update
             .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().disable_update)
+    }
+
+    pub fn disable_delete(&self) -> bool {
+        self.disable_delete
+            .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().disable_delete)
     }
 
     pub fn ignore_foreign_key(&self) -> bool {
@@ -1975,7 +1984,7 @@ impl ModelDef {
             .iter()
             .filter(|v| !v.1.is_type_of_belongs_to_outer_db())
         {
-            let group_name = rel.get_group_name();
+            let group_name = rel.get_group_name().to_case(Case::Snake);
             let mod_name = rel.get_mod_name();
             if let std::collections::btree_map::Entry::Vacant(e) = mods.entry(group_name.clone()) {
                 let mut list = BTreeSet::new();
@@ -2029,10 +2038,10 @@ impl ModelDef {
     }
     pub fn parent(&self) -> Vec<Arc<ModelDef>> {
         let mut cur = self.inheritance.clone();
-        let mut cur_group_name: Option<String> = None;
+        let mut cur_group_name: String = self.group_name.clone();
         while let Some(ref inheritance) = cur {
-            let model = RelDef::get_model_by_name(&inheritance.extends, cur_group_name);
-            cur_group_name = Some(model.group_name.clone());
+            let model = RelDef::get_model_by_name(&inheritance.extends, &cur_group_name);
+            cur_group_name = model.group_name.clone();
             cur.clone_from(&model.inheritance);
             if model.abstract_mode {
                 return vec![model];
@@ -2043,10 +2052,10 @@ impl ModelDef {
     pub fn parents(&self) -> Vec<Arc<ModelDef>> {
         let mut vec = Vec::new();
         let mut cur = self.inheritance.clone();
-        let mut cur_group_name: Option<String> = None;
+        let mut cur_group_name: String = self.group_name.clone();
         while let Some(ref inheritance) = cur {
-            let model = RelDef::get_model_by_name(&inheritance.extends, cur_group_name);
-            cur_group_name = Some(model.group_name.clone());
+            let model = RelDef::get_model_by_name(&inheritance.extends, &cur_group_name);
+            cur_group_name = model.group_name.clone();
             cur.clone_from(&model.inheritance);
             if model.abstract_mode {
                 vec.push(model.clone());
@@ -2057,11 +2066,11 @@ impl ModelDef {
     pub fn downcast_simple(&self) -> Vec<Arc<ModelDef>> {
         let mut vec = Vec::new();
         let mut cur = self.inheritance.clone();
-        let mut cur_group_name: Option<String> = None;
+        let mut cur_group_name: String = self.group_name.clone();
         while let Some(ref inheritance) = cur {
             if inheritance._type == InheritanceType::Simple {
-                let model = RelDef::get_model_by_name(&inheritance.extends, cur_group_name);
-                cur_group_name = Some(model.group_name.clone());
+                let model = RelDef::get_model_by_name(&inheritance.extends, &cur_group_name);
+                cur_group_name = model.group_name.clone();
                 cur.clone_from(&model.inheritance);
                 vec.push(model.clone());
             } else {
@@ -2077,11 +2086,11 @@ impl ModelDef {
     pub fn downcast_aggregation(&self) -> Vec<Arc<ModelDef>> {
         let mut vec = Vec::new();
         let mut cur = self.inheritance.clone();
-        let mut cur_group_name: Option<String> = None;
+        let mut cur_group_name: String = self.group_name.clone();
         while let Some(ref inheritance) = cur {
             if inheritance._type == InheritanceType::ColumnAggregation {
-                let model = RelDef::get_model_by_name(&inheritance.extends, cur_group_name);
-                cur_group_name = Some(model.group_name.clone());
+                let model = RelDef::get_model_by_name(&inheritance.extends, &cur_group_name);
+                cur_group_name = model.group_name.clone();
                 cur.clone_from(&model.inheritance);
                 vec.push(model.clone());
             } else {

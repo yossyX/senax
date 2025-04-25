@@ -412,7 +412,7 @@ impl std::fmt::Display for EnumClass {
                 if_then_else!(
                     self.outer_crate,
                     format!("db_{}", self.db),
-                    "crate".to_string()
+                    "db".to_string()
                 ),
                 _to_var_name(&self.group),
                 _to_var_name(&self.mod_name),
@@ -1145,6 +1145,9 @@ impl FieldDef {
                 DataType::Boolean => yaml_value_to_str(value).unwrap(),
                 DataType::Binary | DataType::Varbinary | DataType::Blob => {
                     yaml_value_to_str(value).unwrap()
+                }
+                _ if self.enum_class.is_some() => {
+                    format!("{}::{}", self.enum_class.as_ref().unwrap(), yaml_value_to_str(value).unwrap())
                 }
                 _ if self.enum_values.is_some() => {
                     format!("{:?}.to_string()", yaml_value_to_str(value).unwrap())

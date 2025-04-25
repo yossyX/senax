@@ -25,7 +25,6 @@ use tera::{Context, Tera};
 use crate::DB_PATH;
 use crate::schema::FieldDef;
 use crate::schema::IndexDef;
-use crate::schema::MODELS;
 use crate::schema::RelDef;
 use crate::schema::{self, CONFIG, GROUPS, GroupDef, ModelDef};
 
@@ -144,10 +143,6 @@ pub fn generate(
     let mut group_list = Vec::new();
     if let Some(group_name) = group_name {
         let models = groups.get(group_name);
-        MODELS.write().unwrap().take();
-        if let Some(models) = models {
-            MODELS.write().unwrap().replace(models.clone());
-        }
         group_list.push(Group {
             group_name,
             group_def: config
@@ -170,10 +165,6 @@ pub fn generate(
     } else {
         for (group_name, group_def) in &config.groups {
             let models = groups.get(group_name);
-            MODELS.write().unwrap().take();
-            if let Some(models) = models {
-                MODELS.write().unwrap().replace(models.clone());
-            }
             group_list.push(Group {
                 group_name,
                 group_def: group_def.clone().unwrap_or_default(),

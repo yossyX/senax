@@ -65,22 +65,24 @@ pub struct ModTemplate<'a> {
 pub fn write_group_rs(
     impl_domain_dir: &Path,
     db: &str,
-    group_name: &String,
+    base_group_name: &str,
+    group_name: &str,
     entities_mod_names: &BTreeSet<(String, &String)>,
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
-    let file_path = impl_domain_dir.join(format!("{}.rs", group_name));
+    let file_path = impl_domain_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "model/repositories/src/impl_domain/group.rs", escape = "none")]
         struct ImplDomainGroupTemplate<'a> {
             pub db: &'a str,
+            pub base_group_name: &'a str,
             pub group_name: &'a str,
         }
 
-        ImplDomainGroupTemplate { db, group_name }.render()?
+        ImplDomainGroupTemplate { db, base_group_name, group_name }.render()?
     } else {
         fs::read_to_string(&file_path)?
     };
@@ -187,15 +189,16 @@ pub fn write_entity(
     impl_domain_dir: &Path,
     db: &str,
     config: &ConfigDef,
-    group_name: &String,
+    base_group_name: &str,
+    group_name: &str,
     mod_name: &str,
     force: bool,
-    model_name: &String,
+    model_name: &str,
     def: &Arc<ModelDef>,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<(), anyhow::Error> {
     set_domain_mode(true);
-    let impl_domain_group_dir = impl_domain_dir.join(group_name);
+    let impl_domain_group_dir = impl_domain_dir.join(group_name.to_case(Case::Snake));
     let file_path = impl_domain_group_dir.join(format!("{}.rs", mod_name));
     remove_files.remove(file_path.as_os_str());
     let pascal_name = &model_name.to_case(Case::Pascal);
@@ -205,6 +208,7 @@ pub fn write_entity(
         #[template(path = "model/repositories/src/impl_domain/entities/entity.rs", escape = "none")]
         pub struct ImplDomainEntityTemplate<'a> {
             pub db: &'a str,
+            pub base_group_name: &'a str,
             pub group_name: &'a str,
             pub mod_name: &'a str,
             pub pascal_name: &'a str,
@@ -214,6 +218,7 @@ pub fn write_entity(
 
         let tpl = ImplDomainEntityTemplate {
             db,
+            base_group_name,
             group_name,
             mod_name,
             pascal_name,
@@ -234,6 +239,7 @@ pub fn write_entity(
     pub struct ImplDomainBaseEntityTemplate<'a> {
         pub db: &'a str,
         pub config: &'a ConfigDef,
+        pub base_group_name: &'a str,
         pub group_name: &'a str,
         pub mod_name: &'a str,
         pub pascal_name: &'a str,
@@ -244,6 +250,7 @@ pub fn write_entity(
     let tpl = ImplDomainBaseEntityTemplate {
         db,
         config,
+        base_group_name,
         group_name,
         mod_name,
         pascal_name,

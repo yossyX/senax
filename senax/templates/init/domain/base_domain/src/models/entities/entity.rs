@@ -6,7 +6,7 @@ use crate::models::@{ db|snake|to_var_name }@ as _model_;
 use crate::value_objects;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
 #[allow(unused_imports)]
-pub use crate::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
+pub use crate::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 
 #[rustfmt::skip]

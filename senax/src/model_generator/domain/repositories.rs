@@ -1,5 +1,4 @@
 use crate::filters;
-use crate::schema::MODELS;
 use crate::{
     common::fs_write,
     schema::{ModelDef, set_domain_mode, to_id_name},
@@ -21,7 +20,6 @@ pub fn write_group_files(
     domain_repositories_dir: &Path,
     db: &str,
     group: &str,
-    entities_mod_names: &BTreeSet<(String, &String)>,
     groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
     force: bool,
     remove_files: &mut HashSet<OsString>,
@@ -93,7 +91,13 @@ pub mod @{ name|snake|to_var_name }@;
 
     for (name, defs) in groups {
         let mod_names: BTreeSet<String> = defs.iter().filter(|(_k, v)| !v.abstract_mode).map(|(_, d)| d.mod_name()).collect();
-        MODELS.write().unwrap().replace(defs.clone());
+        let mod_names = &mod_names;
+        let entities_mod_names: BTreeSet<(String, &String)> = defs
+            .iter()
+            .filter(|(_, d)| !d.abstract_mode)
+            .map(|(model_name, def)| (def.mod_name(), model_name))
+            .collect();
+        let entities_mod_names = &entities_mod_names;
         let file_path = src_dir.join("repositories").join(&format!("{}.rs", name.to_case(Case::Snake)));
         remove_files.remove(file_path.as_os_str());
         let content = if force || !file_path.exists() {
@@ -137,7 +141,7 @@ pub mod @{ mod_name|to_var_name }@;
                 pub mod_names: &'a BTreeSet<String>,
             }
 
-            let tpl = DomainGroupModTemplate { mod_names: &mod_names }.render()?;
+            let tpl = DomainGroupModTemplate { mod_names }.render()?;
             let tpl = tpl.trim_start();
             let content = re.replace(&content, tpl);
 
@@ -258,6 +262,23 @@ pub mod @{ mod_name|to_var_name }@;
             let content = re.replace(&content, tpl);
 
             fs_write(file_path, &*content)?;
+        }
+        for (model_name, def) in defs {
+            let group_name = name;
+            let mod_name = def.mod_name();
+            let mod_name = &mod_name;
+            if !def.abstract_mode {
+                write_entity(
+                    &base_dir,
+                    db,
+                    group_name,
+                    mod_name,
+                    force,
+                    model_name,
+                    def,
+                    remove_files,
+                )?;
+            }
         }
     }
     Ok(())
@@ -458,7 +479,7 @@ pub fn write_cargo_toml(
 
 #[allow(clippy::too_many_arguments)]
 pub fn write_entity(
-    domain_repositories_dir: &Path,
+    base_dir: &Path,
     db: &str,
     group_name: &String,
     mod_name: &str,
@@ -468,11 +489,9 @@ pub fn write_entity(
     remove_files: &mut HashSet<OsString>,
 ) -> Result<(), anyhow::Error> {
     set_domain_mode(true);
-    let domain_group_dir = domain_repositories_dir
-        .join("groups")
-        .join(group_name)
+    let domain_group_dir = base_dir
         .join("src/repositories")
-        .join(group_name);
+        .join(group_name.to_case(Case::Snake));
     let file_path = domain_group_dir.join(format!("{}.rs", mod_name));
     remove_files.remove(file_path.as_os_str());
     let pascal_name = &model_name.to_case(Case::Pascal);
