@@ -6,8 +6,8 @@ use std::fmt::Write;
 use std::{fs, path::Path};
 
 use crate::common::fs_write;
-use crate::{DOMAIN_PATH, SCHEMA_PATH};
 use crate::filters;
+use crate::{DOMAIN_PATH, SCHEMA_PATH};
 
 pub fn db_list(dir_type_only: bool) -> Result<Vec<String>> {
     let schema_path = Path::new(SCHEMA_PATH);
@@ -40,7 +40,7 @@ pub fn generate(db: &str, exclude_from_domain: bool) -> Result<()> {
         pub db_id: u64,
         pub exclude_from_domain: bool,
     }
-    
+
     let file_path = schema_path.join(format!("{}.yml", db));
     if !file_path.exists() {
         let tpl = DbTemplate {
@@ -70,7 +70,7 @@ pub fn generate(db: &str, exclude_from_domain: bool) -> Result<()> {
         let file_path = domain_path.join("Cargo.toml");
         if file_path.exists() {
             let mut content = fs::read_to_string(&file_path)?;
-    
+
             let db = &db.to_case(Case::Snake);
             content = content.replace(
                 "\"mockall\"",
@@ -92,7 +92,7 @@ pub fn generate(db: &str, exclude_from_domain: bool) -> Result<()> {
             );
             fs_write(file_path, &*content)?;
         }
-    
+
         repositories(&domain_path.join("repositories").join(db), db)?;
     }
     Ok(())
@@ -105,7 +105,6 @@ pub struct DomainDbLibTemplate<'a> {
 }
 
 fn repositories(path: &Path, db: &str) -> Result<()> {
-
     #[derive(Template)]
     #[template(path = "init/domain/db_repositories/_Cargo.toml", escape = "none")]
     struct DomainCargoTemplate<'a> {

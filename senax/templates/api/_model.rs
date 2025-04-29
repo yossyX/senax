@@ -2,7 +2,7 @@
 #[rustfmt::skip]
 use domain::models::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ mod_name|to_var_name }@::{self as _domain_, @{ pascal_name }@Updater as _, @{ pascal_name }@UpdaterBase as _};
 use domain::repository::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ mod_name|to_var_name }@ as _repository_;
-use domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository as _Repository;
+use domain::repository::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ group|pascal }@Repository as _Repository;
 use domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@QueryService as _QueryService;
 
 fn query_guard() -> impl async_graphql::Guard {
@@ -322,7 +322,7 @@ fn create_entity(input: ReqObj, repo: &dyn _Repository, auth: &AuthInfo) -> Box<
 @{- def.non_auto_primary_for_factory()|fmt_join("
         {var}: {from_api_type},", "") }@
     }
-    .create(repo.@{ group|to_var_name }@().as_ref());
+    .create(repo.into());
     @{- def.relations_one_for_api_request()|fmt_rel_join("
     if let Some(input) = input.{rel_name} {
         obj.set_{raw_rel_name}(_{raw_rel_name}::create_entity(input, repo, auth));
@@ -348,7 +348,7 @@ pub fn create_list(
 
 #[rustfmt::skip]
 #[allow(unused_variables)]
-fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: ReqObj, repo: &RepositoryImpl, auth: &AuthInfo) -> anyhow::Result<()> {
+fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: ReqObj, repo: &dyn _Repository, auth: &AuthInfo) -> anyhow::Result<()> {
 @{- def.for_api_update_updater()|fmt_join("
     updater.set_{raw_var}({from_api_type_for_update});", "") }@
 @{- def.relations_one_for_api_request_with_replace_type(true)|fmt_rel_join("

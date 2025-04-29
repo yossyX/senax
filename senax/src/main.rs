@@ -34,18 +34,18 @@ mod db_document;
 pub(crate) mod ddl {
     pub mod table;
 }
-pub(crate) mod filters;
 mod actix_generator;
 mod api_generator;
 mod client_generator;
 #[cfg(feature = "config")]
 mod config_server;
 mod db_generator;
+pub(crate) mod filters;
 mod init_generator;
 mod migration_generator;
 mod model_generator;
-mod schema_generator;
 pub(crate) mod schema;
+mod schema_generator;
 mod schema_md;
 
 pub const SCHEMA_PATH: &str = "0_schema";
@@ -281,7 +281,10 @@ async fn exec(cli: Cli) -> Result<()> {
         } => {
             init_generator::generate(name, *non_snake_case)?;
         }
-        Commands::NewDb { db, exclude_from_domain } => {
+        Commands::NewDb {
+            db,
+            exclude_from_domain,
+        } => {
             ensure!(db_re.is_match(db), "bad db name!");
             db_generator::generate(db, *exclude_from_domain)?;
         }

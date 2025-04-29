@@ -42,13 +42,14 @@ pub mod models;
 pub mod seeder;
 
 pub use models::{CacheMsg, CacheOp};
+pub use misc::Updater;
 
 @% if !config.force_disable_cache -%@
 use cache::Cache;
 @%- endif %@
 pub use connection::DbConn;
 
-pub const DB_NAME: &str = "@{ db }@";
+pub const DB_NAME: &str = "@{ db|snake }@";
 pub const DB_UPPER_NAME: &str = "@{ db|upper_snake }@";
 pub const DB_ID: u64 = @{ config.db_id() }@;
 pub const IN_CONDITION_LIMIT: usize = 500;

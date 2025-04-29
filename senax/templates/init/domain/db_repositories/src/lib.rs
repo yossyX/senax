@@ -96,7 +96,7 @@ impl Emu@{ db|pascal }@Repository {
 macro_rules! get_emu_group {
     ($n:ident, $o:ty, $i:ty) => {
         fn $n(&self) -> Box<$o> {
-            Box::new(<$i>::new(self.repo.clone()))
+            Box::new(<$i>::new(Arc::clone(&self.repo)))
         }
     };
 }

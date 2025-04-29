@@ -12,13 +12,12 @@ use_google_resolver = [ "hickory-resolver" ]
 [dependencies]
 domain = { path = "../../1_domain" }
 @%- for db in config.outer_db() %@
-db_@{ db }@ = { path = "../@{ db }@" }
+db_@{ db|snake }@ = { path = "../@{ db|snake }@" }
 @%- endfor %@
 
 ahash.workspace = true
 anyhow.workspace = true
 arc-swap = "1.5.1"
-async-recursion = "1.0.4"
 async-stream.workspace = true
 async-trait.workspace = true
 bytes = "1.4"

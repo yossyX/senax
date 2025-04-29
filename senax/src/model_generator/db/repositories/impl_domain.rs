@@ -10,24 +10,28 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::common::fs_write;
-use crate::schema::{ConfigDef, ModelDef, set_domain_mode, to_id_name};
 use crate::filters;
+use crate::schema::{ConfigDef, ModelDef, set_domain_mode, to_id_name};
 
 pub fn write_impl_domain_rs(
     src_dir: &Path,
     db: &str,
+    group_name: &str,
     groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
     force: bool,
+    remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
     let file_path = src_dir.join("impl_domain.rs");
+    remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "model/repositories/src/impl_domain.rs", escape = "none")]
-        pub struct ImplDomainDbTemplate<'a> {
-            pub db: &'a str,
+        struct ImplDomainDbTemplate<'a> {
+            db: &'a str,
+            group_name: &'a str,
         }
 
-        ImplDomainDbTemplate { db }.render()?
+        ImplDomainDbTemplate { db, group_name }.render()?
     } else {
         fs::read_to_string(&file_path)?
     };
@@ -38,23 +42,75 @@ pub fn write_impl_domain_rs(
         "File contents are invalid.: {:?}",
         &file_path
     );
-    
-#[derive(Template)]
-#[template(
-    source = r###"
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, defs) in groups %@
 pub mod @{ name|snake|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct ModTemplate<'a> {
-    pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
-}
+        ext = "txt",
+        escape = "none"
+    )]
+    struct ModTemplate<'a> {
+        groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    }
 
     let tpl = ModTemplate { groups }.render()?;
+    let tpl = tpl.trim_start();
+    let content = re.replace(&content, tpl);
+
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify up to this line. \(RepoEnd\)").unwrap();
+    ensure!(
+        re.is_match(&content),
+        "File contents are invalid.: {:?}",
+        &file_path
+    );
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
+    // Do not modify below this line. (RepoStart)
+    @%- for (group, _) in groups %@
+    get_repo!(@{ group|snake|to_var_name }@, dyn _domain::@{ group|snake|to_var_name }@::@{ group|pascal }@Repository, @{ group|snake|to_var_name }@::@{ group|pascal }@RepositoryImpl);
+    @%- endfor %@
+    // Do not modify up to this line. (RepoEnd)"###,
+        ext = "txt",
+        escape = "none"
+    )]
+    struct RepoTemplate<'a> {
+        groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    }
+
+    let tpl = RepoTemplate { groups }.render()?;
+    let tpl = tpl.trim_start();
+    let content = re.replace(&content, tpl);
+
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceStart\).+// Do not modify up to this line. \(QueryServiceEnd\)").unwrap();
+    ensure!(
+        re.is_match(&content),
+        "File contents are invalid.: {:?}",
+        &file_path
+    );
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
+    // Do not modify below this line. (QueryServiceStart)
+    @%- for (group, _) in groups %@
+    get_repo!(@{ group|snake|to_var_name }@, dyn _domain::@{ group|snake|to_var_name }@::@{ group|pascal }@QueryService, @{ group|snake|to_var_name }@::@{ group|pascal }@QueryServiceImpl);
+    @%- endfor %@
+    // Do not modify up to this line. (QueryServiceEnd)"###,
+        ext = "txt",
+        escape = "none"
+    )]
+    struct QueryServiceTemplate<'a> {
+        groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    }
+
+    let tpl = QueryServiceTemplate { groups }.render()?;
     let tpl = tpl.trim_start();
     let content = re.replace(&content, tpl);
 
@@ -76,13 +132,18 @@ pub fn write_group_rs(
     let content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "model/repositories/src/impl_domain/group.rs", escape = "none")]
-        struct ImplDomainGroupTemplate<'a> {
-            pub db: &'a str,
-            pub base_group_name: &'a str,
-            pub group_name: &'a str,
+        struct GroupTemplate<'a> {
+            db: &'a str,
+            base_group_name: &'a str,
+            group_name: &'a str,
         }
 
-        ImplDomainGroupTemplate { db, base_group_name, group_name }.render()?
+        GroupTemplate {
+            db,
+            base_group_name,
+            group_name,
+        }
+        .render()?
     } else {
         fs::read_to_string(&file_path)?
     };
@@ -94,10 +155,10 @@ pub fn write_group_rs(
         "File contents are invalid.: {:?}",
         &file_path
     );
-    
-#[derive(Template)]
-#[template(
-    source = r###"
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
 // Do not modify below this line. (ModStart)
 pub mod _base {
 @%- for mod_name in mod_names %@
@@ -108,14 +169,14 @@ pub mod _base {
 pub mod @{ mod_name|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct DomainGroupModTemplate<'a> {
-    pub mod_names: &'a BTreeSet<String>,
-}
+        ext = "txt",
+        escape = "none"
+    )]
+    struct ModTemplate<'a> {
+        mod_names: &'a BTreeSet<String>,
+    }
 
-    let tpl = DomainGroupModTemplate {
+    let tpl = ModTemplate {
         mod_names: &mod_names,
     }
     .render()?;
@@ -128,23 +189,23 @@ pub struct DomainGroupModTemplate<'a> {
         "File contents are invalid.: {:?}",
         &file_path
     );
-    
-#[derive(Template)]
-#[template(
-    source = r###"
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
     // Do not modify below this line. (RepoStart)
     @%- for (mod_name, model_name) in mod_names %@
     get_repo!(@{ mod_name|to_var_name }@, dyn _domain::@{ mod_name|to_var_name }@::@{ model_name|pascal }@Repository, @{ mod_name|to_var_name }@::@{ model_name|pascal }@RepositoryImpl);
     @%- endfor %@
     // Do not modify up to this line. (RepoEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct ImplDomainGroupRepoTemplate<'a> {
-    pub mod_names: &'a BTreeSet<(String, &'a String)>,
-}
+        ext = "txt",
+        escape = "none"
+    )]
+    struct RepoTemplate<'a> {
+        mod_names: &'a BTreeSet<(String, &'a String)>,
+    }
 
-    let tpl = ImplDomainGroupRepoTemplate {
+    let tpl = RepoTemplate {
         mod_names: entities_mod_names,
     }
     .render()?;
@@ -157,23 +218,23 @@ pub struct ImplDomainGroupRepoTemplate<'a> {
         "File contents are invalid.: {:?}",
         &file_path
     );
-    
-#[derive(Template)]
-#[template(
-    source = r###"
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
     // Do not modify below this line. (QueryServiceStart)
     @%- for (mod_name, model_name) in mod_names %@
     get_repo!(@{ mod_name|to_var_name }@, dyn _domain::@{ mod_name|to_var_name }@::@{ model_name|pascal }@QueryService, @{ mod_name|to_var_name }@::@{ model_name|pascal }@RepositoryImpl);
     @%- endfor %@
     // Do not modify up to this line. (QueryServiceEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct ImplDomainGroupQueryServiceTemplate<'a> {
-    pub mod_names: &'a BTreeSet<(String, &'a String)>,
-}
+        ext = "txt",
+        escape = "none"
+    )]
+    struct QueryServiceTemplate<'a> {
+        mod_names: &'a BTreeSet<(String, &'a String)>,
+    }
 
-    let tpl = ImplDomainGroupQueryServiceTemplate {
+    let tpl = QueryServiceTemplate {
         mod_names: entities_mod_names,
     }
     .render()?;
@@ -205,18 +266,21 @@ pub fn write_entity(
     let id_name = &to_id_name(model_name);
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/repositories/src/impl_domain/entities/entity.rs", escape = "none")]
-        pub struct ImplDomainEntityTemplate<'a> {
-            pub db: &'a str,
-            pub base_group_name: &'a str,
-            pub group_name: &'a str,
-            pub mod_name: &'a str,
-            pub pascal_name: &'a str,
-            pub id_name: &'a str,
-            pub def: &'a Arc<ModelDef>,
+        #[template(
+            path = "model/repositories/src/impl_domain/entities/entity.rs",
+            escape = "none"
+        )]
+        struct EntityTemplate<'a> {
+            db: &'a str,
+            base_group_name: &'a str,
+            group_name: &'a str,
+            mod_name: &'a str,
+            pascal_name: &'a str,
+            id_name: &'a str,
+            def: &'a Arc<ModelDef>,
         }
 
-        let tpl = ImplDomainEntityTemplate {
+        let tpl = EntityTemplate {
             db,
             base_group_name,
             group_name,
@@ -236,18 +300,18 @@ pub fn write_entity(
         path = "model/repositories/src/impl_domain/entities/base/_entity.rs",
         escape = "none"
     )]
-    pub struct ImplDomainBaseEntityTemplate<'a> {
-        pub db: &'a str,
-        pub config: &'a ConfigDef,
-        pub base_group_name: &'a str,
-        pub group_name: &'a str,
-        pub mod_name: &'a str,
-        pub pascal_name: &'a str,
-        pub id_name: &'a str,
-        pub def: &'a Arc<ModelDef>,
+    struct BaseEntityTemplate<'a> {
+        db: &'a str,
+        config: &'a ConfigDef,
+        base_group_name: &'a str,
+        group_name: &'a str,
+        mod_name: &'a str,
+        pascal_name: &'a str,
+        id_name: &'a str,
+        def: &'a Arc<ModelDef>,
     }
 
-    let tpl = ImplDomainBaseEntityTemplate {
+    let tpl = BaseEntityTemplate {
         db,
         config,
         base_group_name,
@@ -261,4 +325,3 @@ pub fn write_entity(
     set_domain_mode(false);
     Ok(())
 }
-

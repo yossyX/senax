@@ -1147,7 +1147,11 @@ impl FieldDef {
                     yaml_value_to_str(value).unwrap()
                 }
                 _ if self.enum_class.is_some() => {
-                    format!("{}::{}", self.enum_class.as_ref().unwrap(), yaml_value_to_str(value).unwrap())
+                    format!(
+                        "{}::{}",
+                        self.enum_class.as_ref().unwrap(),
+                        yaml_value_to_str(value).unwrap()
+                    )
                 }
                 _ if self.enum_values.is_some() => {
                     format!("{:?}.to_string()", yaml_value_to_str(value).unwrap())
@@ -1166,7 +1170,7 @@ impl FieldDef {
 
     pub fn get_api_default(&self, name: &str) -> String {
         let conv = |value| -> String {
-            let mut result = match self.data_type {
+            let result = match self.data_type {
                 DataType::Char | DataType::Varchar => {
                     format!("{:?}.to_string()", yaml_value_to_str(value).unwrap())
                 }
@@ -1194,14 +1198,14 @@ impl FieldDef {
                 DataType::Binary | DataType::Varbinary | DataType::Blob => {
                     yaml_value_to_str(value).unwrap()
                 }
-                _ if self.enum_values.is_some() => {
-                    format!("{:?}.to_string()", yaml_value_to_str(value).unwrap())
-                }
+                // _ if self.enum_values.is_some() => {
+                //     format!("{:?}.to_string()", yaml_value_to_str(value).unwrap())
+                // }
                 _ => return "Default::default()".to_string(),
             };
-            if self.value_object.is_some() {
-                result.push_str(".into()")
-            }
+            // if self.value_object.is_some() {
+            //     result.push_str(".into()")
+            // }
             if self.not_null {
                 result
             } else {
@@ -1449,19 +1453,22 @@ impl FieldDef {
         let custom = ApiFieldDef::validator(name);
         let has_custom = custom.is_some();
         if let Some(validator) = custom {
-            validators.push(format!("custom = {:?}", validator));
+            validators.push(format!("custom(function = {:?})", validator));
         }
         match self.data_type {
             DataType::Char | DataType::Varchar => {
                 if !has_custom {
-                    validators.push("custom = \"crate::validator::validate_varchar\"".to_string());
+                    validators.push(
+                        "custom(function = \"crate::validator::validate_varchar\")".to_string(),
+                    );
                 }
                 let length = self.length.unwrap_or(DEFAULT_VARCHAR_LENGTH);
                 validators.push(format!("length(max = {})", length));
             }
             DataType::Text => {
                 if !has_custom {
-                    validators.push("custom = \"crate::validator::validate_text\"".to_string());
+                    validators
+                        .push("custom(function = \"crate::validator::validate_text\")".to_string());
                 }
                 if let Some(length) = self.length {
                     validators.push(format!("length(max = {})", length));
@@ -1470,7 +1477,8 @@ impl FieldDef {
             DataType::ArrayString => {
                 if !has_custom {
                     validators.push(
-                        "custom = \"crate::validator::validate_array_of_varchar\"".to_string(),
+                        "custom(function = \"crate::validator::validate_array_of_varchar\")"
+                            .to_string(),
                     );
                 }
             }
@@ -1488,14 +1496,18 @@ impl FieldDef {
                 validators.push(format!("range(max = {})", self.max.unwrap(),));
             }
             DataType::Double | DataType::Float if !self.signed => {
-                validators.push("range(min = 0)".to_string());
+                validators.push("range(min = 0.0)".to_string());
             }
             DataType::Decimal if !self.signed => {
-                validators
-                    .push("custom = \"crate::validator::validate_unsigned_decimal\"".to_string());
+                validators.push(
+                    "custom(function = \"crate::validator::validate_unsigned_decimal\")"
+                        .to_string(),
+                );
             }
             DataType::Json | DataType::Geometry if self.json_class.is_none() => {
-                validators.push("custom = \"crate::validator::validate_json_object\"".to_string());
+                validators.push(
+                    "custom(function = \"crate::validator::validate_json_object\")".to_string(),
+                );
             }
             _ => {}
         }
@@ -3207,12 +3219,7 @@ impl FieldDef {
     }
 
     pub fn get_bind_as_for_filter(&self) -> &'static str {
-        let exclude_from_domain = CONFIG
-            .read()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .exclude_from_domain;
+        let exclude_from_domain = CONFIG.read().unwrap().as_ref().unwrap().exclude_from_domain;
         if let Some(ref _class) = self.enum_class {
             if self.is_integer() {
                 if exclude_from_domain {

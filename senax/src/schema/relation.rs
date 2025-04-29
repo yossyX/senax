@@ -724,9 +724,18 @@ impl RelDef {
     }
     pub fn get_group_mod_name(&self) -> String {
         if let Some(db) = &self.db {
-            format!("{}_{}_{}", db, self.get_group_name().to_case(Case::Snake), self.get_mod_name())
+            format!(
+                "{}_{}_{}",
+                db,
+                self.get_group_name().to_case(Case::Snake),
+                self.get_mod_name()
+            )
         } else {
-            format!("{}_{}", self.get_group_name().to_case(Case::Snake), self.get_mod_name())
+            format!(
+                "{}_{}",
+                self.get_group_name().to_case(Case::Snake),
+                self.get_mod_name()
+            )
         }
     }
     pub fn get_group_mod_var(&self) -> String {

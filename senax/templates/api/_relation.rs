@@ -3,6 +3,10 @@ use domain::models::@{ db|snake|to_var_name }@::@{ rel_mod }@::{
     self as _domain_, @{ pascal_name }@Updater as _, @{ pascal_name }@UpdaterBase as _
 };
 #[allow(unused_imports)]
+use super::_repository_::_@{ rel_name }@_repository_ as _repository_;
+#[allow(unused_imports)]
+use super::_Repository as _Repository;
+#[allow(unused_imports)]
 use domain::value_objects;
 #[allow(unused_imports)]
 use senax_common::types::blob::{ApiToBlob as _, BlobToApi as _};
@@ -86,11 +90,11 @@ impl From<&dyn _domain_::@{ pascal_name }@Cache> for ResObj@{ rel_name|pascal }@
 
 #[allow(unused_mut)]
 #[allow(clippy::needless_update)]
-pub fn joiner(_look_ahead: async_graphql::Lookahead<'_>) -> Option<Box<_domain_::Joiner_>> {
+pub fn joiner(_look_ahead: async_graphql::Lookahead<'_>) -> Option<Box<_repository_::Joiner_>> {
     if !_look_ahead.exists() {
         return None;
     }
-    let joiner = _domain_::Joiner_ {
+    let joiner = _repository_::Joiner_ {
         @%- if camel_case %@
         @{- def.relations_one_for_api_response()|fmt_rel_join("
         {rel_name}: _{raw_rel_name}::joiner(_look_ahead.field(\"{rel_name_camel}\")),", "") }@
@@ -114,8 +118,8 @@ pub fn joiner(_look_ahead: async_graphql::Lookahead<'_>) -> Option<Box<_domain_:
 #[allow(unused_mut)]
 #[allow(dead_code)]
 #[allow(clippy::needless_update)]
-pub fn reader_joiner() -> Option<Box<_domain_::Joiner_>> {
-    let joiner = _domain_::Joiner_ {
+pub fn reader_joiner() -> Option<Box<_repository_::Joiner_>> {
+    let joiner = _repository_::Joiner_ {
         @{- def.relations_one_for_api_response()|fmt_rel_join("
         {rel_name}: _{raw_rel_name}::reader_joiner(),", "") }@
         @{- def.relations_many_for_api_response()|fmt_rel_join("
@@ -131,8 +135,8 @@ pub fn reader_joiner() -> Option<Box<_domain_::Joiner_>> {
 
 #[allow(unused_mut)]
 #[allow(clippy::needless_update)]
-pub fn updater_joiner() -> Option<Box<_domain_::Joiner_>> {
-    let joiner = _domain_::Joiner_ {
+pub fn updater_joiner() -> Option<Box<_repository_::Joiner_>> {
+    let joiner = _repository_::Joiner_ {
         @{- def.relations_one_for_api_request()|fmt_rel_join("
         {rel_name}: _{raw_rel_name}::updater_joiner(),", "") }@
         @{- def.relations_many_for_api_request()|fmt_rel_join("
@@ -144,7 +148,6 @@ pub fn updater_joiner() -> Option<Box<_domain_::Joiner_>> {
 
 use serde::{Deserialize, Serialize};
 use crate::auth::AuthInfo;
-use crate::db::RepositoryImpl;
 
 @{ def.label|label0 -}@
 #[derive(Debug, async_graphql::InputObject, validator::Validate, Serialize, Deserialize, schemars::JsonSchema)]
@@ -202,12 +205,12 @@ impl From<&mut dyn _domain_::@{ pascal_name }@Updater> for ReqObj@{ rel_name|pas
 #[allow(clippy::let_and_return)]
 #[allow(unused_mut)]
 #[allow(unused_variables)]
-pub fn create_entity(input: ReqObj@{ rel_name|pascal }@, repo: &RepositoryImpl, auth: &AuthInfo) -> Box<dyn _domain_::@{ pascal_name }@Updater> {
-    let mut obj = _domain_::@{ pascal_name }@Factory {
+pub fn create_entity(input: ReqObj@{ rel_name|pascal }@, repo: &dyn _Repository, auth: &AuthInfo) -> Box<dyn _domain_::@{ pascal_name }@Updater> {
+    let mut obj = _repository_::@{ pascal_name }@Factory {
 @{- def.non_auto_primary_for_factory()|fmt_join_with_foreign_default("
         {var}: {from_api_rel_type},", "", rel_id) }@
     }
-    .create(repo);
+    .create(repo.into());
     @{- def.relations_one_for_api_request()|fmt_rel_join("
     if let Some(input) = input.{rel_name} {
         obj.set_{raw_rel_name}(_{raw_rel_name}::create_entity(input, repo, auth));
@@ -222,7 +225,7 @@ pub fn create_entity(input: ReqObj@{ rel_name|pascal }@, repo: &RepositoryImpl, 
 
 pub fn create_list(
     data_list: Vec<ReqObj@{ rel_name|pascal }@>,
-    repo: &RepositoryImpl,
+    repo: &dyn _Repository,
     auth: &AuthInfo,
 ) -> Vec<Box<dyn _domain_::@{ pascal_name }@Updater>> {
     data_list.into_iter().map(|v| create_entity(v, repo, auth)).collect()
@@ -231,7 +234,7 @@ pub fn create_list(
 pub fn update_list(
     list: Vec<Box<dyn _domain_::@{ pascal_name }@Updater>>,
     data_list: Vec<ReqObj@{ rel_name|pascal }@>,
-    repo: &RepositoryImpl,
+    repo: &dyn _Repository,
     auth: &AuthInfo,
 ) -> anyhow::Result<Vec<Box<dyn _domain_::@{ pascal_name }@Updater>>> {
     let mut map: HashMap<_, _> = list
@@ -275,7 +278,7 @@ pub fn update_list(
 pub fn update_updater(
     updater: &mut dyn _domain_::@{ pascal_name }@Updater,
     input: ReqObj@{ rel_name|pascal }@,
-    repo: &RepositoryImpl,
+    repo: &dyn _Repository,
     auth: &AuthInfo,
 ) -> anyhow::Result<()> {
 @{- def.for_api_request_except_without_primary(rel_id)|fmt_join("

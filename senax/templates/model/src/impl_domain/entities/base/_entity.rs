@@ -5,9 +5,9 @@ use crate::misc::Updater as _;
 use crate::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
 #[allow(unused_imports)]
 use anyhow::Context as _;
-#[allow(unused_imports)]
-use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::{self, *};
-use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
+// #[allow(unused_imports)]
+// use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::{self, *};
+// use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
 use domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
 #[allow(unused_imports)]
 use domain::models::{self, ToGeoPoint as _, ToPoint as _};

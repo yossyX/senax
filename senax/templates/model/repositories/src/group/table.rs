@@ -45,7 +45,6 @@ use fxhash::FxHashMap;
 use once_cell::sync::Lazy;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::repositories::ModelTrWithCache;
 
 pub struct SaveData {
     is_new: bool,
@@ -62,12 +61,12 @@ async fn save_data(
     let update_ids: Vec<&_@{ pascal_name }@Id> = update_map.keys().collect();
     let mut conn = DbConn::_new(shard_id as ShardId);
     conn.begin().await?;
-    let list = _@{ pascal_name }@::query()
+    let list = _@{ pascal_name }@_::query()
         .filter(filter!(key IN update_ids))
         .skip_locked()
         .select_for_update(&mut conn)
         .await?;
-    let mut updater_map = _@{ pascal_name }@::updater_list_to_map(list);
+    let mut updater_map = _@{ pascal_name }@_::updater_list_to_map(list);
     let mut save_list = Vec::new();
     let mut update_list = Vec::new();
     for (id, mut l) in update_map.into_iter() {
@@ -123,7 +122,7 @@ async fn save_data(
         conn.rollback().await?;
         return Ok(());
     }
-    _@{ pascal_name }@::bulk_overwrite(&mut conn, save_list).await?;
+    _@{ pascal_name }@_::bulk_overwrite(&mut conn, save_list).await?;
     conn.commit().await?;
     for data in new_list {
         data.result.lock().unwrap().replace(Ok(data.key.clone()));
@@ -149,7 +148,7 @@ impl SessionStore for _@{ pascal_name }@Store {
     async fn load(&self, session_key: &SessionKey) -> Result<Option<SessionData>> {
         let conn = DbConn::_new(calc_shard_id(session_key) as ShardId);
         let id: String = session_key.into();
-        let session = _@{ pascal_name }@::find_optional_from_cache(&conn, id)
+        let session = _@{ pascal_name }@_::find_optional_from_cache(&conn, id)
             .await?
             .map(|s| SessionData::new(s._data(), (s._eol() as u64) << EOL_SHIFT, s._@{ ConfigDef::version() }@()));
         Ok(session)
@@ -158,7 +157,7 @@ impl SessionStore for _@{ pascal_name }@Store {
     async fn reload(&self, session_key: &SessionKey) -> Result<Option<SessionData>> {
         let mut conn = DbConn::_new(calc_shard_id(session_key) as ShardId);
         let id: String = session_key.into();
-        let session = _@{ pascal_name }@::find_optional(&mut conn, id, None)
+        let session = _@{ pascal_name }@_::find_optional(&mut conn, id, None)
             .await?
             .map(|s| SessionData::new(s._data(), (s._eol() as u64) << EOL_SHIFT, s._@{ ConfigDef::version() }@()));
         Ok(session)
@@ -238,7 +237,7 @@ impl SessionStore for _@{ pascal_name }@Store {
         let mut session = id.updater();
         session.mut_eol().set((data.eol() >> EOL_SHIFT) as u32);
         session.mut_@{ ConfigDef::updated_at() }@().mark_for_skip();
-        _@{ pascal_name }@::update_delayed(&mut conn, session).await
+        _@{ pascal_name }@_::update_delayed(&mut conn, session).await
     }
 
     async fn delete(&self, session_key: &SessionKey) -> Result<()> {
@@ -247,7 +246,7 @@ impl SessionStore for _@{ pascal_name }@Store {
         let id: _@{ pascal_name }@Id = s_key.into();
         let mut session = id.updater();
         session.mut_eol().set(0);
-        _@{ pascal_name }@::update_delayed(&mut conn, session).await
+        _@{ pascal_name }@_::update_delayed(&mut conn, session).await
     }
 
     async fn gc(&self, start_key: &SessionKey) -> Result<()> {
@@ -275,7 +274,7 @@ async fn gc(shard_id: ShardId, start_key: SessionKey) -> Result<()> {
     let mut filter = filter!((key < s_key) AND (eol < eol));
     const LIMIT: usize = 1000;
     loop {
-        if _@{ pascal_name }@::query()
+        if _@{ pascal_name }@_::query()
             .filter(filter.clone())
             .limit(LIMIT)
             .force_delete(&mut conn)

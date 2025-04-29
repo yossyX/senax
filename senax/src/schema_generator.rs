@@ -1,4 +1,4 @@
-use anyhow::{ensure, Context as _, Result};
+use anyhow::{Context as _, Result, ensure};
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
@@ -10,14 +10,14 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::{env, fs};
 
+use crate::SCHEMA_PATH;
 use crate::common::{fs_write, simplify_yml, to_plural, to_singular};
 use crate::ddl::table::parse;
 use crate::schema::{
-    self, BelongsToDef, ConfigDef, DataType, EnumValue, FieldDef, FieldDefOrSubsetType, HasManyDef,
-    HasOneDef, IndexDef, ModelDef, SoftDelete, StringOrArray, CONFIG,
+    self, BelongsToDef, CONFIG, ConfigDef, DataType, EnumValue, FieldDef, FieldDefOrSubsetType,
+    HasManyDef, HasOneDef, IndexDef, ModelDef, SoftDelete, StringOrArray,
 };
 use crate::schema::{IndexFieldDef, IndexType, Parser};
-use crate::SCHEMA_PATH;
 
 pub async fn generate(
     db: &str,

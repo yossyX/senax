@@ -16,7 +16,6 @@ db = { package = "db_@{ db|snake }@", path = "../.." }
 ahash.workspace = true
 anyhow.workspace = true
 arc-swap = "1.5.1"
-async-recursion = "1.0.4"
 async-stream.workspace = true
 async-trait.workspace = true
 bytes = "1.4"

@@ -857,8 +857,10 @@ impl ModelDef {
     }
 
     pub fn use_all_rows_cache(&self) -> bool {
-        self.use_cache() && self.use_all_rows_cache
-            .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_all_rows_cache)
+        self.use_cache()
+            && self
+                .use_all_rows_cache
+                .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_all_rows_cache)
     }
 
     pub fn use_filtered_row_cache(&self) -> bool {

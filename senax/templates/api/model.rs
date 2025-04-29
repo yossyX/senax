@@ -32,7 +32,7 @@ use crate::{
 
 async fn find(
     gql_ctx: &async_graphql::Context<'_>,
-    repo: &dyn _QueryService,
+    repo: Box<dyn _QueryService>,
     auth: &AuthInfo,
     primary: &_domain_::@{ pascal_name }@Primary,
 ) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
@@ -47,15 +47,15 @@ async fn find(
     repo.release_read_tx().await?;
     result
 }
-@#-
+@%- if !def.disable_update() %@
 
 async fn find_for_update(
     gql_ctx: &async_graphql::Context<'_>,
-    repo: &dyn _Repository,
+    repo: Box<dyn _Repository>,
     auth: &AuthInfo,
     primary: &_domain_::@{ pascal_name }@Primary,
 ) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@>>> {
-    let @{ mod_name }@_repo = repo.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ mod_name|to_var_name }@();
     @{ mod_name }@_repo
         .find(primary.clone().into())
         .join(joiner(gql_ctx.look_ahead(), auth)?)
@@ -63,20 +63,22 @@ async fn find_for_update(
         .query()
         .await
 }
-#@
+@%- endif %@
+@%- if !def.disable_delete() %@
 
 async fn delete(
-    repo: &dyn _Repository,
+    repo: Box<dyn _Repository>,
     auth: &AuthInfo,
     primary: _domain_::@{ mod_name|pascal }@Primary,
 ) -> anyhow::Result<()> {
-    let @{ mod_name }@_repo = repo.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ mod_name|to_var_name }@();
     let mut query = @{ mod_name }@_repo.find(primary.into());
     query = query.filter(deletable_filter(auth)?);
     let obj = query.query_for_update().await?;
-    _repository_::delete(repo.@{ group|to_var_name }@().as_ref(), obj).await?;
+    _repository_::delete(repo.as_ref().into(), obj).await?;
     Ok(())
 }
+@%- endif %@
 
 pub struct GqlQuery@{ graphql_name }@;
 #[async_graphql::Object]
@@ -128,10 +130,11 @@ impl GqlQuery@{ graphql_name }@ {
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         @{ db|snake }@_query.release_read_tx().await?;
-        Ok(list
+        let result: anyhow::Result<Vec<_>> = list
             .iter()
-            .map(|v| ResObj::try_from_(v, auth, None)?)
-            .collect())
+            .map(|v| Ok(ResObj::try_from_(v, auth, None)?))
+            .collect();
+        Ok(result?)
     }
     @%- endif %@
     @%- if api_def.use_find_by_pk %@
@@ -151,7 +154,7 @@ impl GqlQuery@{ graphql_name }@ {
         let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, repo.@{ db|snake }@_query().as_ref(), auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, repo.@{ db|snake }@_query(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -164,7 +167,7 @@ impl GqlQuery@{ graphql_name }@ {
         let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, repo.@{ db|snake }@_query().as_ref(), auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, repo.@{ db|snake }@_query(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
@@ -397,7 +400,6 @@ pub struct GqlMutation@{ graphql_name }@;
 #[async_graphql::Object]
 impl GqlMutation@{ graphql_name }@ {
     @%- if !api_def.disable_mutation %@
-    @#-
     @%- if !def.disable_update() %@
     @%- if api_def.use_find_by_pk %@
 
@@ -416,7 +418,7 @@ impl GqlMutation@{ graphql_name }@ {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -429,10 +431,9 @@ impl GqlMutation@{ graphql_name }@ {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
+        crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
-    #@
 
     #[graphql(guard = "create_guard()")]
     async fn create(
@@ -441,10 +442,11 @@ impl GqlMutation@{ graphql_name }@ {
         data: ReqObj,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
         let auth: &AuthInfo = gql_ctx.data()?;
         data.validate()
             .map_err(|e| GqlError::ValidationError(e).extend())?;
-        let obj = _repository_::create(repo.@{ db|snake }@_repository().@{ group|to_var_name }@().as_ref(), create_entity(data, repo.@{ db|snake }@_repository().as_ref(), auth))
+        let obj = _repository_::create(@{ group|snake }@_repo.as_ref().into(), create_entity(data, @{ group|snake }@_repo.as_ref(), auth))
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(ResObj::try_from_(&*obj, auth, None)?)
@@ -473,14 +475,14 @@ impl GqlMutation@{ graphql_name }@ {
             return Err(GqlError::ValidationErrorList(errors).extend());
         }
         @%- if def.has_auto_primary() %@
-        let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
         for (idx, data) in list.into_iter().enumerate() {
             if let Some(_id) = data._id.clone() {
                 let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-                let query = @{ mod_name }@_repo.find(id.into());
+                let query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().find(id.into());
                 match query.join(updater_joiner()).query_for_update().await {
                     Ok(obj) => {
-                        _domain_::update(repo, obj, |obj| update_updater(&mut *obj, data, repo, auth))
+                        _domain_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
                             .await
                             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
                     }
@@ -495,7 +497,7 @@ impl GqlMutation@{ graphql_name }@ {
                     }
                 }
             } else {
-                _domain_::create(repo, create_entity(data, repo, auth)).await
+                _domain_::create(@{ group|snake }@_repo.as_ref().into(), create_entity(data, @{ group|snake }@_repo.as_ref(), auth)).await
                     .map_err(|e| GqlError::server_error(gql_ctx, e))?;
             }
         }
@@ -503,7 +505,7 @@ impl GqlMutation@{ graphql_name }@ {
             return Err(GqlError::ValidationErrorList(errors).extend());
         }
         @%- else %@
-        _domain_::import(repo, create_list(list, repo, auth), option)
+        _domain_::import(@{ group|snake }@_repo.as_ref().into(), create_list(list, @{ group|snake }@_repo.as_ref(), auth), option)
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         @%- endif %@
@@ -530,50 +532,18 @@ impl GqlMutation@{ graphql_name }@ {
             }
         };
         let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-        let mut query = @{ mod_name }@_repo.find(id.into());
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
+        let mut query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().find(id.into());
         query = query.filter(updatable_filter(auth)?);
         let obj = query
             .join(updater_joiner())
             .query_for_update()
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-        let obj = _repository_::update(repo.@{ db|snake }@_repository().@{ group|to_var_name }@().as_ref(), obj, |obj| update_updater(&mut *obj, data, repo, auth))
+        let obj = _repository_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(ResObj::try_from_(&*obj, auth, None)?)
-    }
-    @%- if api_def.use_delete_by_pk %@
-
-    #[graphql(guard = "delete_guard()")]
-    async fn delete_by_pk(
-        &self,
-        gql_ctx: &async_graphql::Context<'_>,
-        @%- if camel_case %@
-        @{- def.primaries()|fmt_join("
-        {var}: {inner},", "") }@
-        @%- else %@
-        @{- def.primaries()|fmt_join("
-        #[graphql(name = \"{raw_var}\")] {var}: {inner},", "") }@
-        @%- endif %@
-    ) -> async_graphql::Result<bool> {
-        let repo: &RepositoryImpl = gql_ctx.data()?;
-        let auth: &AuthInfo = gql_ctx.data()?;
-        delete(repo.@{ db|snake }@_repository().as_ref(), auth, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into()).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
-        Ok(true)
-    }
-    @%- endif %@
-
-    #[graphql(guard = "delete_guard()")]
-    async fn delete(
-        &self,
-        gql_ctx: &async_graphql::Context<'_>,
-        #[graphql(name = "_id")] _id: async_graphql::ID,
-    ) -> async_graphql::Result<bool> {
-        let repo: &RepositoryImpl = gql_ctx.data()?;
-        let auth: &AuthInfo = gql_ctx.data()?;
-        delete(repo.@{ db|snake }@_repository().as_ref(), auth, (&_id).try_into()?).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
-        Ok(true)
     }
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
@@ -608,8 +578,8 @@ impl GqlMutation@{ graphql_name }@ {
                 .await?;
         }
         let auth: &AuthInfo = gql_ctx.data()?;
-        let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-        let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(updater_joiner());
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
+        let mut query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().@{ selector|to_var_name }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
         query = query.selector_filter(filter);
         @%- else %@
@@ -642,7 +612,7 @@ impl GqlMutation@{ graphql_name }@ {
                 if let Some(data) = data {
                     data.validate()
                         .map_err(|e| GqlError::ValidationError(e).extend())?;
-                    let obj = _domain_::create(repo, create_entity(data, repo, auth))
+                    let obj = _domain_::create(@{ group|snake }@_repo.as_ref().into(), create_entity(data, @{ group|snake }@_repo.as_ref(), auth))
                         .await
                         .map_err(|e| GqlError::server_error(gql_ctx, e))?;
                     result.push(ResObj::try_from_(&*obj, auth, None)?);
@@ -658,8 +628,8 @@ impl GqlMutation@{ graphql_name }@ {
                     data.validate()
                         .map_err(|e| GqlError::ValidationError(e).extend())?;
                     if let Some(obj) = updater_map.remove(data._id.as_ref()?) {
-                        let obj = _domain_::update(repo, obj, |obj| {
-                                update_updater(&mut *obj, data, repo, auth)
+                        let obj = _domain_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| {
+                                update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth)
                             })
                             .await
                             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
@@ -696,8 +666,8 @@ impl GqlMutation@{ graphql_name }@ {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let ctx: &crate::context::Ctx = gql_ctx.data()?;
-        let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-        let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(updater_joiner());
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
+        let mut query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().@{ selector|to_var_name }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
         query = query.selector_filter(filter);
         @%- else %@
@@ -719,7 +689,7 @@ impl GqlMutation@{ graphql_name }@ {
             data.validate()
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
             let obj =
-                _domain_::update(repo, obj, |obj| update_updater(&mut *obj, data, repo, auth))
+                _domain_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
                     .await
                     .map_err(|e| GqlError::server_error(gql_ctx, e))?;
             result.push(ResObj::try_from_(&*obj, auth, None)?);
@@ -750,8 +720,8 @@ impl GqlMutation@{ graphql_name }@ {
         @%- endif %@
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-        let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
+        let mut query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().@{ selector|to_var_name }@();
         @%- if selector_def.filter_is_required() %@
         query = query.selector_filter(filter);
         @%- else %@
@@ -777,7 +747,42 @@ impl GqlMutation@{ graphql_name }@ {
     @%- endfor %@
     @%- endfor %@
     @%- endif %@
-    @%- else %@
+    @%- endif %@
+    @%- if !def.disable_delete() %@
+    @%- if api_def.use_delete_by_pk %@
+
+    #[graphql(guard = "delete_guard()")]
+    async fn delete_by_pk(
+        &self,
+        gql_ctx: &async_graphql::Context<'_>,
+        @%- if camel_case %@
+        @{- def.primaries()|fmt_join("
+        {var}: {inner},", "") }@
+        @%- else %@
+        @{- def.primaries()|fmt_join("
+        #[graphql(name = \"{raw_var}\")] {var}: {inner},", "") }@
+        @%- endif %@
+    ) -> async_graphql::Result<bool> {
+        let repo: &RepositoryImpl = gql_ctx.data()?;
+        let auth: &AuthInfo = gql_ctx.data()?;
+        delete(repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into()).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
+        Ok(true)
+    }
+    @%- endif %@
+
+    #[graphql(guard = "delete_guard()")]
+    async fn delete(
+        &self,
+        gql_ctx: &async_graphql::Context<'_>,
+        #[graphql(name = "_id")] _id: async_graphql::ID,
+    ) -> async_graphql::Result<bool> {
+        let repo: &RepositoryImpl = gql_ctx.data()?;
+        let auth: &AuthInfo = gql_ctx.data()?;
+        delete(repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, (&_id).try_into()?).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
+        Ok(true)
+    }
+    @%- endif %@
+    @%- if def.disable_update() && def.disable_delete() %@
     async fn dummy(&self) -> bool {
         false
     }

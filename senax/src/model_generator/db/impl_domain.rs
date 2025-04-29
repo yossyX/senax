@@ -10,8 +10,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::common::fs_write;
-use crate::schema::{ConfigDef, ModelDef, set_domain_mode, to_id_name};
 use crate::filters;
+use crate::schema::{ConfigDef, ModelDef, set_domain_mode, to_id_name};
 
 pub fn write_impl_domain_rs(
     model_src_dir: &Path,
@@ -38,10 +38,10 @@ pub fn write_impl_domain_rs(
         "File contents are invalid.: {:?}",
         &file_path
     );
-    
-#[derive(Template)]
-#[template(
-    source = r###"
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, defs) in groups %@
 pub mod @{ name|snake|to_var_name }@;
@@ -49,12 +49,12 @@ pub static NEW_@{ name|upper }@_REPO: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -
 pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> Box<dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryService> + Send + Sync>> = OnceCell::new();
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct ModTemplate<'a> {
-    pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
-}
+        ext = "txt",
+        escape = "none"
+    )]
+    pub struct ModTemplate<'a> {
+        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    }
 
     let tpl = ModTemplate { groups }.render()?;
     let tpl = tpl.trim_start();
@@ -66,21 +66,21 @@ pub struct ModTemplate<'a> {
         "File contents are invalid.: {:?}",
         &file_path
     );
-    
-#[derive(Template)]
-#[template(
-    source = r###"
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
     // Do not modify below this line. (RepoStart)
     @%- for (name, defs) in groups %@
     get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@Repository, NEW_@{ name|upper }@_REPO, "The @{ name|pascal }@Repository is not configured.");
     @%- endfor %@
     // Do not modify up to this line. (RepoEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct ImplDomainDbRepoTemplate<'a> {
-    pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
-}
+        ext = "txt",
+        escape = "none"
+    )]
+    pub struct ImplDomainDbRepoTemplate<'a> {
+        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    }
 
     let tpl = ImplDomainDbRepoTemplate { groups }.render()?;
     let tpl = tpl.trim_start();
@@ -92,21 +92,21 @@ pub struct ImplDomainDbRepoTemplate<'a> {
         "File contents are invalid.: {:?}",
         &file_path
     );
-    
-#[derive(Template)]
-#[template(
-    source = r###"
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
     // Do not modify below this line. (QueryServiceStart)
     @%- for (name, defs) in groups %@
     get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, NEW_@{ name|upper }@_QS, "The @{ name|pascal }@QueryService is not configured.");
     @%- endfor %@
     // Do not modify up to this line. (QueryServiceEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct ImplDomainDbQueryServiceTemplate<'a> {
-    pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
-}
+        ext = "txt",
+        escape = "none"
+    )]
+    pub struct ImplDomainDbQueryServiceTemplate<'a> {
+        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    }
 
     let tpl = ImplDomainDbQueryServiceTemplate { groups }.render()?;
     let tpl = tpl.trim_start();
@@ -143,10 +143,10 @@ pub fn write_group_rs(
         "File contents are invalid.: {:?}",
         &file_path
     );
-    
-#[derive(Template)]
-#[template(
-    source = r###"
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
 // Do not modify below this line. (ModStart)
 pub mod _base {
 @%- for mod_name in mod_names %@
@@ -157,12 +157,12 @@ pub mod _base {
 pub mod @{ mod_name|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct DomainGroupModTemplate<'a> {
-    pub mod_names: &'a BTreeSet<String>,
-}
+        ext = "txt",
+        escape = "none"
+    )]
+    pub struct DomainGroupModTemplate<'a> {
+        pub mod_names: &'a BTreeSet<String>,
+    }
 
     let tpl = DomainGroupModTemplate {
         mod_names: &mod_names,

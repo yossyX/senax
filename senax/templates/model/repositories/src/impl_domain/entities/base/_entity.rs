@@ -28,7 +28,9 @@ use domain::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_
 use crate::repositories::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
 
 #[derive(derive_new::new, Clone)]
-pub struct @{ pascal_name }@RepositoryImpl(std::sync::Arc<tokio::sync::Mutex<db::DbConn>>);
+pub struct @{ pascal_name }@RepositoryImpl {
+    _conn: std::sync::Arc<tokio::sync::Mutex<db::DbConn>>,
+}
 
 #[allow(clippy::needless_update)]
 fn updater_from_factory(v: domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Factory) -> _@{ pascal_name }@Updater {
@@ -119,7 +121,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             }
         }
         Box::new(V {
-            conn: self.0.clone(),
+            conn: self._conn.clone(),
             id,
             filter: None,
             @%- if def.is_soft_delete() %@
@@ -138,7 +140,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             Ok(obj) => *obj,
             Err(_) => panic!("Only _@{ pascal_name }@Updater is accepted."),
         };
-        Ok(_@{ pascal_name }@_::save(self.0.lock().await.deref_mut(), obj).await?.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
+        Ok(_@{ pascal_name }@_::save(self._conn.lock().await.deref_mut(), obj).await?.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
     }
     @%- if !def.disable_update() %@
     async fn import(&self, list: Vec<Box<dyn @{ pascal_name }@Updater>>, option: Option<domain::models::ImportOption>) -> anyhow::Result<()> {
@@ -151,11 +153,11 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         }).collect();
         let option = option.unwrap_or_default();
         if option.replace.unwrap_or_default() {
-            _@{ pascal_name }@_::bulk_replace(self.0.lock().await.deref_mut(), list).await?;
+            _@{ pascal_name }@_::bulk_replace(self._conn.lock().await.deref_mut(), list).await?;
         } else if option.overwrite.unwrap_or_default() {
-            _@{ pascal_name }@_::bulk_overwrite(self.0.lock().await.deref_mut(), list).await?;
+            _@{ pascal_name }@_::bulk_overwrite(self._conn.lock().await.deref_mut(), list).await?;
         } else {
-            _@{ pascal_name }@_::bulk_insert(self.0.lock().await.deref_mut(), list, option.ignore.unwrap_or_default()).await?;
+            _@{ pascal_name }@_::bulk_insert(self._conn.lock().await.deref_mut(), list, option.ignore.unwrap_or_default()).await?;
         }
         Ok(())
     }
@@ -167,7 +169,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         } else {
             panic!("Only _@{ pascal_name }@Updater is accepted.");
         };
-        _@{ pascal_name }@_::insert_delayed(self.0.lock().await.deref_mut(), obj).await?;
+        _@{ pascal_name }@_::insert_delayed(self._conn.lock().await.deref_mut(), obj).await?;
         Ok(())
     }
     @%- endif %@
@@ -178,21 +180,21 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         } else {
             panic!("Only _@{ pascal_name }@Updater is accepted.");
         };
-        _@{ pascal_name }@_::delete(self.0.lock().await.deref_mut(), *obj).await
+        _@{ pascal_name }@_::delete(self._conn.lock().await.deref_mut(), *obj).await
     }
     @%- if def.primaries().len() == 1 %@
     async fn delete_by_ids(&self, ids: &[@{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@]) -> anyhow::Result<u64> {
-        _@{ pascal_name }@_::delete_by_ids(self.0.lock().await.deref_mut(), ids.iter().map(|v| @{ def.primaries()|fmt_join_with_paren2("v{convert_from_entity}", "v.{index}{convert_from_entity}", ", ") }@)).await
+        _@{ pascal_name }@_::delete_by_ids(self._conn.lock().await.deref_mut(), ids.iter().map(|v| @{ def.primaries()|fmt_join_with_paren2("v{convert_from_entity}", "v.{index}{convert_from_entity}", ", ") }@)).await
     }
     @%- endif %@
     async fn delete_all(&self) -> anyhow::Result<()> {
-        _@{ pascal_name }@_::query().delete(self.0.lock().await.deref_mut()).await?;
+        _@{ pascal_name }@_::query().delete(self._conn.lock().await.deref_mut()).await?;
         Ok(())
     }
     @%- endif %@
     @%- if def.act_as_job_queue() %@
     async fn fetch(&self, limit: usize) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>> {
-        let list = _@{ pascal_name }@_::query().order_by(order!(@{ def.primaries()|fmt_join_with_paren("{raw_var}", ", ") }@)).limit(limit).skip_locked().select_for_update(self.0.lock().await.deref_mut()).await?;
+        let list = _@{ pascal_name }@_::query().order_by(order!(@{ def.primaries()|fmt_join_with_paren("{raw_var}", ", ") }@)).limit(limit).skip_locked().select_for_update(self._conn.lock().await.deref_mut()).await?;
         Ok(list.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@Updater>).collect())
     }
     @%- endif %@
@@ -269,7 +271,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             }
         }
         Box::new(V {
-            conn: self.0.clone(),
+            conn: self._conn.clone(),
             selector_filter: None,
             extra_filter: None,
             @%- if def.is_soft_delete() %@
@@ -328,7 +330,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 Box::new(Vec::clone(&self.0).into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@Cache>))
             }
         }
-        Ok(Box::new(V(_@{ pascal_name }@_::find_all_from_cache(self.0.lock().await.deref(), None).await?)))
+        Ok(Box::new(V(_@{ pascal_name }@_::find_all_from_cache(self._conn.lock().await.deref(), None).await?)))
     }
     @%- endif %@
     @%- for (selector, selector_def) in def.selectors %@
@@ -583,7 +585,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             }
         }
         Box::new(V {
-            conn: self.0.clone(),
+            conn: self._conn.clone(),
             selector_filter: None,
             extra_filter: None,
             cursor: None,
@@ -677,7 +679,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             }
         }
         Box::new(V {
-            conn: self.0.clone(),
+            conn: self._conn.clone(),
             id,
             filter: None,
             @%- if def.is_soft_delete() %@
@@ -736,7 +738,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             }
         }
         Box::new(V {
-            conn: self.0.clone(),
+            conn: self._conn.clone(),
             id,
             filter: None,
             @%- if def.is_soft_delete() %@

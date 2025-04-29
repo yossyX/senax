@@ -35,7 +35,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let db_repositories_dir = model_dir.join("repositories");
     let domain_src_dir = Path::new(DOMAIN_PATH).join("src");
     let base_domain_src_dir = Path::new(BASE_DOMAIN_PATH).join("src");
-    let domain_repositories_dir = Path::new(DOMAIN_REPOSITORIES_PATH).join(db);
+    let domain_repositories_dir = Path::new(DOMAIN_REPOSITORIES_PATH).join(db.to_case(Case::Snake));
     let domain_repositories_src_dir = domain_repositories_dir.join("src");
 
     let file_path = model_dir.join("Cargo.toml");
@@ -119,15 +119,15 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     }
     let domain_models_dir = base_domain_src_dir.join("models");
     let impl_domain_dir = model_src_dir.join("impl_domain");
-    if !exclude_from_domain {
-        if clean && impl_domain_dir.exists() {
-            for entry in glob::glob(&format!("{}/**/*.rs", impl_domain_dir.display()))? {
-                match entry {
-                    Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
-                    Err(_) => false,
-                };
-            }
+    if clean && impl_domain_dir.exists() {
+        for entry in glob::glob(&format!("{}/**/*.rs", impl_domain_dir.display()))? {
+            match entry {
+                Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
+                Err(_) => false,
+            };
         }
+    }
+    if !exclude_from_domain {
         domain::base_domain::write_models_db_rs(&domain_models_dir, db, &groups, force)?;
         domain::repositories::write_lib_rs(&domain_repositories_src_dir, db, &groups, force)?;
         domain::repositories::write_cargo_toml(&domain_repositories_dir, db, &groups, force)?;
@@ -228,14 +228,29 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     }
 
     let domain_db_dir = domain_models_dir.join(db.to_case(Case::Snake));
-    if !exclude_from_domain {
-        if clean && domain_db_dir.exists() {
-            for entry in glob::glob(&format!("{}/**/*.rs", domain_db_dir.display()))? {
-                match entry {
-                    Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
-                    Err(_) => false,
-                };
-            }
+    if clean && domain_db_dir.exists() {
+        for entry in glob::glob(&format!("{}/**/*.rs", domain_db_dir.display()))? {
+            match entry {
+                Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
+                Err(_) => false,
+            };
+        }
+    }
+    if clean && db_repositories_dir.exists() {
+        for entry in glob::glob(&format!("{}/**/*.*", db_repositories_dir.display()))? {
+            match entry {
+                Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
+                Err(_) => false,
+            };
+        }
+    }
+    let domain_repositories_dir = domain_repositories_dir.join("groups");
+    if clean && domain_repositories_dir.exists() {
+        for entry in glob::glob(&format!("{}/**/*.*", domain_repositories_dir.display()))? {
+            match entry {
+                Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
+                Err(_) => false,
+            };
         }
     }
 
@@ -277,6 +292,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             &groups,
             &config,
             force,
+            clean,
             exclude_from_domain,
             &mut remove_files,
         )?;

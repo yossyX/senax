@@ -370,7 +370,7 @@ macro_rules! filter {
                 }
                 Filter_::Raw(raw) => {
                     buf.push_str("(");
-                    buf.push_str(raw@%- for db in config.outer_db() %@.replace("##@{ db }@##.", ::db_@{ db }@::connection::DbConn::real_db_name(shard_id)).as_str()@%- endfor %@);
+                    buf.push_str(raw@%- for db in config.outer_db() %@.replace("##@{ db|snake }@##.", ::db_@{ db|snake }@::connection::DbConn::real_db_name(shard_id)).as_str()@%- endfor %@);
                     buf.push_str(") AND ");
                 }
                 Filter_::RawWithParam(raw, _param) => {

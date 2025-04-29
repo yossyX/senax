@@ -565,7 +565,7 @@ pub struct DbConn {
     has_read_tx: usize,
     lock_list: Vec<DbLock>,
     @%- for db in config.outer_db() %@
-    pub _@{ db }@_db: ::db_@{ db }@::connection::DbConn,
+    pub _@{ db|snake }@_db: ::db_@{ db|snake }@::connection::DbConn,
     @%- endfor %@
 }
 
@@ -613,7 +613,7 @@ impl DbConn {
             has_read_tx: 0,
             lock_list: Vec::new(),
             @%- for db in config.outer_db() %@
-            _@{ db }@_db: ::db_@{ db }@::connection::DbConn::__new(ctx_no, time, shard_id),
+            _@{ db|snake }@_db: ::db_@{ db|snake }@::connection::DbConn::__new(ctx_no, time, shard_id),
             @%- endfor %@
         }
     }
@@ -636,8 +636,8 @@ impl DbConn {
     }
     @%- for db in config.outer_db() %@
 
-    pub fn _@{ db }@_db(&mut self) -> &mut ::db_@{ db }@::connection::DbConn {
-        &mut self._@{ db }@_db
+    pub fn _@{ db|snake }@_db(&mut self) -> &mut ::db_@{ db|snake }@::connection::DbConn {
+        &mut self._@{ db|snake }@_db
     }
     @%- endfor %@
 
@@ -859,14 +859,14 @@ impl DbConn {
     pub fn release_conn(&mut self) {
         self.conn.clear();
         @%- for db in config.outer_db() %@
-        self._@{ db }@_db.release_conn();
+        self._@{ db|snake }@_db.release_conn();
         @%- endfor %@
     }
 
     pub async fn begin_without_transaction(&mut self) -> Result<()> {
         self.wo_tx += 1;
         @%- for db in config.outer_db() %@
-        self._@{ db }@_db.begin_without_transaction().await?;
+        self._@{ db|snake }@_db.begin_without_transaction().await?;
         @%- endfor %@
         Ok(())
     }
@@ -875,7 +875,7 @@ impl DbConn {
         ensure!(self.wo_tx > 0, "No without transaction is active.");
         self.wo_tx -= 1;
         @%- for db in config.outer_db() %@
-        self._@{ db }@_db.end_without_transaction().await?;
+        self._@{ db|snake }@_db.end_without_transaction().await?;
         @%- endfor %@
         Ok(())
     }
@@ -895,7 +895,7 @@ impl DbConn {
             });
         }
         @%- for db in config.outer_db() %@
-        self._@{ db }@_db.begin().await?;
+        self._@{ db|snake }@_db.begin().await?;
         @%- endfor %@
         Ok(())
     }
@@ -985,7 +985,7 @@ impl DbConn {
     pub async fn commit(&mut self) -> Result<()> {
         ensure!(self.has_tx(), "No transaction is active.");
         @%- for db in config.outer_db() %@
-        self._@{ db }@_db.commit().await?;
+        self._@{ db|snake }@_db.commit().await?;
         @%- endfor %@
         if let Some(_save_point) = self.save_point.pop() {
             for (_shard_id, tx) in self.tx.iter_mut() {
@@ -1051,7 +1051,7 @@ impl DbConn {
     pub async fn rollback(&mut self) -> Result<()> {
         ensure!(self.has_tx(), "No transaction is active.");
         @%- for db in config.outer_db() %@
-        self._@{ db }@_db.rollback().await?;
+        self._@{ db|snake }@_db.rollback().await?;
         @%- endfor %@
         if let Some(save_point) = self.save_point.pop() {
             self.cache_internal_op_list
@@ -1078,7 +1078,7 @@ impl DbConn {
     pub async fn begin_read_tx(&mut self) -> Result<()> {
         self.has_read_tx += 1;
         @%- for db in config.outer_db() %@
-        self._@{ db }@_db.begin_read_tx().await?;
+        self._@{ db|snake }@_db.begin_read_tx().await?;
         @%- endfor %@
         Ok(())
     }
@@ -1102,7 +1102,7 @@ impl DbConn {
     pub fn release_read_tx(&mut self) -> Result<()> {
         ensure!(self.has_read_tx(), "No read transaction is active.");
         @%- for db in config.outer_db() %@
-        self._@{ db }@_db.release_read_tx()?;
+        self._@{ db|snake }@_db.release_read_tx()?;
         @%- endfor %@
         self.has_read_tx -= 1;
         if self.has_read_tx == 0 {
@@ -1164,7 +1164,7 @@ impl DbConn {
         self.cache_tx.clear();
         @%- endif %@
         @%- for db in config.outer_db() %@
-        self._@{ db }@_db.reset_tx();
+        self._@{ db|snake }@_db.reset_tx();
         @%- endfor %@
     }
     @%- if config.use_sequence %@

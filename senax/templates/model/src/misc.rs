@@ -73,6 +73,13 @@ pub trait Updater {
     fn overwrite_with(&mut self, updater: Self, set_only: bool);
 }
 
+#[async_trait::async_trait]
+pub trait UpdaterForInner {
+    fn __validate(&self) -> anyhow::Result<()>;
+    async fn __set_default_value(&mut self, conn: &mut crate::DbConn) -> anyhow::Result<()>;
+    fn __set_overwrite_extra_value(&mut self, conn: &mut crate::DbConn);
+}
+
 #[derive(Clone, Debug)]
 pub enum BindValue {
     Bool(Option<bool>),

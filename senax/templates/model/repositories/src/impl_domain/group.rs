@@ -14,6 +14,7 @@ pub struct @{ group_name|pascal }@RepositoryImpl {
 }
 #[rustfmt::skip]
 impl @{ group_name|pascal }@Repository for @{ group_name|pascal }@RepositoryImpl {
+    get_repo!(_super, dyn _domain::_super::Repository_, super::RepositoryImpl_);
     // Do not modify below this line. (RepoStart)
     // Do not modify up to this line. (RepoEnd)
 }
@@ -24,6 +25,7 @@ pub struct @{ group_name|pascal }@QueryServiceImpl {
 }
 #[rustfmt::skip]
 impl @{ group_name|pascal }@QueryService for @{ group_name|pascal }@QueryServiceImpl {
+    get_repo!(_super, dyn _domain::_super::QueryService_, super::QueryServiceImpl_);
     // Do not modify below this line. (QueryServiceStart)
     // Do not modify up to this line. (QueryServiceEnd)
 }

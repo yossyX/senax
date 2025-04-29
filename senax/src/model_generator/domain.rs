@@ -70,8 +70,12 @@ use self::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository as _;
         #[derive(Template)]
         #[template(
             source = r###"
-    fn @{ db|snake }@_repository(&self) -> Box<dyn @{ db|snake|to_var_name }@::@{ db|pascal }@Repository>;
-    fn @{ db|snake }@_query(&self) -> Box<dyn @{ db|snake|to_var_name }@::@{ db|pascal }@QueryService>;
+    fn @{ db|snake }@_repository(&self) -> Box<dyn @{ db|snake|to_var_name }@::@{ db|pascal }@Repository> {
+        unimplemented!("@{ db|snake }@_repository is unimplemented.")
+    }
+    fn @{ db|snake }@_query(&self) -> Box<dyn @{ db|snake|to_var_name }@::@{ db|pascal }@QueryService> {
+        unimplemented!("@{ db|snake }@_query is unimplemented.")
+    }
     // Do not modify this line. (Repo)"###,
             ext = "txt",
             escape = "none"

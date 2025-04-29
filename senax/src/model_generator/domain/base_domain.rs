@@ -1,8 +1,8 @@
+use crate::filters;
 use crate::{
     common::fs_write,
     schema::{FieldDef, ModelDef, VALUE_OBJECTS, set_domain_mode, to_id_name},
 };
-use crate::filters;
 use anyhow::{Context, Result, ensure};
 use askama::Template;
 use convert_case::{Case, Casing as _};
@@ -201,21 +201,21 @@ pub fn write_models_db_rs(
         "File contents are invalid.: {:?}",
         &file_path
     );
-    
-#[derive(Template)]
-#[template(
-    source = r###"
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, defs) in groups %@
 pub mod @{ name|snake|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct ModTemplate<'a> {
-    pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
-}
+        ext = "txt",
+        escape = "none"
+    )]
+    pub struct ModTemplate<'a> {
+        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    }
 
     let tpl = ModTemplate { groups }.render()?;
     let tpl = tpl.trim_start();
@@ -402,10 +402,10 @@ pub fn write_group_rs(
         "File contents are invalid.: {:?}",
         &file_path
     );
-    
-#[derive(Template)]
-#[template(
-    source = r###"
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
 // Do not modify below this line. (ModStart)
 pub mod _base {
 @%- for mod_name in mod_names %@
@@ -416,12 +416,12 @@ pub mod _base {
 pub mod @{ mod_name|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct DomainGroupModTemplate<'a> {
-    pub mod_names: &'a BTreeSet<String>,
-}
+        ext = "txt",
+        escape = "none"
+    )]
+    pub struct DomainGroupModTemplate<'a> {
+        pub mod_names: &'a BTreeSet<String>,
+    }
 
     let tpl = DomainGroupModTemplate { mod_names }.render()?;
     let tpl = tpl.trim_start();

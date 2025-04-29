@@ -67,7 +67,7 @@ pub struct DbModTemplate<'a> {
 #[template(
     source = r###"
     @%- for name in add_groups %@
-    db_@{ db }@_@{ name }@::init();
+    db_@{ db|snake }@_@{ name|snake }@::init();
     @%- endfor %@
     // Do not modify this line. (GqlInit)"###,
     ext = "txt",

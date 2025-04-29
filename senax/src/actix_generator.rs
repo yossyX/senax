@@ -11,7 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{API_SCHEMA_PATH, common::fs_write};
+use crate::{API_SCHEMA_PATH, SCHEMA_PATH, common::fs_write};
 use crate::{
     api_generator::template::{ConfigTemplate, DbConfigTemplate},
     schema::CONFIG,
@@ -22,6 +22,8 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     let non_snake_case = crate::common::check_non_snake_case()?;
     for db in &db_list {
         crate::common::check_ascii_name(db);
+        let path = Path::new(SCHEMA_PATH).join(format!("{db}.yml"));
+        anyhow::ensure!(path.exists(), "{} DB is not found.", db);
     }
     let name = crate::common::check_ascii_name(name).to_string();
     let base_path: PathBuf = name.parse()?;
@@ -314,14 +316,17 @@ SESSION_SECRET_KEY={}
 }
 
 fn fix_build_sh(content: &str, name: &str) -> Result<String> {
-    let content = content.replace(
-        "# Do not modify this line. (Api)",
-        &format!(
-            "senax api {} -c ${}_client\n# Do not modify this line. (Api)",
-            name, name
-        ),
-    );
-    Ok(content)
+    if !content.contains(&format!("senax api {}", name)) {
+        let content = content.replace(
+            "# Do not modify this line. (Api)",
+            &format!(
+                "senax api {} -c ${}_client\n# Do not modify this line. (Api)",
+                name, name
+            ),
+        );
+        return Ok(content);
+    }
+    Ok(content.to_owned())
 }
 
 struct Secret;

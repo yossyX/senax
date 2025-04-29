@@ -1,6 +1,10 @@
 #[allow(unused_imports)]
 use domain::models::@{ db|snake|to_var_name }@::@{ rel_mod }@ as _domain_;
 #[allow(unused_imports)]
+use super::_repository_::_@{ rel_name }@_repository_ as _repository_;
+#[allow(unused_imports)]
+use super::_Repository as _Repository;
+#[allow(unused_imports)]
 use domain::value_objects;
 #[allow(unused_imports)]
 use senax_common::types::blob::BlobToApi;
@@ -81,11 +85,11 @@ impl From<&dyn _domain_::@{ pascal_name }@Cache> for ResObj@{ rel_name|pascal }@
 
 #[allow(unused_mut)]
 #[allow(clippy::needless_update)]
-pub fn joiner(_look_ahead: async_graphql::Lookahead<'_>) -> Option<Box<_domain_::Joiner_>> {
+pub fn joiner(_look_ahead: async_graphql::Lookahead<'_>) -> Option<Box<_repository_::Joiner_>> {
     if !_look_ahead.exists() {
         return None;
     }
-    let joiner = _domain_::Joiner_ {
+    let joiner = _repository_::Joiner_ {
         @%- if camel_case %@
         @{- def.relations_one_for_api_response()|fmt_rel_join("
         {rel_name}: _{raw_rel_name}::joiner(_look_ahead.field(\"{rel_name_camel}\")),", "") }@
@@ -109,8 +113,8 @@ pub fn joiner(_look_ahead: async_graphql::Lookahead<'_>) -> Option<Box<_domain_:
 #[allow(unused_mut)]
 #[allow(dead_code)]
 #[allow(clippy::needless_update)]
-pub fn reader_joiner() -> Option<Box<_domain_::Joiner_>> {
-    let joiner = _domain_::Joiner_ {
+pub fn reader_joiner() -> Option<Box<_repository_::Joiner_>> {
+    let joiner = _repository_::Joiner_ {
         @{- def.relations_one_for_api_response()|fmt_rel_join("
         {rel_name}: _{raw_rel_name}::reader_joiner(),", "") }@
         @{- def.relations_many_for_api_response()|fmt_rel_join("

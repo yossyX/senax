@@ -1713,7 +1713,10 @@ impl _@{ pascal_name }@Updater {
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
-    pub fn __validate(&self) -> Result<()> {
+}
+#[async_trait::async_trait]
+impl crate::misc::UpdaterForInner for _@{ pascal_name }@Updater {
+    fn __validate(&self) -> Result<()> {
         self._data.validate()?;
 @{- def.relations_one_and_many(false)|fmt_rel_join("
         if let Some(v) = self.{rel_name}.as_ref() {
@@ -1723,14 +1726,9 @@ impl _@{ pascal_name }@Updater {
         }", "") }@
         Ok(())
     }
-    @%- if config.use_sequence %@
     #[allow(clippy::unnecessary_cast)]
     #[allow(clippy::only_used_in_recursion)]
-    #[async_recursion::async_recursion]
-    pub async fn __set_default_value(&mut self, conn: &mut DbConn) -> Result<()>
-    @%- else %@
-    pub fn __set_default_value(&mut self, conn: &DbConn)
-    @%- endif %@
+    async fn __set_default_value(&mut self, conn: &mut DbConn) -> Result<()>
     {
         if self.is_new() {
             @{- def.auto_seq()|fmt_join("
@@ -1765,7 +1763,6 @@ impl _@{ pascal_name }@Updater {
             self.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
         }
         @%- endif %@
-        @%- if config.use_sequence %@
 @{- def.relations_one_and_many(false)|fmt_rel_join("
         if let Some(v) = self.{rel_name}.as_mut() {
             for v in v.iter_mut() {
@@ -1774,19 +1771,10 @@ impl _@{ pascal_name }@Updater {
             }
         }", "") }@
         Ok(())
-        @%- else %@
-@{- def.relations_one_and_many(false)|fmt_rel_join("
-        if let Some(v) = self.{rel_name}.as_mut() {
-            for v in v.iter_mut() {
-                RelCol{rel_name_pascal}::set_op_none(&mut v._op);
-                v.__set_default_value(conn);
-            }
-        }", "") }@
-        @%- endif %@
     }
 
     #[allow(clippy::only_used_in_recursion)]
-    pub fn __set_overwrite_extra_value(&mut self, conn: &mut DbConn)
+    fn __set_overwrite_extra_value(&mut self, conn: &mut DbConn)
     {
         if self.will_be_deleted() {
             @{- def.soft_delete_tpl2("

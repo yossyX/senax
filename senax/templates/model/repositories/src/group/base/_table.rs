@@ -48,7 +48,7 @@ use ::db::cache::Cache;
 use ::db::connection::{DbArguments, DbConn, DbRow, DbType};
 use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, IntoJson as _, OrderTr};
 use crate::repositories::{CacheOpTr, IdFetcher, IdFetcherWithCache};
-use ::db::misc::{BindValue, Count, Updater, Size, TrashMode};
+use ::db::misc::{BindValue, Count, Updater, Size, TrashMode, UpdaterForInner as _};
 use ::db::models::{ModelTr as _, USE_FAST_CACHE};
 use ::db::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
 pub use ::db::models::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::*;
@@ -4982,14 +4982,14 @@ impl _@{ pascal_name }@_ {
 
     pub async fn save(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<Option<_@{ pascal_name }@>> {
         obj.__validate()?;
-        obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
+        obj.__set_default_value(conn).await?;
         __save(conn, obj, 0).await
     }
 
     pub async fn replace(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<Option<_@{ pascal_name }@>> {
         obj.__validate()?;
         ensure!(obj.is_new(), "The obj is not new.");
-        obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
+        obj.__set_default_value(conn).await?;
         __save(conn, obj, 1).await
     }
     @%- if !def.disable_update() %@
@@ -5016,7 +5016,7 @@ impl _@{ pascal_name }@_ {
     pub async fn insert_ignore(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<Option<_@{ pascal_name }@Updater>> {
         obj.__validate()?;
         ensure!(obj.is_new(), "The obj is not new.");
-        obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
+        obj.__set_default_value(conn).await?;
         let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) 
             VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
         let query = bind_to_query(sql, &obj._data);
@@ -5063,7 +5063,7 @@ impl _@{ pascal_name }@_ {
     pub async fn insert_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__validate()?;
-        obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
+        obj.__set_default_value(conn).await?;
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "insert_delayed", ctx = conn.ctx_no(); "{}", &obj);
         debug!("{:?}", &obj);
         conn.push_callback(Box::new(|| {
@@ -5085,7 +5085,7 @@ impl _@{ pascal_name }@_ {
     // save_delayed does not support relational tables.
     pub async fn save_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
         obj.__validate()?;
-        obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
+        obj.__set_default_value(conn).await?;
         if obj.will_be_deleted() {
             obj._op = OpData::default();
         }
@@ -5148,7 +5148,7 @@ impl _@{ pascal_name }@_ {
             panic!("DELETE is not supported.");
         }
         @%- endif %@
-        obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
+        obj.__set_default_value(conn).await?;
 @{- def.relations_one(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
@@ -5184,7 +5184,7 @@ impl _@{ pascal_name }@_ {
         @%- endif %@
         for mut obj in list.into_iter() {
             obj.__validate()?;
-            obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
+            obj.__set_default_value(conn).await?;
             @%- if def.soft_delete().is_none() && !def.disable_delete() %@
             if obj.will_be_deleted() {
                 remove_ids.push((&obj).into());
@@ -5213,7 +5213,7 @@ impl _@{ pascal_name }@_ {
         for mut obj in list.into_iter() {
             ensure!(obj.is_new(), "bulk_upsert supports only new objects.");
             obj.__validate()?;
-            obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
+            obj.__set_default_value(conn).await?;
             vec.push(obj._data);
         }
         @%- if def.updated_at_conf().is_some() %@
@@ -6547,7 +6547,7 @@ async fn _bulk_insert(conn: &mut DbConn, mut list: Vec<_@{ pascal_name }@Updater
     for mut obj in list.into_iter() {
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__validate()?;
-        obj.__set_default_value(conn)@% if config.use_sequence %@.await?@% endif %@;
+        obj.__set_default_value(conn).await?;
         vec.push(obj.into());
     }
     __bulk_insert(conn, &vec, ignore, replace, false).await

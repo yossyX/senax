@@ -48,12 +48,18 @@ pub use super::_base::_@{ mod_name }@::{@{ pascal_name }@Query@{ selector|pascal
 pub use self::{MockQueryService_ as Mock@{ pascal_name }@QueryService, MockRepository_ as Mock@{ pascal_name }@Repository};
 #[cfg(any(feature = "mock", test))]
 pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
+@{- def.relations()|fmt_rel_join("
+pub use base_domain::models::--1--::{class_mod_var} as _{raw_rel_name}_model_;
+pub use crate::repositories::{class_mod_var} as _{raw_rel_name}_repository_;", "")|replace1(db|snake|to_var_name) }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+pub use base_domain::models::{db_mod_var}::{class_mod_var} as _{raw_rel_name}_model_;
+pub use repository_{raw_db}::repositories::{class_mod_var} as _{raw_rel_name}_repository_;", "") }@
 
 pub async fn create(
-    repo: &dyn super::@{ group_name|pascal }@Repository,
+    repo: Box<dyn crate::repositories::Repository_>,
     obj: Box<dyn @{ pascal_name }@Updater>,
 ) -> anyhow::Result<Box<dyn @{ pascal_name }@>> {
-    let @{ mod_name }@_repo = repo.@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group_name|snake|to_var_name }@().@{ mod_name|to_var_name }@();
     #[allow(deprecated)]
     let res = @{ mod_name }@_repo.save(obj).await?;
     Ok(res.unwrap())
@@ -61,24 +67,24 @@ pub async fn create(
 @%- if !def.disable_update() %@
 
 pub async fn import(
-    repo: &dyn super::@{ group_name|pascal }@Repository,
+    repo: Box<dyn crate::repositories::Repository_>,
     list: Vec<Box<dyn @{ pascal_name }@Updater>>,
     option: Option<domain::models::ImportOption>,
 ) -> anyhow::Result<()> {
-    let @{ mod_name }@_repo = repo.@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group_name|snake|to_var_name }@().@{ mod_name|to_var_name }@();
     #[allow(deprecated)]
     @{ mod_name }@_repo.import(list, option).await
 }
 
 pub async fn update<F>(
-    repo: &dyn super::@{ group_name|pascal }@Repository,
+    repo: Box<dyn crate::repositories::Repository_>,
     mut obj: Box<dyn @{ pascal_name }@Updater>,
     update_updater: F,
 ) -> anyhow::Result<Box<dyn @{ pascal_name }@>>
 where
     F: FnOnce(&mut dyn @{ pascal_name }@Updater) -> anyhow::Result<()>,
 {
-    let @{ mod_name }@_repo = repo.@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group_name|snake|to_var_name }@().@{ mod_name|to_var_name }@();
     update_updater(&mut *obj)?;
     #[allow(deprecated)]
     let res = @{ mod_name }@_repo.save(obj).await?;
@@ -88,10 +94,10 @@ where
 @%- if !def.disable_delete() %@
 
 pub async fn delete(
-    repo: &dyn super::@{ group_name|pascal }@Repository,
+    repo: Box<dyn crate::repositories::Repository_>,
     obj: Box<dyn @{ pascal_name }@Updater>,
 ) -> anyhow::Result<()> {
-    let @{ mod_name }@_repo = repo.@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group_name|snake|to_var_name }@().@{ mod_name|to_var_name }@();
     #[allow(deprecated)]
     @{ mod_name }@_repo.delete(obj).await
 }
