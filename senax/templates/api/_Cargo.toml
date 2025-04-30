@@ -1,0 +1,32 @@
+[package]
+name = "_@{ name|snake }@_@{ db|snake }@_@{ group_name|snake }@"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+domain = { path = "../../../../1_domain" }
+db_@{ db|snake }@ = { path = "../../../../2_db/@{ db|snake }@" }
+db_@{ db|snake }@_@{ group_name|snake }@ = { path = "../../../../2_db/@{ db|snake }@/repositories/@{ group_name|snake }@" }
+_@{ name|snake }@ = { path = "../../../base" }
+
+actix-web = "4.1"
+anyhow.workspace = true
+async-graphql.workspace = true
+async-stream = "0.3"
+async-trait.workspace = true
+chrono.workspace = true
+log.workspace = true
+rust_decimal.workspace = true
+schemars.workspace = true
+senax-common.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+time = "0.3.5"
+tokio.workspace = true
+tracing.workspace = true
+utoipa = { workspace = true, features = ["actix_extras"] }
+utoipa-actix-web = "0.1"
+uuid.workspace = true
+validator.workspace = true
+@{-"\n"}@

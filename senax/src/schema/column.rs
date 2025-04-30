@@ -1459,7 +1459,7 @@ impl FieldDef {
             DataType::Char | DataType::Varchar => {
                 if !has_custom {
                     validators.push(
-                        "custom(function = \"crate::validator::validate_varchar\")".to_string(),
+                        "custom(function = \"_server::validator::validate_varchar\")".to_string(),
                     );
                 }
                 let length = self.length.unwrap_or(DEFAULT_VARCHAR_LENGTH);
@@ -1468,7 +1468,7 @@ impl FieldDef {
             DataType::Text => {
                 if !has_custom {
                     validators
-                        .push("custom(function = \"crate::validator::validate_text\")".to_string());
+                        .push("custom(function = \"_server::validator::validate_text\")".to_string());
                 }
                 if let Some(length) = self.length {
                     validators.push(format!("length(max = {})", length));
@@ -1477,7 +1477,7 @@ impl FieldDef {
             DataType::ArrayString => {
                 if !has_custom {
                     validators.push(
-                        "custom(function = \"crate::validator::validate_array_of_varchar\")"
+                        "custom(function = \"_server::validator::validate_array_of_varchar\")"
                             .to_string(),
                     );
                 }
@@ -1500,13 +1500,13 @@ impl FieldDef {
             }
             DataType::Decimal if !self.signed => {
                 validators.push(
-                    "custom(function = \"crate::validator::validate_unsigned_decimal\")"
+                    "custom(function = \"_server::validator::validate_unsigned_decimal\")"
                         .to_string(),
                 );
             }
             DataType::Json | DataType::Geometry if self.json_class.is_none() => {
                 validators.push(
-                    "custom(function = \"crate::validator::validate_json_object\")".to_string(),
+                    "custom(function = \"_server::validator::validate_json_object\")".to_string(),
                 );
             }
             _ => {}

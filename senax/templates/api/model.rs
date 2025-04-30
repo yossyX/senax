@@ -19,10 +19,11 @@ use std::collections::HashMap;
 #[allow(unused_imports)]
 use validator::Validate as _;
 
-use crate::db::RepositoryImpl;
-use crate::{auth::AuthInfo, auto_api::GqlError};
+use _@{ server_name|snake }@ as _server;
+use _server::db::RepositoryImpl;
+use _server::{auth::AuthInfo, auto_api::GqlError};
 #[allow(unused_imports)]
-use crate::{
+use _server::{
     auth::Role,
     auto_api::{NoGuard, RoleGuard},
 };

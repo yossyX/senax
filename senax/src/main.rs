@@ -150,8 +150,8 @@ enum Commands {
     },
     /// generate api
     Api {
-        /// Specify the server path
-        path: PathBuf,
+        /// Server name
+        name: String,
         /// Specify the DB
         db: Option<String>,
         /// Specify the group
@@ -338,7 +338,7 @@ async fn exec(cli: Cli) -> Result<()> {
             }
         }
         Commands::Api {
-            path,
+            name,
             db,
             group,
             model,
@@ -349,11 +349,11 @@ async fn exec(cli: Cli) -> Result<()> {
         } => {
             if let Some(db) = db {
                 ensure!(db_re.is_match(db), "bad db name!");
-                api_generator::generate(path, db, group, model, ts_dir, *inquiry, *force, *clean)?;
+                api_generator::generate(name, db, group, model, ts_dir, *inquiry, *force, *clean)?;
             } else {
-                for db in crate::api_generator::api_db_list(path)? {
+                for db in crate::api_generator::api_db_list(Path::new(name))? {
                     api_generator::generate(
-                        path, &db, group, model, ts_dir, *inquiry, *force, *clean,
+                        name, &db, group, model, ts_dir, *inquiry, *force, *clean,
                     )?;
                 }
             }

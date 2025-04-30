@@ -71,30 +71,27 @@ pub fn check_struct_name(name: &str) {
     }
 }
 
-pub fn check_name(name: &str) -> &str {
+pub fn check_name(name: &str) {
     static RE: Lazy<Regex> =
         Lazy::new(|| Regex::new(r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$").unwrap());
     if !RE.is_match(name).unwrap() || BAD_KEYWORDS.iter().any(|&x| x == name) {
         error_exit!("{} is an incorrect name.", name)
     }
-    name
 }
 
-pub fn check_column_name(name: &str) -> &str {
+pub fn check_column_name(name: &str) {
     static RE: Lazy<Regex> =
         Lazy::new(|| Regex::new(r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$").unwrap());
     if !RE.is_match(name).unwrap() || BAD_KEYWORDS.iter().any(|&x| x == name) {
         error_exit!("{} is an incorrect name.", name)
     }
-    name
 }
 
-pub fn check_ascii_name(name: &str) -> &str {
+pub fn check_ascii_name(name: &str) {
     static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[A-Za-z][_0-9A-Za-z]*(?<!_)$").unwrap());
     if !RE.is_match(name).unwrap() || BAD_KEYWORDS.iter().any(|&x| x == name) {
         error_exit!("{} is an incorrect name.", name)
     }
-    name
 }
 
 macro_rules! if_then_else {

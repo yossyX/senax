@@ -26,7 +26,7 @@ pub mod template;
 
 #[allow(clippy::too_many_arguments)]
 pub fn generate(
-    server_path: &Path,
+    name: &str,
     db_route: &str,
     group_route: &Option<String>,
     model_route: &Option<String>,
@@ -35,12 +35,13 @@ pub fn generate(
     force: bool,
     clean: bool,
 ) -> Result<()> {
+    let server_dir = Path::new(name);
     ensure!(
-        server_path.exists() && server_path.is_dir(),
+        server_dir.exists() && server_dir.is_dir(),
         "The crate path does not exist."
     );
 
-    let schema_dir = server_path.join(API_SCHEMA_PATH);
+    let schema_dir = server_dir.join(API_SCHEMA_PATH);
     let db_config_path = schema_dir.join(format!("{db_route}.yml"));
     let db = if db_config_path.exists() {
         let db_config: ApiDbDef = parse_yml_file(&db_config_path)?;
@@ -67,8 +68,8 @@ pub fn generate(
     filters::SHOW_LABEL.store(db_config.with_label(), Ordering::SeqCst);
     filters::SHOW_COMMNET.store(db_config.with_comment(), Ordering::SeqCst);
 
-    let src_path = server_path.join("src");
-    let file_path = src_path.join("auto_api.rs");
+    let src_dir = server_dir.join("src");
+    let file_path = src_dir.join("auto_api.rs");
     let mut content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
     let db_var_name = _to_var_name(&db_route.to_case(Case::Snake));
@@ -106,7 +107,7 @@ pub fn generate(
         fs_write(file_path, &*content)?;
     }
 
-    let file_path = src_path.join("auth.rs");
+    let file_path = src_dir.join("auth.rs");
     let content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
     let re = Regex::new(r"(?s)// Do not modify below this line. \(RoleStart\).+// Do not modify up to this line. \(RoleEnd\)").unwrap();
@@ -196,12 +197,12 @@ pub fn generate(
     } else {
         db_config.groups.iter().map(|(v, _)| v.clone()).collect()
     };
-    let base_path = src_path.join("auto_api");
+    let api_dir = server_dir.join("auto_api");
     let mut db_file_group_names = Vec::new();
-    let db_base_path = base_path.join(db_route.to_case(Case::Snake));
+    let api_db_dir = api_dir.join(db_route.to_case(Case::Snake));
     let mut remove_files = HashSet::new();
-    if clean && db_base_path.exists() {
-        for entry in glob::glob(&format!("{}/**/*.rs", db_base_path.display()))? {
+    if clean && api_db_dir.exists() {
+        for entry in glob::glob(&format!("{}/**/*.*", api_db_dir.display()))? {
             match entry {
                 Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
                 Err(_) => false,
@@ -233,7 +234,7 @@ pub fn generate(
         let group_route_mod_name = group_route.to_case(Case::Snake);
         let group_mod_name = group_name.to_case(Case::Snake);
 
-        let file_path = server_path.join("Cargo.toml");
+        let file_path = server_dir.join("Cargo.toml");
         if file_path.exists() {
             let mut content = fs::read_to_string(&file_path)?;
             let db = &db.to_case(Case::Snake);
@@ -247,6 +248,34 @@ pub fn generate(
                     ),
                 );
             }
+            fs_write(file_path, &*content)?;
+        }
+
+        let api_group_dir = api_db_dir.join(&group_route_mod_name);
+
+        #[derive(Template)]
+        #[template(path = "api/_Cargo.toml", escape = "none")]
+        pub struct CargoTemplate<'a> {
+            pub name: &'a str,
+            pub db: &'a str,
+            pub group_name: &'a str,
+        }
+    
+        let file_path = api_group_dir.join("Cargo.toml");
+        remove_files.remove(file_path.as_os_str());
+        if force || !file_path.exists() {
+            let content = CargoTemplate { name, db: &db, group_name }.render()?;
+            fs_write(file_path, &*content)?;
+        }
+
+        #[derive(Template)]
+        #[template(path = "api/lib.rs", escape = "none")]
+        pub struct LibTemplate;
+    
+        let file_path = api_group_dir.join("src/lib.rs");
+        remove_files.remove(file_path.as_os_str());
+        if force || !file_path.exists() {
+            let content = LibTemplate.render()?;
             fs_write(file_path, &*content)?;
         }
 
@@ -282,7 +311,8 @@ pub fn generate(
             });
 
             let api_def = write_model_file(
-                &db_base_path.join(&group_route_mod_name),
+                name,
+                &api_group_dir,
                 &db,
                 db_route,
                 &group_mod_name,
@@ -311,7 +341,7 @@ pub fn generate(
         }
         if !model_routes.is_empty() {
             write_group_file(
-                &db_base_path,
+                &api_group_dir,
                 db_route,
                 &group_route_mod_name,
                 &model_routes,
@@ -336,7 +366,7 @@ pub fn generate(
         }
     }
     write_db_file(
-        &base_path,
+        &api_dir,
         &db,
         db_route,
         &db_file_group_names,
@@ -447,7 +477,7 @@ fn write_group_file(
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
-    let file_path = path.join(format!("{}.rs", group_route.to_case(Case::Snake)));
+    let file_path = path.join("src/api.rs");
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         template::GroupTemplate {
@@ -541,6 +571,7 @@ pub mod @{ name|snake|to_var_name }@;
 
 #[allow(clippy::too_many_arguments)]
 fn write_model_file(
+    server_name: &str,
     path: &Path,
     db: &str,
     db_route: &str,
@@ -556,6 +587,7 @@ fn write_model_file(
     ts_dir: &Option<PathBuf>,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<ApiModelDef> {
+    let path = path.join("src/api");
     let api_def = if let Some(api_def) = api_def {
         api_def.clone()
     } else {
@@ -584,6 +616,7 @@ fn write_model_file(
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         template::ModelTemplate {
+            server_name,
             db,
             db_route,
             group,
@@ -625,6 +658,7 @@ fn write_model_file(
     }
     .render()?;
     write_relation(
+        server_name,
         def,
         &mut buf,
         db,
@@ -779,6 +813,7 @@ fn inquire_relation(
 
 #[allow(clippy::too_many_arguments)]
 fn write_relation(
+    server_name: &str,
     def: &Arc<ModelDef>,
     buf: &mut String,
     db: &str,
@@ -802,6 +837,7 @@ fn write_relation(
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
         relation_buf.push_str(
             &template::RelationTemplate {
+                server_name,
                 db,
                 graphql_name,
                 rel_name,
@@ -822,6 +858,7 @@ fn write_relation(
         );
         let mut rel_fields = make_gql_fields(&rel_model, camel_case);
         write_relation(
+            server_name,
             &rel_model,
             &mut relation_buf,
             db,
@@ -851,6 +888,7 @@ fn write_relation(
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
         relation_buf.push_str(
             &template::RelationTemplate {
+                server_name,
                 db,
                 graphql_name,
                 rel_name,
@@ -871,6 +909,7 @@ fn write_relation(
         );
         let mut rel_fields = make_gql_fields(&rel_model, camel_case);
         write_relation(
+            server_name,
             &rel_model,
             &mut relation_buf,
             db,
@@ -912,6 +951,7 @@ fn write_relation(
         );
         let mut rel_fields = make_gql_fields(&rel_model, camel_case);
         write_relation(
+            server_name,
             &rel_model,
             &mut relation_buf,
             db,

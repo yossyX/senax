@@ -5,15 +5,15 @@ use crate::common::fs_write;
 
 pub fn generate(name: &str, server: &str, _force: bool) -> Result<()> {
     anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
-    let name = crate::common::check_ascii_name(name).to_string();
+    crate::common::check_ascii_name(name);
 
     for f in crate::TEMPLATES.file_names() {
         if f.starts_with("templates/client/") {
-            let path = Path::new(&name).join(f.trim_start_matches("templates/client/"));
+            let path = Path::new(name).join(f.trim_start_matches("templates/client/"));
             let buf = crate::TEMPLATES.get(f)?;
             if f.eq("templates/client/package.json") {
                 let buf = std::str::from_utf8(buf.as_ref())?;
-                let buf = buf.replace("<<client_name>>", &name);
+                let buf = buf.replace("<<client_name>>", name);
                 fs_write(path, buf)?;
             } else {
                 fs_write(path, buf)?;
@@ -24,7 +24,7 @@ pub fn generate(name: &str, server: &str, _force: bool) -> Result<()> {
     let file_path = Path::new("./build.sh");
     if file_path.exists() {
         let content = fs::read_to_string(file_path)?;
-        fs_write(file_path, fix_build_sh(&content, &name, server)?)?;
+        fs_write(file_path, fix_build_sh(&content, name, server)?)?;
     }
 
     Ok(())

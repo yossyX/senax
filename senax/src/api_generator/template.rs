@@ -210,6 +210,7 @@ pub struct GroupJsonSchemaTemplate<'a> {
 #[derive(Template)]
 #[template(path = "api/model.rs", escape = "none")]
 pub struct ModelTemplate<'a> {
+    pub server_name: &'a str,
     pub db: &'a str,
     pub db_route: &'a str,
     pub group: &'a str,
@@ -241,6 +242,7 @@ pub struct BaseModelTemplate<'a> {
 #[derive(Template)]
 #[template(path = "api/_relation.rs", escape = "none")]
 pub struct RelationTemplate<'a> {
+    pub server_name: &'a str,
     pub db: &'a str,
     pub graphql_name: &'a str,
     pub rel_name: &'a str,
@@ -267,10 +269,6 @@ pub struct ReferenceTemplate<'a> {
     pub camel_case: bool,
     pub rel_mod: String,
 }
-
-#[derive(Template)]
-#[template(path = "api/_config.yml", escape = "none")]
-pub struct ConfigTemplate;
 
 #[derive(Template)]
 #[template(path = "api/config.yml", escape = "none")]

@@ -11,11 +11,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::filters;
 use crate::{API_SCHEMA_PATH, SCHEMA_PATH, common::fs_write};
-use crate::{
-    api_generator::template::{ConfigTemplate, DbConfigTemplate},
-    schema::CONFIG,
-};
+use crate::{api_generator::template::DbConfigTemplate, schema::CONFIG};
 
 pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> Result<()> {
     anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
@@ -25,7 +23,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         let path = Path::new(SCHEMA_PATH).join(format!("{db}.yml"));
         anyhow::ensure!(path.exists(), "{} DB is not found.", db);
     }
-    let name = crate::common::check_ascii_name(name).to_string();
+    crate::common::check_ascii_name(name);
     let base_path: PathBuf = name.parse()?;
 
     let file_path = Path::new("./Cargo.toml");
@@ -36,7 +34,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
             .captures(&content)
             .with_context(|| format!("Illegal file content:{}", &file_path.to_string_lossy()))?;
         let members = caps.get(1).unwrap().as_str();
-        let quoted = format!("\"{}\"", &name);
+        let quoted = format!("\"{}\"", name);
         if !members.contains(&quoted) {
             let content = re.replace(&content, format!("members = [{}, {}]", members, &quoted));
             fs_write(file_path, &*content)?;
@@ -52,7 +50,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     }
     if file_path.exists() {
         let content = fs::read_to_string(&file_path)?;
-        fs_write(file_path, fix_env(&content, &name, session, &session_key)?)?;
+        fs_write(file_path, fix_env(&content, name, session, &session_key)?)?;
     }
 
     let mut file_path = PathBuf::from("./.env.example");
@@ -61,13 +59,22 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     }
     if file_path.exists() {
         let content = fs::read_to_string(&file_path)?;
-        fs_write(file_path, fix_env(&content, &name, session, &session_key)?)?;
+        fs_write(file_path, fix_env(&content, name, session, &session_key)?)?;
     }
 
     let file_path = Path::new("./build.sh");
     if file_path.exists() {
         let content = fs::read_to_string(file_path)?;
-        fs_write(file_path, fix_build_sh(&content, &name)?)?;
+        fs_write(file_path, fix_build_sh(&content, name)?)?;
+    }
+
+    write_base_files(&base_path, name, &db_list, session, force)?;
+
+    #[derive(Template)]
+    #[template(path = "new_actix/_Cargo.toml", escape = "none")]
+    pub struct CargoTemplate<'a> {
+        pub name: &'a str,
+        pub session: bool,
     }
 
     let file_path = base_path.join("Cargo.toml");
@@ -91,6 +98,10 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     }
     fs_write(file_path, &*content)?;
 
+    #[derive(Template)]
+    #[template(path = "api/_config.yml", escape = "none")]
+    pub struct ConfigTemplate;
+
     let schema_dir = base_path.join(API_SCHEMA_PATH);
     let config_path = schema_dir.join("_config.yml");
     if !config_path.exists() {
@@ -105,6 +116,10 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         }
     }
 
+    #[derive(Template)]
+    #[template(path = "new_actix/src/auth.rs", escape = "none")]
+    pub struct AuthTemplate;
+
     let src_path = base_path.join("src");
     let file_path = src_path.join("auth.rs");
     if force || !file_path.exists() {
@@ -112,10 +127,20 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         fs_write(file_path, tpl.render()?)?;
     }
 
+    #[derive(Template)]
+    #[template(path = "new_actix/src/context.rs", escape = "none")]
+    pub struct ContextTemplate;
+
     let file_path = src_path.join("context.rs");
     if force || !file_path.exists() {
         let tpl = ContextTemplate;
         fs_write(file_path, tpl.render()?)?;
+    }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/src/db.rs", escape = "none")]
+    pub struct DbTemplate {
+        pub session: bool,
     }
 
     let file_path = src_path.join("db.rs");
@@ -215,16 +240,33 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     }
     fs_write(file_path, &*content)?;
 
+    #[derive(Template)]
+    #[template(path = "new_actix/src/gql_log.rs", escape = "none")]
+    pub struct GqlLogTemplate;
+
     let file_path = src_path.join("gql_log.rs");
     if force || !file_path.exists() {
         let tpl = GqlLogTemplate;
         fs_write(&file_path, tpl.render()?)?;
     }
 
+    #[derive(Template)]
+    #[template(path = "new_actix/src/auto_api.rs", escape = "none")]
+    pub struct AutoApiTemplate {
+        pub session: bool,
+    }
+
     let file_path = src_path.join("auto_api.rs");
     if force || !file_path.exists() {
         let tpl = AutoApiTemplate { session };
         fs_write(&file_path, tpl.render()?)?;
+    }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/src/main.rs", escape = "none")]
+    pub struct MainTemplate {
+        pub non_snake_case: bool,
+        pub session: bool,
     }
 
     let file_path = src_path.join("main.rs");
@@ -236,11 +278,19 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         fs_write(file_path, tpl.render()?)?;
     }
 
+    #[derive(Template)]
+    #[template(path = "new_actix/src/response.rs", escape = "none")]
+    pub struct ResponseTemplate;
+
     let file_path = src_path.join("response.rs");
     if force || !file_path.exists() {
         let tpl = ResponseTemplate;
         fs_write(file_path, tpl.render()?)?;
     }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/src/tasks.rs", escape = "none")]
+    pub struct TasksTemplate;
 
     let file_path = src_path.join("tasks.rs");
     if !file_path.exists() {
@@ -248,11 +298,19 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         fs_write(file_path, tpl.render()?)?;
     }
 
+    #[derive(Template)]
+    #[template(path = "new_actix/src/tests.rs", escape = "none")]
+    pub struct TestsTemplate;
+
     let file_path = src_path.join("tests.rs");
     if !file_path.exists() {
         let tpl = TestsTemplate;
         fs_write(file_path, tpl.render()?)?;
     }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/src/common.rs", escape = "none")]
+    pub struct CommonTemplate;
 
     let file_path = src_path.join("common.rs");
     if !file_path.exists() {
@@ -260,11 +318,19 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         fs_write(file_path, tpl.render()?)?;
     }
 
+    #[derive(Template)]
+    #[template(path = "new_actix/src/validator.rs", escape = "none")]
+    pub struct ValidatorTemplate;
+
     let file_path = src_path.join("validator.rs");
     if !file_path.exists() {
         let tpl = ValidatorTemplate;
         fs_write(file_path, tpl.render()?)?;
     }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/src/routes/root.rs", escape = "none")]
+    pub struct RootTemplate;
 
     let routes_path = src_path.join("routes");
     let file_path = routes_path.join("root.rs");
@@ -273,6 +339,10 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         fs_write(file_path, tpl.render()?)?;
     }
 
+    #[derive(Template)]
+    #[template(path = "new_actix/src/routes/root/index.rs", escape = "none")]
+    pub struct IndexTemplate;
+
     let root_path = routes_path.join("root");
     let file_path = root_path.join("index.rs");
     if force || !file_path.exists() {
@@ -280,6 +350,226 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         fs_write(file_path, tpl.render()?)?;
     }
 
+    Ok(())
+}
+
+pub fn write_base_files(
+    base_path: &Path,
+    name: &str,
+    db_list: &[&str],
+    session: bool,
+    force: bool,
+) -> Result<()> {
+    let non_snake_case = crate::common::check_non_snake_case()?;
+    let base_path = base_path.join("base");
+
+    #[derive(Template)]
+    #[template(path = "new_actix/base/_Cargo.toml", escape = "none")]
+    pub struct CargoTemplate<'a> {
+        pub name: &'a str,
+        pub session: bool,
+    }
+
+    let file_path = base_path.join("Cargo.toml");
+    let mut content = if force || !file_path.exists() {
+        CargoTemplate { name, session }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
+    for db in db_list {
+        let db = &db.to_case(Case::Snake);
+        let reg = Regex::new(&format!(r"(?m)^db_{}\s*=", db))?;
+        if !reg.is_match(&content) {
+            content = content.replace(
+                "[dependencies]",
+                &format!(
+                    "[dependencies]\ndb_{} = {{ path = \"../2_db/{}\" }}",
+                    db, db
+                ),
+            );
+        }
+    }
+    fs_write(file_path, &*content)?;
+
+    #[derive(Template)]
+    #[template(path = "new_actix/base/src/auth.rs", escape = "none")]
+    pub struct AuthTemplate;
+
+    let src_path = base_path.join("src");
+    let file_path = src_path.join("auth.rs");
+    if force || !file_path.exists() {
+        let tpl = AuthTemplate;
+        fs_write(file_path, tpl.render()?)?;
+    }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/base/src/context.rs", escape = "none")]
+    pub struct ContextTemplate;
+
+    let file_path = src_path.join("context.rs");
+    if force || !file_path.exists() {
+        let tpl = ContextTemplate;
+        fs_write(file_path, tpl.render()?)?;
+    }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/base/src/db.rs", escape = "none")]
+    pub struct DbTemplate {
+        pub session: bool,
+    }
+
+    let file_path = src_path.join("db.rs");
+    let mut content = if force || !file_path.exists() {
+        DbTemplate { session }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
+    for db in db_list {
+        let reg = Regex::new(&format!(r"(?m)^\s*db_{}::start", &db.to_case(Case::Snake)))?;
+        if !reg.is_match(&content) {
+            crate::schema::parse(db, false, false)?;
+            let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
+            let tpl = DbInitTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (DbInit)",
+                tpl.render()?.trim_start(),
+            );
+            let tpl = DbStartTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (DbStart)",
+                tpl.render()?.trim_start(),
+            );
+            let tpl = DbStartTestTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (DbStartTest)",
+                tpl.render()?.trim_start(),
+            );
+            let tpl = DbStopTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (DbStop)",
+                tpl.render()?.trim_start(),
+            );
+            let tpl = DbClearLocalCacheTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (DbClearLocalCache)",
+                tpl.render()?.trim_start(),
+            );
+            let tpl = DbClearCacheTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (DbClearCache)",
+                tpl.render()?.trim_start(),
+            );
+            if !config.exclude_from_domain {
+                let tpl = DbRepoTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (Repo)",
+                    tpl.render()?.trim_start(),
+                );
+                let tpl = DbRepoNewTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (RepoNew)",
+                    tpl.render()?.trim_start(),
+                );
+                let tpl = DbRepoImplTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (RepoImpl)",
+                    tpl.render()?.trim_start(),
+                );
+                let tpl = DbRepoImplStartTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (RepoImplStart)",
+                    tpl.render()?.trim_start(),
+                );
+                let tpl = DbRepoImplCommitTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (RepoImplCommit)",
+                    tpl.render()?.trim_start(),
+                );
+                let tpl = DbRepoImplRollbackTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (RepoImplRollback)",
+                    tpl.render()?.trim_start(),
+                );
+                let tpl = DbMigrateTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (migrate)",
+                    tpl.render()?.trim_start(),
+                );
+                let tpl = DbGenSeedSchemaTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (gen_seed_schema)",
+                    tpl.render()?.trim_start(),
+                );
+                let tpl = DbSeedTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (seed)",
+                    tpl.render()?.trim_start(),
+                );
+                let tpl = DbCheckTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (check)",
+                    tpl.render()?.trim_start(),
+                );
+            }
+        }
+    }
+    fs_write(file_path, &*content)?;
+
+    #[derive(Template)]
+    #[template(path = "new_actix/base/src/auto_api.rs", escape = "none")]
+    pub struct AutoApiTemplate {
+        pub session: bool,
+    }
+
+    let file_path = src_path.join("auto_api.rs");
+    if force || !file_path.exists() {
+        let tpl = AutoApiTemplate { session };
+        fs_write(&file_path, tpl.render()?)?;
+    }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/base/src/lib.rs", escape = "none")]
+    pub struct LibTemplate {
+        pub non_snake_case: bool,
+    }
+
+    let file_path = src_path.join("lib.rs");
+    if force || !file_path.exists() {
+        let tpl = LibTemplate {
+            non_snake_case,
+        };
+        fs_write(file_path, tpl.render()?)?;
+    }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/base/src/response.rs", escape = "none")]
+    pub struct ResponseTemplate;
+
+    let file_path = src_path.join("response.rs");
+    if force || !file_path.exists() {
+        let tpl = ResponseTemplate;
+        fs_write(file_path, tpl.render()?)?;
+    }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/base/src/common.rs", escape = "none")]
+    pub struct CommonTemplate;
+
+    let file_path = src_path.join("common.rs");
+    if !file_path.exists() {
+        let tpl = CommonTemplate;
+        fs_write(file_path, tpl.render()?)?;
+    }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/base/src/validator.rs", escape = "none")]
+    pub struct ValidatorTemplate;
+
+    let file_path = src_path.join("validator.rs");
+    if !file_path.exists() {
+        let tpl = ValidatorTemplate;
+        fs_write(file_path, tpl.render()?)?;
+    }
     Ok(())
 }
 
@@ -343,31 +633,6 @@ impl Secret {
         rng.next_u64()
     }
 }
-
-#[derive(Template)]
-#[template(path = "new_actix/_Cargo.toml", escape = "none")]
-pub struct CargoTemplate {
-    pub name: String,
-    pub session: bool,
-}
-
-#[derive(Template)]
-#[template(path = "new_actix/src/auth.rs", escape = "none")]
-pub struct AuthTemplate;
-
-#[derive(Template)]
-#[template(path = "new_actix/src/context.rs", escape = "none")]
-pub struct ContextTemplate;
-
-#[derive(Template)]
-#[template(path = "new_actix/src/db.rs", escape = "none")]
-pub struct DbTemplate {
-    pub session: bool,
-}
-
-#[derive(Template)]
-#[template(path = "new_actix/src/gql_log.rs", escape = "none")]
-pub struct GqlLogTemplate;
 
 #[derive(Template)]
 #[template(
@@ -573,60 +838,4 @@ pub struct DbSeedTemplate<'a> {
 )]
 pub struct DbCheckTemplate<'a> {
     pub db: &'a str,
-}
-
-#[derive(Template)]
-#[template(path = "new_actix/src/auto_api.rs", escape = "none")]
-pub struct AutoApiTemplate {
-    pub session: bool,
-}
-
-#[derive(Template)]
-#[template(path = "new_actix/src/main.rs", escape = "none")]
-pub struct MainTemplate {
-    pub non_snake_case: bool,
-    pub session: bool,
-}
-
-#[derive(Template)]
-#[template(path = "new_actix/src/response.rs", escape = "none")]
-pub struct ResponseTemplate;
-
-#[derive(Template)]
-#[template(path = "new_actix/src/tasks.rs", escape = "none")]
-pub struct TasksTemplate;
-
-#[derive(Template)]
-#[template(path = "new_actix/src/tests.rs", escape = "none")]
-pub struct TestsTemplate;
-
-#[derive(Template)]
-#[template(path = "new_actix/src/common.rs", escape = "none")]
-pub struct CommonTemplate;
-
-#[derive(Template)]
-#[template(path = "new_actix/src/validator.rs", escape = "none")]
-pub struct ValidatorTemplate;
-
-#[derive(Template)]
-#[template(path = "new_actix/src/routes/root.rs", escape = "none")]
-pub struct RootTemplate;
-
-#[derive(Template)]
-#[template(path = "new_actix/src/routes/root/index.rs", escape = "none")]
-pub struct IndexTemplate;
-
-mod filters {
-    use crate::schema::_to_var_name;
-    use convert_case::{Case, Casing};
-
-    pub fn to_var_name(s: &str) -> ::askama::Result<String> {
-        Ok(_to_var_name(s))
-    }
-    pub fn pascal(s: &str) -> ::askama::Result<String> {
-        Ok(s.to_case(Case::Pascal))
-    }
-    pub fn snake(s: &str) -> ::askama::Result<String> {
-        Ok(s.to_case(Case::Snake))
-    }
 }
