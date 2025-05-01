@@ -26,7 +26,7 @@ pub mod template;
 
 #[allow(clippy::too_many_arguments)]
 pub fn generate(
-    name: &str,
+    server: &str,
     db_route: &str,
     group_route: &Option<String>,
     model_route: &Option<String>,
@@ -35,7 +35,7 @@ pub fn generate(
     force: bool,
     clean: bool,
 ) -> Result<()> {
-    let server_dir = Path::new(name);
+    let server_dir = Path::new(server);
     ensure!(
         server_dir.exists() && server_dir.is_dir(),
         "The crate path does not exist."
@@ -69,6 +69,7 @@ pub fn generate(
     filters::SHOW_COMMNET.store(db_config.with_comment(), Ordering::SeqCst);
 
     let src_dir = server_dir.join("src");
+    let base_src_dir = server_dir.join("base/src");
     let file_path = src_dir.join("auto_api.rs");
     let mut content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
@@ -107,7 +108,7 @@ pub fn generate(
         fs_write(file_path, &*content)?;
     }
 
-    let file_path = src_dir.join("auth.rs");
+    let file_path = base_src_dir.join("auth.rs");
     let content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
     let re = Regex::new(r"(?s)// Do not modify below this line. \(RoleStart\).+// Do not modify up to this line. \(RoleEnd\)").unwrap();
@@ -237,14 +238,28 @@ pub fn generate(
         let file_path = server_dir.join("Cargo.toml");
         if file_path.exists() {
             let mut content = fs::read_to_string(&file_path)?;
-            let db = &db.to_case(Case::Snake);
-            let reg = Regex::new(&format!(r"(?m)^db_{}_{}\s*=", db, group_mod_name))?;
+            let db_mod = &db.to_case(Case::Snake);
+            let reg = Regex::new(&format!(r"(?m)^db_{}_{}\s*=", db_mod, group_mod_name))?;
             if !reg.is_match(&content) {
                 content = content.replace(
                     "[dependencies]",
                     &format!(
                         "[dependencies]\ndb_{}_{} = {{ path = \"../2_db/{}/repositories/{}\" }}",
-                        db, group_mod_name, db, group_mod_name
+                        db_mod, group_mod_name, db_mod, group_mod_name
+                    ),
+                );
+            }
+
+            let name = server.to_case(Case::Snake);
+            let db_route = db_route.to_case(Case::Snake);
+            let group_route = group_route.to_case(Case::Snake);
+            let reg = Regex::new(&format!(r"(?m)^_{}_{}_{}\s*=", name, db_route, group_route))?;
+            if !reg.is_match(&content) {
+                content = content.replace(
+                    "[dependencies]",
+                    &format!(
+                        "[dependencies]\n_{}_{}_{} = {{ path = \"auto_api/{}/{}\" }}",
+                        name, db_route, group_route, db_route, group_route
                     ),
                 );
             }
@@ -256,7 +271,7 @@ pub fn generate(
         #[derive(Template)]
         #[template(path = "api/_Cargo.toml", escape = "none")]
         pub struct CargoTemplate<'a> {
-            pub name: &'a str,
+            pub server: &'a str,
             pub db: &'a str,
             pub group_name: &'a str,
         }
@@ -264,7 +279,7 @@ pub fn generate(
         let file_path = api_group_dir.join("Cargo.toml");
         remove_files.remove(file_path.as_os_str());
         if force || !file_path.exists() {
-            let content = CargoTemplate { name, db: &db, group_name }.render()?;
+            let content = CargoTemplate { server, db: &db, group_name }.render()?;
             fs_write(file_path, &*content)?;
         }
 
@@ -311,7 +326,7 @@ pub fn generate(
             });
 
             let api_def = write_model_file(
-                name,
+                server,
                 &api_group_dir,
                 &db,
                 db_route,
@@ -366,7 +381,8 @@ pub fn generate(
         }
     }
     write_db_file(
-        &api_dir,
+        &src_dir,
+        server,
         &db,
         db_route,
         &db_file_group_names,
@@ -392,6 +408,7 @@ pub fn generate(
 
 fn write_db_file(
     path: &Path,
+    server: &str,
     db: &str,
     db_route: &str,
     group_names: &[String],
@@ -399,7 +416,7 @@ fn write_db_file(
     config: &ApiDbDef,
 ) -> Result<()> {
     let camel_case = config.camel_case();
-    let file_path = path.join(format!("{}.rs", &db_route.to_case(Case::Snake)));
+    let file_path = path.join("auto_api").join(format!("{}.rs", &db_route.to_case(Case::Snake)));
     let content = if force || !file_path.exists() {
         template::DbTemplate { db, db_route }.render()?
     } else {
@@ -427,7 +444,7 @@ fn write_db_file(
         all.insert(v.clone());
     });
     let all = all.iter().cloned().collect::<Vec<_>>().join(",");
-    let tpl = template::DbModTemplate { all, add_groups };
+    let tpl = template::DbModTemplate { server, db_route, all, add_groups };
     let content = re.replace(&content, tpl.render()?);
     let tpl = template::DbInitTemplate { db, add_groups };
     let content = content.replace("\n    // Do not modify this line. (DbInit)", &tpl.render()?);

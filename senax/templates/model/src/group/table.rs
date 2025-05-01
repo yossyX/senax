@@ -14,18 +14,8 @@ pub use super::_base::_@{ mod_name }@::{
     _@{ pascal_name }@,@% if !config.force_disable_cache %@ _@{ pascal_name }@Cache,@% endif %@ _@{ pascal_name }@Factory, _@{ pascal_name }@Updater,
     @% for id in def.id() %@@{ id_name }@, @% endfor %@_@{ pascal_name }@Info, _@{ pascal_name }@Getter,
 };
-@%- if config.exclude_from_domain %@
-// pub use super::_base::_@{ mod_name }@::{filter, order};
-@%- else %@
-// pub use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{filter, order};
-@%- endif %@
-@%- if config.exclude_from_domain %@
-// pub use super::_base::_@{ mod_name }@::{join, Joiner_};
-@%- else %@
-// pub use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{join, Joiner_};
-@%- endif %@
 @%- if def.act_as_job_queue() %@
-pub use super::_base::_@{ mod_name }@::QUEUE_NOTIFIER;
+// pub use super::_base::_@{ mod_name }@::QUEUE_NOTIFIER;
 @%- endif %@
 
 impl crate::models::ModelTr<Self, _@{ mod_name }@::CacheOp> for _@{ pascal_name }@ {

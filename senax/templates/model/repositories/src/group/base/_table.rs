@@ -88,11 +88,11 @@ static ALL_ROWS_CACHE: OnceCell<Vec<ArcSwapOption<Vec<()>>>> = OnceCell::new();
 static CACHE_RESET_SYNC: OnceCell<Vec<RwLock<u64>>> = OnceCell::new();
 static CACHE_RESET_SYNC_ALL_ROWS: OnceCell<Vec<Mutex<u64>>> = OnceCell::new();
 static BULK_FETCH_QUEUE: OnceCell<Vec<SegQueue<InnerPrimary>>> = OnceCell::new();
-static PRIMARY_TYPE_ID: u64 = @{ def.get_type_id("PRIMARY_TYPE_ID") }@;
+// static PRIMARY_TYPE_ID: u64 = @{ def.get_type_id("PRIMARY_TYPE_ID") }@;
 static COL_KEY_TYPE_ID: u64 = @{ def.get_type_id("COL_KEY_TYPE_ID") }@;
-static VERSION_TYPE_ID: u64 = @{ def.get_type_id("VERSION_TYPE_ID") }@;
-static CACHE_SYNC_TYPE_ID: u64 = @{ def.get_type_id("CACHE_SYNC_TYPE_ID") }@;
-static CACHE_TYPE_ID: u64 = @{ def.get_type_id("CACHE_TYPE_ID") }@;
+// static VERSION_TYPE_ID: u64 = @{ def.get_type_id("VERSION_TYPE_ID") }@;
+// static CACHE_SYNC_TYPE_ID: u64 = @{ def.get_type_id("CACHE_SYNC_TYPE_ID") }@;
+// static CACHE_TYPE_ID: u64 = @{ def.get_type_id("CACHE_TYPE_ID") }@;
 @%- if def.act_as_job_queue() %@
 pub static QUEUE_NOTIFIER: tokio::sync::Notify = tokio::sync::Notify::const_new();
 @%- endif %@

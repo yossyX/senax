@@ -9,9 +9,9 @@ js_updater = ["rquickjs"]
 
 [dependencies]
 @%- if session %@
-db_session_session = { path = "../2_db/session/repositories/session" }
-db_session = { path = "../2_db/session" }
+db_session = { path = "../../2_db/session" }
 @%- endif %@
+domain = { path = "../../1_domain" }
 
 actix-web = "4.1"
 anyhow.workspace = true

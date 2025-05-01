@@ -27,23 +27,21 @@ use std::sync::{Arc, Weak};
 use tokio::sync::mpsc;
 use tokio::time::{sleep, Duration};
 
+pub use _@{ name }@ as _base;
+use _base::context::Ctx;
+use _base::auth;
+
 use crate::auto_api::{MutationRoot, QueryRoot};
-use crate::context::Ctx;
 
 mod auto_api;
-mod auth;
-mod common;
-mod context;
 mod db;
 mod gql_log;
-mod response;
 mod routes {
     pub mod root;
 }
 mod tasks;
 #[cfg(test)]
 mod tests;
-mod validator;
 
 const HOST_PORT: &str = "HOST_PORT";
 const WORK_DIR: &str = "WORK_DIR";
@@ -189,11 +187,11 @@ async fn main() -> Result<()> {
                         "clean migrate is debug environment only"
                     );
                 }
-                db::migrate(test, clean || force_delete_all_db, ignore_missing).await?;
+                _base::db::migrate(test, clean || force_delete_all_db, ignore_missing).await?;
                 return Ok(());
             }
             Command::GenSeedSchema => {
-                db::gen_seed_schema()?;
+                _base::db::gen_seed_schema()?;
                 return Ok(());
             }
             Command::Seed {
@@ -207,9 +205,9 @@ async fn main() -> Result<()> {
                         force_delete_all_db || cfg!(debug_assertions),
                         "clean migrate is debug environment only"
                     );
-                    db::migrate(test, clean || force_delete_all_db, ignore_missing).await?;
+                    _base::db::migrate(test, clean || force_delete_all_db, ignore_missing).await?;
                 }
-                db::seed(test).await?;
+                _base::db::seed(test).await?;
                 return Ok(());
             }
             Command::OpenApi => {
@@ -217,7 +215,7 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             Command::Check { test } => {
-                db::check(test).await?;
+                _base::db::check(test).await?;
                 return Ok(());
             }
             Command::GenGqlSchema { ts_dir } => {
@@ -235,7 +233,7 @@ async fn main() -> Result<()> {
     )?;
     if arg.auto_migrate {
         info!("Starting migration");
-        if let Err(e) = db::migrate(false, false, true).await {
+        if let Err(e) = _base::db::migrate(false, false, true).await {
             error!("{}", e);
             std::process::exit(1);
         }
@@ -283,16 +281,11 @@ async fn main() -> Result<()> {
         // For rolling update
         for _ in 0..15 {
             tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-            db::clear_local_cache().await;
+            _base::db::clear_local_cache().await;
         }
     });
 
-    #[cfg(feature = "v8")]
-    {
-        let platform = v8::Platform::new(0, false).make_shared();
-        v8::V8::initialize_platform(platform);
-        v8::V8::initialize();
-    }
+    _base::start().await?;
 
     let mut listeners = take_listener(&[&port])?;
 
@@ -399,13 +392,7 @@ async fn main() -> Result<()> {
     drop(db_guard_tx);
     while let Some(_i) = db_guard_rx.recv().await {}
 
-    #[cfg(feature = "v8")]
-    {
-        unsafe {
-            v8::V8::dispose();
-        }
-        v8::V8::dispose_platform();
-    }
+    _base::end().await?;
 
     info!("server stopped");
     if exit_code != 0 {
@@ -475,7 +462,7 @@ async fn handle_signals() {
     let mut signals = Signals::new([SIGUSR1, SIGUSR2]).unwrap();
     while let Some(signal) = signals.next().await {
         match signal {
-            SIGUSR1 => db::clear_whole_cache().await,
+            SIGUSR1 => _base::db::clear_whole_cache().await,
             SIGUSR2 => match unsafe { unistd::fork() }.expect("fork failed") {
                 unistd::ForkResult::Parent { .. } => {}
                 unistd::ForkResult::Child => {

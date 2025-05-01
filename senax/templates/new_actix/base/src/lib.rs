@@ -4,10 +4,6 @@
 #[macro_use]
 extern crate log;
 
-use once_cell::sync::OnceCell;
-use std::sync::{Arc, Weak};
-use tokio::sync::mpsc;
-
 pub mod auth;
 pub mod auto_api;
 pub mod common;
@@ -16,9 +12,24 @@ pub mod db;
 pub mod response;
 pub mod validator;
 
-pub static SHUTDOWN_GUARD: OnceCell<Weak<mpsc::Sender<u8>>> = OnceCell::new();
+pub async fn start() -> anyhow::Result<()> {
+    #[cfg(feature = "v8")]
+    {
+        let platform = v8::Platform::new(0, false).make_shared();
+        v8::V8::initialize_platform(platform);
+        v8::V8::initialize();
+    }
+    Ok(())
+}
 
-pub fn get_shutdown_guard() -> Option<Arc<mpsc::Sender<u8>>> {
-    SHUTDOWN_GUARD.wait().upgrade()
+pub async fn end() -> anyhow::Result<()> {
+    #[cfg(feature = "v8")]
+    {
+        unsafe {
+            v8::V8::dispose();
+        }
+        v8::V8::dispose_platform();
+    }
+    Ok(())
 }
 @{-"\n"}@

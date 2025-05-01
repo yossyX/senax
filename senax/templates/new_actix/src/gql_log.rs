@@ -7,6 +7,8 @@ use async_graphql::{
 };
 use std::{fmt::Write, sync::Arc};
 
+use crate::_base::context::Ctx;
+
 pub struct GqlLogger;
 
 impl ExtensionFactory for GqlLogger {
@@ -26,7 +28,7 @@ impl Extension for LoggerExtension {
         variables: &Variables,
         next: NextParseQuery<'_>,
     ) -> ServerResult<ExecutableDocument> {
-        let _ctx: &crate::context::Ctx = ctx.data().unwrap();
+        let _ctx: &Ctx = ctx.data().unwrap();
         debug!(ctx = _ctx.ctx_no(), gql_query = query; "");
         let document = match next.run(ctx, query, variables).await {
             Ok(d) => d,
@@ -54,7 +56,7 @@ impl Extension for LoggerExtension {
         match next.run(ctx).await {
             Ok(r) => Ok(r),
             Err(err_list) => {
-                let _ctx: &crate::context::Ctx = ctx.data().unwrap();
+                let _ctx: &Ctx = ctx.data().unwrap();
                 for err in &err_list {
                     warn!(ctx = _ctx.ctx_no(); "{} {:?}", err.message, err.locations);
                 }
@@ -69,7 +71,7 @@ impl Extension for LoggerExtension {
         operation_name: Option<&str>,
         next: NextExecute<'_>,
     ) -> Response {
-        let _ctx: &crate::context::Ctx = ctx.data().unwrap();
+        let _ctx: &Ctx = ctx.data().unwrap();
         let resp = next.run(ctx, operation_name).await;
         if resp.is_err() {
             for err in &resp.errors {

@@ -1,5 +1,5 @@
 [package]
-name = "_@{ name|snake }@_@{ db|snake }@_@{ group_name|snake }@"
+name = "_@{ server|snake }@_@{ db|snake }@_@{ group_name|snake }@"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -8,7 +8,7 @@ publish = false
 domain = { path = "../../../../1_domain" }
 db_@{ db|snake }@ = { path = "../../../../2_db/@{ db|snake }@" }
 db_@{ db|snake }@_@{ group_name|snake }@ = { path = "../../../../2_db/@{ db|snake }@/repositories/@{ group_name|snake }@" }
-_@{ name|snake }@ = { path = "../../../base" }
+_@{ server|snake }@ = { path = "../../../base" }
 
 actix-web = "4.1"
 anyhow.workspace = true

@@ -20,6 +20,7 @@ use crate::{
 
 mod db;
 mod domain;
+mod base;
 
 pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) -> Result<()> {
     if !skip_version_check {

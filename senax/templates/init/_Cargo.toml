@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["1_domain", "1_domain/base_domain", "1_domain/repositories/*", "1_domain/repositories/*/groups/*", "2_db/*", "2_db/*/repositories/*"]
+members = ["1_domain", "1_domain/base_domain", "1_domain/repositories/*", "1_domain/repositories/*/groups/*", "2_db/*", "2_db/*/base", "2_db/*/repositories/*"]
 
 [profile.release]
 strip = true

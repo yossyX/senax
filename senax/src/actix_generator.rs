@@ -116,26 +116,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         }
     }
 
-    #[derive(Template)]
-    #[template(path = "new_actix/src/auth.rs", escape = "none")]
-    pub struct AuthTemplate;
-
     let src_path = base_path.join("src");
-    let file_path = src_path.join("auth.rs");
-    if force || !file_path.exists() {
-        let tpl = AuthTemplate;
-        fs_write(file_path, tpl.render()?)?;
-    }
-
-    #[derive(Template)]
-    #[template(path = "new_actix/src/context.rs", escape = "none")]
-    pub struct ContextTemplate;
-
-    let file_path = src_path.join("context.rs");
-    if force || !file_path.exists() {
-        let tpl = ContextTemplate;
-        fs_write(file_path, tpl.render()?)?;
-    }
 
     #[derive(Template)]
     #[template(path = "new_actix/src/db.rs", escape = "none")]
@@ -174,68 +155,68 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
                 "// Do not modify this line. (DbStop)",
                 tpl.render()?.trim_start(),
             );
-            let tpl = DbClearLocalCacheTemplate { db };
-            content = content.replace(
-                "// Do not modify this line. (DbClearLocalCache)",
-                tpl.render()?.trim_start(),
-            );
-            let tpl = DbClearCacheTemplate { db };
-            content = content.replace(
-                "// Do not modify this line. (DbClearCache)",
-                tpl.render()?.trim_start(),
-            );
-            if !config.exclude_from_domain {
-                let tpl = DbRepoTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (Repo)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbRepoNewTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (RepoNew)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbRepoImplTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (RepoImpl)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbRepoImplStartTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (RepoImplStart)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbRepoImplCommitTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (RepoImplCommit)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbRepoImplRollbackTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (RepoImplRollback)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbMigrateTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (migrate)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbGenSeedSchemaTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (gen_seed_schema)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbSeedTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (seed)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbCheckTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (check)",
-                    tpl.render()?.trim_start(),
-                );
-            }
+            // let tpl = DbClearLocalCacheTemplate { db };
+            // content = content.replace(
+            //     "// Do not modify this line. (DbClearLocalCache)",
+            //     tpl.render()?.trim_start(),
+            // );
+            // let tpl = DbClearCacheTemplate { db };
+            // content = content.replace(
+            //     "// Do not modify this line. (DbClearCache)",
+            //     tpl.render()?.trim_start(),
+            // );
+            // if !config.exclude_from_domain {
+            //     let tpl = DbRepoTemplate { db };
+            //     content = content.replace(
+            //         "// Do not modify this line. (Repo)",
+            //         tpl.render()?.trim_start(),
+            //     );
+            //     let tpl = DbRepoNewTemplate { db };
+            //     content = content.replace(
+            //         "// Do not modify this line. (RepoNew)",
+            //         tpl.render()?.trim_start(),
+            //     );
+            //     let tpl = DbRepoImplTemplate { db };
+            //     content = content.replace(
+            //         "// Do not modify this line. (RepoImpl)",
+            //         tpl.render()?.trim_start(),
+            //     );
+            //     let tpl = DbRepoImplStartTemplate { db };
+            //     content = content.replace(
+            //         "// Do not modify this line. (RepoImplStart)",
+            //         tpl.render()?.trim_start(),
+            //     );
+            //     let tpl = DbRepoImplCommitTemplate { db };
+            //     content = content.replace(
+            //         "// Do not modify this line. (RepoImplCommit)",
+            //         tpl.render()?.trim_start(),
+            //     );
+            //     let tpl = DbRepoImplRollbackTemplate { db };
+            //     content = content.replace(
+            //         "// Do not modify this line. (RepoImplRollback)",
+            //         tpl.render()?.trim_start(),
+            //     );
+            //     let tpl = DbMigrateTemplate { db };
+            //     content = content.replace(
+            //         "// Do not modify this line. (migrate)",
+            //         tpl.render()?.trim_start(),
+            //     );
+            //     let tpl = DbGenSeedSchemaTemplate { db };
+            //     content = content.replace(
+            //         "// Do not modify this line. (gen_seed_schema)",
+            //         tpl.render()?.trim_start(),
+            //     );
+            //     let tpl = DbSeedTemplate { db };
+            //     content = content.replace(
+            //         "// Do not modify this line. (seed)",
+            //         tpl.render()?.trim_start(),
+            //     );
+            //     let tpl = DbCheckTemplate { db };
+            //     content = content.replace(
+            //         "// Do not modify this line. (check)",
+            //         tpl.render()?.trim_start(),
+            //     );
+            // }
         }
     }
     fs_write(file_path, &*content)?;
@@ -264,7 +245,8 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
 
     #[derive(Template)]
     #[template(path = "new_actix/src/main.rs", escape = "none")]
-    pub struct MainTemplate {
+    pub struct MainTemplate<'a> {
+        pub name: &'a str,
         pub non_snake_case: bool,
         pub session: bool,
     }
@@ -272,19 +254,10 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     let file_path = src_path.join("main.rs");
     if force || !file_path.exists() {
         let tpl = MainTemplate {
+            name,
             non_snake_case,
             session,
         };
-        fs_write(file_path, tpl.render()?)?;
-    }
-
-    #[derive(Template)]
-    #[template(path = "new_actix/src/response.rs", escape = "none")]
-    pub struct ResponseTemplate;
-
-    let file_path = src_path.join("response.rs");
-    if force || !file_path.exists() {
-        let tpl = ResponseTemplate;
         fs_write(file_path, tpl.render()?)?;
     }
 
@@ -305,26 +278,6 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     let file_path = src_path.join("tests.rs");
     if !file_path.exists() {
         let tpl = TestsTemplate;
-        fs_write(file_path, tpl.render()?)?;
-    }
-
-    #[derive(Template)]
-    #[template(path = "new_actix/src/common.rs", escape = "none")]
-    pub struct CommonTemplate;
-
-    let file_path = src_path.join("common.rs");
-    if !file_path.exists() {
-        let tpl = CommonTemplate;
-        fs_write(file_path, tpl.render()?)?;
-    }
-
-    #[derive(Template)]
-    #[template(path = "new_actix/src/validator.rs", escape = "none")]
-    pub struct ValidatorTemplate;
-
-    let file_path = src_path.join("validator.rs");
-    if !file_path.exists() {
-        let tpl = ValidatorTemplate;
         fs_write(file_path, tpl.render()?)?;
     }
 
@@ -383,7 +336,7 @@ pub fn write_base_files(
             content = content.replace(
                 "[dependencies]",
                 &format!(
-                    "[dependencies]\ndb_{} = {{ path = \"../2_db/{}\" }}",
+                    "[dependencies]\ndb_{} = {{ path = \"../../2_db/{}\" }}",
                     db, db
                 ),
             );
@@ -429,26 +382,26 @@ pub fn write_base_files(
         if !reg.is_match(&content) {
             crate::schema::parse(db, false, false)?;
             let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
-            let tpl = DbInitTemplate { db };
-            content = content.replace(
-                "// Do not modify this line. (DbInit)",
-                tpl.render()?.trim_start(),
-            );
-            let tpl = DbStartTemplate { db };
-            content = content.replace(
-                "// Do not modify this line. (DbStart)",
-                tpl.render()?.trim_start(),
-            );
-            let tpl = DbStartTestTemplate { db };
-            content = content.replace(
-                "// Do not modify this line. (DbStartTest)",
-                tpl.render()?.trim_start(),
-            );
-            let tpl = DbStopTemplate { db };
-            content = content.replace(
-                "// Do not modify this line. (DbStop)",
-                tpl.render()?.trim_start(),
-            );
+            // let tpl = DbInitTemplate { db };
+            // content = content.replace(
+            //     "// Do not modify this line. (DbInit)",
+            //     tpl.render()?.trim_start(),
+            // );
+            // let tpl = DbStartTemplate { db };
+            // content = content.replace(
+            //     "// Do not modify this line. (DbStart)",
+            //     tpl.render()?.trim_start(),
+            // );
+            // let tpl = DbStartTestTemplate { db };
+            // content = content.replace(
+            //     "// Do not modify this line. (DbStartTest)",
+            //     tpl.render()?.trim_start(),
+            // );
+            // let tpl = DbStopTemplate { db };
+            // content = content.replace(
+            //     "// Do not modify this line. (DbStop)",
+            //     tpl.render()?.trim_start(),
+            // );
             let tpl = DbClearLocalCacheTemplate { db };
             content = content.replace(
                 "// Do not modify this line. (DbClearLocalCache)",

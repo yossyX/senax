@@ -2,7 +2,7 @@ use async_graphql::Object;
 use utoipa_actix_web::scope;
 
 #[allow(unused_imports)]
-use crate::auto_api::{Role, RoleGuard};
+use crate::_base::auto_api::{Role, RoleGuard};
 
 // Do not modify this line. (GqlMod:)
 

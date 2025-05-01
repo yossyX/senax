@@ -52,13 +52,15 @@ pub struct DbTemplate<'a> {
 #[template(
     source = r###"
 @%- for name in add_groups %@
-pub mod @{ name|snake|to_var_name }@;
+pub use _@{ server|snake }@_@{ db_route|snake }@_@{ name|snake }@::api as @{ name|snake|to_var_name }@;
 @%- endfor %@
 // Do not modify this line. (GqlMod:@{ all }@)"###,
     ext = "txt",
     escape = "none"
 )]
 pub struct DbModTemplate<'a> {
+    pub server: &'a str,
+    pub db_route: &'a str,
     pub all: String,
     pub add_groups: &'a BTreeSet<String>,
 }

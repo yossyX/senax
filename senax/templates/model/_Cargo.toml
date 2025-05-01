@@ -10,7 +10,9 @@ etcd = [ "senax-common/etcd" ]
 use_google_resolver = [ "hickory-resolver" ]
 
 [dependencies]
+@%- if !config.exclude_from_domain %@
 domain = { path = "../../1_domain" }
+@%- endif %@
 @%- for db in config.outer_db() %@
 db_@{ db|snake }@ = { path = "../@{ db|snake }@" }
 @%- endfor %@
