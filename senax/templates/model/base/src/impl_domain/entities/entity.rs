@@ -1,3 +1,4 @@
+use base_domain as domain;
 use domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Updater;
 
 #[allow(unused_imports)]

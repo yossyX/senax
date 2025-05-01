@@ -44,7 +44,7 @@ pub fn write_impl_domain_rs(
         source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, defs) in groups %@
-pub mod @{ name|snake|to_var_name }@;
+pub use crate::_base::impl_domain::@{ name|snake|to_var_name }@;
 pub static NEW_@{ name|upper }@_REPO: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> Box<dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@Repository> + Send + Sync>> = OnceCell::new();
 pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> Box<dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryService> + Send + Sync>> = OnceCell::new();
 @%- endfor %@
@@ -128,7 +128,7 @@ pub fn write_group_rs(
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/src/impl_domain/group.rs", escape = "none")]
+        #[template(path = "model/base/src/impl_domain/group.rs", escape = "none")]
         struct ImplDomainGroupTemplate;
 
         ImplDomainGroupTemplate.render()?
@@ -194,7 +194,7 @@ pub fn write_entity(
     let id_name = &to_id_name(model_name);
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/src/impl_domain/entities/entity.rs", escape = "none")]
+        #[template(path = "model/base/src/impl_domain/entities/entity.rs", escape = "none")]
         pub struct ImplDomainEntityTemplate<'a> {
             pub db: &'a str,
             pub group_name: &'a str,
@@ -220,7 +220,7 @@ pub fn write_entity(
 
     #[derive(Template)]
     #[template(
-        path = "model/src/impl_domain/entities/base/_entity.rs",
+        path = "model/base/src/impl_domain/entities/base/_entity.rs",
         escape = "none"
     )]
     pub struct ImplDomainBaseEntityTemplate<'a> {

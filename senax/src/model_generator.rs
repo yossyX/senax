@@ -20,7 +20,6 @@ use crate::{
 
 mod db;
 mod domain;
-mod base;
 
 pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) -> Result<()> {
     if !skip_version_check {
@@ -65,6 +64,8 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         fs_write(file_path, tpl.render()?)?;
     }
 
+    let base_dir = model_dir.join("base");
+    let base_src_dir = base_dir.join("src");
     let model_src_dir = model_dir.join("src");
     let file_path = model_src_dir.join("lib.rs");
     if force || !file_path.exists() {
@@ -91,19 +92,11 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     struct ModelsTemplate<'a> {
         pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
         pub config: &'a ConfigDef,
-        pub table_names: BTreeSet<String>,
     }
 
-    let mut table_names = BTreeSet::default();
-    for (_, defs) in &groups {
-        for (_, def) in defs {
-            table_names.insert(def.table_name());
-        }
-    }
     let tpl = ModelsTemplate {
         groups: &groups,
         config: &config,
-        table_names,
     };
     fs_write(file_path, tpl.render()?)?;
 
@@ -119,7 +112,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         db::impl_domain::write_impl_domain_rs(&model_src_dir, db, &groups, force)?;
     }
     let domain_models_dir = base_domain_src_dir.join("models");
-    let impl_domain_dir = model_src_dir.join("impl_domain");
+    let impl_domain_dir = base_src_dir.join("impl_domain");
     if clean && impl_domain_dir.exists() {
         for entry in glob::glob(&format!("{}/**/*.rs", impl_domain_dir.display()))? {
             match entry {
@@ -133,6 +126,15 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         domain::repositories::write_lib_rs(&domain_repositories_src_dir, db, &groups, force)?;
         domain::repositories::write_cargo_toml(&domain_repositories_dir, db, &groups, force)?;
     }
+
+    db::base::write_files(
+        &base_dir,
+        db,
+        &groups,
+        &config,
+        force,
+        non_snake_case,
+    )?;
 
     let file_path = model_src_dir.join("main.rs");
     if force || !file_path.exists() {
@@ -156,56 +158,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let tpl = SeederTemplate { groups: &groups };
     fs_write(file_path, tpl.render()?)?;
 
-    #[derive(Template)]
-    #[template(path = "model/src/accessor.rs", escape = "none")]
-    struct AccessorTemplate {}
-
-    let file_path = model_src_dir.join("accessor.rs");
-    let tpl = AccessorTemplate {};
-    fs_write(file_path, tpl.render()?)?;
-
-    #[derive(Template)]
-    #[template(path = "model/src/cache.rs", escape = "none")]
-    struct CacheTemplate {}
-
-    let file_path = model_src_dir.join("cache.rs");
-    if !config.force_disable_cache {
-        let tpl = CacheTemplate {};
-        fs_write(file_path, tpl.render()?)?;
-    } else if file_path.exists() {
-        fs::remove_file(&file_path)?;
-    }
-
-    #[derive(Template)]
-    #[template(path = "model/src/misc.rs", escape = "none")]
-    struct MiscTemplate<'a> {
-        pub config: &'a ConfigDef,
-    }
-
-    let file_path = model_src_dir.join("misc.rs");
-    let tpl = MiscTemplate { config: &config };
-    fs_write(file_path, tpl.render()?)?;
-
-    #[derive(Template)]
-    #[template(path = "model/src/connection.rs", escape = "none")]
-    struct ConnectionTemplate<'a> {
-        pub db: &'a str,
-        pub config: &'a ConfigDef,
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
-        pub tx_isolation: Option<&'a str>,
-        pub read_tx_isolation: Option<&'a str>,
-    }
-
-    let file_path = model_src_dir.join("connection.rs");
-    let tpl = ConnectionTemplate {
-        db,
-        config: &config,
-        groups: &groups,
-        tx_isolation: config.tx_isolation.map(|v| v.as_str()),
-        read_tx_isolation: config.read_tx_isolation.map(|v| v.as_str()),
-    };
-    fs_write(file_path, tpl.render()?)?;
-
     let path = model_dir.join("migrations");
     if !path.exists() {
         let file_path = path.join(".gitkeep");
@@ -218,7 +170,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         fs_write(file_path, "")?;
     }
 
-    let model_models_dir = model_src_dir.join("models");
+    let model_models_dir = base_src_dir.join("models");
     if clean && model_models_dir.exists() {
         for entry in glob::glob(&format!("{}/**/*.rs", model_models_dir.display()))? {
             match entry {
@@ -270,7 +222,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         let concrete_models = defs.iter().filter(|(_k, v)| !v.abstract_mode).collect();
 
         #[derive(Template)]
-        #[template(path = "model/src/group.rs", escape = "none")]
+        #[template(path = "model/base/src/group.rs", escape = "none")]
         struct GroupTemplate<'a> {
             pub group_name: &'a str,
             pub mod_names: &'a BTreeSet<String>,
@@ -339,7 +291,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 remove_files.remove(file_path.as_os_str());
                 if force || !file_path.exists() {
                     #[derive(Template)]
-                    #[template(path = "model/src/group/abstract.rs", escape = "none")]
+                    #[template(path = "model/base/src/group/abstract.rs", escape = "none")]
                     struct GroupAbstractTemplate<'a> {
                         pub db: &'a str,
                         pub group_name: &'a str,
@@ -368,7 +320,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 remove_files.remove(file_path.as_os_str());
 
                 #[derive(Template)]
-                #[template(path = "model/src/group/base/_abstract.rs", escape = "none")]
+                #[template(path = "model/base/src/group/base/_abstract.rs", escape = "none")]
                 struct GroupBaseAbstractTemplate<'a> {
                     pub db: &'a str,
                     pub group_name: &'a str,
@@ -413,7 +365,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 remove_files.remove(file_path.as_os_str());
                 if force || !file_path.exists() {
                     #[derive(Template)]
-                    #[template(path = "model/src/group/table.rs", escape = "none")]
+                    #[template(path = "model/base/src/group/table.rs", escape = "none")]
                     struct GroupTableTemplate<'a> {
                         pub db: &'a str,
                         pub group_name: &'a str,
@@ -468,7 +420,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 }
 
                 #[derive(Template)]
-                #[template(path = "model/src/group/base/_table.rs", escape = "none")]
+                #[template(path = "model/base/src/group/base/_table.rs", escape = "none")]
                 struct GroupBaseTableTemplate<'a> {
                     pub db: &'a str,
                     pub group_name: &'a str,

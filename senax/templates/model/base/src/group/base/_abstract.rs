@@ -11,6 +11,9 @@ use strum::{EnumMessage, EnumString, FromRepr, IntoStaticStr};
 
 use crate as db;
 use crate::misc::BindValue;
+@%- if !config.exclude_from_domain %@
+use base_domain as domain;
+@% endif %@
 
 @% for mod_name in def.relation_mods() -%@
 use crate::models::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;

@@ -38,6 +38,7 @@ use crate::misc::{BindValue, Updater, Size, TrashMode};
 use crate::models::USE_FAST_CACHE;
 use crate::{self as db, accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
 @%- if !config.exclude_from_domain %@
+use base_domain as domain;
 #[allow(unused_imports)]
 use domain::value_objects;
 // pub use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{join, Joiner_};
@@ -225,7 +226,7 @@ pub struct @{ id_name }@(pub @{ column_def.get_inner_type(false, false) }@);
 #[display("{:?}", _0)]
 @%- endif %@
 pub struct @{ id_name }@(
-    #[schemars(schema_with = "crate::seeder::id_schema")]
+    #[schemars(schema_with = "crate::misc::id_schema")]
     pub @{ column_def.get_inner_type(true, false) }@
 );
 

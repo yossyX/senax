@@ -3,47 +3,27 @@
 
 use crate::connection::{DbConn, DbType};
 use ::anyhow::Result;
-use ::async_trait::async_trait;
 use ::futures::TryStreamExt;
-use ::fxhash::FxHashMap;
-use ::log::error;
-use ::once_cell::sync::OnceCell;
 use ::senax_common::ShardId;
-use ::serde::{Deserialize, Serialize};
 use ::std::collections::BTreeMap;
 use ::std::path::Path;
 use ::std::sync::Arc;
-use ::tokio::sync::{Mutex, RwLock, Semaphore};
+use ::tokio::sync::{Mutex, Semaphore};
 
-pub const USE_FAST_CACHE: bool = @{ config.use_fast_cache() }@;
-pub const USE_STORAGE_CACHE: bool = @{ config.use_storage_cache }@;
-pub static CACHE_UPDATE_LOCK: RwLock<()> = RwLock::const_new(());
+pub use crate::_base::models::USE_FAST_CACHE;
+pub use crate::_base::models::CACHE_UPDATE_LOCK;
+// pub const USE_FAST_CACHE: bool = @{ config.use_fast_cache() }@;
+// pub const USE_STORAGE_CACHE: bool = @{ config.use_storage_cache }@;
+// pub static CACHE_UPDATE_LOCK: RwLock<()> = RwLock::const_new(());
 @{-"\n"}@
 @%- for (name, defs) in groups %@
-pub mod @{ name|snake|to_var_name }@;
+pub use crate::_base::models::@{ name|snake|to_var_name }@;
 @%- endfor %@
 
-#[derive(serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Clone, Copy, Debug, strum::IntoStaticStr)]
-#[allow(non_camel_case_types)]
-#[allow(dead_code)]
-pub enum NotifyOp {
-    insert,
-    update,
-    upsert,
-    delete,
-    delete_all,
-    invalidate,
-    invalidate_all,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, strum::EnumString, strum::IntoStaticStr)]
-#[allow(non_camel_case_types)]
-#[allow(dead_code)]
-pub enum TableName {
-    @%- for table_name in table_names %@
-    @{ table_name|to_var_name }@,
-    @%- endfor %@
-}
+pub use crate::_base::models::NotifyOp;
+pub use crate::_base::models::TableName;
+pub use crate::_base::models::Controller;
+pub use crate::_base::models::ModelTr;
 
 pub(crate) async fn start(db_dir: &Path) -> Result<()> {
 @%- for (name, defs) in groups %@
@@ -75,88 +55,7 @@ pub(crate) async fn check() -> Result<()> {
     Ok(())
 }
 
-pub(crate) struct CacheActor;
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct CacheMsg(pub Vec<CacheOp>, pub FxHashMap<ShardId, u64>);
-
-#[allow(clippy::large_enum_variant)]
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub enum CacheOp {
-@%- for (name, defs) in groups %@
-    @{ name|to_pascal_name }@(@{ name|snake|to_var_name }@::CacheOp),
-@%- endfor %@
-    _AllClear,
-}
-
-impl CacheMsg {
-    pub(crate) async fn handle_cache_msg(self) {
-        let _lock = CACHE_UPDATE_LOCK.write().await;
-        let _sync_map = Arc::new(self.1);
-        #[cfg(not(feature = "cache_update_only"))]
-        {
-@%- for (name, defs) in groups %@
-            if let Some(g) = @{ name|upper }@_CTRL.get() {
-                g.handle_cache_msg(self.0.clone(), Arc::clone(&_sync_map)).await;
-            }
-@%- endfor %@
-        }
-        DbConn::_publish_update_notice().await;
-    }
-
-    pub async fn do_send(self) {
-        if !crate::is_test_mode() {
-            CacheActor::handle(self);
-        } else {
-            self.handle_cache_msg().await;
-        }
-    }
-
-    pub async fn do_send_to_internal(self) {
-        self.handle_cache_msg().await;
-    }
-}
-
-#[rustfmt::skip]
-impl CacheActor {
-    pub fn handle(msg: CacheMsg) {
-        tokio::spawn(
-            async move {
-                let _guard = crate::get_shutdown_guard();
-                if let Some(linker) = crate::LINKER_SENDER.get() {
-                    if let Err(e) = linker.send(&msg) {
-                        error!("{}", e);
-                    }
-                }
-                msg.handle_cache_msg().await;
-            }
-        );
-    }
-}
-
-pub(crate) async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, _clear_test: bool) {
-@%- if !config.force_disable_cache %@
-    #[cfg(not(feature = "cache_update_only"))]
-    for (shard_id, sync) in _sync_map.iter() {
-        if *sync == 0 && !_clear_test {
-            let shard_id = *shard_id;
-            tokio::spawn(async move {
-                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                @%- for (name, defs) in groups %@
-                if let Some(g) = @{ name|upper }@_CTRL.get() {
-                    g._clear_cache(shard_id, 0, _clear_test).await;
-                }
-                @%- endfor %@
-            });
-        }
-        @%- for (name, defs) in groups %@
-        if let Some(g) = @{ name|upper }@_CTRL.get() {
-            g._clear_cache(*shard_id, *sync, _clear_test).await;
-        }
-        @%- endfor %@
-    }
-@%- endif %@
-}
+pub(crate) use crate::_base::models::_clear_cache;
 
 pub(crate) async fn exec_ddl<'c, E>(sql: &str, conn: E) -> Result<()>
 where
@@ -222,27 +121,9 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
     Ok(())
 }
 @% for (name, defs) in groups %@
-pub(crate) static @{ name|upper }@_CTRL: OnceCell<Box<dyn Controller + Send + Sync>> = OnceCell::new();
+pub(crate) use crate::_base::models::@{ name|upper }@_CTRL;
 pub fn set_@{ name|snake }@(tr: Box<dyn Controller + Send + Sync>) {
     let _ = @{ name|upper }@_CTRL.set(tr);
 }
 @%- endfor %@
-
-#[async_trait]
-pub trait Controller {
-    async fn start(&self, db_dir: &Path) -> Result<()>;
-    async fn start_test(&self) -> Result<()>;
-    async fn check(&self, shard_id: ShardId) -> Result<()>;
-    #[cfg(not(feature="cache_update_only"))]
-    async fn handle_cache_msg(&self, op: Vec<CacheOp>, sync_map: Arc<FxHashMap<ShardId, u64>>);
-    #[cfg(not(feature="cache_update_only"))]
-    async fn _clear_cache(&self, shard_id: ShardId, sync: u64, clear_test: bool);
-    async fn seed(&self, seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()>;
-}
-
-pub trait ModelTr<_Self, CacheOp> {
-    fn __before_delete(_conn: &mut DbConn, _list: &[_Self]) -> impl std::future::Future<Output = Result<()>> + Send;
-    fn __after_delete(_list: &[_Self]) -> impl std::future::Future<Output = ()> + Send;
-    fn __receive_update_notice(msg: &CacheOp) -> impl std::future::Future<Output = ()> + Send;
-}
 @{-"\n"}@

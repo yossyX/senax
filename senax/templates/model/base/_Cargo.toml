@@ -1,5 +1,5 @@
 [package]
-name = "db_@{ db|snake }@"
+name = "_db_@{ db|snake }@"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -10,9 +10,8 @@ etcd = [ "senax-common/etcd" ]
 use_google_resolver = [ "hickory-resolver" ]
 
 [dependencies]
-_db_@{ db|snake }@ = { path = "base" }
 @%- if !config.exclude_from_domain %@
-domain = { path = "../../1_domain" }
+base_domain = { path = "../../../1_domain/base_domain" }
 @%- endif %@
 @%- for db in config.outer_db() %@
 db_@{ db|snake }@ = { path = "../@{ db|snake }@" }

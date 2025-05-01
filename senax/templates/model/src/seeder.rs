@@ -4,7 +4,6 @@ use anyhow::{Result, bail};
 use regex::Regex;
 use schemars::JsonSchema;
 use schemars::r#gen::SchemaSettings;
-use schemars::schema::{InstanceType, Schema, SchemaObject, SingleOrVec};
 use senax_common::types::blob::FILES;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -160,17 +159,5 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
     }
     FILES.get().unwrap().write().unwrap().clear();
     Ok(())
-}
-
-#[allow(dead_code)]
-pub(crate) fn id_schema(_: &mut schemars::r#gen::SchemaGenerator) -> Schema {
-    let schema = SchemaObject {
-        instance_type: Some(SingleOrVec::Vec(vec![
-            InstanceType::String,
-            InstanceType::Integer,
-        ])),
-        ..Default::default()
-    };
-    Schema::Object(schema)
 }
 @{-"\n"}@
