@@ -28,12 +28,7 @@ use crate::{DbConn, DELAYED_DB_DIR};
 #[allow(clippy::collapsible_if)]
 #[allow(clippy::assigning_clones)]
 #[allow(clippy::too_many_arguments)]
-pub mod _base {
 @%- for name in mod_names %@
-    pub mod _@{ name }@;
-@%- endfor %@
-}
-@% for name in mod_names %@
 pub mod @{ name|to_var_name }@;
 @%- endfor %@
 
@@ -42,12 +37,12 @@ pub mod @{ name|to_var_name }@;
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum CacheOp {
 @%- for (name, (_, def)) in models %@
-    @{ name|to_pascal_name }@(_base::_@{ def.mod_name() }@::CacheOp),
+    @{ name|to_pascal_name }@(@{ def.mod_name()|to_var_name }@::CacheOp),
 @%- endfor %@
 }
 
 #[rustfmt::skip]
-#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct @{ group_name|pascal }@ {
 @%- for (name, (_, def)) in models %@

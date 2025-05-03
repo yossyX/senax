@@ -1,6 +1,3 @@
-use crate::common::fs_write;
-use crate::filters;
-use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable, to_id_name};
 use anyhow::Result;
 use askama::Template;
 use compact_str::CompactString;
@@ -15,6 +12,12 @@ use std::{
     path::Path,
     sync::Arc,
 };
+
+use crate::common::fs_write;
+use crate::filters;
+use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable, to_id_name};
+use crate::model_generator::REL_START;
+use crate::schema::IS_MAIN_GROUP;
 
 mod impl_domain;
 
@@ -111,7 +114,9 @@ pub fn write_group_files(
     let model_models_dir = src_dir.join("repositories");
     let impl_domain_dir = src_dir.join("impl_domain");
     let base_group_name = group;
-    for (group_name, (_, defs)) in groups {
+    for (group_name, (f, defs)) in groups {
+        let is_main_group = f.load(std::sync::atomic::Ordering::Relaxed) == REL_START;
+        IS_MAIN_GROUP.store(is_main_group, std::sync::atomic::Ordering::Relaxed);
         let mod_names: BTreeSet<String> = defs
             .iter()
             .filter(|(_, (_, d))| !d.abstract_mode)
@@ -137,6 +142,7 @@ pub fn write_group_files(
             pub mod_names: &'a BTreeSet<String>,
             pub models: IndexMap<&'a String, &'a (AtomicUsize, Arc<ModelDef>)>,
             pub config: &'a ConfigDef,
+            pub is_main_group: bool,
         }
 
         let tpl = GroupTemplate {
@@ -144,6 +150,7 @@ pub fn write_group_files(
             mod_names: &mod_names,
             models: concrete_models,
             config: &config,
+            is_main_group,
         };
         fs_write(file_path, tpl.render()?)?;
 
@@ -274,6 +281,6 @@ pub fn write_group_files(
             }
         }
     }
-
+    IS_MAIN_GROUP.store(true, std::sync::atomic::Ordering::Relaxed);
     Ok(())
 }

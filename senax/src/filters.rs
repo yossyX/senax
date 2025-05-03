@@ -609,11 +609,26 @@ fn _fmt_index_col(name: &&String, col: &&FieldDef, f: &str, index: usize) -> Str
 
 pub fn fmt_cache_owners(v: &[(String, String, String, u64)], f: &str) -> ::askama::Result<String> {
     Ok(v.iter()
-        .map(|(mod_name, model_name, name, rel_hash)| {
-            f.replace("{mod}", mod_name)
-                .replace("{model_name}", &model_name.to_case(Case::Pascal))
-                .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
-                .replace("{rel_hash}", &rel_hash.to_string())
+        .map(|(group_name, model_name, name, rel_hash)| {
+            f.replace(
+                "{mod}",
+                &format!(
+                    "{}::{}",
+                    &_to_var_name(&group_name.to_case(Case::Snake)),
+                    &_to_var_name(&model_name.to_case(Case::Snake))
+                ),
+            )
+            .replace(
+                "{base_mod}",
+                &format!(
+                    "{}::_base::_{}",
+                    &_to_var_name(&group_name.to_case(Case::Snake)),
+                    &model_name.to_case(Case::Snake)
+                ),
+            )
+            .replace("{model_name}", &model_name.to_case(Case::Pascal))
+            .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
+            .replace("{rel_hash}", &rel_hash.to_string())
         })
         .collect::<Vec<_>>()
         .join(""))

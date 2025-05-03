@@ -35,7 +35,7 @@ pub struct @{ pascal_name }@RepositoryImpl {
 #[allow(clippy::needless_update)]
 fn updater_from_factory(v: domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Factory) -> _@{ pascal_name }@Updater {
     _@{ pascal_name }@Updater {
-        _data: ::db::models::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::Data {
+        _data: ::db::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::Data {
 @{ def.for_factory()|fmt_join("            {var}: v.{var}{convert_domain_factory}{convert_from_entity},", "\n") }@
             ..Default::default()
         },
@@ -470,7 +470,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 @%- if def.is_soft_delete() %@
                 query = query.when(self.with_trashed, |v| v.with_trashed());
                 @%- endif %@
-                use db::models::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::InnerPrimary as _InnerPrimary_;
+                use db::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::InnerPrimary as _InnerPrimary_;
                 let list: Vec<_InnerPrimary_> = query.select_for(conn).await?;
                 if !single_transaction {
                     conn.release_read_tx()?;

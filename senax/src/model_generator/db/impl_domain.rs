@@ -187,30 +187,29 @@ pub fn write_entity(
     remove_files.remove(file_path.as_os_str());
     let pascal_name = &model_name.to_case(Case::Pascal);
     let id_name = &to_id_name(model_name);
-    if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(path = "db/base/src/impl_domain/entities/entity.rs", escape = "none")]
-        pub struct ImplDomainEntityTemplate<'a> {
-            pub db: &'a str,
-            pub config: &'a ConfigDef,
-            pub group_name: &'a str,
-            pub mod_name: &'a str,
-            pub pascal_name: &'a str,
-            pub id_name: &'a str,
-            pub def: &'a Arc<ModelDef>,
-        }
-
-        let tpl = ImplDomainEntityTemplate {
-            db,
-            config,
-            group_name,
-            mod_name,
-            pascal_name,
-            id_name,
-            def,
-        };
-        fs_write(file_path, tpl.render()?)?;
+    #[derive(Template)]
+    #[template(path = "db/base/src/impl_domain/entities/entity.rs", escape = "none")]
+    pub struct ImplDomainEntityTemplate<'a> {
+        pub db: &'a str,
+        pub config: &'a ConfigDef,
+        pub group_name: &'a str,
+        pub mod_name: &'a str,
+        pub pascal_name: &'a str,
+        pub id_name: &'a str,
+        pub def: &'a Arc<ModelDef>,
     }
+
+    let tpl = ImplDomainEntityTemplate {
+        db,
+        config,
+        group_name,
+        mod_name,
+        pascal_name,
+        id_name,
+        def,
+    };
+    fs_write(file_path, tpl.render()?)?;
+
     set_domain_mode(false);
     Ok(())
 }

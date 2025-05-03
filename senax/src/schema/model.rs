@@ -19,6 +19,8 @@ use crate::schema::_to_var_name;
 
 use super::*;
 
+pub static IS_MAIN_GROUP: AtomicBool = AtomicBool::new(true);
+
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
 /// ### 継承
@@ -882,6 +884,9 @@ impl ModelDef {
     }
 
     pub fn use_insert_delayed(&self) -> bool {
+        if !IS_MAIN_GROUP.load(std::sync::atomic::Ordering::Relaxed) {
+            return false;
+        }
         self.use_insert_delayed
             .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_insert_delayed)
     }
@@ -891,6 +896,9 @@ impl ModelDef {
     }
 
     pub fn use_save_delayed(&self) -> bool {
+        if !IS_MAIN_GROUP.load(std::sync::atomic::Ordering::Relaxed) {
+            return false;
+        }
         !self.disable_update()
             && self
                 .use_save_delayed
@@ -898,6 +906,9 @@ impl ModelDef {
     }
 
     pub fn use_update_delayed(&self) -> bool {
+        if !IS_MAIN_GROUP.load(std::sync::atomic::Ordering::Relaxed) {
+            return false;
+        }
         !self.disable_update()
             && self
                 .use_update_delayed
@@ -905,6 +916,9 @@ impl ModelDef {
     }
 
     pub fn use_upsert_delayed(&self) -> bool {
+        if !IS_MAIN_GROUP.load(std::sync::atomic::Ordering::Relaxed) {
+            return false;
+        }
         !self.disable_update()
             && self
                 .use_upsert_delayed

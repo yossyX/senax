@@ -206,14 +206,14 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         begin_traverse(&group_name);
         let repo_include_groups: GroupsDef = groups
             .iter()
-            .filter(|(_, (f, _))| f.load(std::sync::atomic::Ordering::Relaxed) == REL_LOOP)
-            .map(|(n, (_, v))| {
+            .filter(|(_, (f, _))| f.load(std::sync::atomic::Ordering::Relaxed) >= REL_LOOP)
+            .map(|(n, (f, v))| {
                 let v2: IndexMap<String, (AtomicUsize, Arc<ModelDef>)> = v
                     .iter()
-                    .filter(|(n, (f, v))| f.load(std::sync::atomic::Ordering::Relaxed) > 0)
-                    .map(|(n, (_, v))| (n.to_string(), (AtomicUsize::new(0), v.clone())))
+                    .filter(|(_, (f, _))| f.load(std::sync::atomic::Ordering::Relaxed) > 0)
+                    .map(|(n, (f, v))| (n.to_string(), (AtomicUsize::new(f.load(std::sync::atomic::Ordering::Relaxed)), v.clone())))
                     .collect();
-                (n.to_string(), (AtomicUsize::new(0), v2))
+                (n.to_string(), (AtomicUsize::new(f.load(std::sync::atomic::Ordering::Relaxed)), v2))
             })
             .collect();
         let ref_groups: Vec<_> = groups
@@ -303,37 +303,9 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             if def.abstract_mode {
                 let file_path = model_group_dir.join(format!("{}.rs", mod_name));
                 remove_files.remove(file_path.as_os_str());
-                if force || !file_path.exists() {
-                    #[derive(Template)]
-                    #[template(path = "db/base/src/group/abstract.rs", escape = "none")]
-                    struct GroupAbstractTemplate<'a> {
-                        pub db: &'a str,
-                        pub group_name: &'a str,
-                        pub mod_name: &'a str,
-                        pub name: &'a str,
-                        pub pascal_name: &'a str,
-                        pub def: &'a Arc<ModelDef>,
-                        pub config: &'a ConfigDef,
-                    }
-
-                    let tpl = GroupAbstractTemplate {
-                        db,
-                        group_name,
-                        mod_name,
-                        name: model_name,
-                        pascal_name: &model_name.to_case(Case::Pascal),
-                        def,
-                        config: &config,
-                    };
-                    fs_write(file_path, tpl.render()?)?;
-                }
-
-                let file_path = model_group_base_dir.join(format!("_{}.rs", mod_name));
-                remove_files.remove(file_path.as_os_str());
-
                 #[derive(Template)]
-                #[template(path = "db/base/src/group/base/_abstract.rs", escape = "none")]
-                struct GroupBaseAbstractTemplate<'a> {
+                #[template(path = "db/base/src/group/abstract.rs", escape = "none")]
+                struct GroupAbstractTemplate<'a> {
                     pub db: &'a str,
                     pub group_name: &'a str,
                     pub mod_name: &'a str,
@@ -345,7 +317,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     pub config: &'a ConfigDef,
                 }
 
-                let tpl = GroupBaseAbstractTemplate {
+                let tpl = GroupAbstractTemplate {
                     db,
                     group_name,
                     mod_name,
@@ -373,35 +345,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             } else {
                 let file_path = model_group_dir.join(format!("{}.rs", mod_name));
                 remove_files.remove(file_path.as_os_str());
-                if force || !file_path.exists() {
-                    #[derive(Template)]
-                    #[template(path = "db/base/src/group/table.rs", escape = "none")]
-                    struct GroupTableTemplate<'a> {
-                        pub db: &'a str,
-                        pub group_name: &'a str,
-                        pub mod_name: &'a str,
-                        pub model_name: &'a str,
-                        pub pascal_name: &'a str,
-                        pub id_name: &'a str,
-                        pub def: &'a Arc<ModelDef>,
-                        pub config: &'a ConfigDef,
-                    }
-
-                    let tpl = GroupTableTemplate {
-                        db,
-                        group_name,
-                        mod_name,
-                        model_name,
-                        pascal_name: &model_name.to_case(Case::Pascal),
-                        id_name: &to_id_name(model_name),
-                        def,
-                        config: &config,
-                    };
-                    fs_write(file_path, tpl.render()?)?;
-                }
-
-                let file_path = model_group_base_dir.join(format!("_{}.rs", mod_name));
-                remove_files.remove(file_path.as_os_str());
                 let mut force_indexes = Vec::new();
                 let (_, _, idx_map) = crate::migration_generator::make_table_def(def, &config)?;
                 for (index_name, index_def) in &def.merged_indexes {
@@ -426,10 +369,9 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         force_indexes.push((cond.join(" && "), idx));
                     }
                 }
-
                 #[derive(Template)]
-                #[template(path = "db/base/src/group/base/_table.rs", escape = "none")]
-                struct GroupBaseTableTemplate<'a> {
+                #[template(path = "db/base/src/group/table.rs", escape = "none")]
+                struct GroupTableTemplate<'a> {
                     pub db: &'a str,
                     pub group_name: &'a str,
                     pub mod_name: &'a str,
@@ -443,7 +385,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     pub version_col: CompactString,
                 }
 
-                let tpl = GroupBaseTableTemplate {
+                let tpl = GroupTableTemplate {
                     db,
                     group_name,
                     mod_name,
@@ -525,9 +467,9 @@ pub fn check_version(db: &str) -> Result<()> {
 
 pub const REL_USE: usize = 1;
 pub const REL_LOOP: usize = 2;
+pub const REL_START: usize = 3;
 
 fn reset_rel_flags() {
-    // println!("reset_rel_flags");
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
     for (_, (f, models)) in groups {
@@ -540,12 +482,11 @@ fn reset_rel_flags() {
 
 fn begin_traverse(target_group: &str) {
     reset_rel_flags();
-    // println!("begin_traverse: {}", target_group);
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
     for (group, (group_flag, models)) in groups {
         if group == target_group {
-            group_flag.store(REL_LOOP, std::sync::atomic::Ordering::Relaxed);
+            group_flag.store(REL_START, std::sync::atomic::Ordering::Relaxed);
             for (_, (model_flag, _)) in models {
                 model_flag.store(REL_USE, std::sync::atomic::Ordering::Relaxed);
             }
@@ -570,10 +511,9 @@ fn traverse_rel_flags(target_group: &str, target_model: &str) -> usize {
         if group == target_group {
             let flag = group_flag.load(std::sync::atomic::Ordering::Relaxed);
             if flag == 0 {
-                // println!("set group USE: {}", target_group);
                 group_flag.store(REL_USE, std::sync::atomic::Ordering::Relaxed);
             }
-            if flag == REL_LOOP {
+            if flag >= REL_LOOP {
                 ret = REL_LOOP;
             }
             for (model, (model_flag, def)) in models {
@@ -581,14 +521,12 @@ fn traverse_rel_flags(target_group: &str, target_model: &str) -> usize {
                     if model_flag.load(std::sync::atomic::Ordering::Relaxed) != 0 {
                         return ret;
                     }
-                    // println!("set model USE: {}", target_model);
                     model_flag.store(REL_USE, std::sync::atomic::Ordering::Relaxed);
                     for r in &def.merged_relations {
                         let g = r.1.get_group_name();
                         let m = r.1.get_foreign_model_name();
                         if !r.1.is_type_of_belongs_to_outer_db() {
                             if traverse_rel_flags(&g, &m) == REL_LOOP {
-                                // println!("set group LOOP: {}", target_group);
                                 group_flag.store(REL_LOOP, std::sync::atomic::Ordering::Relaxed);
                                 ret = REL_LOOP;
                             }

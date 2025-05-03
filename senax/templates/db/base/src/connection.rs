@@ -488,8 +488,9 @@ pub async fn connect(
 
 #[rustfmt::skip]
 pub async fn init_test() -> Result<()> {
-    let source_len = DbConn::shard_num();
-    *WRITER.write().await = vec![None; source_len];
+    if let Some(source_len) = SHARD_NUM.get() {
+        *WRITER.write().await = vec![None; *source_len];
+    }
     if let Some(list) = READER.get() {
         for pool in list {
             pool.write().await.clear();

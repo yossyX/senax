@@ -51,7 +51,7 @@ use crate::repositories::{CacheOpTr, IdFetcher, IdFetcherWithCache};
 use ::db::misc::{BindValue, Count, Updater, Size, TrashMode, UpdaterForInner as _};
 use ::db::models::USE_FAST_CACHE;
 use ::db::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
-pub use ::db::models::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::*;
+pub use ::db::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
 @%- if !config.exclude_from_domain %@
 #[allow(unused_imports)]
 use ::domain::value_objects;
@@ -61,7 +61,7 @@ use ::domain::models::@{ rel_def.db()|to_var_name }@::@{ rel_def.get_group_mod_v
 @%- endfor %@
 @%- endif %@
 @%- for mod_name in def.relation_mods() %@
-use db::models::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use db::models::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
 use crate::repositories::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as repo_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- if !config.exclude_from_domain %@
 use ::domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
@@ -4382,8 +4382,8 @@ impl _@{ pascal_name }@Cache_ {
             if !conn.clear_whole_cache {
                 if let Some(obj) = _@{ pascal_name }@_::find_optional_from_cache(conn, &id).await? {
                     @{- def.cache_owners|fmt_cache_owners("
-                    if let Some(v) = crate::repositories::{mod}::RelFk{rel_name_pascal}::get_fk(&obj._wrapper._inner) {
-                        crate::repositories::{mod}::_{model_name}Cache_::__push_notify_cache_op(conn, v).await?;
+                    if let Some(v) = crate::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._wrapper._inner) {
+                        crate::repositories::{base_mod}::_{model_name}Cache_::__push_notify_cache_op(conn, v).await?;
                     }") }@
                 }
             }
@@ -4391,8 +4391,8 @@ impl _@{ pascal_name }@Cache_ {
             if !conn.clear_whole_cache {
                 if let Some(obj) = _@{ pascal_name }@_::find_optional(conn, &id, None).await? {
                     @{- def.cache_owners|fmt_cache_owners("
-                    if let Some(v) = crate::repositories::{mod}::RelFk{rel_name_pascal}::get_fk(&obj._inner) {
-                        crate::repositories::{mod}::_{model_name}Cache_::__push_notify_cache_op(conn, v).await?;
+                    if let Some(v) = crate::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._inner) {
+                        crate::repositories::{base_mod}::_{model_name}Cache_::__push_notify_cache_op(conn, v).await?;
                     }") }@
                 }
             }
@@ -4471,7 +4471,7 @@ impl _@{ pascal_name }@_ {
     }
 @%- for parent in def.downcast_aggregation() %@
 
-    pub fn downcast_from(base: &db::models::@{ parent.group_name|snake|to_var_name }@::_base::_@{ parent.name|snake }@::_@{ parent.name|pascal }@) -> Option<_@{ pascal_name }@> {
+    pub fn downcast_from(base: &db::models::@{ parent.group_name|snake|to_var_name }@::@{ parent.name|snake|to_var_name }@::_@{ parent.name|pascal }@) -> Option<_@{ pascal_name }@> {
         if base._inner.@{ def.inheritance_check() }@ {
             let clone = base._inner.clone();
             Some(_@{ pascal_name }@ {
@@ -4490,7 +4490,7 @@ impl _@{ pascal_name }@_ {
 @%- endfor %@
 @%- for parent in def.downcast_simple() %@
 
-    pub fn downcast_from(base: &db::models::@{ parent.group_name|snake|to_var_name }@::_base::_@{ parent.name|snake }@::_@{ parent.name|pascal }@) -> _@{ pascal_name }@ {
+    pub fn downcast_from(base: &db::models::@{ parent.group_name|snake|to_var_name }@::@{ parent.name|snake|to_var_name }@::_@{ parent.name|pascal }@) -> _@{ pascal_name }@ {
         let clone = base._inner.clone();
         _@{ pascal_name }@ {
             _inner: Data {
@@ -5373,8 +5373,8 @@ impl _@{ pascal_name }@_ {
         @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
         if !conn.clear_whole_cache {
             @{- def.cache_owners|fmt_cache_owners("
-            if let Some(v) = crate::repositories::{mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
-                crate::repositories::{mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
+            if let Some(v) = crate::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
+                crate::repositories::{base_mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
             }") }@
         }
         @%- endif %@
@@ -5405,8 +5405,8 @@ impl _@{ pascal_name }@_ {
         @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
         if !conn.clear_whole_cache {
             @{- def.cache_owners|fmt_cache_owners("
-            if let Some(v) = crate::repositories::{mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
-                crate::repositories::{mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
+            if let Some(v) = crate::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
+                crate::repositories::{base_mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
             }") }@
         }
         @%- endif %@
@@ -5467,8 +5467,8 @@ impl _@{ pascal_name }@_ {
         @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
         if !conn.clear_whole_cache {
             @{- def.cache_owners|fmt_cache_owners("
-            if let Some(v) = crate::repositories::{mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
-                crate::repositories::{mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
+            if let Some(v) = crate::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
+                crate::repositories::{base_mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
             }") }@
         }
         @%- endif %@
@@ -6092,8 +6092,8 @@ pub(crate) fn ___save(
         if !conn.clear_whole_cache {
             @{- def.cache_owners|fmt_cache_owners("
             if rel_hash != {rel_hash} {
-                if let Some(v) = crate::repositories::{mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
-                    crate::repositories::{mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
+                if let Some(v) = crate::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
+                    crate::repositories::{base_mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
                 }
             }") }@
         }
@@ -6120,8 +6120,8 @@ pub(crate) fn ___save(
             if !conn.clear_whole_cache {
                 @{- def.cache_owners|fmt_cache_owners("
                 if rel_hash != {rel_hash} {
-                    if let Some(v) = crate::repositories::{mod}::RelFk{rel_name_pascal}::get_fk(&obj._inner) {
-                        crate::repositories::{mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
+                    if let Some(v) = crate::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._inner) {
+                        crate::repositories::{base_mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
                     }
                 }") }@
             }
@@ -6477,8 +6477,8 @@ async fn __bulk_insert(conn: &mut DbConn, list: &[ForInsert], ignore: bool, repl
         for list in &result {
             for obj in list.iter() {
                 @{- def.cache_owners|fmt_cache_owners("
-                if let Some(v) = crate::repositories::{mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
-                    crate::repositories::{mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
+                if let Some(v) = crate::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
+                    crate::repositories::{base_mod}::_{model_name}Cache_::__push_invalidate_cache_op(conn, v).await?;
                 }") }@
             }
         }

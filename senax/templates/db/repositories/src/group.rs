@@ -42,6 +42,7 @@ pub(crate) async fn start(db_dir: Option<&Path>) -> Result<()> {
 @%- for (name, (_, def)) in models %@
     _base::_@{ def.mod_name() }@::init().await?;
 @%- endfor %@
+@%- if is_main_group %@
 
     if !db::is_test_mode() {
         let path = db_dir.unwrap().join(DELAYED_DB_DIR).join("@{ group_name }@");
@@ -61,6 +62,7 @@ pub(crate) async fn start(db_dir: Option<&Path>) -> Result<()> {
             }
         });
     }
+@%- endif %@
 
     Ok(())
 }
@@ -106,10 +108,10 @@ pub(crate) async fn _clear_cache(_shard_id: ShardId, _sync: u64, _clear_test: bo
 #[allow(clippy::single_match)]
 #[allow(clippy::match_single_binding)]
 pub(crate) async fn seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()> {
+    @%- if is_main_group %@
     if let Some(mapping) = seed.as_mapping() {
         for (name, value) in mapping {
             match name.as_str() {
-                // TODO メイングループのみ
 @%- for (name, (_, def)) in models %@
                 Some("@{ name }@") => _base::_@{ def.mod_name() }@::_seed(value, conns).await?,
 @%- endfor %@
@@ -117,6 +119,7 @@ pub(crate) async fn seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Resu
             }
         }
     }
+    @%- endif %@
     Ok(())
 }
 @{-"\n"}@

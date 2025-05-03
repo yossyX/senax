@@ -593,11 +593,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                                     &cur_group_name, &cur_model_name, rel_name
                                 ));
                                 ref_model.cache_owners.push((
-                                    format!(
-                                        "{}::_base::_{}",
-                                        &_to_var_name(&cur_group_name.to_case(Case::Snake)),
-                                        &cur_model_name.to_case(Case::Snake)
-                                    ),
+                                    cur_group_name.to_string(),
                                     cur_model_name.to_string(),
                                     rel_name.to_string(),
                                     rel_hash,

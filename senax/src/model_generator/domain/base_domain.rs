@@ -239,29 +239,28 @@ pub fn write_abstract(
     let file_path = domain_group_dir.join(format!("{}.rs", mod_name));
     remove_files.remove(file_path.as_os_str());
     let pascal_name = &model_name.to_case(Case::Pascal);
-    if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(
-            path = "domain/base_domain/src/models/entities/abstract.rs",
-            escape = "none"
-        )]
-        pub struct DomainAbstractTemplate<'a> {
-            pub db: &'a str,
-            pub group_name: &'a str,
-            pub mod_name: &'a str,
-            pub pascal_name: &'a str,
-            pub def: &'a Arc<ModelDef>,
-            }
-
-        let tpl = DomainAbstractTemplate {
-            db,
-            group_name,
-            mod_name,
-            pascal_name,
-            def,
-            };
-        fs_write(file_path, tpl.render()?)?;
+    #[derive(Template)]
+    #[template(
+        path = "domain/base_domain/src/models/entities/abstract.rs",
+        escape = "none"
+    )]
+    pub struct DomainAbstractTemplate<'a> {
+        pub db: &'a str,
+        pub group_name: &'a str,
+        pub mod_name: &'a str,
+        pub pascal_name: &'a str,
+        pub def: &'a Arc<ModelDef>,
     }
+
+    let tpl = DomainAbstractTemplate {
+        db,
+        group_name,
+        mod_name,
+        pascal_name,
+        def,
+    };
+    fs_write(file_path, tpl.render()?)?;
+
     set_domain_mode(false);
     Ok(())
 }
@@ -307,19 +306,17 @@ pub fn write_entity(
         pub model_id: u64,
     }
 
-    if force || !file_path.exists() {
-        let tpl = DomainEntityTemplate {
-            db,
-            group_name,
-            mod_name,
-            model_name,
-            pascal_name,
-            id_name,
-            def,
-            model_id,
-        };
-        fs_write(file_path, tpl.render()?)?;
-    }
+    let tpl = DomainEntityTemplate {
+        db,
+        group_name,
+        mod_name,
+        model_name,
+        pascal_name,
+        id_name,
+        def,
+        model_id,
+    };
+    fs_write(file_path, tpl.render()?)?;
     set_domain_mode(false);
     Ok(())
 }

@@ -5,7 +5,6 @@ use regex::Regex;
 use schemars::JsonSchema;
 use schemars::r#gen::SchemaSettings;
 use senax_common::types::blob::FILES;
-use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::PathBuf;
@@ -16,8 +15,9 @@ use crate::{DbConn, connection, models::exec_ddl};
 // SEEDS
 include!(concat!(env!("OUT_DIR"), "/seeds.rs"));
 
-#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[allow(dead_code)]
 pub struct SeedSchema {
 @%- for (name, (_, defs)) in groups %@@% if !defs.is_empty() %@
     @{ name|to_var_name }@: Option<crate::models::@{ name|snake|to_var_name }@::@{ name|pascal }@>,

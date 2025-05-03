@@ -6,7 +6,7 @@ use crate::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }
 #[allow(unused_imports)]
 use anyhow::Context as _;
 // #[allow(unused_imports)]
-// use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::{self, *};
+// use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{self, *};
 // use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
 use base_domain as domain;
 use domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
@@ -26,7 +26,7 @@ use domain::models::@{ db|snake|to_var_name }@ as _model_;
 use domain::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
 @%- endfor %@
 
-type __Getter__ = dyn crate::models::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::_@{ pascal_name }@Getter;
+type __Getter__ = dyn crate::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::_@{ pascal_name }@Getter;
 @%- if !config.force_disable_cache %@
 type __Cache__ = _@{ pascal_name }@Cache;
 @%- endif %@

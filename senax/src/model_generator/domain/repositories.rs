@@ -1,5 +1,6 @@
 use crate::filters;
-use crate::schema::GroupsDef;
+use crate::model_generator::REL_START;
+use crate::schema::{GroupsDef, IS_MAIN_GROUP};
 use crate::{
     common::fs_write,
     schema::{ModelDef, set_domain_mode, to_id_name},
@@ -222,7 +223,9 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
 
     let repositories_dir = src_dir.join("repositories");
     let base_group_name = group_name;
-    for (name, (_, defs)) in groups {
+    for (name, (f, defs)) in groups {
+        let is_main_group = f.load(std::sync::atomic::Ordering::Relaxed) == REL_START;
+        IS_MAIN_GROUP.store(is_main_group, std::sync::atomic::Ordering::Relaxed);
         let mod_names: BTreeSet<String> = defs
             .iter()
             .filter(|(_k, (_, v))| !v.abstract_mode)
@@ -419,6 +422,7 @@ pub mod @{ mod_name|to_var_name }@;
             }
         }
     }
+    IS_MAIN_GROUP.store(true, std::sync::atomic::Ordering::Relaxed);
     Ok(())
 }
 

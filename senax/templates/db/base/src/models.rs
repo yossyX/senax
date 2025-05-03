@@ -44,7 +44,7 @@ pub enum TableName {
 
 pub(crate) struct CacheActor;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct CacheMsg(pub Vec<CacheOp>, pub FxHashMap<ShardId, u64>);
 
 #[allow(clippy::large_enum_variant)]

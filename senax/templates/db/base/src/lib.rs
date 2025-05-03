@@ -117,7 +117,7 @@ pub async fn _start(
         let pw = pw.as_ref().with_context(|| "LINKER_PASSWORD required")?;
         let send_only = cfg!(feature = "cache_update_only");
         let (sender, mut receiver) = linker::link(DB_ID, port, pw, exit_tx.clone(), send_only)?;
-        LINKER_SENDER.set(sender).unwrap();
+        LINKER_SENDER.set(sender).unwrap_or_else(|_| panic!("LINKER_SENDER failed"));
         tokio::spawn(async move {
             while let Some(data) = receiver.recv().await {
                 if let Some(data) = data {
@@ -159,6 +159,7 @@ pub async fn _start_test() -> Result<MutexGuard<'static, u8>> {
     static TEST_LOCK: Lazy<Mutex<u8>> = Lazy::new(|| Mutex::new(0));
     let guard = TEST_LOCK.lock().await;
     TEST_MODE.store(true, Ordering::SeqCst);
+    connection::init_test().await?;
     set_bulk_insert_max_size().await?;
     // models::start_test().await?;
     Ok(guard)
