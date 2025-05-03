@@ -267,9 +267,6 @@ pub struct ModelDef {
     /// ### insertされたデータのキャッシュを他のサーバに通知しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_insert_cache_propagation: bool,
-    /// ### 物理削除時の_before_deleteと_after_deleteの呼び出しを行う
-    #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_on_delete_fn: bool,
     /// ### 抽象化モード
     #[serde(default, skip_serializing_if = "super::is_false")]
     #[serde(rename = "abstract")]
@@ -421,9 +418,6 @@ pub struct ModelJson {
     /// ### insertされたデータのキャッシュを他のサーバに通知しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_insert_cache_propagation: bool,
-    /// ### 物理削除時の_before_deleteと_after_deleteの呼び出しを行う
-    #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_on_delete_fn: bool,
     /// ### 抽象化モード
     #[serde(default, skip_serializing_if = "super::is_false")]
     #[serde(rename = "abstract")]
@@ -511,7 +505,6 @@ impl From<ModelDef> for ModelJson {
             disable_update: value.disable_update,
             disable_delete: value.disable_delete,
             disable_insert_cache_propagation: value.disable_insert_cache_propagation,
-            use_on_delete_fn: value.use_on_delete_fn,
             abstract_mode: value.abstract_mode,
             inheritance: value.inheritance.map(|v| v.into()),
             engine: value.engine,
@@ -628,7 +621,6 @@ impl TryFrom<ModelJson> for ModelDef {
             disable_update: value.disable_update,
             disable_delete: value.disable_delete,
             disable_insert_cache_propagation: value.disable_insert_cache_propagation,
-            use_on_delete_fn: value.use_on_delete_fn,
             abstract_mode: value.abstract_mode,
             inheritance: value
                 .inheritance

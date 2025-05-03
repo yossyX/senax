@@ -237,11 +237,6 @@ function EditModel() {
                 {...formData}
                 hidden={!detail}
               />
-              <AutoField
-                name="use_on_delete_fn"
-                {...formData}
-                hidden={!detail}
-              />
               <AutoField name="abstract" {...formData} hidden={!detail} />
               <AutoField
                 name="inheritance"

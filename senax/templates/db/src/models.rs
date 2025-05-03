@@ -23,7 +23,6 @@ pub use crate::_base::models::@{ name|snake|to_var_name }@;
 pub use crate::_base::models::NotifyOp;
 pub use crate::_base::models::TableName;
 pub use crate::_base::models::Controller;
-pub use crate::_base::models::ModelTr;
 
 pub(crate) async fn start(db_dir: &Path) -> Result<()> {
 @%- for (name, (_, defs)) in groups %@

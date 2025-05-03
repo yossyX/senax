@@ -49,7 +49,7 @@ use ::db::connection::{DbArguments, DbConn, DbRow, DbType};
 use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, IntoJson as _, OrderTr};
 use crate::repositories::{CacheOpTr, IdFetcher, IdFetcherWithCache};
 use ::db::misc::{BindValue, Count, Updater, Size, TrashMode, UpdaterForInner as _};
-use ::db::models::{ModelTr as _, USE_FAST_CACHE};
+use ::db::models::USE_FAST_CACHE;
 use ::db::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
 pub use ::db::models::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::*;
 @%- if !config.exclude_from_domain %@
@@ -261,7 +261,6 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
     fn handle_cache_msg(self, sync_map: Arc<FxHashMap<ShardId, u64>>) -> BoxFuture<'static, ()> {
         async move {
             let time = MSec::now();
-            _@{pascal_name}@::__receive_update_notice(&self).await;
             for (shard_id, sync) in sync_map.iter() {
                 if *sync == 0 {
                     let shard_id = *shard_id;
@@ -5323,32 +5322,6 @@ impl _@{ pascal_name }@_ {
             let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
             for ids in id_chunks {
                 let q = "@{ def.primaries()|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
-    @%- if def.use_on_delete_fn %@
-                let sql = format!(
-                    r#"SELECT {} FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({}) FOR UPDATE;"#,
-                    Data::_sql_cols(),
-                    &q[0..q.len() - 1]
-                );
-                let mut query = sqlx::query(&sql);
-                let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-                for id in ids {
-                    @{- def.primaries()|fmt_join("
-                    query = query.bind(id.{index}{bind_as});", "") }@
-                }
-                let result = if conn.wo_tx() {
-                    query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
-                } else {
-                    query.fetch_all(conn.get_tx().await?.as_mut()).await?
-                };
-                let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
-                let list: Vec<_@{ pascal_name }@> = result?.into_iter().map(|v| v.into()).collect();
-                _@{ pascal_name }@::__before_delete(conn, &list).await?;
-                conn.push_callback(Box::new(|| {
-                    async move {
-                        _@{ pascal_name }@::__after_delete(&list).await;
-                    }.boxed()
-                })).await;
-    @%- endif %@
     @%- for on_delete_str in def.on_delete_list %@
                 crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, ids, false).await?;
     @%- endfor %@
@@ -5468,14 +5441,6 @@ impl _@{ pascal_name }@_ {
     #[allow(clippy::needless_borrow)]
     pub async fn force_delete(conn: &mut DbConn, obj: _@{ pascal_name }@Updater) -> Result<()> {
         let id: InnerPrimary = (&obj).into();
-@%- if def.use_on_delete_fn %@
-        let notify_obj: _@{ pascal_name }@ = if obj._is_loaded {
-            _@{ pascal_name }@::from(obj.clone())
-        } else {
-            _@{ pascal_name }@_::find_for_update(conn, &id, None).await?.into()
-        };
-        _@{ pascal_name }@::__before_delete(conn, &[notify_obj.clone()]).await?;
-@%- endif %@
 @%- for on_delete_str in def.on_delete_list %@
         crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, &[id.clone()], false).await?;
 @%- endfor %@
@@ -5489,13 +5454,6 @@ impl _@{ pascal_name }@_ {
             query.execute(conn.get_tx().await?.as_mut()).await?;
         }
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "force_delete", ctx = conn.ctx_no(), id = id.to_string(); "{}", &obj);
-@%- if def.use_on_delete_fn %@
-        conn.push_callback(Box::new(|| {
-            async {
-                _@{ pascal_name }@::__after_delete(&[notify_obj]).await;
-            }.boxed()
-        })).await;
-@%- endif %@
 @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
         @%- else if def.use_clear_whole_cache() %@
@@ -5617,48 +5575,6 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
     let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
     for ids in id_chunks {
         let q = "@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
-@%- if def.use_on_delete_fn %@
-        let sql = format!(
-            r#"SELECT {} FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({}) FOR UPDATE;"#,
-            Data::_sql_cols(),
-            &q[0..q.len() - 1]
-        );
-        let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
-        }
-        let result = if conn.wo_tx() {
-            query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
-        } else {
-            query.fetch_all(conn.get_tx().await?.as_mut()).await?
-        };
-        let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
-        let result = result?;
-        let result_num = result.len() as u64;
-        let list: Vec<_@{ pascal_name }@> = result.into_iter().map(|v| v.into()).collect();
-        let id_list: Vec<InnerPrimary> = list.iter().map(|v| v.into()).collect();
-        _@{ pascal_name }@::__before_delete(conn, &list).await?;
-        conn.push_callback(Box::new(|| {
-            async move {
-                _@{ pascal_name }@::__after_delete(&list).await;
-            }.boxed()
-        })).await;
-@%- if !config.force_disable_cache %@
-        @%- if def.act_as_job_queue() %@
-        @%- else if def.use_clear_whole_cache() %@
-        conn.clear_whole_cache = true;
-        @%- else %@
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
-            let cache_msg = CacheOp::Cascade { ids: id_list.clone(), shard_id: conn.shard_id() };
-            conn.push_cache_op(cache_msg.wrap()).await;
-        }
-        @%- endif %@
-@%- endif %@
-@%- for on_delete_str in def.on_delete_list %@
-        crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, &id_list, cascade_only).await?;
-@%- endfor %@
-@%- else %@
         let sql = format!(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
             &q[0..q.len() - 1]
@@ -5690,7 +5606,6 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
 @%- for on_delete_str in def.on_delete_list %@
         crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, &id_list, cascade_only).await?;
 @%- endfor %@
-@%- endif %@
         let sql = format!(
             r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
             &q[0..q.len() - 1]
@@ -6831,8 +6746,7 @@ pub(crate) async fn _seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Res
     if let Some(mapping) = seed.as_mapping() {
         for (name, factory) in mapping {
             let seed: _@{ pascal_name }@Factory = serde_yaml::from_str(&serde_yaml::to_string(&factory)?)?;
-            let shard_id = seed._shard_id().await as usize;
-            let conn = &mut conns[shard_id];
+            let conn = &mut conns[0];
             let obj = seed.create();
             if let Some(obj) = _@{ pascal_name }@_::save(conn, obj).await? {
                 @{- def.auto_inc_or_seq()|fmt_join("

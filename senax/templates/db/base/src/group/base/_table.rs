@@ -41,18 +41,9 @@ use crate::{self as db, accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITIO
 use base_domain as domain;
 #[allow(unused_imports)]
 use domain::value_objects;
-// pub use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{join, Joiner_};
-@%- for (name, rel_def) in def.belongs_to_outer_db() %@
-// use domain::repository::@{ rel_def.db()|to_var_name }@::@{ rel_def.get_group_mod_var() }@ as join_@{ rel_def.get_group_mod_name() }@;
-@%- endfor %@
 @%- endif %@
 @%- for mod_name in def.relation_mods() %@
 use crate::models::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
-@%- if !config.exclude_from_domain %@
-// use domain::repository::@{ db|snake|to_var_name }@::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
-@%- else %@
-// use crate::models::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
-@%- endif %@
 @%- endfor %@
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
 use db_@{ rel_def.db() }@::models::@{ rel_def.get_base_group_mod_var() }@ as rel_@{ rel_def.get_group_mod_name() }@;
@@ -62,9 +53,6 @@ static PRIMARY_TYPE_ID: u64 = @{ def.get_type_id("PRIMARY_TYPE_ID") }@;
 static VERSION_TYPE_ID: u64 = @{ def.get_type_id("VERSION_TYPE_ID") }@;
 static CACHE_SYNC_TYPE_ID: u64 = @{ def.get_type_id("CACHE_SYNC_TYPE_ID") }@;
 static CACHE_TYPE_ID: u64 = @{ def.get_type_id("CACHE_TYPE_ID") }@;
-@%- if def.act_as_job_queue() %@
-pub static QUEUE_NOTIFIER: tokio::sync::Notify = tokio::sync::Notify::const_new();
-@%- endif %@
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(tag = "_")]

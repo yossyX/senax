@@ -1,6 +1,6 @@
 #[allow(unused_imports)]
 #[rustfmt::skip]
-use domain::models::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ mod_name|to_var_name }@::{self as _domain_, @{ pascal_name }@Updater as _, @{ pascal_name }@UpdaterBase as _};
+use domain::models::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ mod_name|to_var_name }@::{self as _domain_, @{ pascal_name }@Updater as _};
 use domain::repository::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ mod_name|to_var_name }@ as _repository_;
 use domain::repository::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ group|pascal }@Repository as _Repository;
 use domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@QueryService as _QueryService;

@@ -139,10 +139,4 @@ pub trait Controller {
     async fn _clear_cache(&self, shard_id: ShardId, sync: u64, clear_test: bool);
     async fn seed(&self, seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()>;
 }
-
-pub trait ModelTr<_Self, CacheOp> {
-    fn __before_delete(_conn: &mut DbConn, _list: &[_Self]) -> impl std::future::Future<Output = Result<()>> + Send;
-    fn __after_delete(_list: &[_Self]) -> impl std::future::Future<Output = ()> + Send;
-    fn __receive_update_notice(msg: &CacheOp) -> impl std::future::Future<Output = ()> + Send;
-}
 @{-"\n"}@

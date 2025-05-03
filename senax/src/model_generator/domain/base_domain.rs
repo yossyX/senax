@@ -246,43 +246,22 @@ pub fn write_abstract(
             escape = "none"
         )]
         pub struct DomainAbstractTemplate<'a> {
+            pub db: &'a str,
+            pub group_name: &'a str,
             pub mod_name: &'a str,
             pub pascal_name: &'a str,
             pub def: &'a Arc<ModelDef>,
-        }
+            }
 
         let tpl = DomainAbstractTemplate {
+            db,
+            group_name,
             mod_name,
             pascal_name,
             def,
-        };
+            };
         fs_write(file_path, tpl.render()?)?;
     }
-    let domain_group_base_dir = domain_group_dir.join("_base");
-    let file_path = domain_group_base_dir.join(format!("_{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
-
-    #[derive(Template)]
-    #[template(
-        path = "domain/base_domain/src/models/entities/base/_abstract.rs",
-        escape = "none"
-    )]
-    pub struct DomainBaseAbstractTemplate<'a> {
-        pub db: &'a str,
-        pub group_name: &'a str,
-        pub mod_name: &'a str,
-        pub pascal_name: &'a str,
-        pub def: &'a Arc<ModelDef>,
-    }
-
-    let tpl = DomainBaseAbstractTemplate {
-        db,
-        group_name,
-        mod_name,
-        pascal_name,
-        def,
-    };
-    fs_write(file_path, tpl.render()?)?;
     set_domain_mode(false);
     Ok(())
 }
@@ -321,6 +300,7 @@ pub fn write_entity(
         pub db: &'a str,
         pub group_name: &'a str,
         pub mod_name: &'a str,
+        pub model_name: &'a str,
         pub pascal_name: &'a str,
         pub id_name: &'a str,
         pub def: &'a Arc<ModelDef>,
@@ -332,6 +312,7 @@ pub fn write_entity(
             db,
             group_name,
             mod_name,
+            model_name,
             pascal_name,
             id_name,
             def,
@@ -339,35 +320,6 @@ pub fn write_entity(
         };
         fs_write(file_path, tpl.render()?)?;
     }
-    let domain_group_base_dir = domain_group_dir.join("_base");
-    let file_path = domain_group_base_dir.join(format!("_{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
-
-    #[derive(Template)]
-    #[template(
-        path = "domain/base_domain/src/models/entities/base/_entity.rs",
-        escape = "none"
-    )]
-    pub struct DomainBaseEntityTemplate<'a> {
-        pub db: &'a str,
-        pub group_name: &'a str,
-        pub mod_name: &'a str,
-        pub model_name: &'a str,
-        pub pascal_name: &'a str,
-        pub id_name: &'a str,
-        pub def: &'a Arc<ModelDef>,
-    }
-
-    let tpl = DomainBaseEntityTemplate {
-        db,
-        group_name,
-        mod_name,
-        model_name,
-        pascal_name,
-        id_name,
-        def,
-    };
-    fs_write(file_path, tpl.render()?)?;
     set_domain_mode(false);
     Ok(())
 }
@@ -405,11 +357,6 @@ pub fn write_group_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-pub mod _base {
-@%- for mod_name in mod_names %@
-    pub mod _@{ mod_name }@;
-@%- endfor %@
-}
 @%- for mod_name in mod_names %@
 pub mod @{ mod_name|to_var_name }@;
 @%- endfor %@

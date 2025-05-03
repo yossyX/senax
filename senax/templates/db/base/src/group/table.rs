@@ -14,29 +14,6 @@ pub use super::_base::_@{ mod_name }@::{
     _@{ pascal_name }@,@% if !config.force_disable_cache %@ _@{ pascal_name }@Cache,@% endif %@ _@{ pascal_name }@Factory, _@{ pascal_name }@Updater,
     @% for id in def.id() %@@{ id_name }@, @% endfor %@_@{ pascal_name }@Info, _@{ pascal_name }@Getter,
 };
-@%- if def.act_as_job_queue() %@
-// pub use super::_base::_@{ mod_name }@::QUEUE_NOTIFIER;
-@%- endif %@
-
-impl crate::models::ModelTr<Self, _@{ mod_name }@::CacheOp> for _@{ pascal_name }@ {
-    async fn __before_delete(_conn: &mut DbConn, _list: &[Self]) -> Result<()> {
-        // Not called unless the use_on_delete_fn flag is true.
-        Ok(())
-    }
-    async fn __after_delete(_list: &[Self]) {
-        // Not called unless the use_on_delete_fn flag is true.
-    }
-    async fn __receive_update_notice(msg: &_@{ mod_name }@::CacheOp) {
-        // Since the cache update lock is being acquired, it must be processed in the shortest possible time.
-    }
-}
-
-impl _@{ pascal_name }@Factory {
-    /// used by seeder
-    pub async fn _shard_id(&self) -> ShardId {
-        0
-    }
-}
 
 impl std::fmt::Display for _@{ pascal_name }@ {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

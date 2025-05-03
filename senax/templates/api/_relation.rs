@@ -1,6 +1,6 @@
 #[allow(unused_imports)]
 use domain::models::@{ db|snake|to_var_name }@::@{ rel_mod }@::{
-    self as _domain_, @{ pascal_name }@Updater as _, @{ pascal_name }@UpdaterBase as _
+    self as _domain_, @{ pascal_name }@Updater as _
 };
 #[allow(unused_imports)]
 use super::_repository_::_@{ rel_name }@_repository_ as _repository_;

@@ -148,11 +148,6 @@ pub fn write_group_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-pub mod _base {
-@%- for mod_name in mod_names %@
-    pub mod _@{ mod_name }@;
-@%- endfor %@
-}
 @%- for mod_name in mod_names %@
 pub mod @{ mod_name|to_var_name }@;
 @%- endfor %@
@@ -197,6 +192,7 @@ pub fn write_entity(
         #[template(path = "db/base/src/impl_domain/entities/entity.rs", escape = "none")]
         pub struct ImplDomainEntityTemplate<'a> {
             pub db: &'a str,
+            pub config: &'a ConfigDef,
             pub group_name: &'a str,
             pub mod_name: &'a str,
             pub pascal_name: &'a str,
@@ -206,6 +202,7 @@ pub fn write_entity(
 
         let tpl = ImplDomainEntityTemplate {
             db,
+            config,
             group_name,
             mod_name,
             pascal_name,
@@ -214,35 +211,6 @@ pub fn write_entity(
         };
         fs_write(file_path, tpl.render()?)?;
     }
-    let path = impl_domain_group_dir.join("_base");
-    let file_path = path.join(format!("_{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
-
-    #[derive(Template)]
-    #[template(
-        path = "db/base/src/impl_domain/entities/base/_entity.rs",
-        escape = "none"
-    )]
-    pub struct ImplDomainBaseEntityTemplate<'a> {
-        pub db: &'a str,
-        pub config: &'a ConfigDef,
-        pub group_name: &'a str,
-        pub mod_name: &'a str,
-        pub pascal_name: &'a str,
-        pub id_name: &'a str,
-        pub def: &'a Arc<ModelDef>,
-    }
-
-    let tpl = ImplDomainBaseEntityTemplate {
-        db,
-        config,
-        group_name,
-        mod_name,
-        pascal_name,
-        id_name,
-        def,
-    };
-    fs_write(file_path, tpl.render()?)?;
     set_domain_mode(false);
     Ok(())
 }
