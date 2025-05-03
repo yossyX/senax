@@ -444,22 +444,23 @@ async fn get_merged_models(AxumPath(path): AxumPath<(String, String)>) -> impl I
         check_ascii_name(&path.0)?;
         check_ascii_name(&path.1)?;
         crate::schema::parse(&path.0, true, false)?;
-        let models = schema::GROUPS
-            .read()
-            .unwrap()
-            .as_ref()
-            .unwrap()
+        let group_lock = schema::GROUPS.read().unwrap();
+        let groups = group_lock.as_ref().unwrap();
+        let models: Vec<_> = groups
             .get(&path.1)
-            .cloned()
-            .unwrap_or_default();
-        let models: Vec<_> = models
-            .into_iter()
-            .map(|(k, v)| {
-                let mut model: ModelJson = v.as_ref().clone().into();
-                model.name = k;
-                model
+            .and_then(|(_, models)| {
+                Some(
+                    models
+                        .iter()
+                        .map(|(k, (_, v))| {
+                            let mut model: ModelJson = v.as_ref().clone().into();
+                            model.name = k.to_string();
+                            model
+                        })
+                        .collect(),
+                )
             })
-            .collect();
+            .unwrap_or_default();
         Ok(models)
     }
     .await;
@@ -807,22 +808,23 @@ async fn get_api_server_models(
         check_ascii_name(db)?;
         check_ascii_name(group)?;
         crate::schema::parse(db, true, false)?;
-        let models = schema::GROUPS
-            .read()
-            .unwrap()
-            .as_ref()
-            .unwrap()
+        let group_lock = schema::GROUPS.read().unwrap();
+        let groups = group_lock.as_ref().unwrap();
+        let models: Vec<_> = groups
             .get(group)
-            .cloned()
-            .unwrap_or_default();
-        let models: Vec<_> = models
-            .into_iter()
-            .map(|(k, v)| {
-                let mut model: ModelJson = v.as_ref().clone().into();
-                model.name = k;
-                model
+            .and_then(|(_, models)| {
+                Some(
+                    models
+                        .iter()
+                        .map(|(k, (_, v))| {
+                            let mut model: ModelJson = v.as_ref().clone().into();
+                            model.name = k.to_string();
+                            model
+                        })
+                        .collect(),
+                )
             })
-            .collect();
+            .unwrap_or_default();
         Ok(models)
     }
     .await;

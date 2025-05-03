@@ -1,14 +1,17 @@
 use crate::common::fs_write;
 use crate::filters;
-use crate::schema::{ConfigDef, ModelDef, StringOrArray, Timestampable, to_id_name};
+use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable, to_id_name};
 use anyhow::Result;
 use askama::Template;
 use compact_str::CompactString;
 use convert_case::{Case, Casing as _};
 use indexmap::IndexMap;
+use regex::Regex;
+use std::sync::atomic::AtomicUsize;
 use std::{
     collections::{BTreeSet, HashSet},
     ffi::OsString,
+    fs,
     path::Path,
     sync::Arc,
 };
@@ -19,7 +22,8 @@ pub fn write_group_files(
     db_repositories_dir: &Path,
     db: &str,
     group: &str,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    groups: &GroupsDef,
+    ref_groups: &[String],
     config: &ConfigDef,
     force: bool,
     clean: bool,
@@ -29,16 +33,33 @@ pub fn write_group_files(
     let base_dir = db_repositories_dir.join(group.to_case(Case::Snake));
     let file_path = base_dir.join("Cargo.toml");
     remove_files.remove(file_path.as_os_str());
-    if force || !file_path.exists() {
+    let mut content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "model/repositories/_Cargo.toml", escape = "none")]
         struct Template<'a> {
             db: &'a str,
             group: &'a str,
         }
-        let content = Template { db, group }.render()?;
-        fs_write(file_path, &*content)?;
+        Template { db, group }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
+    for group in ref_groups {
+        let reg = Regex::new(&format!(r"(?m)^db_{}_{}\s*=", db, group))?;
+        if !reg.is_match(&content) {
+            let db = &db.to_case(Case::Snake);
+            let group = &group.to_case(Case::Snake);
+            content = content.replace(
+                "[dependencies]",
+                &format!(
+                    "[dependencies]\ndb_{}_{} = {{ path = \"../{}\" }}",
+                    db, group, group
+                ),
+            );
+        }
     }
+    fs_write(file_path, &*content)?;
+
     let src_dir = base_dir.join("src");
     let file_path = src_dir.join("lib.rs");
     remove_files.remove(file_path.as_os_str());
@@ -57,13 +78,20 @@ pub fn write_group_files(
     #[derive(Template)]
     #[template(path = "model/repositories/src/repositories.rs", escape = "none")]
     struct RepositoriesTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub db: &'a str,
         pub config: &'a ConfigDef,
+        pub groups: &'a GroupsDef,
+        pub ref_groups: &'a [String],
     }
 
     let file_path = src_dir.join("repositories.rs");
     remove_files.remove(file_path.as_os_str());
-    let tpl = RepositoriesTemplate { groups, config };
+    let tpl = RepositoriesTemplate {
+        db,
+        config,
+        groups,
+        ref_groups,
+    };
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
@@ -78,33 +106,36 @@ pub fn write_group_files(
     fs_write(file_path, tpl.render()?)?;
 
     if !exclude_from_domain {
-        impl_domain::write_impl_domain_rs(&src_dir, db, group, &groups, force, remove_files)?;
+        impl_domain::write_impl_domain_rs(&src_dir, db, group, groups, force, remove_files)?;
     }
     let model_models_dir = src_dir.join("repositories");
     let impl_domain_dir = src_dir.join("impl_domain");
     let base_group_name = group;
-    for (group_name, defs) in groups {
+    for (group_name, (_, defs)) in groups {
         let mod_names: BTreeSet<String> = defs
             .iter()
-            .filter(|(_, d)| !d.abstract_mode)
-            .map(|(_, d)| d.mod_name())
+            .filter(|(_, (_, d))| !d.abstract_mode)
+            .map(|(_, (_, d))| d.mod_name())
             .collect();
         let entities_mod_names: BTreeSet<(String, &String)> = defs
             .iter()
-            .filter(|(_, d)| !d.abstract_mode)
-            .map(|(model_name, def)| (def.mod_name(), model_name))
+            .filter(|(_, (_, d))| !d.abstract_mode)
+            .map(|(model_name, (_, def))| (def.mod_name(), model_name))
             .collect();
 
         let file_path = model_models_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
         remove_files.remove(file_path.as_os_str());
-        let concrete_models = defs.iter().filter(|(_k, v)| !v.abstract_mode).collect();
+        let concrete_models = defs
+            .iter()
+            .filter(|(_k, (_, v))| !v.abstract_mode)
+            .collect();
 
         #[derive(Template)]
         #[template(path = "model/repositories/src/group.rs", escape = "none")]
         struct GroupTemplate<'a> {
             pub group_name: &'a str,
             pub mod_names: &'a BTreeSet<String>,
-            pub models: IndexMap<&'a String, &'a Arc<ModelDef>>,
+            pub models: IndexMap<&'a String, &'a (AtomicUsize, Arc<ModelDef>)>,
             pub config: &'a ConfigDef,
         }
 
@@ -128,14 +159,9 @@ pub fn write_group_files(
             )?;
         }
 
-        let visibility = if config.export_db_layer {
-            ""
-        } else {
-            "(crate)"
-        };
         let model_group_dir = model_models_dir.join(group_name.to_case(Case::Snake));
         let model_group_base_dir = model_group_dir.join("_base");
-        for (model_name, def) in defs {
+        for (model_name, (_, def)) in defs {
             let table_name = def.table_name();
             let mod_name = def.mod_name();
             let mod_name = &mod_name;
@@ -155,7 +181,6 @@ pub fn write_group_files(
                         pub id_name: &'a str,
                         pub def: &'a Arc<ModelDef>,
                         pub config: &'a ConfigDef,
-                        pub visibility: &'a str,
                     }
 
                     let tpl = GroupTableTemplate {
@@ -168,7 +193,6 @@ pub fn write_group_files(
                         id_name: &to_id_name(model_name),
                         def,
                         config: &config,
-                        visibility,
                     };
                     fs_write(file_path, tpl.render()?)?;
                 }
@@ -215,7 +239,6 @@ pub fn write_group_files(
                     pub force_indexes: Vec<(String, String)>,
                     pub config: &'a ConfigDef,
                     pub version_col: CompactString,
-                    pub visibility: &'a str,
                 }
 
                 let tpl = GroupBaseTableTemplate {
@@ -231,7 +254,6 @@ pub fn write_group_files(
                     force_indexes,
                     config: &config,
                     version_col: ConfigDef::version(),
-                    visibility,
                 };
                 fs_write(file_path, tpl.render()?)?;
 

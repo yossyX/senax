@@ -161,7 +161,6 @@ function Config() {
               <AutoField name="collation" {...formData} />
               <AutoField name="preserve_column_order" {...formData} />
               <AutoField name="exclude_from_domain" {...formData} />
-              <AutoField name="export_db_layer" {...formData} />
               <AutoField name="use_label_as_sql_comment" {...formData} />
               <AutoField
                 name="rename_created_at"

@@ -41,7 +41,7 @@ pub mod @{ name|to_var_name }@;
 #[allow(clippy::large_enum_variant)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum CacheOp {
-@%- for (name, def) in models %@
+@%- for (name, (_, def)) in models %@
     @{ name|to_pascal_name }@(_base::_@{ def.mod_name() }@::CacheOp),
 @%- endfor %@
 }
@@ -50,7 +50,7 @@ pub enum CacheOp {
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct @{ group_name|pascal }@ {
-@%- for (name, def) in models %@
+@%- for (name, (_, def)) in models %@
     #[serde(default)]
     @{ name|to_var_name }@: IndexMap<String, @{ def.mod_name()|to_var_name }@::_@{ name|pascal }@Factory>,
 @%- endfor %@

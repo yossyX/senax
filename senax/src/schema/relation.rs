@@ -677,29 +677,29 @@ pub struct RelDef {
 pub const MODEL_NAME_SPLITTER: &str = "::";
 impl RelDef {
     pub fn is_type_of_has(&self) -> bool {
-        self.rel_type.unwrap() == RelationsType::HasMany
-            || self.rel_type.unwrap() == RelationsType::HasOne
+        self.rel_type == Some(RelationsType::HasMany)
+            || self.rel_type == Some(RelationsType::HasOne)
     }
     pub fn is_type_of_has_many(&self) -> bool {
-        self.rel_type.unwrap() == RelationsType::HasMany
+        self.rel_type == Some(RelationsType::HasMany)
     }
     pub fn is_type_of_has_one(&self) -> bool {
-        self.rel_type.unwrap() == RelationsType::HasOne
+        self.rel_type == Some(RelationsType::HasOne)
     }
     pub fn is_type_of_belongs_to(&self) -> bool {
-        self.rel_type.unwrap() == RelationsType::BelongsTo
+        self.rel_type == Some(RelationsType::BelongsTo)
     }
     pub fn is_type_of_belongs_to_outer_db(&self) -> bool {
-        self.rel_type.unwrap() == RelationsType::BelongsToOuterDb
+        self.rel_type == Some(RelationsType::BelongsToOuterDb)
     }
     pub fn db(&self) -> &str {
         self.db.as_deref().unwrap_or("--RELATION HAS NO DB--")
     }
     pub fn get_foreign_class_name(&self) -> String {
         if domain_mode() {
-            self.get_foreign_model_name().1.to_case(Case::Pascal)
+            self.get_foreign_model_name().to_case(Case::Pascal)
         } else {
-            format!("_{}", self.get_foreign_model_name().1.to_case(Case::Pascal))
+            format!("_{}", self.get_foreign_model_name().to_case(Case::Pascal))
         }
     }
     pub fn get_id_name(&self) -> String {
@@ -714,13 +714,13 @@ impl RelDef {
                 target_model.name
             );
         }
-        to_id_name(&self.get_foreign_model_name().1)
+        to_id_name(&self.get_foreign_model_name())
     }
     pub fn get_group_var(&self) -> String {
         _to_var_name(&self.get_group_name().to_case(Case::Snake))
     }
     pub fn get_mod_name(&self) -> String {
-        self.get_foreign_model_name().0.to_case(Case::Snake)
+        self.get_foreign_model_name().to_case(Case::Snake)
     }
     pub fn get_group_mod_name(&self) -> String {
         if let Some(db) = &self.db {
@@ -804,10 +804,10 @@ impl RelDef {
         get_model(group_name, stem_name)
     }
 
-    pub fn get_foreign_model_name(&self) -> (String, String) {
+    pub fn get_foreign_model_name(&self) -> String {
         if self.is_type_of_belongs_to_outer_db() {
             let (_group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
-            (stem_name.to_case(Case::Snake), stem_name.to_string())
+            stem_name.to_string()
         } else {
             let (group_name, stem_name) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
             get_model_name(group_name, stem_name)
@@ -845,9 +845,9 @@ fn get_model(group_name: &str, stem_name: &str) -> Arc<ModelDef> {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .get(stem_name)
+        .1.get(stem_name)
     {
-        return model.clone();
+        return model.1.clone();
     }
     let singular_name = to_singular(stem_name);
     GROUPS
@@ -857,12 +857,12 @@ fn get_model(group_name: &str, stem_name: &str) -> Arc<ModelDef> {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .get(&singular_name)
+        .1.get(&singular_name)
         .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name))
-        .clone()
+        .1.clone()
 }
 
-fn get_model_name(group_name: &str, stem_name: &str) -> (String, String) {
+fn get_model_name(group_name: &str, stem_name: &str) -> String {
     if let Some(model) = GROUPS
         .read()
         .unwrap()
@@ -870,9 +870,9 @@ fn get_model_name(group_name: &str, stem_name: &str) -> (String, String) {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .get(stem_name)
+        .1.get(stem_name)
     {
-        return (model.mod_name().to_string(), model.name.clone());
+        return model.1.name.clone();
     }
     let singular_name = to_singular(stem_name);
     let group_lock = GROUPS.read().unwrap();
@@ -881,7 +881,7 @@ fn get_model_name(group_name: &str, stem_name: &str) -> (String, String) {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .get(&singular_name)
+        .1.get(&singular_name)
         .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name));
-    (model.mod_name().to_string(), model.name.clone())
+    model.1.name.clone()
 }

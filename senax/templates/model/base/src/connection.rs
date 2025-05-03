@@ -1751,7 +1751,7 @@ async fn reset_writer_pool(
                         tokio::spawn(async move {
                             if let Ok(pool) = new_pool.acquire().await {
                                 let sync = DbConn::___inc_cache_sync(pool).await.unwrap_or(0);
-                                @%- for (name, defs) in groups %@
+                                @%- for (name, (_, defs)) in groups %@
                                 if let Some(g) = models::@{ name|upper }@_CTRL.get() {
                                     g._clear_cache(idx as ShardId, sync, false).await;
                                 }

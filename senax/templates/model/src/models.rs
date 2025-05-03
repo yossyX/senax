@@ -16,7 +16,7 @@ pub use crate::_base::models::CACHE_UPDATE_LOCK;
 // pub const USE_STORAGE_CACHE: bool = @{ config.use_storage_cache }@;
 // pub static CACHE_UPDATE_LOCK: RwLock<()> = RwLock::const_new(());
 @{-"\n"}@
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
 pub use crate::_base::models::@{ name|snake|to_var_name }@;
 @%- endfor %@
 
@@ -26,7 +26,7 @@ pub use crate::_base::models::Controller;
 pub use crate::_base::models::ModelTr;
 
 pub(crate) async fn start(db_dir: &Path) -> Result<()> {
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
     if let Some(g) = @{ name|upper }@_CTRL.get() {
         g.start(db_dir).await?;
     }
@@ -35,7 +35,7 @@ pub(crate) async fn start(db_dir: &Path) -> Result<()> {
 }
 
 pub(crate) async fn start_test() -> Result<()> {
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
     if let Some(g) = @{ name|upper }@_CTRL.get() {
         g.start_test().await?;
     }
@@ -46,7 +46,7 @@ pub(crate) async fn start_test() -> Result<()> {
 #[rustfmt::skip]
 pub(crate) async fn check() -> Result<()> {
     for shard_id in DbConn::shard_num_range() {
-        @%- for (name, defs) in groups %@
+        @%- for (name, (_, defs)) in groups %@
         if let Some(g) = @{ name|upper }@_CTRL.get() {
             g.check(shard_id).await?;
         }
@@ -120,7 +120,7 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
         .await?;
     Ok(())
 }
-@% for (name, defs) in groups %@
+@% for (name, (_, defs)) in groups %@
 pub(crate) use crate::_base::models::@{ name|upper }@_CTRL;
 pub fn set_@{ name|snake }@(tr: Box<dyn Controller + Send + Sync>) {
     let _ = @{ name|upper }@_CTRL.set(tr);

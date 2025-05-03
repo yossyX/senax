@@ -39,7 +39,7 @@ pub mod @{ name|to_var_name }@;
 
 #[rustfmt::skip]
 pub(crate) async fn start(db_dir: Option<&Path>) -> Result<()> {
-@%- for (name, def) in models %@
+@%- for (name, (_, def)) in models %@
     _base::_@{ def.mod_name() }@::init().await?;
 @%- endfor %@
 
@@ -51,7 +51,7 @@ pub(crate) async fn start(db_dir: Option<&Path>) -> Result<()> {
                 let db = sled::open(&path);
                 match db {
                     Ok(db) => {
-                        @%- for (name, def) in models %@
+                        @%- for (name, (_, def)) in models %@
                         _base::_@{ def.mod_name() }@::init_db(&db).await.unwrap();
                         @%- endfor %@
                         break;
@@ -66,7 +66,7 @@ pub(crate) async fn start(db_dir: Option<&Path>) -> Result<()> {
 }
 
 pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
-    @%- for (name, def) in models %@
+    @%- for (name, (_, def)) in models %@
     @%- if !def.skip_ddl.unwrap_or_default() %@
     _base::_@{ def.mod_name() }@::check(shard_id).await?;
     @%- endif %@
@@ -77,14 +77,16 @@ pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
 #[rustfmt::skip]
 #[cfg(not(feature="cache_update_only"))]
 impl super::GroupCacheOpTr for CacheOp {
+    #[allow(unreachable_patterns)]
     async fn handle_cache_msg(self, _sync_map: Arc<FxHashMap<ShardId, u64>>) {
         @%- if !config.force_disable_cache %@
         use super::CacheOpTr as _;
 
         match self {
-@%- for (name, def) in models %@
+@%- for (name, (_, def)) in models %@
             CacheOp::@{ name|to_pascal_name }@(msg) => msg.handle_cache_msg(_sync_map).await,
 @%- endfor %@
+            _ => {},
         };
         @%- endif %@
     }
@@ -94,7 +96,7 @@ impl super::GroupCacheOpTr for CacheOp {
 #[rustfmt::skip]
 pub(crate) async fn _clear_cache(_shard_id: ShardId, _sync: u64, _clear_test: bool) {
 @%- if !config.force_disable_cache %@
-@%- for (name, def) in models %@
+@%- for (name, (_, def)) in models %@
     _base::_@{ def.mod_name() }@::__clear_cache(_shard_id, _sync, _clear_test).await;
 @%- endfor %@
 @%- endif %@
@@ -108,7 +110,7 @@ pub(crate) async fn seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Resu
         for (name, value) in mapping {
             match name.as_str() {
                 // TODO メイングループのみ
-@%- for (name, def) in models %@
+@%- for (name, (_, def)) in models %@
                 Some("@{ name }@") => _base::_@{ def.mod_name() }@::_seed(value, conns).await?,
 @%- endfor %@
                 _ => {}

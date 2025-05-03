@@ -132,7 +132,8 @@ pub fn generate(server_path: &Path, db: &str, group: &Option<String>) -> Result<
     crate::schema::parse(db, true, false)?;
     crate::schema::set_domain_mode(true);
 
-    let groups = GROUPS.read().unwrap().as_ref().unwrap().clone();
+    let group_lock = GROUPS.read().unwrap();
+    let groups = group_lock.as_ref().unwrap();
     ensure!(
         server_path.exists() && server_path.is_dir(),
         "The crate path does not exist."
@@ -197,7 +198,7 @@ pub fn generate(server_path: &Path, db: &str, group: &Option<String>) -> Result<
             }
         }
 
-        let group = groups.get(org_group_name).unwrap();
+        let (_, group) = groups.get(org_group_name).unwrap();
         for (k, _) in &api_group_def {
             if !group.contains_key(k) {
                 eprintln!("There is no {} model in the {} group.", k, org_group_name)
@@ -210,9 +211,9 @@ pub fn generate(server_path: &Path, db: &str, group: &Option<String>) -> Result<
         let model_list: Vec<_> = group
             .iter()
             .filter(|(name, _)| api_group_def.contains_key(*name))
-            .filter(|(_, def)| !def.abstract_mode)
+            .filter(|(_, (_, def))| !def.abstract_mode)
             .collect();
-        for (name, def) in &model_list {
+        for (name, (_, def)) in &model_list {
             if api_group_def.get(*name).is_some() {
                 api_models.push(make_model(
                     db,

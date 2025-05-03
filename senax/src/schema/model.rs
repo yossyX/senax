@@ -1672,7 +1672,7 @@ impl ModelDef {
     pub fn relations(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| !v.1.is_type_of_belongs_to_outer_db())
+            .filter(|v| !v.1.is_type_of_belongs_to_outer_db() && v.1.rel_type.is_some())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
@@ -1984,7 +1984,7 @@ impl ModelDef {
         for (_name, rel) in self
             .merged_relations
             .iter()
-            .filter(|v| !v.1.is_type_of_belongs_to_outer_db())
+            .filter(|v| !v.1.is_type_of_belongs_to_outer_db() && v.1.rel_type.is_some())
         {
             let group_name = rel.get_group_name().to_case(Case::Snake);
             let mod_name = rel.get_mod_name();

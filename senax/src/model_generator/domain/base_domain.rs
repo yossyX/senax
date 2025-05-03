@@ -1,4 +1,5 @@
 use crate::filters;
+use crate::schema::GroupsDef;
 use crate::{
     common::fs_write,
     schema::{FieldDef, ModelDef, VALUE_OBJECTS, set_domain_mode, to_id_name},
@@ -181,7 +182,7 @@ pub mod @{ db|snake|to_var_name }@;
 pub fn write_models_db_rs(
     domain_models_dir: &Path,
     db: &str,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    groups: &GroupsDef,
     force: bool,
 ) -> Result<()> {
     let file_path = domain_models_dir.join(format!("{}.rs", &db.to_case(Case::Snake)));
@@ -206,7 +207,7 @@ pub fn write_models_db_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
 pub mod @{ name|snake|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
@@ -214,7 +215,7 @@ pub mod @{ name|snake|to_var_name }@;
         escape = "none"
     )]
     pub struct ModTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = ModTemplate { groups }.render()?;

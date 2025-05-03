@@ -27,10 +27,11 @@ pub async fn generate(
 ) -> Result<()> {
     schema::parse(db, false, false)?;
     let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
-    let groups = GROUPS.read().unwrap().as_ref().unwrap().clone();
+    let group_lock = GROUPS.read().unwrap();
+    let groups = group_lock.as_ref().unwrap();
     let mut new_tables = IndexMap::new();
-    for (_group_name, defs) in &groups {
-        for (_model_name, def) in defs {
+    for (_group_name, (_, defs)) in groups {
+        for (_model_name, (_, def)) in defs {
             if def.has_table() {
                 let (table_name, table, _) = make_table_def(def, &config)?;
                 new_tables.insert(table_name, table);

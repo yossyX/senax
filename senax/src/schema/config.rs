@@ -115,9 +115,6 @@ pub struct ConfigDef {
     /// ### ドメイン生成から除外
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub exclude_from_domain: bool,
-    /// ### DB層のモデルの公開範囲をpublicにする
-    #[serde(default, skip_serializing_if = "super::is_false")]
-    pub export_db_layer: bool,
     /// ### 論理名をカラムのSQLコメントとして使用
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_label_as_sql_comment: bool,
@@ -269,9 +266,6 @@ pub struct ConfigJson {
     /// ### ドメイン生成から除外
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub exclude_from_domain: bool,
-    /// ### DB層のモデルの公開範囲をpublicにする
-    #[serde(default, skip_serializing_if = "super::is_false")]
-    pub export_db_layer: bool,
     /// ### 論理名をカラムのSQLコメントとして使用
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_label_as_sql_comment: bool,
@@ -353,7 +347,6 @@ impl From<ConfigDef> for ConfigJson {
             collation: value.collation,
             preserve_column_order: value.preserve_column_order,
             exclude_from_domain: value.exclude_from_domain,
-            export_db_layer: value.export_db_layer,
             use_label_as_sql_comment: value.use_label_as_sql_comment,
             rename_created_at: value.rename_created_at,
             label_of_created_at: value.label_of_created_at,
@@ -419,7 +412,6 @@ impl From<ConfigJson> for ConfigDef {
             collation: value.collation,
             preserve_column_order: value.preserve_column_order,
             exclude_from_domain: value.exclude_from_domain,
-            export_db_layer: value.export_db_layer,
             use_label_as_sql_comment: value.use_label_as_sql_comment,
             rename_created_at: value.rename_created_at,
             label_of_created_at: value.label_of_created_at,
@@ -520,10 +512,11 @@ impl ConfigDef {
     }
     pub fn outer_db(&self) -> HashSet<String> {
         let mut v = HashSet::new();
-        let groups = super::GROUPS.read().unwrap().as_ref().unwrap().clone();
+        let group_lock = super::GROUPS.read().unwrap();
+        let groups = group_lock.as_ref().unwrap();
         for (_, models) in groups {
-            for (_, model) in models {
-                for (_, belongs) in &model.belongs_to_outer_db() {
+            for (_, model) in &models.1 {
+                for (_, belongs) in &model.1.belongs_to_outer_db() {
                     v.insert(belongs.db().to_string());
                 }
             }

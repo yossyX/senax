@@ -11,13 +11,13 @@ use std::sync::Arc;
 
 use crate::common::fs_write;
 use crate::filters;
-use crate::schema::{ConfigDef, ModelDef, set_domain_mode, to_id_name};
+use crate::schema::{set_domain_mode, to_id_name, ConfigDef, GroupsDef, ModelDef};
 
 pub fn write_impl_domain_rs(
     src_dir: &Path,
     db: &str,
     group_name: &str,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    groups: &GroupsDef,
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
@@ -47,7 +47,7 @@ pub fn write_impl_domain_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
 pub mod @{ name|snake|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
@@ -55,7 +55,7 @@ pub mod @{ name|snake|to_var_name }@;
         escape = "none"
     )]
     struct ModTemplate<'a> {
-        groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        groups: &'a GroupsDef,
     }
 
     let tpl = ModTemplate { groups }.render()?;
@@ -81,7 +81,7 @@ pub mod @{ name|snake|to_var_name }@;
         escape = "none"
     )]
     struct RepoTemplate<'a> {
-        groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        groups: &'a GroupsDef,
     }
 
     let tpl = RepoTemplate { groups }.render()?;
@@ -107,7 +107,7 @@ pub mod @{ name|snake|to_var_name }@;
         escape = "none"
     )]
     struct QueryServiceTemplate<'a> {
-        groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        groups: &'a GroupsDef,
     }
 
     let tpl = QueryServiceTemplate { groups }.render()?;

@@ -8,9 +8,10 @@ use std::collections::{BTreeSet, HashSet};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 
 use crate::filters;
-use crate::schema::{ConfigDef, StringOrArray, Timestampable};
+use crate::schema::{ConfigDef, GroupDef, GroupsDef, StringOrArray, Timestampable};
 use crate::{BASE_DOMAIN_PATH, DOMAIN_REPOSITORIES_PATH};
 use crate::{
     DB_PATH, DOMAIN_PATH,
@@ -30,7 +31,8 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
 
     let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
     let exclude_from_domain = config.exclude_from_domain;
-    let groups = GROUPS.read().unwrap().as_ref().unwrap().clone();
+    let group_lock = GROUPS.read().unwrap();
+    let groups = group_lock.as_ref().unwrap();
     let model_dir = Path::new(DB_PATH).join(db.to_case(Case::Snake));
     let db_repositories_dir = model_dir.join("repositories");
     let domain_src_dir = Path::new(DOMAIN_PATH).join("src");
@@ -90,7 +92,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     #[derive(Template)]
     #[template(path = "model/src/models.rs", escape = "none")]
     struct ModelsTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
         pub config: &'a ConfigDef,
     }
 
@@ -127,14 +129,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         domain::repositories::write_cargo_toml(&domain_repositories_dir, db, &groups, force)?;
     }
 
-    db::base::write_files(
-        &base_dir,
-        db,
-        &groups,
-        &config,
-        force,
-        non_snake_case,
-    )?;
+    db::base::write_files(&base_dir, db, &groups, &config, force, non_snake_case)?;
 
     let file_path = model_src_dir.join("main.rs");
     if force || !file_path.exists() {
@@ -151,7 +146,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     #[derive(Template)]
     #[template(path = "model/src/seeder.rs", escape = "none")]
     struct SeederTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let file_path = model_src_dir.join("seeder.rs");
@@ -207,26 +202,48 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         }
     }
 
-    for (group_name, defs) in &groups {
-        let mod_names: BTreeSet<String> = defs.iter().map(|(_, d)| d.mod_name()).collect();
+    for (group_name, (_, defs)) in groups {
+        begin_traverse(&group_name);
+        let repo_include_groups: GroupsDef = groups
+            .iter()
+            .filter(|(_, (f, _))| f.load(std::sync::atomic::Ordering::Relaxed) == REL_LOOP)
+            .map(|(n, (_, v))| {
+                let v2: IndexMap<String, (AtomicUsize, Arc<ModelDef>)> = v
+                    .iter()
+                    .filter(|(n, (f, v))| f.load(std::sync::atomic::Ordering::Relaxed) > 0)
+                    .map(|(n, (_, v))| (n.to_string(), (AtomicUsize::new(0), v.clone())))
+                    .collect();
+                (n.to_string(), (AtomicUsize::new(0), v2))
+            })
+            .collect();
+        let ref_groups: Vec<_> = groups
+            .iter()
+            .filter(|(_, (f, _))| f.load(std::sync::atomic::Ordering::Relaxed) == REL_USE)
+            .map(|(n, _)| n.to_string())
+            .collect();
+
+        let mod_names: BTreeSet<String> = defs.iter().map(|(_, (_, d))| d.mod_name()).collect();
         let entities_mod_names: BTreeSet<(String, &String)> = defs
             .iter()
-            .filter(|(_, d)| !d.abstract_mode)
-            .map(|(model_name, def)| (def.mod_name(), model_name))
+            .filter(|(_, (_, d))| !d.abstract_mode)
+            .map(|(model_name, (_, def))| (def.mod_name(), model_name))
             .collect();
 
         let model_group_dir = model_models_dir.join(group_name.to_case(Case::Snake));
         let model_group_base_dir = model_group_dir.join("_base");
         let file_path = model_models_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
         remove_files.remove(file_path.as_os_str());
-        let concrete_models = defs.iter().filter(|(_k, v)| !v.abstract_mode).collect();
+        let concrete_models = defs
+            .iter()
+            .filter(|(_k, (_, v))| !v.abstract_mode)
+            .collect();
 
         #[derive(Template)]
         #[template(path = "model/base/src/group.rs", escape = "none")]
         struct GroupTemplate<'a> {
             pub group_name: &'a str,
             pub mod_names: &'a BTreeSet<String>,
-            pub models: IndexMap<&'a String, &'a Arc<ModelDef>>,
+            pub models: IndexMap<&'a String, &'a (AtomicUsize, Arc<ModelDef>)>,
             pub config: &'a ConfigDef,
         }
 
@@ -242,7 +259,8 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             &db_repositories_dir,
             db,
             group_name,
-            &groups,
+            &repo_include_groups,
+            &ref_groups,
             &config,
             force,
             clean,
@@ -263,7 +281,8 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 &domain_repositories_dir,
                 db,
                 group_name,
-                &groups,
+                &repo_include_groups,
+                &ref_groups,
                 force,
                 &mut remove_files,
             )?;
@@ -276,13 +295,8 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 &mut remove_files,
             )?;
         }
-        let visibility = if config.export_db_layer {
-            ""
-        } else {
-            "(crate)"
-        };
 
-        for (model_name, def) in defs {
+        for (model_name, (_, def)) in defs {
             let table_name = def.table_name();
             let mod_name = def.mod_name();
             let mod_name = &mod_name;
@@ -300,7 +314,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         pub pascal_name: &'a str,
                         pub def: &'a Arc<ModelDef>,
                         pub config: &'a ConfigDef,
-                        pub visibility: &'a str,
                     }
 
                     let tpl = GroupAbstractTemplate {
@@ -311,7 +324,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         pascal_name: &model_name.to_case(Case::Pascal),
                         def,
                         config: &config,
-                        visibility,
                     };
                     fs_write(file_path, tpl.render()?)?;
                 }
@@ -331,7 +343,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     pub table_name: &'a str,
                     pub def: &'a Arc<ModelDef>,
                     pub config: &'a ConfigDef,
-                    pub visibility: &'a str,
                 }
 
                 let tpl = GroupBaseAbstractTemplate {
@@ -344,7 +355,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     table_name: &table_name,
                     def,
                     config: &config,
-                    visibility,
                 };
                 fs_write(file_path, tpl.render()?)?;
 
@@ -375,7 +385,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         pub id_name: &'a str,
                         pub def: &'a Arc<ModelDef>,
                         pub config: &'a ConfigDef,
-                        pub visibility: &'a str,
                     }
 
                     let tpl = GroupTableTemplate {
@@ -387,7 +396,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         id_name: &to_id_name(model_name),
                         def,
                         config: &config,
-                        visibility,
                     };
                     fs_write(file_path, tpl.render()?)?;
                 }
@@ -433,7 +441,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     pub force_indexes: Vec<(String, String)>,
                     pub config: &'a ConfigDef,
                     pub version_col: CompactString,
-                    pub visibility: &'a str,
                 }
 
                 let tpl = GroupBaseTableTemplate {
@@ -448,7 +455,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     force_indexes,
                     config: &config,
                     version_col: schema::ConfigDef::version(),
-                    visibility,
                 };
                 fs_write(file_path, tpl.render()?)?;
 
@@ -515,4 +521,82 @@ pub fn check_version(db: &str) -> Result<()> {
         ensure!(req.matches(&version), "Use {} version of Senax.", ver);
     }
     Ok(())
+}
+
+pub const REL_USE: usize = 1;
+pub const REL_LOOP: usize = 2;
+
+fn reset_rel_flags() {
+    // println!("reset_rel_flags");
+    let group_lock = GROUPS.read().unwrap();
+    let groups = group_lock.as_ref().unwrap();
+    for (_, (f, models)) in groups {
+        f.store(0, std::sync::atomic::Ordering::Relaxed);
+        for (_, (f, _)) in models {
+            f.store(0, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+}
+
+fn begin_traverse(target_group: &str) {
+    reset_rel_flags();
+    // println!("begin_traverse: {}", target_group);
+    let group_lock = GROUPS.read().unwrap();
+    let groups = group_lock.as_ref().unwrap();
+    for (group, (group_flag, models)) in groups {
+        if group == target_group {
+            group_flag.store(REL_LOOP, std::sync::atomic::Ordering::Relaxed);
+            for (_, (model_flag, _)) in models {
+                model_flag.store(REL_USE, std::sync::atomic::Ordering::Relaxed);
+            }
+            for (_, (_, def)) in models {
+                for r in &def.merged_relations {
+                    let g = r.1.get_group_name();
+                    let m = r.1.get_foreign_model_name();
+                    if !r.1.is_type_of_belongs_to_outer_db() && !g.eq(group) {
+                        traverse_rel_flags(&g, &m);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn traverse_rel_flags(target_group: &str, target_model: &str) -> usize {
+    let group_lock = GROUPS.read().unwrap();
+    let groups = group_lock.as_ref().unwrap();
+    let mut ret = REL_USE;
+    for (group, (group_flag, models)) in groups {
+        if group == target_group {
+            let flag = group_flag.load(std::sync::atomic::Ordering::Relaxed);
+            if flag == 0 {
+                // println!("set group USE: {}", target_group);
+                group_flag.store(REL_USE, std::sync::atomic::Ordering::Relaxed);
+            }
+            if flag == REL_LOOP {
+                ret = REL_LOOP;
+            }
+            for (model, (model_flag, def)) in models {
+                if model == target_model {
+                    if model_flag.load(std::sync::atomic::Ordering::Relaxed) != 0 {
+                        return ret;
+                    }
+                    // println!("set model USE: {}", target_model);
+                    model_flag.store(REL_USE, std::sync::atomic::Ordering::Relaxed);
+                    for r in &def.merged_relations {
+                        let g = r.1.get_group_name();
+                        let m = r.1.get_foreign_model_name();
+                        if !r.1.is_type_of_belongs_to_outer_db() {
+                            if traverse_rel_flags(&g, &m) == REL_LOOP {
+                                // println!("set group LOOP: {}", target_group);
+                                group_flag.store(REL_LOOP, std::sync::atomic::Ordering::Relaxed);
+                                ret = REL_LOOP;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    ret
 }

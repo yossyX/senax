@@ -18,6 +18,7 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tera::Filter;
 use tera::{Context, Tera};
@@ -75,7 +76,8 @@ pub fn generate(
     schema::parse(db, false, false)?;
 
     let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
-    let groups = GROUPS.read().unwrap().as_ref().unwrap().clone();
+    let group_lock = GROUPS.read().unwrap();
+    let groups = group_lock.as_ref().unwrap();
     let locale = env::var("LC_ALL").unwrap_or_else(|_| {
         env::var("LC_TIME").unwrap_or_else(|_| env::var("LANG").unwrap_or_default())
     });
@@ -151,8 +153,8 @@ pub fn generate(
                 .context("The specified group was not found.")?
                 .clone()
                 .unwrap_or_default(),
-            models: models.map(|i| {
-                i.iter().fold(IndexMap::new(), |mut acc, (k, v)| {
+            models: models.map(|(_, i)| {
+                i.iter().fold(IndexMap::new(), |mut acc, (k, (_, v))| {
                     if v.has_table() {
                         acc.insert(k, v.into());
                     }
@@ -168,8 +170,8 @@ pub fn generate(
             group_list.push(Group {
                 group_name,
                 group_def: group_def.clone().unwrap_or_default(),
-                models: models.map(|i| {
-                    i.iter().fold(IndexMap::new(), |mut acc, (k, v)| {
+                models: models.map(|(_, i)| {
+                    i.iter().fold(IndexMap::new(), |mut acc, (k, (_, v))| {
                         if v.has_table() {
                             acc.insert(k, v.into());
                         }
@@ -318,11 +320,11 @@ impl Filter for UpperSnake {
 
 fn gen_er(
     group_name: &str,
-    models: &Option<&IndexMap<String, Arc<ModelDef>>>,
+    models: &Option<&(AtomicUsize, IndexMap<String, (AtomicUsize, Arc<ModelDef>)>)>,
     use_er: bool,
 ) -> Result<Option<String>> {
     let models = match models {
-        Some(v) if !v.is_empty() && use_er => v,
+        Some((_, v)) if !v.is_empty() && use_er => v,
         _ => {
             return Ok(None);
         }
@@ -330,7 +332,7 @@ fn gen_er(
     let mut target_models: IndexMap<String, Model> = IndexMap::new();
     let mut another_models: IndexMap<String, AnotherModel> = IndexMap::new();
     let mut relations: IndexMap<String, Relation> = IndexMap::new();
-    for (model_name, model) in models.iter() {
+    for (model_name, (_, model)) in models.iter() {
         if !model.has_table() {
             continue;
         }

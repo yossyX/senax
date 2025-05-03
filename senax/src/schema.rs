@@ -10,7 +10,7 @@ use serde_yaml::Value;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, RwLock};
 
 pub mod column;
@@ -38,10 +38,11 @@ static DELETED: RwLock<CompactString> = RwLock::new(CompactString::const_new("")
 static AGGREGATION_TYPE: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
 static VERSION: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
 
+pub type GroupsDef =
+    IndexMap<String, (AtomicUsize, IndexMap<String, (AtomicUsize, Arc<ModelDef>)>)>;
+
 pub static CONFIG: RwLock<Option<ConfigDef>> = RwLock::new(None);
-#[allow(clippy::type_complexity)]
-pub static GROUPS: RwLock<Option<IndexMap<String, IndexMap<String, Arc<ModelDef>>>>> =
-    RwLock::new(None);
+pub static GROUPS: RwLock<Option<GroupsDef>> = RwLock::new(None);
 pub static VALUE_OBJECTS: RwLock<Option<HashMap<String, FieldDef>>> = RwLock::new(None);
 pub static DOMAIN_MODE: AtomicBool = AtomicBool::new(false);
 
@@ -612,6 +613,24 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
         for (cur_model_name, def) in defs.iter() {
             let model = def.borrow();
             for (rel_name, rel_def) in model.merged_relations.iter() {
+                if rel_def.is_type_of_belongs_to() {
+                    if !model.full_name().eq(&rel_def.model) {
+                        let mut rel_model =
+                            get_model(&rel_def.model, cur_group_name, &groups).borrow_mut();
+                        let m_name = format!("{}::{}", cur_group_name, cur_model_name);
+                        if rel_def.on_delete.is_some() && !rel_model
+                            .merged_relations
+                            .iter()
+                            .any(|(__, v)| v.model == m_name)
+                        {
+                            let mut r = RelDef::default();
+                            r.model = m_name;
+                            rel_model
+                                .merged_relations
+                                .insert(format!("_{}_{}_", cur_group_name, cur_model_name), r);
+                        }
+                    }
+                }
                 if rel_def.is_type_of_has() {
                     let foreign_ids = rel_def.get_foreign_id(&model);
                     if model.full_name().eq(&rel_def.model) {
@@ -644,29 +663,28 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
             }
         }
     }
-    let groups: IndexMap<String, IndexMap<String, Arc<ModelDef>>> =
-        groups.into_iter().fold(IndexMap::new(), |mut map, (k, v)| {
-            let v = v.into_iter().fold(IndexMap::new(), |mut map, (k, v)| {
-                let mut model = v.into_inner();
-                let non_primaries: Vec<String> = model
-                    .merged_fields
-                    .iter()
-                    .filter(|(_k, v)| !v.primary && !v.auto_gen)
-                    .map(|(k, _v)| k.clone())
-                    .collect();
-                // Move auto-generated fields to the top.
-                for name in non_primaries {
-                    model.merged_fields.move_index(
-                        model.merged_fields.get_index_of(&name).unwrap(),
-                        model.merged_fields.len() - 1,
-                    );
-                }
-                map.insert(k, Arc::new(model));
-                map
-            });
-            map.insert(k, v);
+    let groups: GroupsDef = groups.into_iter().fold(IndexMap::new(), |mut map, (k, v)| {
+        let v = v.into_iter().fold(IndexMap::new(), |mut map, (k, v)| {
+            let mut model = v.into_inner();
+            let non_primaries: Vec<String> = model
+                .merged_fields
+                .iter()
+                .filter(|(_k, v)| !v.primary && !v.auto_gen)
+                .map(|(k, _v)| k.clone())
+                .collect();
+            // Move auto-generated fields to the top.
+            for name in non_primaries {
+                model.merged_fields.move_index(
+                    model.merged_fields.get_index_of(&name).unwrap(),
+                    model.merged_fields.len() - 1,
+                );
+            }
+            map.insert(k, (AtomicUsize::new(0), Arc::new(model)));
             map
         });
+        map.insert(k, (AtomicUsize::new(0), v));
+        map
+    });
     CONFIG.write().unwrap().replace(config);
     GROUPS.write().unwrap().replace(groups);
     Ok(())

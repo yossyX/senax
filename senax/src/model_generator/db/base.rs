@@ -9,12 +9,12 @@ use std::sync::Arc;
 
 use crate::common::fs_write;
 use crate::filters;
-use crate::schema::{ConfigDef, ModelDef};
+use crate::schema::{ConfigDef, GroupsDef, ModelDef};
 
 pub fn write_files(
     base_dir: &Path,
     db: &str,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    groups: &GroupsDef,
     config: &ConfigDef,
     force: bool,
     non_snake_case: bool,
@@ -89,7 +89,7 @@ pub fn write_files(
     struct ConnectionTemplate<'a> {
         pub db: &'a str,
         pub config: &'a ConfigDef,
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
         pub tx_isolation: Option<&'a str>,
         pub read_tx_isolation: Option<&'a str>,
     }
@@ -109,14 +109,14 @@ pub fn write_files(
     #[derive(Template)]
     #[template(path = "model/base/src/models.rs", escape = "none")]
     struct ModelsTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
         pub config: &'a ConfigDef,
         pub table_names: BTreeSet<String>,
     }
 
     let mut table_names = BTreeSet::default();
-    for (_, defs) in groups {
-        for (_, def) in defs {
+    for (_, (_, defs)) in groups {
+        for (_, (_, def)) in defs {
             table_names.insert(def.table_name());
         }
     }
@@ -134,7 +134,7 @@ pub fn write_files(
 
 pub fn write_impl_domain_rs(
     src_dir: &Path,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    groups: &GroupsDef,
     force: bool,
 ) -> Result<()> {
     let file_path = src_dir.join("impl_domain.rs");
@@ -159,7 +159,7 @@ pub fn write_impl_domain_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
 pub mod @{ name|snake|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
@@ -167,7 +167,7 @@ pub mod @{ name|snake|to_var_name }@;
         escape = "none"
     )]
     pub struct ModTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = ModTemplate { groups }.render()?;

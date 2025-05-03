@@ -53,7 +53,8 @@ pub fn generate(
     model_generator::check_version(&db)?;
     crate::schema::parse(&db, true, false)?;
     crate::schema::set_domain_mode(true);
-    let groups = GROUPS.read().unwrap().as_ref().unwrap().clone();
+    let group_lock = GROUPS.read().unwrap();
+    let groups = group_lock.as_ref().unwrap();
 
     let config_path = schema_dir.join("_config.yml");
     let config: ApiConfigDef = parse_yml_file(&config_path)?;
@@ -229,7 +230,7 @@ pub fn generate(
         } else {
             group_route
         };
-        let group = groups
+        let (_, group) = groups
             .get(group_name)
             .unwrap_or_else(|| panic!("The {db} DB does not have {group_name} group."));
         let group_route_mod_name = group_route.to_case(Case::Snake);
@@ -275,18 +276,23 @@ pub fn generate(
             pub db: &'a str,
             pub group_name: &'a str,
         }
-    
+
         let file_path = api_group_dir.join("Cargo.toml");
         remove_files.remove(file_path.as_os_str());
         if force || !file_path.exists() {
-            let content = CargoTemplate { server, db: &db, group_name }.render()?;
+            let content = CargoTemplate {
+                server,
+                db: &db,
+                group_name,
+            }
+            .render()?;
             fs_write(file_path, &*content)?;
         }
 
         #[derive(Template)]
         #[template(path = "api/lib.rs", escape = "none")]
         pub struct LibTemplate;
-    
+
         let file_path = api_group_dir.join("src/lib.rs");
         remove_files.remove(file_path.as_os_str());
         if force || !file_path.exists() {
@@ -299,7 +305,7 @@ pub fn generate(
         } else if inquiry {
             group
                 .iter()
-                .filter(|(_, def)| !def.abstract_mode)
+                .filter(|(_, (_, def))| !def.abstract_mode)
                 .map(|(v, _)| v.clone())
                 .collect()
         } else {
@@ -321,7 +327,7 @@ pub fn generate(
             } else {
                 model_route
             };
-            let def = group.get(model_name).unwrap_or_else(|| {
+            let (_, def) = group.get(model_name).unwrap_or_else(|| {
                 panic!("The {group_name} group does not have {model_name} model.")
             });
 
@@ -416,7 +422,9 @@ fn write_db_file(
     config: &ApiDbDef,
 ) -> Result<()> {
     let camel_case = config.camel_case();
-    let file_path = path.join("auto_api").join(format!("{}.rs", &db_route.to_case(Case::Snake)));
+    let file_path = path
+        .join("auto_api")
+        .join(format!("{}.rs", &db_route.to_case(Case::Snake)));
     let content = if force || !file_path.exists() {
         template::DbTemplate { db, db_route }.render()?
     } else {
@@ -444,7 +452,12 @@ fn write_db_file(
         all.insert(v.clone());
     });
     let all = all.iter().cloned().collect::<Vec<_>>().join(",");
-    let tpl = template::DbModTemplate { server, db_route, all, add_groups };
+    let tpl = template::DbModTemplate {
+        server,
+        db_route,
+        all,
+        add_groups,
+    };
     let content = re.replace(&content, tpl.render()?);
     let tpl = template::DbInitTemplate { db, add_groups };
     let content = content.replace("\n    // Do not modify this line. (DbInit)", &tpl.render()?);

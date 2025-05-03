@@ -55,7 +55,6 @@ strum_macros = "0.27"
 syn = "2.0.48"
 tera = { version = "1.17.0", features = ["date-locale", "preserve_order"] }
 termcolor = "1.2.0"
-thread_local = "1.1.7"
 tokio = { version = "1", features = ["full"] }
 validator = { version = "0.20", features = ["derive", "unic"] }
 webbrowser = "1"

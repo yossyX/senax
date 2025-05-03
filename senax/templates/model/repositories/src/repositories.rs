@@ -7,53 +7,58 @@ use db::DbConn;
 use ::futures::future::BoxFuture;
 use ::fxhash::FxHashMap;
 use ::senax_common::{cache::msec::MSec, ShardId};
-@% for (name, defs) in groups %@
+@% for (name, (_, defs)) in groups %@
 pub mod @{ name|snake|to_var_name }@;
+@%- endfor %@
+@%- for name in ref_groups %@
+pub use db_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|to_var_name }@;
 @%- endfor %@
 
 pub(crate) struct Controller;
 #[async_trait]
 impl db::models::Controller for Controller {
     async fn start(&self, db_dir: &Path) -> Result<()> {
-        @%- for (name, defs) in groups %@
+        @%- for (name, (_, defs)) in groups %@
         @{ name|snake|to_var_name }@::start(Some(db_dir)).await?;
         @%- endfor %@
         Ok(())
     }
     async fn start_test(&self) -> Result<()> {
-        @%- for (name, defs) in groups %@
+        @%- for (name, (_, defs)) in groups %@
         @{ name|snake|to_var_name }@::start(None).await?;
         @%- endfor %@
         Ok(())
     }
     async fn check(&self, shard_id: ShardId) -> Result<()> {
         tokio::try_join!(
-            @%- for (name, defs) in groups %@
+            @%- for (name, (_, defs)) in groups %@
             @{ name|snake|to_var_name }@::check(shard_id),
             @%- endfor %@
         )?;
         Ok(())
     }
     #[cfg(not(feature="cache_update_only"))]
+    #[allow(unreachable_patterns)]
     async fn handle_cache_msg(&self, op: Vec<db::CacheOp>, sync_map: Arc<FxHashMap<ShardId, u64>>) {
         use db::CacheOp;
         for op in op.into_iter() {
             match op {
-                @%- for (name, defs) in groups %@
+                @%- for (name, (_, defs)) in groups %@
                 CacheOp::@{ name|pascal|to_var_name }@(op) => op.handle_cache_msg(Arc::clone(&sync_map)).await,
                 @%- endfor %@
                 CacheOp::_AllClear => _clear_cache(&sync_map, false).await,
+                _ => {},
             };
         }
     }
     #[cfg(not(feature="cache_update_only"))]
     async fn _clear_cache(&self, shard_id: ShardId, sync: u64, clear_test: bool) {
-        @%- for (name, defs) in groups %@
+        @%- for (name, (_, defs)) in groups %@
         @{ name|snake|to_var_name }@::_clear_cache(shard_id, sync, clear_test).await;
         @%- endfor %@
     }
     async fn seed(&self, value: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()> {
-        @%- for (name, defs) in groups %@
+        @%- for (name, (_, defs)) in groups %@
         @{ name|snake|to_var_name }@::seed(value, conns).await?;
         @%- endfor %@
         Ok(())
@@ -67,12 +72,12 @@ pub(crate) async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, clear_test
             let shard_id = *shard_id;
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                @%- for (name, defs) in groups %@
+                @%- for (name, (_, defs)) in groups %@
                 @{ name|snake|to_var_name }@::_clear_cache(shard_id, 0, clear_test).await;
                 @%- endfor %@
             });
         }
-        @%- for (name, defs) in groups %@
+        @%- for (name, (_, defs)) in groups %@
         @{ name|snake|to_var_name }@::_clear_cache(*shard_id, *sync, clear_test).await;
         @%- endfor %@
     }

@@ -16,7 +16,7 @@ pub const USE_FAST_CACHE: bool = @{ config.use_fast_cache() }@;
 pub const USE_STORAGE_CACHE: bool = @{ config.use_storage_cache }@;
 pub static CACHE_UPDATE_LOCK: RwLock<()> = RwLock::const_new(());
 @{-"\n"}@
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
 pub mod @{ name|snake|to_var_name }@;
 @%- endfor %@
 
@@ -50,7 +50,7 @@ pub struct CacheMsg(pub Vec<CacheOp>, pub FxHashMap<ShardId, u64>);
 #[allow(clippy::large_enum_variant)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum CacheOp {
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
     @{ name|to_pascal_name }@(@{ name|snake|to_var_name }@::CacheOp),
 @%- endfor %@
     _AllClear,
@@ -62,7 +62,7 @@ impl CacheMsg {
         let _sync_map = Arc::new(self.1);
         #[cfg(not(feature = "cache_update_only"))]
         {
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
             if let Some(g) = @{ name|upper }@_CTRL.get() {
                 g.handle_cache_msg(self.0.clone(), Arc::clone(&_sync_map)).await;
             }
@@ -109,14 +109,14 @@ pub async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, _clear_test: bool
             let shard_id = *shard_id;
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                @%- for (name, defs) in groups %@
+                @%- for (name, (_, defs)) in groups %@
                 if let Some(g) = @{ name|upper }@_CTRL.get() {
                     g._clear_cache(shard_id, 0, _clear_test).await;
                 }
                 @%- endfor %@
             });
         }
-        @%- for (name, defs) in groups %@
+        @%- for (name, (_, defs)) in groups %@
         if let Some(g) = @{ name|upper }@_CTRL.get() {
             g._clear_cache(*shard_id, *sync, _clear_test).await;
         }
@@ -124,7 +124,7 @@ pub async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, _clear_test: bool
     }
 @%- endif %@
 }
-@% for (name, defs) in groups %@
+@% for (name, (_, defs)) in groups %@
 pub static @{ name|upper }@_CTRL: OnceCell<Box<dyn Controller + Send + Sync>> = OnceCell::new();
 @%- endfor %@
 

@@ -11,12 +11,12 @@ use std::sync::Arc;
 
 use crate::common::fs_write;
 use crate::filters;
-use crate::schema::{ConfigDef, ModelDef, set_domain_mode, to_id_name};
+use crate::schema::{set_domain_mode, to_id_name, ConfigDef, GroupsDef, ModelDef};
 
 pub fn write_impl_domain_rs(
     model_src_dir: &Path,
     db: &str,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    groups: &GroupsDef,
     force: bool,
 ) -> Result<()> {
     let file_path = model_src_dir.join("impl_domain.rs");
@@ -43,7 +43,7 @@ pub fn write_impl_domain_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
 pub use crate::_base::impl_domain::@{ name|snake|to_var_name }@;
 pub static NEW_@{ name|upper }@_REPO: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> Box<dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@Repository> + Send + Sync>> = OnceCell::new();
 pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> Box<dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryService> + Send + Sync>> = OnceCell::new();
@@ -53,7 +53,7 @@ pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> 
         escape = "none"
     )]
     pub struct ModTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = ModTemplate { groups }.render()?;
@@ -71,7 +71,7 @@ pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> 
     #[template(
         source = r###"
     // Do not modify below this line. (RepoStart)
-    @%- for (name, defs) in groups %@
+    @%- for (name, (_, defs)) in groups %@
     get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@Repository, NEW_@{ name|upper }@_REPO, "The @{ name|pascal }@Repository is not configured.");
     @%- endfor %@
     // Do not modify up to this line. (RepoEnd)"###,
@@ -79,7 +79,7 @@ pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> 
         escape = "none"
     )]
     pub struct ImplDomainDbRepoTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = ImplDomainDbRepoTemplate { groups }.render()?;
@@ -97,7 +97,7 @@ pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> 
     #[template(
         source = r###"
     // Do not modify below this line. (QueryServiceStart)
-    @%- for (name, defs) in groups %@
+    @%- for (name, (_, defs)) in groups %@
     get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, NEW_@{ name|upper }@_QS, "The @{ name|pascal }@QueryService is not configured.");
     @%- endfor %@
     // Do not modify up to this line. (QueryServiceEnd)"###,
@@ -105,7 +105,7 @@ pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> 
         escape = "none"
     )]
     pub struct ImplDomainDbQueryServiceTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = ImplDomainDbQueryServiceTemplate { groups }.render()?;

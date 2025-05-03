@@ -1,4 +1,5 @@
 use crate::filters;
+use crate::schema::GroupsDef;
 use crate::{
     common::fs_write,
     schema::{ModelDef, set_domain_mode, to_id_name},
@@ -20,23 +21,41 @@ pub fn write_group_files(
     domain_repositories_dir: &Path,
     db: &str,
     group_name: &str,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    groups: &GroupsDef,
+    ref_groups: &[String],
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
     let base_dir = domain_repositories_dir.join(group_name.to_case(Case::Snake));
     let file_path = base_dir.join("Cargo.toml");
     remove_files.remove(file_path.as_os_str());
-    if force || !file_path.exists() {
+    let mut content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "init/domain/group_repositories/_Cargo.toml", escape = "none")]
         struct Template<'a> {
             db: &'a str,
             group_name: &'a str,
         }
-        let content = Template { db, group_name }.render()?;
-        fs_write(file_path, &*content)?;
+        Template { db, group_name }.render()?
+    } else {
+        fs::read_to_string(&file_path)?
+    };
+    for group in ref_groups {
+        let reg = Regex::new(&format!(r"(?m)^repository_{}_{}\s*=", db, group))?;
+        if !reg.is_match(&content) {
+            let db = &db.to_case(Case::Snake);
+            let group = &group.to_case(Case::Snake);
+            content = content.replace(
+                "[dependencies]",
+                &format!(
+                    "[dependencies]\nrepository_{}_{} = {{ path = \"../{}\" }}",
+                    db, group, group
+                ),
+            );
+        }
     }
+    fs_write(file_path, &*content)?;
+
     let src_dir = base_dir.join("src");
     let file_path = src_dir.join("lib.rs");
     remove_files.remove(file_path.as_os_str());
@@ -68,15 +87,20 @@ pub fn write_group_files(
         #[template(
             source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
 pub mod @{ name|snake|to_var_name }@;
+@%- endfor %@
+@%- for name in ref_groups %@
+pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
             ext = "txt",
             escape = "none"
         )]
         struct ModTemplate<'a> {
-            pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+            pub db: &'a str,
+            pub groups: &'a GroupsDef,
+            pub ref_groups: &'a [String],
         }
 
         let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
@@ -85,7 +109,12 @@ pub mod @{ name|snake|to_var_name }@;
             "File contents are invalid.: {:?}",
             &file_path
         );
-        let tpl = ModTemplate { groups }.render()?;
+        let tpl = ModTemplate {
+            db,
+            groups,
+            ref_groups,
+        }
+        .render()?;
         let tpl = tpl.trim_start();
         let content = re.replace(&content, tpl);
 
@@ -93,7 +122,7 @@ pub mod @{ name|snake|to_var_name }@;
         #[template(
             source = r###"
     // Do not modify below this line. (RepoStart)
-    @%- for (name, defs) in groups %@
+    @%- for (name, (_, defs)) in groups %@
     fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository>;
     @%- endfor %@
     // Do not modify up to this line. (RepoEnd)"###,
@@ -101,7 +130,7 @@ pub mod @{ name|snake|to_var_name }@;
             escape = "none"
         )]
         struct RepoTemplate<'a> {
-            pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+            pub groups: &'a GroupsDef,
         }
 
         let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify up to this line. \(RepoEnd\)").unwrap();
@@ -118,7 +147,7 @@ pub mod @{ name|snake|to_var_name }@;
         #[template(
             source = r###"
     // Do not modify below this line. (QueryServiceStart)
-    @%- for (name, defs) in groups %@
+    @%- for (name, (_, defs)) in groups %@
     fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService>;
     @%- endfor %@
     // Do not modify up to this line. (QueryServiceEnd)"###,
@@ -126,7 +155,7 @@ pub mod @{ name|snake|to_var_name }@;
             escape = "none"
         )]
         struct QueryServiceTemplate<'a> {
-            pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+            pub groups: &'a GroupsDef,
         }
 
         let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceStart\).+// Do not modify up to this line. \(QueryServiceEnd\)").unwrap();
@@ -143,7 +172,7 @@ pub mod @{ name|snake|to_var_name }@;
         #[template(
             source = r###"
     // Do not modify below this line. (EmuRepoStart)
-    @%- for (name, defs) in groups %@
+    @%- for (name, (_, defs)) in groups %@
     get_emu_repo!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@Repository);
     @%- endfor %@
     // Do not modify up to this line. (EmuRepoEnd)"###,
@@ -151,7 +180,7 @@ pub mod @{ name|snake|to_var_name }@;
             escape = "none"
         )]
         struct EmuRepoTemplate<'a> {
-            pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+            pub groups: &'a GroupsDef,
         }
 
         let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuRepoStart\).+// Do not modify up to this line. \(EmuRepoEnd\)").unwrap();
@@ -168,7 +197,7 @@ pub mod @{ name|snake|to_var_name }@;
         #[template(
             source = r###"
     // Do not modify below this line. (EmuQueryServiceStart)
-    @%- for (name, defs) in groups %@
+    @%- for (name, (_, defs)) in groups %@
     get_emu_repo!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@QueryService);
     @%- endfor %@
     // Do not modify up to this line. (EmuQueryServiceEnd)"###,
@@ -176,7 +205,7 @@ pub mod @{ name|snake|to_var_name }@;
             escape = "none"
         )]
         struct EmuQueryServiceTemplate<'a> {
-            pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+            pub groups: &'a GroupsDef,
         }
 
         let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuQueryServiceStart\).+// Do not modify up to this line. \(EmuQueryServiceEnd\)").unwrap();
@@ -193,17 +222,17 @@ pub mod @{ name|snake|to_var_name }@;
 
     let repositories_dir = src_dir.join("repositories");
     let base_group_name = group_name;
-    for (name, defs) in groups {
+    for (name, (_, defs)) in groups {
         let mod_names: BTreeSet<String> = defs
             .iter()
-            .filter(|(_k, v)| !v.abstract_mode)
-            .map(|(_, d)| d.mod_name())
+            .filter(|(_k, (_, v))| !v.abstract_mode)
+            .map(|(_, (_, d))| d.mod_name())
             .collect();
         let mod_names = &mod_names;
         let entities_mod_names: BTreeSet<(String, &String)> = defs
             .iter()
-            .filter(|(_, d)| !d.abstract_mode)
-            .map(|(model_name, def)| (def.mod_name(), model_name))
+            .filter(|(_, (_, d))| !d.abstract_mode)
+            .map(|(model_name, (_, def))| (def.mod_name(), model_name))
             .collect();
         let entities_mod_names = &entities_mod_names;
         let file_path = repositories_dir.join(&format!("{}.rs", name.to_case(Case::Snake)));
@@ -371,7 +400,7 @@ pub mod @{ mod_name|to_var_name }@;
 
             fs_write(file_path, &*content)?;
         }
-        for (model_name, def) in defs {
+        for (model_name, (_, def)) in defs {
             let group_name = name;
             let mod_name = def.mod_name();
             let mod_name = &mod_name;
@@ -396,7 +425,7 @@ pub mod @{ mod_name|to_var_name }@;
 pub fn write_lib_rs(
     domain_repositories_src_dir: &Path,
     db: &str,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    groups: &GroupsDef,
     force: bool,
 ) -> Result<()> {
     let file_path = domain_repositories_src_dir.join("lib.rs");
@@ -410,7 +439,7 @@ pub fn write_lib_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, defs) in groups %@
+@%- for (name, (_, defs)) in groups %@
 pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|to_var_name }@ as @{ name|snake|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
@@ -419,7 +448,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     )]
     pub struct ModTemplate<'a> {
         pub db: &'a str,
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
@@ -443,7 +472,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     #[template(
         source = r###"
     // Do not modify below this line. (RepoStart)
-    @%- for (name, defs) in groups %@
+    @%- for (name, (_, defs)) in groups %@
     fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository>;
     @%- endfor %@
     // Do not modify up to this line. (RepoEnd)"###,
@@ -451,7 +480,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
         escape = "none"
     )]
     pub struct DomainDbRepoTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = DomainDbRepoTemplate { groups }.render()?;
@@ -469,7 +498,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     #[template(
         source = r###"
     // Do not modify below this line. (QueryServiceStart)
-    @%- for (name, defs) in groups %@
+    @%- for (name, (_, defs)) in groups %@
     fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService>;
     @%- endfor %@
     // Do not modify up to this line. (QueryServiceEnd)"###,
@@ -477,7 +506,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
         escape = "none"
     )]
     pub struct QueryServiceDbQueryServiceTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = QueryServiceDbQueryServiceTemplate { groups }.render()?;
@@ -495,7 +524,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     #[template(
         source = r###"
     // Do not modify below this line. (EmuRepoStart)
-    @%- for (name, defs) in groups %@
+    @%- for (name, (_, defs)) in groups %@
     get_emu_group!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@Repository);
     @%- endfor %@
     // Do not modify up to this line. (EmuRepoEnd)"###,
@@ -503,7 +532,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
         escape = "none"
     )]
     pub struct DomainDbEmuRepoTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = DomainDbEmuRepoTemplate { groups }.render()?;
@@ -521,7 +550,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     #[template(
         source = r###"
     // Do not modify below this line. (EmuQueryServiceStart)
-    @%- for (name, defs) in groups %@
+    @%- for (name, (_, defs)) in groups %@
     get_emu_group!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@QueryService);
     @%- endfor %@
     // Do not modify up to this line. (EmuQueryServiceEnd)"###,
@@ -529,7 +558,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
         escape = "none"
     )]
     pub struct DomainDbEmuQueryServiceTemplate<'a> {
-        pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = DomainDbEmuQueryServiceTemplate { groups }.render()?;
@@ -543,7 +572,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
 pub fn write_cargo_toml(
     domain_repositories_dir: &Path,
     db: &str,
-    groups: &IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
+    groups: &GroupsDef,
     force: bool,
 ) -> Result<()> {
     let file_path = domain_repositories_dir.join("Cargo.toml");

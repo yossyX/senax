@@ -88,11 +88,7 @@ static ALL_ROWS_CACHE: OnceCell<Vec<ArcSwapOption<Vec<()>>>> = OnceCell::new();
 static CACHE_RESET_SYNC: OnceCell<Vec<RwLock<u64>>> = OnceCell::new();
 static CACHE_RESET_SYNC_ALL_ROWS: OnceCell<Vec<Mutex<u64>>> = OnceCell::new();
 static BULK_FETCH_QUEUE: OnceCell<Vec<SegQueue<InnerPrimary>>> = OnceCell::new();
-// static PRIMARY_TYPE_ID: u64 = @{ def.get_type_id("PRIMARY_TYPE_ID") }@;
 static COL_KEY_TYPE_ID: u64 = @{ def.get_type_id("COL_KEY_TYPE_ID") }@;
-// static VERSION_TYPE_ID: u64 = @{ def.get_type_id("VERSION_TYPE_ID") }@;
-// static CACHE_SYNC_TYPE_ID: u64 = @{ def.get_type_id("CACHE_SYNC_TYPE_ID") }@;
-// static CACHE_TYPE_ID: u64 = @{ def.get_type_id("CACHE_TYPE_ID") }@;
 @%- if def.act_as_job_queue() %@
 pub static QUEUE_NOTIFIER: tokio::sync::Notify = tokio::sync::Notify::const_new();
 @%- endif %@
@@ -1823,7 +1819,7 @@ impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.
 @%- endfor %@
 
 #[async_trait]
-pub@{ visibility }@ trait _@{ pascal_name }@Joiner {
+pub trait _@{ pascal_name }@Joiner {
     async fn join(&mut self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<()> {
         if let Some(joiner) = joiner {
             @{- def.relations()|fmt_rel_join("
@@ -3577,7 +3573,7 @@ pub use join_@{ fetch_macro_name }@ as join;
 @%- endif %@
 
 #[derive(Debug, Clone, Default)]
-pub@{ visibility }@ struct QueryBuilder {
+pub struct QueryBuilder {
     filter: Option<Filter_>,
     order: Option<Vec<Order_>>,
     raw_order: Option<String>,
@@ -3591,11 +3587,11 @@ pub@{ visibility }@ struct QueryBuilder {
 }
 
 impl QueryBuilder {
-    pub@{ visibility }@ fn filter(mut self, filter: Filter_) -> Self {
+    pub fn filter(mut self, filter: Filter_) -> Self {
         self.filter = Some(filter);
         self
     }
-    pub@{ visibility }@ fn order_by(mut self, order: Vec<Order_>) -> Self {
+    pub fn order_by(mut self, order: Vec<Order_>) -> Self {
         if order.is_empty() {
             self.order = None;
         } else {
@@ -3603,7 +3599,7 @@ impl QueryBuilder {
         }
         self
     }
-    pub@{ visibility }@ fn raw_order_by(mut self, order: &str) -> Self {
+    pub fn raw_order_by(mut self, order: &str) -> Self {
         if order.is_empty() {
             self.raw_order = None;
         } else {
@@ -3611,38 +3607,38 @@ impl QueryBuilder {
         }
         self
     }
-    pub@{ visibility }@ fn limit(mut self, limit: usize) -> Self {
+    pub fn limit(mut self, limit: usize) -> Self {
         self.limit = Some(limit);
         self
     }
-    pub@{ visibility }@ fn offset(mut self, offset: usize) -> Self {
+    pub fn offset(mut self, offset: usize) -> Self {
         self.offset = Some(offset);
         self
     }
-    pub@{ visibility }@ fn skip_locked(mut self) -> Self {
+    pub fn skip_locked(mut self) -> Self {
         self.skip_locked = true;
         self
     }
     @%- if def.is_soft_delete() %@
-    pub@{ visibility }@ fn with_trashed(mut self) -> Self {
+    pub fn with_trashed(mut self) -> Self {
         self.trash_mode = TrashMode::With;
         self
     }
-    pub@{ visibility }@ fn only_trashed(mut self) -> Self {
+    pub fn only_trashed(mut self) -> Self {
         self.trash_mode = TrashMode::Only;
         self
     }
     @%- endif %@
-    pub@{ visibility }@ fn append_raw_query(mut self, query: &str) -> Self {
+    pub fn append_raw_query(mut self, query: &str) -> Self {
         self.raw_query.push_str(query);
         self
     }
     /// bind for raw_query
-    pub@{ visibility }@ fn bind<T: Into<BindValue>>(mut self, value: T) -> Self {
+    pub fn bind<T: Into<BindValue>>(mut self, value: T) -> Self {
         self.bind.push(value.into());
         self
     }
-    pub@{ visibility }@ fn when<F>(self, condition: bool, f: F) -> Self
+    pub fn when<F>(self, condition: bool, f: F) -> Self
     where
         F: FnOnce(Self) -> Self,
     {
@@ -3652,7 +3648,7 @@ impl QueryBuilder {
             self
         }
     }
-    pub@{ visibility }@ fn if_let_some<T, F>(self, value: &Option<T>, f: F) -> Self
+    pub fn if_let_some<T, F>(self, value: &Option<T>, f: F) -> Self
     where
         F: FnOnce(Self, &T) -> Self,
     {
@@ -3841,7 +3837,7 @@ impl QueryBuilder {
     @%- endif %@
     @%- if !def.disable_update() %@
 
-    pub@{ visibility }@ async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
+    pub async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let sql = self._sql(Data::_sql_cols(), !conn.wo_tx(), conn.shard_id(), &filter_digest);
@@ -3868,7 +3864,7 @@ impl QueryBuilder {
     }
     @%- endif %@
 
-    pub@{ visibility }@ async fn select(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@>> {
+    pub async fn select(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@>> {
         let joiner = self.joiner.take();
         let result: Vec<Data> = self._select(conn).await?;
         #[allow(unused_mut)]
@@ -3877,20 +3873,20 @@ impl QueryBuilder {
         Ok(list)
     }
 
-    pub@{ visibility }@ async fn select_one(mut self, conn: &mut DbConn) -> Result<Option<_@{ pascal_name }@>> {
+    pub async fn select_one(mut self, conn: &mut DbConn) -> Result<Option<_@{ pascal_name }@>> {
         self.limit = Some(1);
         let mut list = Self::select(self, conn).await?;
         Ok(list.pop())
     }
 
-    pub@{ visibility }@ async fn select_for<T>(self, conn: &mut DbConn) -> Result<Vec<T>>
+    pub async fn select_for<T>(self, conn: &mut DbConn) -> Result<Vec<T>>
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
     {
         self._select(conn).await
     }
 
-    pub@{ visibility }@ async fn select_one_for<T>(mut self, conn: &mut DbConn) -> Result<Option<T>>
+    pub async fn select_one_for<T>(mut self, conn: &mut DbConn) -> Result<Option<T>>
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
     {
@@ -3911,22 +3907,22 @@ impl QueryBuilder {
     @%- if def.use_cache() %@
 
     #[cfg(feature="cache_update_only")]
-    pub@{ visibility }@ async fn select_from_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
+    pub async fn select_from_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         unimplemented!("cache_update_only feature disables fetching from cache.")
     }
 
     #[cfg(not(feature="cache_update_only"))]
-    pub@{ visibility }@ async fn select_from_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
+    pub async fn select_from_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         self._select_from_cache(conn).await
     }
     @%- endif %@
 
-    pub@{ visibility }@ async fn count(self, conn: &mut DbConn) -> Result<i64> {
+    pub async fn count(self, conn: &mut DbConn) -> Result<i64> {
         let result: Count = self.select_one_for(conn).await?.unwrap_or_default();
         Ok(result.c)
     }
 
-    pub@{ visibility }@ async fn select_stream(self, conn: &mut DbConn) -> Result<impl Stream<Item = _@{ pascal_name }@>> {
+    pub async fn select_stream(self, conn: &mut DbConn) -> Result<impl Stream<Item = _@{ pascal_name }@>> {
         let mut rx: mpsc::Receiver<Data> = self._select_stream(conn).await?;
         Ok(async_stream::stream! {
             while let Some(v) = rx.recv().await {
@@ -3935,7 +3931,7 @@ impl QueryBuilder {
         })
     }
 
-    pub@{ visibility }@ async fn select_stream_for<T>(self, conn: &mut DbConn) -> Result<impl Stream<Item = T>>
+    pub async fn select_stream_for<T>(self, conn: &mut DbConn) -> Result<impl Stream<Item = T>>
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin + 'static,
     {
@@ -3951,7 +3947,7 @@ impl QueryBuilder {
 
     #[allow(unused_mut)]
     #[allow(clippy::if_same_then_else)]
-    pub@{ visibility }@ async fn update(self, conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<u64> {
+    pub async fn update(self, conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<u64> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
@@ -4031,7 +4027,7 @@ impl QueryBuilder {
     @%- if !def.disable_delete() %@
 
     #[allow(unused_mut)]
-    pub@{ visibility }@ async fn delete(self, conn: &mut DbConn) -> Result<u64> {
+    pub async fn delete(self, conn: &mut DbConn) -> Result<u64> {
         @{- def.soft_delete_tpl2("
         self.force_delete(conn).await","
         let mut obj = _{pascal_name}_::updater();
@@ -4048,7 +4044,7 @@ impl QueryBuilder {
 
     #[allow(unused_mut)]
     #[allow(clippy::if_same_then_else)]
-    pub@{ visibility }@ async fn force_delete(self, conn: &mut DbConn) -> Result<u64> {
+    pub async fn force_delete(self, conn: &mut DbConn) -> Result<u64> {
         @%- if def.on_delete_list.is_empty() %@
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
@@ -4156,7 +4152,7 @@ impl QueryBuilder {
 }
 
 #[async_trait]
-pub@{ visibility }@ trait UnionBuilder {
+pub trait UnionBuilder {
     async fn select_union(self, conn: &mut DbConn, order: Option<Vec<Order_>>, limit: Option<usize>, offset: Option<usize>) -> Result<Vec<_@{ pascal_name }@>>;
     async fn select_union_for_update(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>>;
 }
@@ -4433,7 +4429,7 @@ impl _@{ pascal_name }@Cache_ {
 }
 @%- endif %@
 
-pub@{ visibility }@ struct _@{ pascal_name }@_;
+pub struct _@{ pascal_name }@_;
 impl _@{ pascal_name }@_ {
     pub fn updater() -> _@{ pascal_name }@Updater {
         _@{ pascal_name }@Updater {

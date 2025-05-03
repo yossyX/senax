@@ -4392,7 +4392,6 @@ dependencies = [
  "syn 2.0.100",
  "tera",
  "termcolor",
- "thread_local",
  "tokio",
  "tower 0.5.2",
  "tower-http",

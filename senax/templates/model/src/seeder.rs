@@ -19,7 +19,7 @@ include!(concat!(env!("OUT_DIR"), "/seeds.rs"));
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SeedSchema {
-@%- for (name, defs) in groups %@@% if !defs.is_empty() %@
+@%- for (name, (_, defs)) in groups %@@% if !defs.is_empty() %@
     @{ name|to_var_name }@: Option<crate::models::@{ name|snake|to_var_name }@::@{ name|pascal }@>,
 @%- endif %@@% endfor %@
 }
@@ -35,7 +35,7 @@ impl SeedSchema {
         if let Some(mapping) = seeds.as_mapping() {
             for (name, value) in mapping {
                 match name.as_str() {
-                @%- for (name, defs) in groups %@@% if !defs.is_empty() %@
+                @%- for (name, (_, defs)) in groups %@@% if !defs.is_empty() %@
                     Some("@{ name }@") => {
                         crate::models::@{ name|upper }@_CTRL
                             .get()
