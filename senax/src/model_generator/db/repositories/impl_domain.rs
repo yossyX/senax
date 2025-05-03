@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use crate::common::fs_write;
 use crate::filters;
-use crate::schema::{set_domain_mode, to_id_name, ConfigDef, GroupsDef, ModelDef};
+use crate::schema::{ConfigDef, GroupsDef, ModelDef, set_domain_mode, to_id_name};
 
 pub fn write_impl_domain_rs(
     src_dir: &Path,
@@ -25,7 +25,7 @@ pub fn write_impl_domain_rs(
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/repositories/src/impl_domain.rs", escape = "none")]
+        #[template(path = "db/repositories/src/impl_domain.rs", escape = "none")]
         struct ImplDomainDbTemplate<'a> {
             db: &'a str,
             group_name: &'a str,
@@ -131,7 +131,7 @@ pub fn write_group_rs(
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/repositories/src/impl_domain/group.rs", escape = "none")]
+        #[template(path = "db/repositories/src/impl_domain/group.rs", escape = "none")]
         struct GroupTemplate<'a> {
             db: &'a str,
             base_group_name: &'a str,
@@ -267,7 +267,7 @@ pub fn write_entity(
     if force || !file_path.exists() {
         #[derive(Template)]
         #[template(
-            path = "model/repositories/src/impl_domain/entities/entity.rs",
+            path = "db/repositories/src/impl_domain/entities/entity.rs",
             escape = "none"
         )]
         struct EntityTemplate<'a> {
@@ -297,7 +297,7 @@ pub fn write_entity(
 
     #[derive(Template)]
     #[template(
-        path = "model/repositories/src/impl_domain/entities/base/_entity.rs",
+        path = "db/repositories/src/impl_domain/entities/base/_entity.rs",
         escape = "none"
     )]
     struct BaseEntityTemplate<'a> {

@@ -845,7 +845,8 @@ fn get_model(group_name: &str, stem_name: &str) -> Arc<ModelDef> {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .1.get(stem_name)
+        .1
+        .get(stem_name)
     {
         return model.1.clone();
     }
@@ -857,9 +858,11 @@ fn get_model(group_name: &str, stem_name: &str) -> Arc<ModelDef> {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .1.get(&singular_name)
+        .1
+        .get(&singular_name)
         .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name))
-        .1.clone()
+        .1
+        .clone()
 }
 
 fn get_model_name(group_name: &str, stem_name: &str) -> String {
@@ -870,7 +873,8 @@ fn get_model_name(group_name: &str, stem_name: &str) -> String {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .1.get(stem_name)
+        .1
+        .get(stem_name)
     {
         return model.1.name.clone();
     }
@@ -881,7 +885,8 @@ fn get_model_name(group_name: &str, stem_name: &str) -> String {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .1.get(&singular_name)
+        .1
+        .get(&singular_name)
         .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name));
     model.1.name.clone()
 }

@@ -22,7 +22,7 @@ pub fn write_files(
     let file_path = base_dir.join("Cargo.toml");
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/base/_Cargo.toml", escape = "none")]
+        #[template(path = "db/base/_Cargo.toml", escape = "none")]
         struct CargoTemplate<'a> {
             pub db: &'a str,
             pub config: &'a ConfigDef,
@@ -39,7 +39,7 @@ pub fn write_files(
     let file_path = src_dir.join("lib.rs");
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/base/src/lib.rs", escape = "none")]
+        #[template(path = "db/base/src/lib.rs", escape = "none")]
         struct LibTemplate<'a> {
             pub db: &'a str,
             pub config: &'a ConfigDef,
@@ -55,7 +55,7 @@ pub fn write_files(
     }
 
     #[derive(Template)]
-    #[template(path = "model/base/src/accessor.rs", escape = "none")]
+    #[template(path = "db/base/src/accessor.rs", escape = "none")]
     struct AccessorTemplate {}
 
     let file_path = src_dir.join("accessor.rs");
@@ -63,7 +63,7 @@ pub fn write_files(
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "model/base/src/cache.rs", escape = "none")]
+    #[template(path = "db/base/src/cache.rs", escape = "none")]
     struct CacheTemplate {}
 
     let file_path = src_dir.join("cache.rs");
@@ -75,7 +75,7 @@ pub fn write_files(
     }
 
     #[derive(Template)]
-    #[template(path = "model/base/src/misc.rs", escape = "none")]
+    #[template(path = "db/base/src/misc.rs", escape = "none")]
     struct MiscTemplate<'a> {
         pub config: &'a ConfigDef,
     }
@@ -85,7 +85,7 @@ pub fn write_files(
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "model/base/src/connection.rs", escape = "none")]
+    #[template(path = "db/base/src/connection.rs", escape = "none")]
     struct ConnectionTemplate<'a> {
         pub db: &'a str,
         pub config: &'a ConfigDef,
@@ -107,7 +107,7 @@ pub fn write_files(
     let file_path = src_dir.join("models.rs");
 
     #[derive(Template)]
-    #[template(path = "model/base/src/models.rs", escape = "none")]
+    #[template(path = "db/base/src/models.rs", escape = "none")]
     struct ModelsTemplate<'a> {
         pub groups: &'a GroupsDef,
         pub config: &'a ConfigDef,
@@ -132,15 +132,11 @@ pub fn write_files(
     Ok(())
 }
 
-pub fn write_impl_domain_rs(
-    src_dir: &Path,
-    groups: &GroupsDef,
-    force: bool,
-) -> Result<()> {
+pub fn write_impl_domain_rs(src_dir: &Path, groups: &GroupsDef, force: bool) -> Result<()> {
     let file_path = src_dir.join("impl_domain.rs");
     let content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/base/src/impl_domain.rs", escape = "none")]
+        #[template(path = "db/base/src/impl_domain.rs", escape = "none")]
         pub struct ImplDomainDbTemplate;
 
         ImplDomainDbTemplate.render()?

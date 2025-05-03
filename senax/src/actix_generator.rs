@@ -488,9 +488,7 @@ pub fn write_base_files(
 
     let file_path = src_path.join("lib.rs");
     if force || !file_path.exists() {
-        let tpl = LibTemplate {
-            non_snake_case,
-        };
+        let tpl = LibTemplate { non_snake_case };
         fs_write(file_path, tpl.render()?)?;
     }
 

@@ -43,7 +43,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let file_path = model_dir.join("Cargo.toml");
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/_Cargo.toml", escape = "none")]
+        #[template(path = "db/_Cargo.toml", escape = "none")]
         struct CargoTemplate<'a> {
             pub db: &'a str,
             pub config: &'a ConfigDef,
@@ -59,7 +59,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let file_path = model_dir.join("build.rs");
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/build.rs", escape = "none")]
+        #[template(path = "db/build.rs", escape = "none")]
         struct BuildTemplate {}
 
         let tpl = BuildTemplate {};
@@ -72,7 +72,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let file_path = model_src_dir.join("lib.rs");
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/src/lib.rs", escape = "none")]
+        #[template(path = "db/src/lib.rs", escape = "none")]
         struct LibTemplate<'a> {
             pub db: &'a str,
             pub config: &'a ConfigDef,
@@ -90,7 +90,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let file_path = model_src_dir.join("models.rs");
 
     #[derive(Template)]
-    #[template(path = "model/src/models.rs", escape = "none")]
+    #[template(path = "db/src/models.rs", escape = "none")]
     struct ModelsTemplate<'a> {
         pub groups: &'a GroupsDef,
         pub config: &'a ConfigDef,
@@ -134,7 +134,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let file_path = model_src_dir.join("main.rs");
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "model/src/main.rs", escape = "none")]
+        #[template(path = "db/src/main.rs", escape = "none")]
         struct MainTemplate<'a> {
             pub db: &'a str,
         }
@@ -144,7 +144,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     }
 
     #[derive(Template)]
-    #[template(path = "model/src/seeder.rs", escape = "none")]
+    #[template(path = "db/src/seeder.rs", escape = "none")]
     struct SeederTemplate<'a> {
         pub groups: &'a GroupsDef,
     }
@@ -239,7 +239,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             .collect();
 
         #[derive(Template)]
-        #[template(path = "model/base/src/group.rs", escape = "none")]
+        #[template(path = "db/base/src/group.rs", escape = "none")]
         struct GroupTemplate<'a> {
             pub group_name: &'a str,
             pub mod_names: &'a BTreeSet<String>,
@@ -305,7 +305,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 remove_files.remove(file_path.as_os_str());
                 if force || !file_path.exists() {
                     #[derive(Template)]
-                    #[template(path = "model/base/src/group/abstract.rs", escape = "none")]
+                    #[template(path = "db/base/src/group/abstract.rs", escape = "none")]
                     struct GroupAbstractTemplate<'a> {
                         pub db: &'a str,
                         pub group_name: &'a str,
@@ -332,7 +332,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 remove_files.remove(file_path.as_os_str());
 
                 #[derive(Template)]
-                #[template(path = "model/base/src/group/base/_abstract.rs", escape = "none")]
+                #[template(path = "db/base/src/group/base/_abstract.rs", escape = "none")]
                 struct GroupBaseAbstractTemplate<'a> {
                     pub db: &'a str,
                     pub group_name: &'a str,
@@ -375,7 +375,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 remove_files.remove(file_path.as_os_str());
                 if force || !file_path.exists() {
                     #[derive(Template)]
-                    #[template(path = "model/base/src/group/table.rs", escape = "none")]
+                    #[template(path = "db/base/src/group/table.rs", escape = "none")]
                     struct GroupTableTemplate<'a> {
                         pub db: &'a str,
                         pub group_name: &'a str,
@@ -428,7 +428,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 }
 
                 #[derive(Template)]
-                #[template(path = "model/base/src/group/base/_table.rs", escape = "none")]
+                #[template(path = "db/base/src/group/base/_table.rs", escape = "none")]
                 struct GroupBaseTableTemplate<'a> {
                     pub db: &'a str,
                     pub group_name: &'a str,

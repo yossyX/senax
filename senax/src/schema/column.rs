@@ -1467,8 +1467,9 @@ impl FieldDef {
             }
             DataType::Text => {
                 if !has_custom {
-                    validators
-                        .push("custom(function = \"_server::validator::validate_text\")".to_string());
+                    validators.push(
+                        "custom(function = \"_server::validator::validate_text\")".to_string(),
+                    );
                 }
                 if let Some(length) = self.length {
                     validators.push(format!("length(max = {})", length));

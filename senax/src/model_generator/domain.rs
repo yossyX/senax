@@ -11,7 +11,7 @@ pub fn write_repositories_rs(domain_src_dir: &Path, db: &str) -> Result<()> {
     let file_path = domain_src_dir.join("repository.rs");
     let mut content = if !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "init/domain/src/repository.rs", escape = "none")]
+        #[template(path = "domain/src/repository.rs", escape = "none")]
         pub struct DomainRepositoryTemplate;
 
         DomainRepositoryTemplate.render()?

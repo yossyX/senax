@@ -31,7 +31,7 @@ pub fn write_group_files(
     remove_files.remove(file_path.as_os_str());
     let mut content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "init/domain/group_repositories/_Cargo.toml", escape = "none")]
+        #[template(path = "domain/group_repositories/_Cargo.toml", escape = "none")]
         struct Template<'a> {
             db: &'a str,
             group_name: &'a str,
@@ -61,7 +61,7 @@ pub fn write_group_files(
     remove_files.remove(file_path.as_os_str());
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "init/domain/group_repositories/src/lib.rs", escape = "none")]
+        #[template(path = "domain/group_repositories/src/lib.rs", escape = "none")]
         struct Template;
         let content = Template.render()?;
         fs_write(file_path, &*content)?;
@@ -72,7 +72,7 @@ pub fn write_group_files(
     let content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(
-            path = "init/domain/group_repositories/src/repositories.rs",
+            path = "domain/group_repositories/src/repositories.rs",
             escape = "none"
         )]
         struct Template<'a> {
@@ -240,7 +240,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
         let content = if force || !file_path.exists() {
             #[derive(Template)]
             #[template(
-                path = "init/domain/group_repositories/src/repositories/group.rs",
+                path = "domain/group_repositories/src/repositories/group.rs",
                 escape = "none"
             )]
             struct Template<'a> {
@@ -578,7 +578,7 @@ pub fn write_cargo_toml(
     let file_path = domain_repositories_dir.join("Cargo.toml");
     let mut content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "init/domain/db_repositories/_Cargo.toml", escape = "none")]
+        #[template(path = "domain/db_repositories/_Cargo.toml", escape = "none")]
         struct DomainCargoTemplate<'a> {
             db: &'a str,
         }
@@ -643,7 +643,7 @@ pub fn write_entity(
 
     #[derive(Template)]
     #[template(
-        path = "init/domain/group_repositories/src/repositories/entities/entity.rs",
+        path = "domain/group_repositories/src/repositories/entities/entity.rs",
         escape = "none"
     )]
     pub struct DomainEntityTemplate<'a> {
@@ -676,7 +676,7 @@ pub fn write_entity(
 
     #[derive(Template)]
     #[template(
-        path = "init/domain/group_repositories/src/repositories/entities/base/_entity.rs",
+        path = "domain/group_repositories/src/repositories/entities/base/_entity.rs",
         escape = "none"
     )]
     pub struct DomainBaseEntityTemplate<'a> {

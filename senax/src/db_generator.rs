@@ -99,14 +99,14 @@ pub fn generate(db: &str, exclude_from_domain: bool) -> Result<()> {
 }
 
 #[derive(Template)]
-#[template(path = "init/domain/db_repositories/src/lib.rs", escape = "none")]
+#[template(path = "domain/db_repositories/src/lib.rs", escape = "none")]
 pub struct DomainDbLibTemplate<'a> {
     pub db: &'a str,
 }
 
 fn repositories(path: &Path, db: &str) -> Result<()> {
     #[derive(Template)]
-    #[template(path = "init/domain/db_repositories/_Cargo.toml", escape = "none")]
+    #[template(path = "domain/db_repositories/_Cargo.toml", escape = "none")]
     struct DomainCargoTemplate<'a> {
         db: &'a str,
     }
@@ -116,7 +116,7 @@ fn repositories(path: &Path, db: &str) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     // #[derive(Template)]
-    // #[template(path = "init/domain/db_repositories/src/lib.rs", escape = "none")]
+    // #[template(path = "domain/db_repositories/src/lib.rs", escape = "none")]
     // struct DomainLibTemplate<'a> {
     //     db: &'a str,
     // }
@@ -126,7 +126,7 @@ fn repositories(path: &Path, db: &str) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     // #[derive(Template)]
-    // #[template(path = "init/domain/db_repositories/src/repositories.rs", escape = "none")]
+    // #[template(path = "domain/db_repositories/src/repositories.rs", escape = "none")]
     // struct DomainRepositoriesTemplate;
 
     // let file_path = path.join("src/repositories.rs");

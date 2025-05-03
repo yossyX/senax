@@ -618,10 +618,11 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         let mut rel_model =
                             get_model(&rel_def.model, cur_group_name, &groups).borrow_mut();
                         let m_name = format!("{}::{}", cur_group_name, cur_model_name);
-                        if rel_def.on_delete.is_some() && !rel_model
-                            .merged_relations
-                            .iter()
-                            .any(|(__, v)| v.model == m_name)
+                        if rel_def.on_delete.is_some()
+                            && !rel_model
+                                .merged_relations
+                                .iter()
+                                .any(|(__, v)| v.model == m_name)
                         {
                             let mut r = RelDef::default();
                             r.model = m_name;

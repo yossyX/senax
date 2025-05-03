@@ -84,10 +84,7 @@ pub use @{ mod_name|to_var_name }@::@{ name }@;
 
     #[allow(dead_code)]
     #[derive(Template)]
-    #[template(
-        path = "init/domain/base_domain/src/value_objects/base.rs",
-        escape = "none"
-    )]
+    #[template(path = "domain/base_domain/src/value_objects/base.rs", escape = "none")]
     struct DomainValueObjectBaseTemplate<'a> {
         pub mod_name: &'a str,
         pub pascal_name: &'a str,
@@ -96,7 +93,7 @@ pub use @{ mod_name|to_var_name }@::@{ name }@;
 
     #[derive(Template)]
     #[template(
-        path = "init/domain/base_domain/src/value_objects/wrapper.rs",
+        path = "domain/base_domain/src/value_objects/wrapper.rs",
         escape = "none"
     )]
     struct DomainValueObjectWrapperTemplate<'a> {
@@ -148,7 +145,7 @@ pub mod @{ db|snake|to_var_name }@;
     let file_path = base_domain_src_dir.join("models.rs");
     let mut content = if !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "init/domain/base_domain/src/models.rs", escape = "none")]
+        #[template(path = "domain/base_domain/src/models.rs", escape = "none")]
         struct DomainModelsTemplate;
 
         DomainModelsTemplate.render()?
@@ -188,7 +185,7 @@ pub fn write_models_db_rs(
     let file_path = domain_models_dir.join(format!("{}.rs", &db.to_case(Case::Snake)));
     let content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "init/domain/base_domain/src/models/db.rs", escape = "none")]
+        #[template(path = "domain/base_domain/src/models/db.rs", escape = "none")]
         pub struct DomainDbTemplate;
 
         DomainDbTemplate.render()?
@@ -245,7 +242,7 @@ pub fn write_abstract(
     if force || !file_path.exists() {
         #[derive(Template)]
         #[template(
-            path = "init/domain/base_domain/src/models/entities/abstract.rs",
+            path = "domain/base_domain/src/models/entities/abstract.rs",
             escape = "none"
         )]
         pub struct DomainAbstractTemplate<'a> {
@@ -267,7 +264,7 @@ pub fn write_abstract(
 
     #[derive(Template)]
     #[template(
-        path = "init/domain/base_domain/src/models/entities/base/_abstract.rs",
+        path = "domain/base_domain/src/models/entities/base/_abstract.rs",
         escape = "none"
     )]
     pub struct DomainBaseAbstractTemplate<'a> {
@@ -317,7 +314,7 @@ pub fn write_entity(
 
     #[derive(Template)]
     #[template(
-        path = "init/domain/base_domain/src/models/entities/entity.rs",
+        path = "domain/base_domain/src/models/entities/entity.rs",
         escape = "none"
     )]
     pub struct DomainEntityTemplate<'a> {
@@ -348,7 +345,7 @@ pub fn write_entity(
 
     #[derive(Template)]
     #[template(
-        path = "init/domain/base_domain/src/models/entities/base/_entity.rs",
+        path = "domain/base_domain/src/models/entities/base/_entity.rs",
         escape = "none"
     )]
     pub struct DomainBaseEntityTemplate<'a> {
@@ -387,7 +384,7 @@ pub fn write_group_rs(
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "init/domain/base_domain/src/models/group.rs", escape = "none")]
+        #[template(path = "domain/base_domain/src/models/group.rs", escape = "none")]
         struct DomainGroupTemplate<'a> {
             pub group_name: &'a str,
         }

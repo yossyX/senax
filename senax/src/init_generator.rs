@@ -86,7 +86,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     base_domain(&domain_path.join("base_domain"), non_snake_case)?;
 
     #[derive(Template)]
-    #[template(path = "init/domain/_Cargo.toml", escape = "none")]
+    #[template(path = "domain/_Cargo.toml", escape = "none")]
     struct DomainCargoTemplate;
 
     let file_path = domain_path.join("Cargo.toml");
@@ -94,7 +94,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "init/domain/src/lib.rs", escape = "none")]
+    #[template(path = "domain/src/lib.rs", escape = "none")]
     struct DomainLibTemplate {
         pub non_snake_case: bool,
     }
@@ -104,7 +104,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "init/domain/src/repository.rs", escape = "none")]
+    #[template(path = "domain/src/repository.rs", escape = "none")]
     struct DomainRepositoryTemplate;
 
     let file_path = domain_path.join("src/repository.rs");
@@ -112,7 +112,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "init/domain/src/use_cases.rs", escape = "none")]
+    #[template(path = "domain/src/use_cases.rs", escape = "none")]
     struct DomainUseCasesTemplate;
 
     let file_path = domain_path.join("src/use_cases.rs");
@@ -120,7 +120,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "init/domain/src/services.rs", escape = "none")]
+    #[template(path = "domain/src/services.rs", escape = "none")]
     struct DomainServicesTemplate;
 
     let file_path = domain_path.join("src/services.rs");
@@ -128,7 +128,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     fs_write(file_path, tpl)?;
 
     #[derive(Template)]
-    #[template(path = "init/domain/src/events.rs", escape = "none")]
+    #[template(path = "domain/src/events.rs", escape = "none")]
     struct DomainEventsTemplate;
 
     let file_path = domain_path.join("src/events.rs");
@@ -140,7 +140,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
 
 fn base_domain(path: &Path, non_snake_case: bool) -> Result<()> {
     #[derive(Template)]
-    #[template(path = "init/domain/base_domain/_Cargo.toml", escape = "none")]
+    #[template(path = "domain/base_domain/_Cargo.toml", escape = "none")]
     struct DomainCargoTemplate;
 
     let file_path = path.join("Cargo.toml");
@@ -148,7 +148,7 @@ fn base_domain(path: &Path, non_snake_case: bool) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "init/domain/base_domain/src/lib.rs", escape = "none")]
+    #[template(path = "domain/base_domain/src/lib.rs", escape = "none")]
     struct DomainLibTemplate {
         pub non_snake_case: bool,
     }
@@ -158,7 +158,7 @@ fn base_domain(path: &Path, non_snake_case: bool) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "init/domain/base_domain/src/models.rs", escape = "none")]
+    #[template(path = "domain/base_domain/src/models.rs", escape = "none")]
     struct DomainModelsTemplate;
 
     let file_path = path.join("src/models.rs");
@@ -166,7 +166,7 @@ fn base_domain(path: &Path, non_snake_case: bool) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "init/domain/base_domain/src/value_objects.rs", escape = "none")]
+    #[template(path = "domain/base_domain/src/value_objects.rs", escape = "none")]
     struct DomainValueObjectsTemplate;
 
     let file_path = path.join("src/value_objects.rs");
