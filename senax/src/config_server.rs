@@ -35,9 +35,7 @@ use crate::api_generator::schema::{
     ApiConfigDef, ApiConfigJson, ApiDbDef, ApiDbJson, ApiModelDef, ApiModelJson,
 };
 use crate::common::{
-    BACKUP, READ_ONLY, fs_write, parse_yml, parse_yml_file, read_api_yml, read_group_yml,
-    read_simple_vo_yml, set_api_config, simplify_yml, write_api_yml, write_group_yml,
-    write_simple_vo_yml,
+    fs_write, parse_yml, parse_yml_file, read_api_yml, read_group_yml, read_simple_vo_yml, set_api_config, simplify_yml, write_api_yml, write_group_yml, write_simple_vo_yml, AtomicLoad as _, BACKUP, READ_ONLY
 };
 use crate::schema::{self, ConfigDef, ConfigJson, FieldDef, ModelDef, ModelJson, ValueObjectJson};
 use crate::{API_SCHEMA_PATH, SCHEMA_PATH};
@@ -295,7 +293,7 @@ async fn save_db_config(
     let result = async move {
         let db = &db;
         check_ascii_name(db)?;
-        if !READ_ONLY.load(Ordering::SeqCst) {
+        if !READ_ONLY.relaxed_load() {
             let path = Path::new(SCHEMA_PATH).join(format!("{db}.yml"));
             let content = fs::read_to_string(&path)?;
             if let Some(bk) = BACKUP.get() {
@@ -669,7 +667,7 @@ async fn save_api_server_config(
     let _semaphore = SEMAPHORE.acquire().await;
     let result = async move {
         let server = check_ascii_name(&path)?;
-        if !READ_ONLY.load(Ordering::SeqCst) {
+        if !READ_ONLY.relaxed_load() {
             let path = Path::new(server)
             .join(API_SCHEMA_PATH)
             .join("_config.yml");
@@ -739,7 +737,7 @@ async fn save_api_server_db_config(
     let result = async move {
         let server = check_ascii_name(&path.0)?;
         let db_path = check_ascii_name(&path.1)?;
-        if !READ_ONLY.load(Ordering::SeqCst) {
+        if !READ_ONLY.relaxed_load() {
             let path = Path::new(server)
                 .join(API_SCHEMA_PATH)
                 .join(format!("{}.yml", db_path));

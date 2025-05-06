@@ -49,6 +49,7 @@ pub(crate) use assign_sql;
 pub trait ColTr {
     fn name(&self) -> &'static str;
 }
+#[allow(clippy::len_without_is_empty)]
 pub trait BindTr {
     fn name(&self) -> &'static str;
     fn placeholder(&self) -> &'static str {

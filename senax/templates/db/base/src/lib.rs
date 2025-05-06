@@ -32,12 +32,22 @@ pub mod connection;
 @%- if !config.exclude_from_domain %@
 #[rustfmt::skip]
 #[allow(clippy::module_inception)]
+#[allow(clippy::map_identity)]
 pub mod impl_domain;
 @%- endif %@
 #[rustfmt::skip]
 pub mod misc;
 #[rustfmt::skip]
 #[allow(clippy::module_inception)]
+#[allow(clippy::map_identity)]
+#[allow(clippy::match_single_binding)]
+#[allow(clippy::clone_on_copy)]
+#[allow(clippy::nonminimal_bool)]
+#[allow(clippy::useless_conversion)]
+#[allow(clippy::enum_variant_names)]
+#[allow(clippy::collapsible_if)]
+#[allow(clippy::assigning_clones)]
+#[allow(clippy::too_many_arguments)]
 pub mod models;
 
 pub use models::{CacheMsg, CacheOp};

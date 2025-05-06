@@ -28,11 +28,15 @@ use db::{models::@{ group_name|snake|to_var_name }@::CacheOp, DbConn, DELAYED_DB
 #[allow(clippy::collapsible_if)]
 #[allow(clippy::assigning_clones)]
 #[allow(clippy::too_many_arguments)]
+@%- if SEPARATED_BASE_FILES %@
 pub mod _base {
 @%- for name in mod_names %@
     pub mod _@{ name }@;
 @%- endfor %@
 }
+@%- else %@
+pub mod _base;
+@%- endif %@
 @% for name in mod_names %@
 pub mod @{ name|to_var_name }@;
 @%- endfor %@
@@ -80,6 +84,7 @@ pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
 #[cfg(not(feature="cache_update_only"))]
 impl super::GroupCacheOpTr for CacheOp {
     #[allow(unreachable_patterns)]
+    #[allow(clippy::single_match)]
     async fn handle_cache_msg(self, _sync_map: Arc<FxHashMap<ShardId, u64>>) {
         @%- if !config.force_disable_cache %@
         use super::CacheOpTr as _;

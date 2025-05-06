@@ -127,48 +127,21 @@ pub fn write_files(
     };
     fs_write(file_path, tpl.render()?)?;
 
-    write_impl_domain_rs(&src_dir, groups, force)?;
+    write_impl_domain_rs(&src_dir, groups)?;
 
     Ok(())
 }
 
-pub fn write_impl_domain_rs(src_dir: &Path, groups: &GroupsDef, force: bool) -> Result<()> {
+pub fn write_impl_domain_rs(src_dir: &Path, groups: &GroupsDef) -> Result<()> {
     let file_path = src_dir.join("impl_domain.rs");
-    let content = if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(path = "db/base/src/impl_domain.rs", escape = "none")]
-        pub struct ImplDomainDbTemplate;
-
-        ImplDomainDbTemplate.render()?
-    } else {
-        fs::read_to_string(&file_path)?
-    };
-
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
 
     #[derive(Template)]
-    #[template(
-        source = r###"
-// Do not modify below this line. (ModStart)
-@%- for (name, (_, defs)) in groups %@
-pub mod @{ name|snake|to_var_name }@;
-@%- endfor %@
-// Do not modify up to this line. (ModEnd)"###,
-        ext = "txt",
-        escape = "none"
-    )]
-    pub struct ModTemplate<'a> {
+    #[template(path = "db/base/src/impl_domain.rs", escape = "none")]
+    pub struct ImplDomainDbTemplate<'a> {
         pub groups: &'a GroupsDef,
     }
 
-    let tpl = ModTemplate { groups }.render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
+    let content = ImplDomainDbTemplate { groups }.render()?;
 
     fs_write(file_path, &*content)?;
     Ok(())

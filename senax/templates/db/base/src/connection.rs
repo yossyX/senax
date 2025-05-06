@@ -1391,18 +1391,6 @@ impl Drop for DbConn {
     }
 }
 
-#[cfg(feature = "use_google_resolver")]
-async fn resolve_ips(host: &str, port: u16) -> std::io::Result<Vec<SocketAddr>> {
-    use hickory_resolver::config::{ResolverConfig, ResolverOpts};
-    use hickory_resolver::TokioAsyncResolver;
-    let resolver = TokioAsyncResolver::tokio(ResolverConfig::google(), ResolverOpts::default());
-    let response = resolver.lookup_ip(host).await?;
-    Ok(response
-        .iter()
-        .map(|ip| SocketAddr::new(ip, port))
-        .collect())
-}
-
 #[allow(clippy::explicit_counter_loop)]
 async fn lookup(url: &url::Url) -> Result<Vec<SocketAddr>> {
     use std::net::{IpAddr, Ipv4Addr};
@@ -1415,24 +1403,6 @@ async fn lookup(url: &url::Url) -> Result<Vec<SocketAddr>> {
                 for v in tokio::net::lookup_host(format!("{}:{}", domain, port)).await? {
                     _count += 1;
                     set.insert(v);
-                }
-                #[cfg(feature = "use_google_resolver")]
-                if domain.contains('.') && _count != set.len() {
-                    let mut task = JoinSet::new();
-                    for _ in 0..100 {
-                        let domain = domain.to_string();
-                        task.spawn(async move { resolve_ips(&domain, port).await });
-                    }
-                    while let Some(r) = task.join_next().await {
-                        if let Ok(Ok(r)) = r {
-                            for v in r {
-                                set.insert(v);
-                                if _count == set.len() {
-                                    break;
-                                }
-                            }
-                        }
-                    }
                 }
                 if set.is_empty() {
                     anyhow::bail!("Host not found: {}", url);

@@ -13,11 +13,12 @@ use std::{
     sync::Arc,
 };
 
-use crate::common::fs_write;
-use crate::filters;
+use crate::common::{fs_write, OVERWRITTEN_MSG};
+use crate::{filters, SEPARATED_BASE_FILES};
 use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable, to_id_name};
 use crate::model_generator::REL_START;
 use crate::schema::IS_MAIN_GROUP;
+use crate::common::AtomicLoad as _;
 
 mod impl_domain;
 
@@ -115,8 +116,8 @@ pub fn write_group_files(
     let impl_domain_dir = src_dir.join("impl_domain");
     let base_group_name = group;
     for (group_name, (f, defs)) in groups {
-        let is_main_group = f.load(std::sync::atomic::Ordering::Relaxed) == REL_START;
-        IS_MAIN_GROUP.store(is_main_group, std::sync::atomic::Ordering::Relaxed);
+        let is_main_group = f.relaxed_load() == REL_START;
+        IS_MAIN_GROUP.relaxed_store(is_main_group);
         let mod_names: BTreeSet<String> = defs
             .iter()
             .filter(|(_, (_, d))| !d.abstract_mode)
@@ -166,6 +167,16 @@ pub fn write_group_files(
             )?;
         }
 
+        let mut impl_output = String::new();
+        impl_output.push_str(
+            OVERWRITTEN_MSG,
+        );
+
+        let mut output = String::new();
+        output.push_str(
+            OVERWRITTEN_MSG,
+        );
+
         let model_group_dir = model_models_dir.join(group_name.to_case(Case::Snake));
         let model_group_base_dir = model_group_dir.join("_base");
         for (model_name, (_, def)) in defs {
@@ -204,8 +215,6 @@ pub fn write_group_files(
                     fs_write(file_path, tpl.render()?)?;
                 }
 
-                let file_path = model_group_base_dir.join(format!("_{}.rs", mod_name));
-                remove_files.remove(file_path.as_os_str());
                 let mut force_indexes = Vec::new();
                 let (_, _, idx_map) = crate::migration_generator::make_table_def(def, &config)?;
                 for (index_name, index_def) in &def.merged_indexes {
@@ -262,10 +271,17 @@ pub fn write_group_files(
                     config: &config,
                     version_col: ConfigDef::version(),
                 };
-                fs_write(file_path, tpl.render()?)?;
-
+                let ret = tpl.render()?;
+                if SEPARATED_BASE_FILES {
+                    let file_path = model_group_base_dir.join(format!("_{}.rs", mod_name));
+                    remove_files.remove(file_path.as_os_str());
+                    fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, ret))?;
+                } else {
+                    output.push_str(&format!("pub mod _{} {{\n{}}}\n", mod_name, ret));
+                }
+            
                 if !exclude_from_domain {
-                    impl_domain::write_entity(
+                    impl_output.push_str(&impl_domain::write_entity(
                         &impl_domain_dir,
                         db,
                         &config,
@@ -276,11 +292,21 @@ pub fn write_group_files(
                         model_name,
                         def,
                         remove_files,
-                    )?;
+                    )?);
                 }
             }
         }
+        if !SEPARATED_BASE_FILES {
+            let file_path = model_group_dir.join("_base.rs");
+            remove_files.remove(file_path.as_os_str());
+            fs_write(file_path, output)?;
+
+            let group_dir = impl_domain_dir.join(group_name.to_case(Case::Snake));
+            let file_path = group_dir.join("_base.rs");
+            remove_files.remove(file_path.as_os_str());
+            fs_write(file_path, impl_output)?;
+        }
     }
-    IS_MAIN_GROUP.store(true, std::sync::atomic::Ordering::Relaxed);
+    IS_MAIN_GROUP.relaxed_store(true);
     Ok(())
 }

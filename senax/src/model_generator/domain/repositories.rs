@@ -1,4 +1,5 @@
-use crate::filters;
+use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
+use crate::{filters, SEPARATED_BASE_FILES};
 use crate::model_generator::REL_START;
 use crate::schema::{GroupsDef, IS_MAIN_GROUP};
 use crate::{
@@ -224,8 +225,8 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     let repositories_dir = src_dir.join("repositories");
     let base_group_name = group_name;
     for (name, (f, defs)) in groups {
-        let is_main_group = f.load(std::sync::atomic::Ordering::Relaxed) == REL_START;
-        IS_MAIN_GROUP.store(is_main_group, std::sync::atomic::Ordering::Relaxed);
+        let is_main_group = f.relaxed_load() == REL_START;
+        IS_MAIN_GROUP.relaxed_store(is_main_group);
         let mod_names: BTreeSet<String> = defs
             .iter()
             .filter(|(_k, (_, v))| !v.abstract_mode)
@@ -265,11 +266,15 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             #[template(
                 source = r###"
 // Do not modify below this line. (ModStart)
+@%- if SEPARATED_BASE_FILES %@
 pub mod _base {
 @%- for mod_name in mod_names %@
     pub mod _@{ mod_name }@;
 @%- endfor %@
 }
+@%- else %@
+pub mod _base;
+@%- endif %@
 @%- for mod_name in mod_names %@
 pub mod @{ mod_name|to_var_name }@;
 @%- endfor %@
@@ -403,12 +408,16 @@ pub mod @{ mod_name|to_var_name }@;
 
             fs_write(file_path, &*content)?;
         }
+        let mut output = String::new();
+        output.push_str(
+            OVERWRITTEN_MSG,
+        );
         for (model_name, (_, def)) in defs {
             let group_name = name;
             let mod_name = def.mod_name();
             let mod_name = &mod_name;
             if !def.abstract_mode {
-                write_entity(
+                output.push_str(&write_entity(
                     &repositories_dir,
                     db,
                     base_group_name,
@@ -418,11 +427,17 @@ pub mod @{ mod_name|to_var_name }@;
                     model_name,
                     def,
                     remove_files,
-                )?;
+                )?);
             }
         }
+        if !SEPARATED_BASE_FILES {
+            let group_dir = repositories_dir.join(name.to_case(Case::Snake));
+            let file_path = group_dir.join("_base.rs");
+            remove_files.remove(file_path.as_os_str());
+            fs_write(file_path, output)?;
+        }
     }
-    IS_MAIN_GROUP.store(true, std::sync::atomic::Ordering::Relaxed);
+    IS_MAIN_GROUP.relaxed_store(true);
     Ok(())
 }
 
@@ -630,7 +645,7 @@ pub fn write_entity(
     model_name: &str,
     def: &Arc<ModelDef>,
     remove_files: &mut HashSet<OsString>,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     set_domain_mode(true);
     let domain_group_dir = repositories_dir.join(group_name.to_case(Case::Snake));
     let file_path = domain_group_dir.join(format!("{}.rs", mod_name));
@@ -674,9 +689,6 @@ pub fn write_entity(
         };
         fs_write(file_path, tpl.render()?)?;
     }
-    let domain_group_base_dir = domain_group_dir.join("_base");
-    let file_path = domain_group_base_dir.join(format!("_{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
 
     #[derive(Template)]
     #[template(
@@ -704,7 +716,15 @@ pub fn write_entity(
         id_name,
         def,
     };
-    fs_write(file_path, tpl.render()?)?;
+    let ret = tpl.render()?;
     set_domain_mode(false);
-    Ok(())
+    if SEPARATED_BASE_FILES {
+        let domain_group_base_dir = domain_group_dir.join("_base");
+        let file_path = domain_group_base_dir.join(format!("_{}.rs", mod_name));
+        remove_files.remove(file_path.as_os_str());
+        fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, ret))?;
+        Ok("".to_string())
+    } else {
+        Ok(format!("pub mod _{} {{\n{}}}\n", mod_name, ret))
+    }
 }

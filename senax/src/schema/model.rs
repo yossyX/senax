@@ -14,7 +14,7 @@ use std::{
 };
 
 use crate::api_generator::schema::{ApiFieldDef, ApiRelationDef};
-use crate::common::{hash, if_then_else, to_plural, yaml_value_to_str};
+use crate::common::{hash, if_then_else, to_plural, yaml_value_to_str, AtomicLoad as _};
 use crate::schema::_to_var_name;
 
 use super::*;
@@ -884,7 +884,7 @@ impl ModelDef {
     }
 
     pub fn use_insert_delayed(&self) -> bool {
-        if !IS_MAIN_GROUP.load(std::sync::atomic::Ordering::Relaxed) {
+        if !IS_MAIN_GROUP.relaxed_load() {
             return false;
         }
         self.use_insert_delayed
@@ -896,7 +896,7 @@ impl ModelDef {
     }
 
     pub fn use_save_delayed(&self) -> bool {
-        if !IS_MAIN_GROUP.load(std::sync::atomic::Ordering::Relaxed) {
+        if !IS_MAIN_GROUP.relaxed_load() {
             return false;
         }
         !self.disable_update()
@@ -906,7 +906,7 @@ impl ModelDef {
     }
 
     pub fn use_update_delayed(&self) -> bool {
-        if !IS_MAIN_GROUP.load(std::sync::atomic::Ordering::Relaxed) {
+        if !IS_MAIN_GROUP.relaxed_load() {
             return false;
         }
         !self.disable_update()
@@ -916,7 +916,7 @@ impl ModelDef {
     }
 
     pub fn use_upsert_delayed(&self) -> bool {
-        if !IS_MAIN_GROUP.load(std::sync::atomic::Ordering::Relaxed) {
+        if !IS_MAIN_GROUP.relaxed_load() {
             return false;
         }
         !self.disable_update()

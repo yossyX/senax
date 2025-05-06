@@ -133,7 +133,7 @@ impl GqlQuery@{ graphql_name }@ {
         @{ db|snake }@_query.release_read_tx().await?;
         let result: anyhow::Result<Vec<_>> = list
             .iter()
-            .map(|v| Ok(ResObj::try_from_(v, auth, None)?))
+            .map(|v| ResObj::try_from_(v, auth, None))
             .collect();
         Ok(result?)
     }

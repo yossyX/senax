@@ -10,14 +10,15 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
-use crate::filters;
-use crate::schema::{ConfigDef, GroupDef, GroupsDef, StringOrArray, Timestampable};
+use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
+use crate::schema::{_to_var_name, ConfigDef, GroupsDef, StringOrArray, Timestampable};
 use crate::{BASE_DOMAIN_PATH, DOMAIN_REPOSITORIES_PATH};
 use crate::{
     DB_PATH, DOMAIN_PATH,
     common::fs_write,
     schema::{self, CONFIG, GROUPS, ModelDef, to_id_name},
 };
+use crate::{SEPARATED_BASE_FILES, filters};
 
 mod db;
 mod domain;
@@ -206,19 +207,24 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         begin_traverse(&group_name);
         let repo_include_groups: GroupsDef = groups
             .iter()
-            .filter(|(_, (f, _))| f.load(std::sync::atomic::Ordering::Relaxed) >= REL_LOOP)
+            .filter(|(_, (f, _))| f.relaxed_load() >= REL_INCLUDE)
             .map(|(n, (f, v))| {
                 let v2: IndexMap<String, (AtomicUsize, Arc<ModelDef>)> = v
                     .iter()
-                    .filter(|(_, (f, _))| f.load(std::sync::atomic::Ordering::Relaxed) > 0)
-                    .map(|(n, (f, v))| (n.to_string(), (AtomicUsize::new(f.load(std::sync::atomic::Ordering::Relaxed)), v.clone())))
+                    .filter(|(_, (f, _))| f.relaxed_load() > 0)
+                    .map(|(n, (f, v))| {
+                        (
+                            n.to_string(),
+                            (AtomicUsize::new(f.relaxed_load()), v.clone()),
+                        )
+                    })
                     .collect();
-                (n.to_string(), (AtomicUsize::new(f.load(std::sync::atomic::Ordering::Relaxed)), v2))
+                (n.to_string(), (AtomicUsize::new(f.relaxed_load()), v2))
             })
             .collect();
         let ref_groups: Vec<_> = groups
             .iter()
-            .filter(|(_, (f, _))| f.load(std::sync::atomic::Ordering::Relaxed) == REL_USE)
+            .filter(|(_, (f, _))| f.relaxed_load() == REL_USE)
             .map(|(n, _)| n.to_string())
             .collect();
 
@@ -230,30 +236,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             .collect();
 
         let model_group_dir = model_models_dir.join(group_name.to_case(Case::Snake));
-        let model_group_base_dir = model_group_dir.join("_base");
-        let file_path = model_models_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
-        remove_files.remove(file_path.as_os_str());
-        let concrete_models = defs
-            .iter()
-            .filter(|(_k, (_, v))| !v.abstract_mode)
-            .collect();
-
-        #[derive(Template)]
-        #[template(path = "db/base/src/group.rs", escape = "none")]
-        struct GroupTemplate<'a> {
-            pub group_name: &'a str,
-            pub mod_names: &'a BTreeSet<String>,
-            pub models: IndexMap<&'a String, &'a (AtomicUsize, Arc<ModelDef>)>,
-            pub config: &'a ConfigDef,
-        }
-
-        let tpl = GroupTemplate {
-            group_name,
-            mod_names: &mod_names,
-            models: concrete_models,
-            config: &config,
-        };
-        fs_write(file_path, tpl.render()?)?;
 
         db::repositories::write_group_files(
             &db_repositories_dir,
@@ -269,14 +251,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         )?;
 
         if !exclude_from_domain {
-            domain::base_domain::write_group_rs(
-                &domain_db_dir,
-                group_name,
-                &entities_mod_names,
-                &mod_names,
-                force,
-                &mut remove_files,
-            )?;
             domain::repositories::write_group_files(
                 &domain_repositories_dir,
                 db,
@@ -286,23 +260,18 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 force,
                 &mut remove_files,
             )?;
-            db::impl_domain::write_group_rs(
-                &impl_domain_dir,
-                db,
-                group_name,
-                &entities_mod_names,
-                force,
-                &mut remove_files,
-            )?;
         }
+
+        let mut table_output = String::new();
+        let mut base_domain_output = String::new();
+        let mut impl_domain_output = String::new();
 
         for (model_name, (_, def)) in defs {
             let table_name = def.table_name();
             let mod_name = def.mod_name();
             let mod_name = &mod_name;
+            base_domain_output.push_str(&format!("pub mod {}", _to_var_name(mod_name)));
             if def.abstract_mode {
-                let file_path = model_group_dir.join(format!("{}.rs", mod_name));
-                remove_files.remove(file_path.as_os_str());
                 #[derive(Template)]
                 #[template(path = "db/base/src/group/abstract.rs", escape = "none")]
                 struct GroupAbstractTemplate<'a> {
@@ -328,10 +297,17 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     def,
                     config: &config,
                 };
-                fs_write(file_path, tpl.render()?)?;
+                let output = tpl.render()?;
+                if SEPARATED_BASE_FILES {
+                    let file_path = model_group_dir.join(format!("{}.rs", mod_name));
+                    remove_files.remove(file_path.as_os_str());
+                    fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, output))?;
+                } else {
+                    table_output.push_str(&format!("pub mod {} {{\n{}}}\n", _to_var_name(mod_name), output));
+                }
 
                 if !exclude_from_domain {
-                    domain::base_domain::write_abstract(
+                    base_domain_output.push_str(&domain::base_domain::write_abstract(
                         &domain_db_dir,
                         db,
                         group_name,
@@ -340,11 +316,9 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         model_name,
                         def,
                         &mut remove_files,
-                    )?;
+                    )?);
                 }
             } else {
-                let file_path = model_group_dir.join(format!("{}.rs", mod_name));
-                remove_files.remove(file_path.as_os_str());
                 let mut force_indexes = Vec::new();
                 let (_, _, idx_map) = crate::migration_generator::make_table_def(def, &config)?;
                 for (index_name, index_def) in &def.merged_indexes {
@@ -398,10 +372,17 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     config: &config,
                     version_col: schema::ConfigDef::version(),
                 };
-                fs_write(file_path, tpl.render()?)?;
+                let output = tpl.render()?;
+                if SEPARATED_BASE_FILES {
+                    let file_path = model_group_dir.join(format!("{}.rs", mod_name));
+                    remove_files.remove(file_path.as_os_str());
+                    fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, output))?;
+                } else {
+                    table_output.push_str(&format!("pub mod {} {{\n{}}}\n", _to_var_name(mod_name), output));
+                }
 
                 if !exclude_from_domain {
-                    domain::base_domain::write_entity(
+                    base_domain_output.push_str(&domain::base_domain::write_entity(
                         &domain_db_dir,
                         db,
                         group_name,
@@ -410,8 +391,8 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         model_name,
                         def,
                         &mut remove_files,
-                    )?;
-                    db::impl_domain::write_entity(
+                    )?);
+                    impl_domain_output.push_str(&db::impl_domain::write_entity(
                         &impl_domain_dir,
                         db,
                         &config,
@@ -421,9 +402,52 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         model_name,
                         def,
                         &mut remove_files,
-                    )?;
+                    )?);
                 }
             }
+        }
+        let file_path = model_models_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
+        remove_files.remove(file_path.as_os_str());
+        let concrete_models = defs
+            .iter()
+            .filter(|(_k, (_, v))| !v.abstract_mode)
+            .collect();
+
+        #[derive(Template)]
+        #[template(path = "db/base/src/group.rs", escape = "none")]
+        struct GroupTemplate<'a> {
+            pub group_name: &'a str,
+            pub mod_names: &'a BTreeSet<String>,
+            pub models: IndexMap<&'a String, &'a (AtomicUsize, Arc<ModelDef>)>,
+            pub config: &'a ConfigDef,
+            pub table_output: String,
+        }
+
+        let tpl = GroupTemplate {
+            group_name,
+            mod_names: &mod_names,
+            models: concrete_models,
+            config: &config,
+            table_output,
+        };
+        fs_write(file_path, tpl.render()?)?;
+
+        if !exclude_from_domain {
+            domain::base_domain::write_group_rs(
+                &domain_db_dir,
+                group_name,
+                base_domain_output,
+                &mut remove_files,
+            )?;
+            db::impl_domain::write_group_rs(
+                &impl_domain_dir,
+                db,
+                group_name,
+                &entities_mod_names,
+                force,
+                impl_domain_output,
+                &mut remove_files,
+            )?;
         }
     }
     if !exclude_from_domain {
@@ -466,16 +490,16 @@ pub fn check_version(db: &str) -> Result<()> {
 }
 
 pub const REL_USE: usize = 1;
-pub const REL_LOOP: usize = 2;
+pub const REL_INCLUDE: usize = 2;
 pub const REL_START: usize = 3;
 
 fn reset_rel_flags() {
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
     for (_, (f, models)) in groups {
-        f.store(0, std::sync::atomic::Ordering::Relaxed);
+        f.relaxed_store(0);
         for (_, (f, _)) in models {
-            f.store(0, std::sync::atomic::Ordering::Relaxed);
+            f.relaxed_store(0);
         }
     }
 }
@@ -486,9 +510,9 @@ fn begin_traverse(target_group: &str) {
     let groups = group_lock.as_ref().unwrap();
     for (group, (group_flag, models)) in groups {
         if group == target_group {
-            group_flag.store(REL_START, std::sync::atomic::Ordering::Relaxed);
+            group_flag.relaxed_store(REL_START);
             for (_, (model_flag, _)) in models {
-                model_flag.store(REL_USE, std::sync::atomic::Ordering::Relaxed);
+                model_flag.relaxed_store(REL_USE);
             }
             for (_, (_, def)) in models {
                 for r in &def.merged_relations {
@@ -509,26 +533,26 @@ fn traverse_rel_flags(target_group: &str, target_model: &str) -> usize {
     let mut ret = REL_USE;
     for (group, (group_flag, models)) in groups {
         if group == target_group {
-            let flag = group_flag.load(std::sync::atomic::Ordering::Relaxed);
+            let flag = group_flag.relaxed_load();
             if flag == 0 {
-                group_flag.store(REL_USE, std::sync::atomic::Ordering::Relaxed);
+                group_flag.relaxed_store(REL_USE);
             }
-            if flag >= REL_LOOP {
-                ret = REL_LOOP;
+            if flag >= REL_INCLUDE {
+                ret = REL_INCLUDE;
             }
             for (model, (model_flag, def)) in models {
                 if model == target_model {
-                    if model_flag.load(std::sync::atomic::Ordering::Relaxed) != 0 {
+                    if model_flag.relaxed_load() != 0 {
                         return ret;
                     }
-                    model_flag.store(REL_USE, std::sync::atomic::Ordering::Relaxed);
+                    model_flag.relaxed_store(REL_USE);
                     for r in &def.merged_relations {
                         let g = r.1.get_group_name();
                         let m = r.1.get_foreign_model_name();
                         if !r.1.is_type_of_belongs_to_outer_db() {
-                            if traverse_rel_flags(&g, &m) == REL_LOOP {
-                                group_flag.store(REL_LOOP, std::sync::atomic::Ordering::Relaxed);
-                                ret = REL_LOOP;
+                            if traverse_rel_flags(&g, &m) == REL_INCLUDE {
+                                group_flag.relaxed_store(REL_INCLUDE);
+                                ret = REL_INCLUDE;
                             }
                         }
                     }

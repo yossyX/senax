@@ -1,4 +1,7 @@
-use crate::{common::if_then_else, schema::*};
+use crate::{
+    common::{AtomicLoad as _, if_then_else},
+    schema::*,
+};
 use convert_case::{Case, Casing};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -278,26 +281,16 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
         .replace("{placeholder}", &col.placeholder())
         .replace(
             "{label}",
-            &label4(if_then_else!(
-                SHOW_LABEL.load(Ordering::Relaxed),
-                &col.label,
-                &None
-            ))
-            .unwrap(),
+            &label4(if_then_else!(SHOW_LABEL.relaxed_load(), &col.label, &None)).unwrap(),
         )
         .replace(
             "{label_wo_hash}",
-            &label4_wo_hash(if_then_else!(
-                SHOW_LABEL.load(Ordering::Relaxed),
-                &col.label,
-                &None
-            ))
-            .unwrap(),
+            &label4_wo_hash(if_then_else!(SHOW_LABEL.relaxed_load(), &col.label, &None)).unwrap(),
         )
         .replace(
             "{comment}",
             &comment4(if_then_else!(
-                SHOW_COMMNET.load(Ordering::Relaxed),
+                SHOW_COMMNET.relaxed_load(),
                 &col.comment,
                 &None
             ))
@@ -425,26 +418,16 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         .replace("{index}", &index.to_string())
         .replace(
             "{label}",
-            &label4(if_then_else!(
-                SHOW_LABEL.load(Ordering::Relaxed),
-                &rel.label,
-                &None
-            ))
-            .unwrap(),
+            &label4(if_then_else!(SHOW_LABEL.relaxed_load(), &rel.label, &None)).unwrap(),
         )
         .replace(
             "{label_wo_hash}",
-            &label4_wo_hash(if_then_else!(
-                SHOW_LABEL.load(Ordering::Relaxed),
-                &rel.label,
-                &None
-            ))
-            .unwrap(),
+            &label4_wo_hash(if_then_else!(SHOW_LABEL.relaxed_load(), &rel.label, &None)).unwrap(),
         )
         .replace(
             "{comment}",
             &comment4(if_then_else!(
-                SHOW_COMMNET.load(Ordering::Relaxed),
+                SHOW_COMMNET.relaxed_load(),
                 &rel.comment,
                 &None
             ))
@@ -529,26 +512,16 @@ fn _fmt_rel_outer_db(
         .replace("{index}", &index.to_string())
         .replace(
             "{label}",
-            &label4(if_then_else!(
-                SHOW_LABEL.load(Ordering::Relaxed),
-                &rel.label,
-                &None
-            ))
-            .unwrap(),
+            &label4(if_then_else!(SHOW_LABEL.relaxed_load(), &rel.label, &None)).unwrap(),
         )
         .replace(
             "{label_wo_hash}",
-            &label4_wo_hash(if_then_else!(
-                SHOW_LABEL.load(Ordering::Relaxed),
-                &rel.label,
-                &None
-            ))
-            .unwrap(),
+            &label4_wo_hash(if_then_else!(SHOW_LABEL.relaxed_load(), &rel.label, &None)).unwrap(),
         )
         .replace(
             "{comment}",
             &comment4(if_then_else!(
-                SHOW_COMMNET.load(Ordering::Relaxed),
+                SHOW_COMMNET.relaxed_load(),
                 &rel.comment,
                 &None
             ))

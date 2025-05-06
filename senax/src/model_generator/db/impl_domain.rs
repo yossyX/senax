@@ -9,9 +9,9 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::common::fs_write;
-use crate::filters;
-use crate::schema::{ConfigDef, GroupsDef, ModelDef, set_domain_mode, to_id_name};
+use crate::common::{OVERWRITTEN_MSG, fs_write};
+use crate::schema::{set_domain_mode, to_id_name, ConfigDef, GroupsDef, ModelDef, _to_var_name};
+use crate::{SEPARATED_BASE_FILES, filters};
 
 pub fn write_impl_domain_rs(
     model_src_dir: &Path,
@@ -122,49 +122,25 @@ pub fn write_group_rs(
     group_name: &String,
     entities_mod_names: &BTreeSet<(String, &String)>,
     force: bool,
+    impl_domain_output: String,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
     let file_path = impl_domain_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
     remove_files.remove(file_path.as_os_str());
-    let content = if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(path = "db/base/src/impl_domain/group.rs", escape = "none")]
-        struct ImplDomainGroupTemplate;
-
-        ImplDomainGroupTemplate.render()?
-    } else {
-        fs::read_to_string(&file_path)?
-    };
+    #[derive(Template)]
+    #[template(path = "db/base/src/impl_domain/group.rs", escape = "none")]
+    struct ImplDomainGroupTemplate {
+        pub mod_names: BTreeSet<String>,
+        pub impl_domain_output: String,
+    }
 
     let mod_names: BTreeSet<String> = entities_mod_names.iter().map(|v| v.0.clone()).collect();
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
-    ensure!(
-        re.is_match(&content),
-        "File contents are invalid.: {:?}",
-        &file_path
-    );
-
-    #[derive(Template)]
-    #[template(
-        source = r###"
-// Do not modify below this line. (ModStart)
-@%- for mod_name in mod_names %@
-pub mod @{ mod_name|to_var_name }@;
-@%- endfor %@
-// Do not modify up to this line. (ModEnd)"###,
-        ext = "txt",
-        escape = "none"
-    )]
-    pub struct DomainGroupModTemplate<'a> {
-        pub mod_names: &'a BTreeSet<String>,
-    }
-
-    let tpl = DomainGroupModTemplate {
-        mod_names: &mod_names,
+    let content = ImplDomainGroupTemplate {
+        mod_names,
+        impl_domain_output,
     }
     .render()?;
-    let tpl = tpl.trim_start();
-    let content = re.replace(&content, tpl);
+
     fs_write(file_path, &*content)?;
     Ok(())
 }
@@ -180,11 +156,8 @@ pub fn write_entity(
     model_name: &str,
     def: &Arc<ModelDef>,
     remove_files: &mut HashSet<OsString>,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     set_domain_mode(true);
-    let impl_domain_group_dir = impl_domain_dir.join(group_name.to_case(Case::Snake));
-    let file_path = impl_domain_group_dir.join(format!("{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
     let pascal_name = &model_name.to_case(Case::Pascal);
     let id_name = &to_id_name(model_name);
     #[derive(Template)]
@@ -208,8 +181,15 @@ pub fn write_entity(
         id_name,
         def,
     };
-    fs_write(file_path, tpl.render()?)?;
-
+    let ret = tpl.render()?;
     set_domain_mode(false);
-    Ok(())
+    if SEPARATED_BASE_FILES {
+        let impl_domain_group_dir = impl_domain_dir.join(group_name.to_case(Case::Snake));
+        let file_path = impl_domain_group_dir.join(format!("{}.rs", mod_name));
+        remove_files.remove(file_path.as_os_str());
+        fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, ret))?;
+        Ok("".to_string())
+    } else {
+        Ok(format!("pub mod {} {{\n{}}}\n", _to_var_name(mod_name), ret))
+    }
 }

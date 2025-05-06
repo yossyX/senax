@@ -43,7 +43,7 @@ pub type GroupsDef =
 
 pub static CONFIG: RwLock<Option<ConfigDef>> = RwLock::new(None);
 pub static GROUPS: RwLock<Option<GroupsDef>> = RwLock::new(None);
-pub static VALUE_OBJECTS: RwLock<Option<HashMap<String, FieldDef>>> = RwLock::new(None);
+pub static VALUE_OBJECTS: RwLock<Option<IndexMap<String, FieldDef>>> = RwLock::new(None);
 pub static DOMAIN_MODE: AtomicBool = AtomicBool::new(false);
 
 type GroupIndex = IndexMap<String, IndexMap<String, RefCell<ModelDef>>>;
@@ -94,10 +94,10 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
     }
 
     let path = Path::new(SCHEMA_PATH).join(SIMPLE_VALUE_OBJECTS_FILE);
-    let mut value_objects: HashMap<String, FieldDef> = if path.exists() {
+    let mut value_objects: IndexMap<String, FieldDef> = if path.exists() {
         parse_yml_file(&path)?
     } else {
-        HashMap::new()
+        IndexMap::new()
     };
     for (name, def) in value_objects.iter_mut() {
         ensure!(

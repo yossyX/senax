@@ -58,6 +58,7 @@ pub const DEFAULT_CONFIG_HOST: &str = "0.0.0.0";
 pub const DEFAULT_CONFIG_PORT: u16 = 9100;
 pub const API_SCHEMA_PATH: &str = "api_schema";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const SEPARATED_BASE_FILES: bool = cfg!(feature="separated-base-files");
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
 #[cfg(feature = "config")]

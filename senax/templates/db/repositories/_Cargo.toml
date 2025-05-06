@@ -7,7 +7,6 @@ publish = false
 [features]
 cache_update_only = []
 etcd = [ "senax-common/etcd" ]
-use_google_resolver = [ "hickory-resolver" ]
 
 [dependencies]
 domain = { path = "../../../../1_domain" }
@@ -28,7 +27,6 @@ derive-new.workspace = true
 dotenvy.workspace = true
 futures.workspace = true
 fxhash = "0.2"
-hickory-resolver = { version = "0.24.1", optional = true }
 includedir = "0.6.0"
 indexmap = "2"
 log.workspace = true

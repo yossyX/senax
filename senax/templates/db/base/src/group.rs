@@ -18,19 +18,13 @@ use ::std::time::Duration;
 
 use crate::{DbConn, DELAYED_DB_DIR};
 
-#[rustfmt::skip]
-#[allow(clippy::map_identity)]
-#[allow(clippy::match_single_binding)]
-#[allow(clippy::clone_on_copy)]
-#[allow(clippy::nonminimal_bool)]
-#[allow(clippy::useless_conversion)]
-#[allow(clippy::enum_variant_names)]
-#[allow(clippy::collapsible_if)]
-#[allow(clippy::assigning_clones)]
-#[allow(clippy::too_many_arguments)]
+@%- if SEPARATED_BASE_FILES %@
 @%- for name in mod_names %@
 pub mod @{ name|to_var_name }@;
 @%- endfor %@
+@%- else %@
+@{ table_output }@
+@%- endif %@
 
 #[rustfmt::skip]
 #[allow(clippy::large_enum_variant)]

@@ -9,8 +9,8 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::common::fs_write;
-use crate::filters;
+use crate::common::{fs_write, OVERWRITTEN_MSG};
+use crate::{filters, SEPARATED_BASE_FILES};
 use crate::schema::{ConfigDef, GroupsDef, ModelDef, set_domain_mode, to_id_name};
 
 pub fn write_impl_domain_rs(
@@ -160,11 +160,15 @@ pub fn write_group_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
+@%- if SEPARATED_BASE_FILES %@
 pub mod _base {
 @%- for mod_name in mod_names %@
     pub mod _@{ mod_name }@;
 @%- endfor %@
 }
+@%- else %@
+pub mod _base;
+@%- endif %@
 @%- for mod_name in mod_names %@
 pub mod @{ mod_name|to_var_name }@;
 @%- endfor %@
@@ -257,7 +261,7 @@ pub fn write_entity(
     model_name: &str,
     def: &Arc<ModelDef>,
     remove_files: &mut HashSet<OsString>,
-) -> Result<(), anyhow::Error> {
+) -> Result<String, anyhow::Error> {
     set_domain_mode(true);
     let impl_domain_group_dir = impl_domain_dir.join(group_name.to_case(Case::Snake));
     let file_path = impl_domain_group_dir.join(format!("{}.rs", mod_name));
@@ -291,9 +295,6 @@ pub fn write_entity(
         };
         fs_write(file_path, tpl.render()?)?;
     }
-    let path = impl_domain_group_dir.join("_base");
-    let file_path = path.join(format!("_{}.rs", mod_name));
-    remove_files.remove(file_path.as_os_str());
 
     #[derive(Template)]
     #[template(
@@ -321,7 +322,15 @@ pub fn write_entity(
         id_name,
         def,
     };
-    fs_write(file_path, tpl.render()?)?;
+    let ret = tpl.render()?;
     set_domain_mode(false);
-    Ok(())
+    if SEPARATED_BASE_FILES {
+        let path = impl_domain_group_dir.join("_base");
+        let file_path = path.join(format!("_{}.rs", mod_name));
+        remove_files.remove(file_path.as_os_str());
+        fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, ret))?;
+        Ok("".to_string())
+    } else {
+        Ok(format!("pub mod _{} {{\n{}}}\n", mod_name, ret))
+    }
 }
