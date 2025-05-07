@@ -159,7 +159,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
-@{- parent.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
+@{- parent.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         __Updater__::mut_{raw_var}(self).set(v{convert_domain_inner_type})
     }", "") }@
@@ -321,7 +321,7 @@ impl @{ pascal_name }@Updater for _@{ pascal_name }@Updater {
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
-@{- def.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
+@{- def.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         __Updater__::mut_{raw_var}(self).set(v{convert_domain_inner_type})
     }", "") }@

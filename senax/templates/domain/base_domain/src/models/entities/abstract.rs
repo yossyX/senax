@@ -116,7 +116,7 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common@% if !def.parents().is_empt
 pub trait @{ pascal_name }@Updater: @{ pascal_name }@Common + crate::models::MarkForDelete@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater@% endfor %@@% endif %@ {
 @{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
-@{- def.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
+@{- def.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>>;

@@ -4,7 +4,10 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use rust_decimal::Decimal;
 use senax_common::cache::calc_mem_size;
 use serde_json::Value;
+use sqlx::query::Query;
 use std::convert::TryFrom;
+
+use crate::connection::{DbArguments, DbType};
 
 #[derive(Default, sqlx::FromRow, senax_macros::SqlCol)]
 pub struct Count {
@@ -93,6 +96,25 @@ pub enum BindValue {
     Json(Option<Value>),
     Uuid(Option<uuid::fmt::Hyphenated>),
     BinaryUuid(Option<uuid::Uuid>),
+}
+
+impl BindValue {
+    pub fn bind(self, query: Query<DbType, DbArguments>) -> Query<DbType, DbArguments> {
+        log::debug!("bind: {:?}", &self);
+        match self {
+            BindValue::Bool(v) => query.bind(v),
+            BindValue::Enum(v) => query.bind(v),
+            BindValue::Number(v) => query.bind(v),
+            BindValue::String(v) => query.bind(v),
+            BindValue::DateTime(v) => query.bind(v),
+            BindValue::Date(v) => query.bind(v),
+            BindValue::Time(v) => query.bind(v),
+            BindValue::Blob(v) => query.bind(v),
+            BindValue::Json(v) => query.bind(v),
+            BindValue::Uuid(v) => query.bind(v),
+            BindValue::BinaryUuid(v) => query.bind(v),
+        }
+    }
 }
 
 macro_rules! impl_bind_value {

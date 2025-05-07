@@ -1249,7 +1249,7 @@ impl ModelDef {
             })
             .collect()
     }
-    pub fn non_primaries_wo_invisibles_and_read_only(
+    pub fn non_primaries_wo_invisible_and_read_only(
         &self,
         self_only: bool,
     ) -> Vec<(&String, &FieldDef)> {

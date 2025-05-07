@@ -3663,9 +3663,13 @@ impl QueryBuilder {
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
     {
+        let result: sqlx::Result<Vec<_>> = self.__select(T::_sql_cols(), conn).await?.iter().map(T::from_row).collect();
+        Ok(result?)
+    }
+    async fn __select(self, sql_cols: &str, conn: &mut DbConn) -> Result<Vec<DbRow>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
-        let sql = self._sql(T::_sql_cols(), false, conn.shard_id(), &filter_digest);
+        let sql = self._sql(sql_cols, false, conn.shard_id(), &filter_digest);
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         query = self._bind(query);
@@ -3674,8 +3678,7 @@ impl QueryBuilder {
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
-        let result: sqlx::Result<Vec<_>> = result.iter().map(T::from_row).collect();
-        Ok(result?)
+        Ok(result)
     }
 
     #[allow(clippy::if_same_then_else)]
@@ -3722,37 +3725,16 @@ impl QueryBuilder {
             query = c.bind_to_query(query);
         }
         for value in self.bind.into_iter() {
-            debug!("bind: {:?}", &value);
-            query = match value {
-                BindValue::Bool(v) => query.bind(v),
-                BindValue::Enum(v) => query.bind(v),
-                BindValue::Number(v) => query.bind(v),
-                BindValue::String(v) => query.bind(v),
-                BindValue::DateTime(v) => query.bind(v),
-                BindValue::Date(v) => query.bind(v),
-                BindValue::Time(v) => query.bind(v),
-                BindValue::Blob(v) => query.bind(v),
-                BindValue::Json(v) => query.bind(v),
-                BindValue::Uuid(v) => query.bind(v),
-                BindValue::BinaryUuid(v) => query.bind(v),
-            };
+            query = value.bind(query);
         }
         query
     }
 
-    async fn _select_stream<'a, T>(self, conn: &mut DbConn) -> Result<mpsc::Receiver<T>>
-    where
-        T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row>
-            + SqlColumns
-            + Send
-            + Sync
-            + Unpin
-            + 'static,
-    {
+    async fn _select_stream(self, sql_cols: &str, conn: &mut DbConn) -> Result<mpsc::Receiver<DbRow>> {
         let ctx_no = conn.ctx_no();
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = ctx_no; "filter digest:{}", filter_digest);
-        let sql = self._sql(T::_sql_cols(), false, conn.shard_id(), &filter_digest);
+        let sql = self._sql(sql_cols, false, conn.shard_id(), &filter_digest);
         let (tx, rx) = mpsc::channel(1000);
         let mut executor = conn.acquire_reader().await?;
         tokio::spawn(async move {
@@ -3768,17 +3750,9 @@ impl QueryBuilder {
                 warn!("{}", e);
                 None
             }) {
-                match T::from_row(&v) {
-                    Ok(v) => {
-                        if let Err(e) = tx.send(v).await {
-                            warn!("{}", e);
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        error!("{}", e);
-                        break;
-                    }
+                if let Err(e) = tx.send(v).await {
+                    warn!("{}", e);
+                    break;
                 }
             }
         });
@@ -3920,10 +3894,18 @@ impl QueryBuilder {
     }
 
     pub async fn select_stream(self, conn: &mut DbConn) -> Result<impl Stream<Item = _@{ pascal_name }@>> {
-        let mut rx: mpsc::Receiver<Data> = self._select_stream(conn).await?;
+        let mut rx = self._select_stream(Data::_sql_cols(), conn).await?;
         Ok(async_stream::stream! {
             while let Some(v) = rx.recv().await {
-                yield  _@{ pascal_name }@::from(v);
+                match Data::from_row(&v) {
+                    Ok(v) => {
+                        yield _@{ pascal_name }@::from(v);
+                    }
+                    Err(e) => {
+                        error!("{}", e);
+                        break;
+                    }
+                }
             }
         })
     }
@@ -3932,10 +3914,18 @@ impl QueryBuilder {
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin + 'static,
     {
-        let mut rx: mpsc::Receiver<T> = self._select_stream(conn).await?;
+        let mut rx = self._select_stream(T::_sql_cols(), conn).await?;
         Ok(async_stream::stream! {
             while let Some(v) = rx.recv().await {
-                yield  v;
+                match T::from_row(&v) {
+                    Ok(v) => {
+                        yield v;
+                    }
+                    Err(e) => {
+                        error!("{}", e);
+                        break;
+                    }
+                }
             }
         })
     }
@@ -3991,20 +3981,7 @@ impl QueryBuilder {
             query = c.bind_to_query(query);
         }
         for value in self.bind.into_iter() {
-            debug!("bind: {:?}", &value);
-            query = match value {
-                BindValue::Bool(v) => query.bind(v),
-                BindValue::Enum(v) => query.bind(v),
-                BindValue::Number(v) => query.bind(v),
-                BindValue::String(v) => query.bind(v),
-                BindValue::DateTime(v) => query.bind(v),
-                BindValue::Date(v) => query.bind(v),
-                BindValue::Time(v) => query.bind(v),
-                BindValue::Blob(v) => query.bind(v),
-                BindValue::Json(v) => query.bind(v),
-                BindValue::Uuid(v) => query.bind(v),
-                BindValue::BinaryUuid(v) => query.bind(v),
-            };
+            query = value.bind(query);
         }
         let now = std::time::Instant::now();
         let result = if conn.wo_tx() {
@@ -4074,20 +4051,7 @@ impl QueryBuilder {
             query = c.bind_to_query(query);
         }
         for value in self.bind.into_iter() {
-            debug!("bind: {:?}", &value);
-            query = match value {
-                BindValue::Bool(v) => query.bind(v),
-                BindValue::Enum(v) => query.bind(v),
-                BindValue::Number(v) => query.bind(v),
-                BindValue::String(v) => query.bind(v),
-                BindValue::DateTime(v) => query.bind(v),
-                BindValue::Date(v) => query.bind(v),
-                BindValue::Time(v) => query.bind(v),
-                BindValue::Blob(v) => query.bind(v),
-                BindValue::Json(v) => query.bind(v),
-                BindValue::Uuid(v) => query.bind(v),
-                BindValue::BinaryUuid(v) => query.bind(v),
-            };
+            query = value.bind(query);
         }
         let now = std::time::Instant::now();
         let result = if conn.wo_tx() {
@@ -5013,7 +4977,7 @@ impl _@{ pascal_name }@_ {
         obj.__set_default_value(conn).await?;
         let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) 
             VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
-        let query = bind_to_query(sql, &obj._data);
+        let query = bind_to_query(sqlx::query(sql), &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await?
@@ -6145,7 +6109,7 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, re
     } else {
         r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#
     };
-    let query = bind_to_query(sql, &obj._data);
+    let query = bind_to_query(sqlx::query(sql), &obj._data);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     let result = if conn.wo_tx() {
         query.execute(conn.acquire_writer().await?.as_mut()).await?
@@ -6196,7 +6160,7 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     let mut update_cache = false; // To distinguish from updates that do not require cache updates
     if obj.is_updated() {
         let mut vec: Vec<String> = Vec::new();
-        @{- def.non_primaries_wo_invisibles_and_read_only(false)|fmt_join_cache_or_not("
+        @{- def.non_primaries_wo_invisible_and_read_only(false)|fmt_join_cache_or_not("
         crate::misc::assign_sql!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, update_cache, \"{placeholder}\");", "
         crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         @%- if def.versioned %@
@@ -6212,7 +6176,7 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        @{- def.non_primaries_wo_invisibles_and_read_only(false)|fmt_join("
+        @{- def.non_primaries_wo_invisible_and_read_only(false)|fmt_join("
         for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{var}{bind_as});
         }","") }@
@@ -6298,7 +6262,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     let sql = format!(r#"INSERT INTO @{ table_name|db_esc }@ 
         (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) 
         VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@) ON DUPLICATE KEY UPDATE {}"#, &vec.join(","));
-    let query = bind_to_query(&sql, &obj._data);
+    let query = bind_to_query(sqlx::query(&sql), &obj._data);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     let query = bind_non_primaries(&obj, query, &sql);
     let result = if conn.wo_tx() {
@@ -6549,7 +6513,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for data in list {
-@{- def.all_fields_wo_read_only()|fmt_join("\n            query = query.bind(data._data.{var}{bind_as});", "") }@
+            query = bind_to_query(query, &data._data);
         }
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await?
@@ -6665,8 +6629,7 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     for data in list {
-@{- def.all_fields_wo_read_only()|fmt_join("
-        query = query.bind(data.{var}{bind_as});", "") }@
+        query = bind_to_query(query, data);
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "bulk_upsert", ctx = conn.ctx_no(); "{}", &data);
         debug!("{:?}", &data);
     }
@@ -6734,8 +6697,7 @@ fn make_force_indexes(filter_digest: &str) -> Vec<&'static str> {
 }
 
 #[allow(clippy::needless_borrow)]
-fn bind_to_query<'a>(sql: &'a str, data: &'a Data) -> Query<'a, DbType, DbArguments> {
-    let mut query = sqlx::query(sql);
+fn bind_to_query<'a>(mut query: Query<'a, DbType, DbArguments>, data: &'a Data) -> Query<'a, DbType, DbArguments> {
     @{- def.all_fields_wo_read_only()|fmt_join("
     query = query.bind(data.{var}{bind_as});", "") }@
     query

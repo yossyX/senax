@@ -289,7 +289,7 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent 
 pub trait @{ pascal_name }@Updater: downcast_rs::Downcast + Send + Sync + @{ pascal_name }@Common + crate::models::MarkForDelete@% for parent in def.parent() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater@% endfor %@ + 'static {
 @{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
-@{- def.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
+@{- def.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>>;
@@ -376,7 +376,7 @@ impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_na
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
-@{- parent.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
+@{- parent.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         self.{var} = v{convert_domain_factory}
     }", "") }@
@@ -497,7 +497,7 @@ impl @{ pascal_name }@Updater for @{ pascal_name }@Entity {
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
-@{- def.non_primaries_wo_invisibles_and_read_only(true)|fmt_join("
+@{- def.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         self.{var} = v{convert_domain_factory}
     }", "") }@

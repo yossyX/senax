@@ -15,7 +15,7 @@ pub use db_session_session::repositories::session::session::{_SessionStore, SESS
 pub use senax_actix_session::Session;
 @%- endif %@
 
-use crate::_base::auth::{AuthInfo, Role};
+use crate::_base::auth::AuthInfo;
 use crate::_base::context::Ctx;
 use crate::_base::db::RepositoryImpl;
 
@@ -39,7 +39,7 @@ impl MutationRoot {
         &self,
         gql_ctx: &async_graphql::Context<'_>, // Context must be next to self
         #[graphql(validator(max_length = 255))] username: String,
-        role: Role,
+        role: crate::_base::auth::Role,
     ) -> async_graphql::Result<String> {
         let exp = chrono::Utc::now()
             .checked_add_signed(chrono::Duration::hours(24))
