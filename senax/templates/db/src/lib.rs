@@ -26,6 +26,7 @@ pub mod impl_domain;
 #[allow(clippy::module_inception)]
 pub mod models;
 #[rustfmt::skip]
+#[cfg(feature = "seeder")]
 pub mod seeder;
 
 #[allow(unused_variables)]

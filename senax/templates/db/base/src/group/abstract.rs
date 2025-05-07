@@ -1,5 +1,4 @@
 use anyhow::Result;
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -18,7 +17,8 @@ use crate::models::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ 
 @% endfor %@
 @% for (name, column_def) in def.num_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, FromRepr, IntoStaticStr, JsonSchema)]
+#[derive(Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, FromRepr, IntoStaticStr)]
+#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
 #[repr(@{ column_def.get_inner_type(true, true) }@)]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
@@ -86,7 +86,8 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 @% endfor -%@
 @% for (name, column_def) in def.str_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
+#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum _@{ name|pascal }@ {

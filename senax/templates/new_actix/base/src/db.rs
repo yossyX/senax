@@ -89,10 +89,7 @@ pub fn gen_seed_schema() -> Result<()> {
     Ok(())
 }
 
-pub async fn seed(use_test: bool) -> Result<()> {
-    @%- if session %@
-    db_session::seeder::seed(use_test, None).await?;
-    @%- endif %@
+pub async fn seed(_use_test: bool) -> Result<()> {
     // Do not modify this line. (seed)
     Ok(())
 }

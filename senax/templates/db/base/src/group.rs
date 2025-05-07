@@ -9,7 +9,6 @@
 use ::anyhow::Result;
 use ::fxhash::FxHashMap;
 use ::indexmap::IndexMap;
-use ::schemars::JsonSchema;
 use ::senax_common::{cache::msec::MSec, ShardId};
 use ::serde::{Deserialize, Serialize};
 use ::std::path::Path;
@@ -36,7 +35,8 @@ pub enum CacheOp {
 }
 
 #[rustfmt::skip]
-#[derive(JsonSchema)]
+#[cfg(feature = "seeder")]
+#[derive(::schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct @{ group_name|pascal }@ {
 @%- for (name, (_, def)) in models %@

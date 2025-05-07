@@ -6,7 +6,6 @@ use crossbeam::queue::SegQueue;
 use derive_more::Display;
 use fxhash::{FxHashMap, FxHasher64};
 use once_cell::sync::OnceCell;
-use schemars::JsonSchema;
 use senax_common::cache::db_cache::{CacheVal, HashVal};
 use senax_common::cache::msec::MSec;
 use senax_common::cache::calc_mem_size;
@@ -34,7 +33,7 @@ use crate::connection::{DbArguments, DbConn, DbRow, DbType};
 use crate::misc::ToJsonBlob as _;
 use crate::misc::{BindValue, Updater, Size, TrashMode};
 use crate::models::USE_FAST_CACHE;
-use crate::{self as db, accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
+use crate::{self as db, accessor::*, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
 @%- if !config.exclude_from_domain %@
 use base_domain as domain;
 #[allow(unused_imports)]
@@ -197,7 +196,8 @@ impl CacheOp {
 }
 
 @% for (name, column_def) in def.id_except_auto_increment() -%@
-#[derive(Deserialize, Serialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, Default, JsonSchema)]
+#[derive(Deserialize, Serialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, Default)]
+#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
 #[serde(transparent)]
 @%- if !column_def.is_displayable() %@
 #[display("{:?}", _0)]
@@ -205,13 +205,14 @@ impl CacheOp {
 pub struct @{ id_name }@(pub @{ column_def.get_inner_type(false, false) }@);
 @% endfor -%@
 @% for (name, column_def) in def.id_auto_inc_or_seq() -%@
-#[derive(Serialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, Default, JsonSchema)]
+#[derive(Serialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, Default)]
+#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
 #[serde(transparent)]
 @%- if !column_def.is_displayable() %@
 #[display("{:?}", _0)]
 @%- endif %@
 pub struct @{ id_name }@(
-    #[schemars(schema_with = "crate::misc::id_schema")]
+    #[cfg_attr(feature = "seeder", schemars(schema_with = "crate::misc::id_schema"))]
     pub @{ column_def.get_inner_type(true, false) }@
 );
 
@@ -439,7 +440,8 @@ impl sqlx::FromRow<'_, DbRow> for CacheData {
 
 @% for (name, column_def) in def.num_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, FromRepr, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
+#[derive(Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, FromRepr, EnumMessage, EnumString, IntoStaticStr)]
+#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
 #[repr(@{ column_def.get_inner_type(true, true) }@)]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
@@ -507,7 +509,8 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 @% endfor -%@
 @% for (name, column_def) in def.str_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr, JsonSchema)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
+#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum _@{ name|pascal }@ {
@@ -696,7 +699,8 @@ impl HashVal for CacheSyncWrapper {
 }
 @%- endif %@
 
-#[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct _@{ pascal_name }@Factory {
 @{ def.for_factory()|fmt_join("{label}{comment}{factory_default}    pub {var}: {factory},", "\n") }@

@@ -132,18 +132,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
 
     db::base::write_files(&base_dir, db, &groups, &config, force, non_snake_case)?;
 
-    let file_path = model_src_dir.join("main.rs");
-    if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(path = "db/src/main.rs", escape = "none")]
-        struct MainTemplate<'a> {
-            pub db: &'a str,
-        }
-
-        let tpl = MainTemplate { db };
-        fs_write(file_path, tpl.render()?)?;
-    }
-
     #[derive(Template)]
     #[template(path = "db/src/seeder.rs", escape = "none")]
     struct SeederTemplate<'a> {
