@@ -50,6 +50,7 @@ impl fmt::Display for Table {
             "{}",
             self.indexes
                 .values()
+                .filter(|index| !matches!(index, TableKey::Key(_, x) if x.is_empty()))
                 .map(|index| format!(",\n    {}", index))
                 .collect::<Vec<_>>()
                 .join("")
