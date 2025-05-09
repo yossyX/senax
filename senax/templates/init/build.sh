@@ -6,7 +6,6 @@ senax model -c
 
 # Do not modify this line. (Api)
 
-cargo run -- gen-seed-schema
 cargo run -- gql-schema > schema.graphql
 if sed --version 2>&1 | grep -q GNU; then
   sed -i '/login/d' schema.graphql

@@ -11,7 +11,7 @@ use ::senax_common::{cache::msec::MSec, ShardId};
 pub mod @{ name|snake|to_var_name }@;
 @%- endfor %@
 @%- for name in ref_groups %@
-pub use db_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|to_var_name }@;
+pub use _db_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|to_var_name }@;
 @%- endfor %@
 
 pub(crate) struct Controller;

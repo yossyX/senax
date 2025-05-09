@@ -187,12 +187,14 @@ pub fn session() -> Result<()> {
     }
 
     let file_path = schema_path.join("session.yml");
-    let tpl = SessionTemplate {
-        db_id: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_micros() as u64,
-    };
-    fs_write(file_path, tpl.render()?)?;
+    if !file_path.exists() {
+        let tpl = SessionTemplate {
+            db_id: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_micros() as u64,
+        };
+        fs_write(file_path, tpl.render()?)?;
+    }
     Ok(())
 }

@@ -69,21 +69,6 @@ pub struct DbModTemplate<'a> {
 #[template(
     source = r###"
     @%- for name in add_groups %@
-    db_@{ db|snake }@_@{ name|snake }@::init();
-    @%- endfor %@
-    // Do not modify this line. (GqlInit)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct DbInitTemplate<'a> {
-    pub db: &'a str,
-    pub add_groups: &'a BTreeSet<String>,
-}
-
-#[derive(Template)]
-#[template(
-    source = r###"
-    @%- for name in add_groups %@
     @%- if !camel_case %@
     #[graphql(name = "@{ name }@")]
     @%- endif %@

@@ -11,7 +11,7 @@ use anyhow::{ensure, Context, Result};
 use async_graphql::{EmptySubscription, Schema};
 use clap::{Parser, Subcommand};
 @%- if session %@
-use db_session_session::repositories::session::session::_SessionStore;
+use db_session_repositories::session::session::_SessionStore;
 @%- endif %@
 use dotenvy::dotenv;
 use mimalloc::MiMalloc;
@@ -81,6 +81,8 @@ enum Command {
     GqlSchema,
     /// Execute database migration
     Migrate {
+        #[clap(long)]
+        db: Option<String>,
         /// Drop database before migrating
         #[clap(short, long)]
         clean: bool,
@@ -98,6 +100,8 @@ enum Command {
     GenSeedSchema,
     /// Import the database seed.
     Seed {
+        #[clap(long)]
+        db: Option<String>,
         /// Use clean migration
         #[clap(short, long)]
         clean: bool,
@@ -131,6 +135,7 @@ async fn main() -> Result<()> {
     dotenv().ok();
     #[cfg(feature = "etcd")]
     senax_common::etcd::init().await?;
+    db::init();
 
     let arg: AppArg = AppArg::parse();
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
@@ -176,6 +181,7 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             Command::Migrate {
+                db,
                 clean,
                 force_delete_all_db,
                 ignore_missing,
@@ -187,7 +193,7 @@ async fn main() -> Result<()> {
                         "clean migrate is debug environment only"
                     );
                 }
-                _base::db::migrate(test, clean || force_delete_all_db, ignore_missing).await?;
+                _base::db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing).await?;
                 return Ok(());
             }
             Command::GenSeedSchema => {
@@ -195,6 +201,7 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             Command::Seed {
+                db,
                 clean,
                 force_delete_all_db,
                 ignore_missing,
@@ -205,9 +212,9 @@ async fn main() -> Result<()> {
                         force_delete_all_db || cfg!(debug_assertions),
                         "clean migrate is debug environment only"
                     );
-                    _base::db::migrate(test, clean || force_delete_all_db, ignore_missing).await?;
+                    _base::db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing).await?;
                 }
-                _base::db::seed(test).await?;
+                _base::db::seed(db.as_deref(), test).await?;
                 return Ok(());
             }
             Command::OpenApi => {
@@ -233,7 +240,7 @@ async fn main() -> Result<()> {
     )?;
     if arg.auto_migrate {
         info!("Starting migration");
-        if let Err(e) = _base::db::migrate(false, false, true).await {
+        if let Err(e) = _base::db::migrate(None, false, false, true).await {
             error!("{}", e);
             std::process::exit(1);
         }

@@ -39,7 +39,7 @@ pub fn write_group_files(
     remove_files.remove(file_path.as_os_str());
     let mut content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "db/repositories/_Cargo.toml", escape = "none")]
+        #[template(path = "db/repositories/group/_Cargo.toml", escape = "none")]
         struct Template<'a> {
             db: &'a str,
             group: &'a str,
@@ -56,7 +56,7 @@ pub fn write_group_files(
             content = content.replace(
                 "[dependencies]",
                 &format!(
-                    "[dependencies]\ndb_{}_{} = {{ path = \"../{}\" }}",
+                    "[dependencies]\n_db_{}_{} = {{ path = \"../{}\" }}",
                     db, group, group
                 ),
             );
@@ -69,7 +69,7 @@ pub fn write_group_files(
     remove_files.remove(file_path.as_os_str());
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "db/repositories/src/lib.rs", escape = "none")]
+        #[template(path = "db/repositories/group/src/lib.rs", escape = "none")]
         struct LibTemplate<'a> {
             pub group: &'a str,
             pub config: &'a ConfigDef,
@@ -80,7 +80,7 @@ pub fn write_group_files(
     }
 
     #[derive(Template)]
-    #[template(path = "db/repositories/src/repositories.rs", escape = "none")]
+    #[template(path = "db/repositories/group/src/repositories.rs", escape = "none")]
     struct RepositoriesTemplate<'a> {
         pub db: &'a str,
         pub config: &'a ConfigDef,
@@ -99,7 +99,7 @@ pub fn write_group_files(
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "db/repositories/src/misc.rs", escape = "none")]
+    #[template(path = "db/repositories/group/src/misc.rs", escape = "none")]
     struct MiscTemplate<'a> {
         pub config: &'a ConfigDef,
     }
@@ -137,7 +137,7 @@ pub fn write_group_files(
             .collect();
 
         #[derive(Template)]
-        #[template(path = "db/repositories/src/group.rs", escape = "none")]
+        #[template(path = "db/repositories/group/src/group.rs", escape = "none")]
         struct GroupTemplate<'a> {
             pub group_name: &'a str,
             pub mod_names: &'a BTreeSet<String>,
@@ -188,7 +188,7 @@ pub fn write_group_files(
                 remove_files.remove(file_path.as_os_str());
                 if force || !file_path.exists() {
                     #[derive(Template)]
-                    #[template(path = "db/repositories/src/group/table.rs", escape = "none")]
+                    #[template(path = "db/repositories/group/src/group/table.rs", escape = "none")]
                     struct GroupTableTemplate<'a> {
                         pub db: &'a str,
                         pub base_group_name: &'a str,
@@ -241,7 +241,7 @@ pub fn write_group_files(
                 }
 
                 #[derive(Template)]
-                #[template(path = "db/repositories/src/group/base/_table.rs", escape = "none")]
+                #[template(path = "db/repositories/group/src/group/base/_table.rs", escape = "none")]
                 struct GroupBaseTableTemplate<'a> {
                     pub db: &'a str,
                     pub base_group_name: &'a str,

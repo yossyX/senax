@@ -64,10 +64,12 @@ impl Repository for RepositoryImpl {
 }
 
 #[rustfmt::skip]
-pub async fn migrate(use_test: bool, clean: bool, ignore_missing: bool) -> Result<()> {
+pub async fn migrate(db: Option<&str>, use_test: bool, clean: bool, ignore_missing: bool) -> Result<()> {
     let mut join_set = tokio::task::JoinSet::new();
     @%- if session %@
-    join_set.spawn_local(db_session::migrate(use_test, clean, ignore_missing));
+    if db.is_none() || db == Some("session") {
+        join_set.spawn_local(db_session::migrate(use_test, clean, ignore_missing));
+    }
     @%- endif %@
     // Do not modify this line. (migrate)
     let mut error = None;
@@ -86,12 +88,14 @@ pub async fn migrate(use_test: bool, clean: bool, ignore_missing: bool) -> Resul
 
 pub fn gen_seed_schema() -> Result<()> {
     // Do not modify this line. (gen_seed_schema)
-    Ok(())
+    panic!("The gen_seed_schema function needs to be modified");
+    // Ok(())
 }
 
-pub async fn seed(_use_test: bool) -> Result<()> {
+pub async fn seed(_db: Option<&str>, _use_test: bool) -> Result<()> {
     // Do not modify this line. (seed)
-    Ok(())
+    panic!("The seed function needs to be modified");
+    // Ok(())
 }
 
 #[rustfmt::skip]

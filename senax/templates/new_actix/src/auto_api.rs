@@ -10,7 +10,7 @@ use utoipa_actix_web::scope;
 @%- if session %@
 
 #[allow(unused_imports)]
-pub use db_session_session::repositories::session::session::{_SessionStore, SESSION_ROLE};
+pub use db_session_repositories::session::session::{_SessionStore, SESSION_ROLE};
 #[allow(unused_imports)]
 pub use senax_actix_session::Session;
 @%- endif %@

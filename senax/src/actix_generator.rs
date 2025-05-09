@@ -90,8 +90,10 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
             content = content.replace(
                 "[dependencies]",
                 &format!(
-                    "[dependencies]\ndb_{} = {{ path = \"../2_db/{}\" }}",
-                    db, db
+                    "[dependencies]
+db_{} = {{ path = \"../2_db/{}\" }}
+db_{}_repositories = {{ path = \"../2_db/{}/repositories\" }}",
+                    db, db, db, db
                 ),
             );
         }
@@ -588,7 +590,7 @@ impl Secret {
 #[derive(Template)]
 #[template(
     source = r###"
-    crate::auto_api::@{ db|snake|to_var_name }@::init();
+    db_@{ db|snake }@_repositories::init();
     // Do not modify this line. (DbInit)"###,
     ext = "txt",
     escape = "none"
@@ -746,7 +748,9 @@ pub struct DbRepoImplRollbackTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    join_set.spawn_local(db_@{ db|snake }@::migrate(use_test, clean, ignore_missing));
+    if db.is_none() || db == Some("@{ db }@") {
+        join_set.spawn_local(db_@{ db|snake }@::migrate(use_test, clean, ignore_missing));
+    }
     // Do not modify this line. (migrate)"###,
     ext = "txt",
     escape = "none"

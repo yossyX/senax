@@ -6,8 +6,6 @@ publish = false
 
 [dependencies]
 domain = { path = "../../../../1_domain" }
-db_@{ db|snake }@ = { path = "../../../../2_db/@{ db|snake }@" }
-db_@{ db|snake }@_@{ group_name|snake }@ = { path = "../../../../2_db/@{ db|snake }@/repositories/@{ group_name|snake }@" }
 _@{ server|snake }@ = { path = "../../../base" }
 
 actix-web = "4.1"

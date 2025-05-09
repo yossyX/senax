@@ -239,18 +239,6 @@ pub fn generate(
         let file_path = server_dir.join("Cargo.toml");
         if file_path.exists() {
             let mut content = fs::read_to_string(&file_path)?;
-            let db_mod = &db.to_case(Case::Snake);
-            let reg = Regex::new(&format!(r"(?m)^db_{}_{}\s*=", db_mod, group_mod_name))?;
-            if !reg.is_match(&content) {
-                content = content.replace(
-                    "[dependencies]",
-                    &format!(
-                        "[dependencies]\ndb_{}_{} = {{ path = \"../2_db/{}/repositories/{}\" }}",
-                        db_mod, group_mod_name, db_mod, group_mod_name
-                    ),
-                );
-            }
-
             let name = server.to_case(Case::Snake);
             let db_route = db_route.to_case(Case::Snake);
             let group_route = group_route.to_case(Case::Snake);
@@ -459,8 +447,6 @@ fn write_db_file(
         add_groups,
     };
     let content = re.replace(&content, tpl.render()?);
-    let tpl = template::DbInitTemplate { db, add_groups };
-    let content = content.replace("\n    // Do not modify this line. (DbInit)", &tpl.render()?);
     let tpl = template::DbQueryTemplate {
         db_route,
         add_groups,

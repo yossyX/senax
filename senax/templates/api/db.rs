@@ -6,10 +6,6 @@ use crate::_base::auto_api::{Role, RoleGuard};
 
 // Do not modify this line. (GqlMod:)
 
-pub fn init() {
-    // Do not modify this line. (DbInit)
-}
-
 pub struct GqlQuery@{ db_route|pascal }@;
 #[Object]
 impl GqlQuery@{ db_route|pascal }@ {

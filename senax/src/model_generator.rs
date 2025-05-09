@@ -98,7 +98,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     }
 
     let tpl = ModelsTemplate {
-        groups: &groups,
+        groups,
         config: &config,
     };
     fs_write(file_path, tpl.render()?)?;
@@ -132,6 +132,18 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
 
     db::base::write_files(&base_dir, db, &groups, &config, force, non_snake_case)?;
 
+    let file_path = model_src_dir.join("main.rs");
+    if force || !file_path.exists() {
+        #[derive(Template)]
+        #[template(path = "db/src/main.rs", escape = "none")]
+        struct MainTemplate<'a> {
+            pub db: &'a str,
+        }
+
+        let tpl = MainTemplate { db };
+        fs_write(file_path, tpl.render()?)?;
+    }
+
     #[derive(Template)]
     #[template(path = "db/src/seeder.rs", escape = "none")]
     struct SeederTemplate<'a> {
@@ -139,7 +151,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     }
 
     let file_path = model_src_dir.join("seeder.rs");
-    let tpl = SeederTemplate { groups: &groups };
+    let tpl = SeederTemplate { groups };
     fs_write(file_path, tpl.render()?)?;
 
     let path = model_dir.join("migrations");
@@ -190,6 +202,31 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             };
         }
     }
+
+    #[derive(Template)]
+    #[template(path = "db/repositories/_Cargo.toml", escape = "none")]
+    struct RepositoriesCargoTemplate<'a> {
+        pub db: &'a str,
+        pub groups: &'a GroupsDef,
+    }
+
+    let file_path = db_repositories_dir.join("Cargo.toml");
+    remove_files.remove(file_path.as_os_str());
+    let tpl = RepositoriesCargoTemplate { db, groups };
+    fs_write(file_path, tpl.render()?)?;
+
+    
+    #[derive(Template)]
+    #[template(path = "db/repositories/src/lib.rs", escape = "none")]
+    struct RepositoriesLibTemplate<'a> {
+        pub db: &'a str,
+        pub groups: &'a GroupsDef,
+    }
+
+    let file_path = db_repositories_dir.join("src/lib.rs");
+    remove_files.remove(file_path.as_os_str());
+    let tpl = RepositoriesLibTemplate { db, groups };
+    fs_write(file_path, tpl.render()?)?;
 
     for (group_name, (_, defs)) in groups {
         begin_traverse(&group_name);

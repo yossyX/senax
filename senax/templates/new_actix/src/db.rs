@@ -3,9 +3,9 @@ use rand::RngCore;
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc;
 
-fn init() {
+pub fn init() {
     @%- if session %@
-    db_session_session::init();
+    db_session_repositories::init();
     @%- endif %@
     // Do not modify this line. (DbInit)
 }
@@ -18,7 +18,6 @@ pub async fn start(
     linker_port: &Option<String>,
     pw: &Option<String>,
 ) -> Result<()> {
-    init();
     let mut uuid_node = [0u8; 6];
     rand::rng().fill_bytes(&mut uuid_node);
     let uuid_node = Some(uuid_node);
