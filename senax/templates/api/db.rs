@@ -4,7 +4,7 @@ use utoipa_actix_web::scope;
 #[allow(unused_imports)]
 use crate::_base::auto_api::{Role, RoleGuard};
 
-// Do not modify this line. (GqlMod:)
+// Do not modify this line. (GqlMod)
 
 pub struct GqlQuery@{ db_route|pascal }@;
 #[Object]

@@ -96,9 +96,9 @@ function EditValue() {
     <>
       <ScrollRestoration />
       <Helmet>
-        <title>Senax Value Object Configuration</title>
+        <title>Senax Value Object Configuration ({data.name || 'New'})</title>
       </Helmet>
-      <ContentLayout header={<Header variant="h1">Value Object</Header>}>
+      <ContentLayout header={<Header variant="h1">{data.name || 'New'}</Header>}>
         <Container
           header={
             <Header

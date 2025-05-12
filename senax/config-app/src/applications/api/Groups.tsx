@@ -16,7 +16,7 @@ function Groups() {
   return (
     <>
       <Helmet>
-        <title>Senax Database Api Server ({db})</title>
+        <title>Senax Api Server ({db})</title>
       </Helmet>
       <ContentLayout
         header={

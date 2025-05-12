@@ -81,7 +81,7 @@ function Values() {
       <Helmet>
         <title>Senax Value Objects</title>
       </Helmet>
-      <ContentLayout header={<Header variant="h1">Value Objects</Header>}>
+      <ContentLayout header={<Header variant="h1">Simple Value Objects</Header>}>
         <Container
           header={
             <Header

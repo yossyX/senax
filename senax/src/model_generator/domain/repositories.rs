@@ -1,7 +1,7 @@
 use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
-use crate::{filters, SEPARATED_BASE_FILES};
 use crate::model_generator::REL_START;
 use crate::schema::{GroupsDef, IS_MAIN_GROUP};
+use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{
     common::fs_write,
     schema::{ModelDef, set_domain_mode, to_id_name},
@@ -40,21 +40,20 @@ pub fn write_group_files(
         }
         Template { db, group_name }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
+    let reg = Regex::new(r"(?m)^repository_\w+\s*=.+\n")?;
+    content = reg.replace_all(&content, "").into_owned();
     for group in ref_groups {
-        let reg = Regex::new(&format!(r"(?m)^repository_{}_{}\s*=", db, group))?;
-        if !reg.is_match(&content) {
-            let db = &db.to_case(Case::Snake);
-            let group = &group.to_case(Case::Snake);
-            content = content.replace(
-                "[dependencies]",
-                &format!(
-                    "[dependencies]\nrepository_{}_{} = {{ path = \"../{}\" }}",
-                    db, group, group
-                ),
-            );
-        }
+        let db = &db.to_case(Case::Snake);
+        let group = &group.to_case(Case::Snake);
+        content = content.replace(
+            "[dependencies]",
+            &format!(
+                "[dependencies]\nrepository_{}_{} = {{ path = \"../{}\" }}",
+                db, group, group
+            ),
+        );
     }
     fs_write(file_path, &*content)?;
 
@@ -82,7 +81,7 @@ pub fn write_group_files(
         }
         Template { group_name }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
     {
         #[derive(Template)]
@@ -252,7 +251,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             };
             Template { group_name: &name }.render()?
         } else {
-            fs::read_to_string(&file_path)?
+            fs::read_to_string(&file_path)?.replace("\r\n", "\n")
         };
         {
             let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
@@ -409,9 +408,7 @@ pub mod @{ mod_name|to_var_name }@;
             fs_write(file_path, &*content)?;
         }
         let mut output = String::new();
-        output.push_str(
-            OVERWRITTEN_MSG,
-        );
+        output.push_str(OVERWRITTEN_MSG);
         for (model_name, (_, def)) in defs {
             let group_name = name;
             let mod_name = def.mod_name();
@@ -451,7 +448,7 @@ pub fn write_lib_rs(
     let content = if force || !file_path.exists() {
         crate::db_generator::DomainDbLibTemplate { db }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
 
     #[derive(Template)]
@@ -596,39 +593,35 @@ pub fn write_cargo_toml(
 ) -> Result<()> {
     let file_path = domain_repositories_dir.join("Cargo.toml");
     let mut content = if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(path = "domain/db_repositories/_Cargo.toml", escape = "none")]
-        struct DomainCargoTemplate<'a> {
-            db: &'a str,
-        }
-        DomainCargoTemplate { db }.render()?
+        crate::db_generator::DomainCargoTemplate { db }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    for (group, _) in groups {
-        let reg = Regex::new(&format!(r"(?m)^repository_{}_{}\s*=", db, group))?;
-        if !reg.is_match(&content) {
-            let db = &db.to_case(Case::Snake);
-            let group = &group.to_case(Case::Snake);
-            content = content.replace(
-                "\"mockall\"",
-                &format!("\"mockall\",\"repository_{}_{}/mock\"", db, group),
-            );
-            content = content.replace(
-                "[dependencies]",
-                &format!(
-                    "[dependencies]\nrepository_{}_{} = {{ path = \"groups/{}\" }}",
-                    db, group, group
-                ),
-            );
-            content = content.replace(
-                "[dev-dependencies]",
-                &format!(
-                    "[dev-dependencies]\nrepository_{}_{} = {{ path = \"groups/{}\", features = [\"mock\"] }}",
-                    db, group, group
-                ),
-            );
-        }
+    let reg = Regex::new(r"(?m)^repository_\w+\s*=.+\n")?;
+    content = reg.replace_all(&content, "").into_owned();
+    let reg = Regex::new(r#"[ \t]*"repository_\w+/mock"[ \t]*,?[ \t]*\n?"#)?;
+    content = reg.replace_all(&content, "").into_owned();
+    for (group, (_, _)) in groups.iter().rev() {
+        let db = &db.to_case(Case::Snake);
+        let group = &group.to_case(Case::Snake);
+        content = content.replace(
+            "\"mockall\"",
+            &format!("\"mockall\",\n    \"repository_{}_{}/mock\"", db, group),
+        );
+        content = content.replace(
+            "[dependencies]",
+            &format!(
+                "[dependencies]\nrepository_{}_{} = {{ path = \"groups/{}\" }}",
+                db, group, group
+            ),
+        );
+        content = content.replace(
+            "[dev-dependencies]",
+            &format!(
+                "[dev-dependencies]\nrepository_{}_{} = {{ path = \"groups/{}\", features = [\"mock\"] }}",
+                db, group, group
+            ),
+        );
     }
     fs_write(file_path, &*content)?;
     Ok(())

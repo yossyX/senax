@@ -128,19 +128,21 @@ pub struct Relation {
     pub relations: Vec<Arc<Relation>>,
 }
 
-pub fn generate(server_path: &Path, db: &str, group: &Option<String>) -> Result<ApiDef> {
+pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef> {
+    let server_dir = Path::new(server);
+    ensure!(
+        server_dir.exists() && server_dir.is_dir(),
+        "The crate path does not exist."
+    );
+
     crate::schema::parse(db, true, false)?;
     crate::schema::set_domain_mode(true);
 
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
-    ensure!(
-        server_path.exists() && server_path.is_dir(),
-        "The crate path does not exist."
-    );
     let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
 
-    let schema_dir = server_path.join(API_SCHEMA_PATH);
+    let schema_dir = server_dir.join(API_SCHEMA_PATH);
     let config_path = schema_dir.join("_config.yml");
     let api_config: ApiConfigDef = parse_yml_file(&config_path)?;
     API_CONFIG.write().unwrap().replace(api_config.clone());

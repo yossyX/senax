@@ -9,9 +9,9 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::common::{fs_write, OVERWRITTEN_MSG};
-use crate::{filters, SEPARATED_BASE_FILES};
+use crate::common::{OVERWRITTEN_MSG, fs_write};
 use crate::schema::{ConfigDef, GroupsDef, ModelDef, set_domain_mode, to_id_name};
+use crate::{SEPARATED_BASE_FILES, filters};
 
 pub fn write_impl_domain_rs(
     src_dir: &Path,
@@ -25,7 +25,7 @@ pub fn write_impl_domain_rs(
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "db/repositories/group/src/impl_domain.rs", escape = "none")]
+        #[template(path = "db/repositories/src/impl_domain.rs", escape = "none")]
         struct ImplDomainDbTemplate<'a> {
             db: &'a str,
             group_name: &'a str,
@@ -33,7 +33,7 @@ pub fn write_impl_domain_rs(
 
         ImplDomainDbTemplate { db, group_name }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
 
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
@@ -131,7 +131,7 @@ pub fn write_group_rs(
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "db/repositories/group/src/impl_domain/group.rs", escape = "none")]
+        #[template(path = "db/repositories/src/impl_domain/group.rs", escape = "none")]
         struct GroupTemplate<'a> {
             db: &'a str,
             base_group_name: &'a str,
@@ -145,7 +145,7 @@ pub fn write_group_rs(
         }
         .render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
 
     let mod_names: BTreeSet<String> = entities_mod_names.iter().map(|v| v.0.clone()).collect();
@@ -271,7 +271,7 @@ pub fn write_entity(
     if force || !file_path.exists() {
         #[derive(Template)]
         #[template(
-            path = "db/repositories/group/src/impl_domain/entities/entity.rs",
+            path = "db/repositories/src/impl_domain/entities/entity.rs",
             escape = "none"
         )]
         struct EntityTemplate<'a> {
@@ -298,7 +298,7 @@ pub fn write_entity(
 
     #[derive(Template)]
     #[template(
-        path = "db/repositories/group/src/impl_domain/entities/base/_entity.rs",
+        path = "db/repositories/src/impl_domain/entities/base/_entity.rs",
         escape = "none"
     )]
     struct BaseEntityTemplate<'a> {

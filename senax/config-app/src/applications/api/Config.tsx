@@ -71,9 +71,9 @@ function Config() {
   return (
     <>
       <Helmet>
-        <title>Senax Api Configuration</title>
+        <title>Senax API Configuration</title>
       </Helmet>
-      <ContentLayout header={<Header variant="h1">Api Config</Header>}>
+      <ContentLayout header={<Header variant="h1">API Config</Header>}>
         <Container header={<Header variant="h2"></Header>}>
           <Form
             actions={

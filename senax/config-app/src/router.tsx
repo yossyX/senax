@@ -49,18 +49,30 @@ const routes: RouteObject[] = [
     element: <SidebarLayout />,
     errorElement: <Status500 />,
     children: databaseRouter,
+    handle: {
+      crumb: () => ({ text: 'DB', href: "#" })
+    },
   },
   {
-    path: "simple_vo",
+    path: "vo",
     element: <SidebarLayout />,
     errorElement: <Status500 />,
-    children: voRouter,
+    children: [{
+      path: "simple",
+      children: voRouter,
+    }],
+    handle: {
+      crumb: () => ({ text: 'Value Objects', href: "#" })
+    },
   },
   {
     path: "api_server",
     element: <SidebarLayout />,
     errorElement: <Status500 />,
     children: apiRouter,
+    handle: {
+      crumb: () => ({ text: 'API', href: "#" })
+    },
   },
   {
     path: "build",

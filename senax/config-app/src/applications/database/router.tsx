@@ -33,6 +33,9 @@ const routes: RouteObject[] = [
         fetch_json(`/api/vo/simple`),
       ]);
     },
+    handle: {
+      crumb: (match: any) => ({ text: match.params.db, href: match.pathname })
+    },
     children: [
       {
         path: "",
@@ -57,6 +60,9 @@ const routes: RouteObject[] = [
           const response = await res.text();
           return response;
         },
+        handle: {
+          crumb: () => ({ text: 'Config', href: "#" })
+        },
       },
       {
         path: ":group",
@@ -67,6 +73,9 @@ const routes: RouteObject[] = [
             fetch_json(`/api/model_schema`),
             fetch_json(`/api/model_names/${params.db}`),
           ]);
+        },
+        handle: {
+          crumb: (match: any) => ({ text: match.params.group, href: match.pathname })
         },
         children: [
           {
@@ -92,6 +101,9 @@ const routes: RouteObject[] = [
               const response = await res.text();
               return response;
             },
+            handle: {
+              crumb: () => ({ text: 'New', href: "#" })
+            },
           },
           {
             path: ":model",
@@ -111,6 +123,9 @@ const routes: RouteObject[] = [
               }
               const response = await res.text();
               return response;
+            },
+            handle: {
+              crumb: (match: any) => ({ text: match.params.model, href: match.pathname })
             },
           },
         ],

@@ -13,12 +13,12 @@ use std::{
     sync::Arc,
 };
 
-use crate::common::{fs_write, OVERWRITTEN_MSG};
-use crate::{filters, SEPARATED_BASE_FILES};
-use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable, to_id_name};
+use crate::common::AtomicLoad as _;
+use crate::common::{OVERWRITTEN_MSG, fs_write};
 use crate::model_generator::REL_START;
 use crate::schema::IS_MAIN_GROUP;
-use crate::common::AtomicLoad as _;
+use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable, to_id_name};
+use crate::{SEPARATED_BASE_FILES, filters};
 
 mod impl_domain;
 
@@ -39,28 +39,27 @@ pub fn write_group_files(
     remove_files.remove(file_path.as_os_str());
     let mut content = if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "db/repositories/group/_Cargo.toml", escape = "none")]
+        #[template(path = "db/repositories/_Cargo.toml", escape = "none")]
         struct Template<'a> {
             db: &'a str,
             group: &'a str,
         }
         Template { db, group }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
+    let reg = Regex::new(r"(?m)^_repo_\w+\s*=.+\n")?;
+    content = reg.replace_all(&content, "").into_owned();
     for group in ref_groups {
-        let reg = Regex::new(&format!(r"(?m)^db_{}_{}\s*=", db, group))?;
-        if !reg.is_match(&content) {
-            let db = &db.to_case(Case::Snake);
-            let group = &group.to_case(Case::Snake);
-            content = content.replace(
-                "[dependencies]",
-                &format!(
-                    "[dependencies]\n_db_{}_{} = {{ path = \"../{}\" }}",
-                    db, group, group
-                ),
-            );
-        }
+        let db = &db.to_case(Case::Snake);
+        let group = &group.to_case(Case::Snake);
+        content = content.replace(
+            "[dependencies]",
+            &format!(
+                "[dependencies]\n_repo_{}_{} = {{ path = \"../{}\" }}",
+                db, group, group
+            ),
+        );
     }
     fs_write(file_path, &*content)?;
 
@@ -69,18 +68,23 @@ pub fn write_group_files(
     remove_files.remove(file_path.as_os_str());
     if force || !file_path.exists() {
         #[derive(Template)]
-        #[template(path = "db/repositories/group/src/lib.rs", escape = "none")]
+        #[template(path = "db/repositories/src/lib.rs", escape = "none")]
         struct LibTemplate<'a> {
             pub group: &'a str,
             pub config: &'a ConfigDef,
+            pub groups: &'a GroupsDef,
         }
 
-        let tpl = LibTemplate { group, config };
+        let tpl = LibTemplate {
+            group,
+            config,
+            groups,
+        };
         fs_write(file_path, tpl.render()?)?;
     }
 
     #[derive(Template)]
-    #[template(path = "db/repositories/group/src/repositories.rs", escape = "none")]
+    #[template(path = "db/repositories/src/repositories.rs", escape = "none")]
     struct RepositoriesTemplate<'a> {
         pub db: &'a str,
         pub config: &'a ConfigDef,
@@ -99,7 +103,7 @@ pub fn write_group_files(
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
-    #[template(path = "db/repositories/group/src/misc.rs", escape = "none")]
+    #[template(path = "db/repositories/src/misc.rs", escape = "none")]
     struct MiscTemplate<'a> {
         pub config: &'a ConfigDef,
     }
@@ -137,7 +141,7 @@ pub fn write_group_files(
             .collect();
 
         #[derive(Template)]
-        #[template(path = "db/repositories/group/src/group.rs", escape = "none")]
+        #[template(path = "db/repositories/src/group.rs", escape = "none")]
         struct GroupTemplate<'a> {
             pub group_name: &'a str,
             pub mod_names: &'a BTreeSet<String>,
@@ -168,14 +172,10 @@ pub fn write_group_files(
         }
 
         let mut impl_output = String::new();
-        impl_output.push_str(
-            OVERWRITTEN_MSG,
-        );
+        impl_output.push_str(OVERWRITTEN_MSG);
 
         let mut output = String::new();
-        output.push_str(
-            OVERWRITTEN_MSG,
-        );
+        output.push_str(OVERWRITTEN_MSG);
 
         let model_group_dir = model_models_dir.join(group_name.to_case(Case::Snake));
         let model_group_base_dir = model_group_dir.join("_base");
@@ -188,7 +188,7 @@ pub fn write_group_files(
                 remove_files.remove(file_path.as_os_str());
                 if force || !file_path.exists() {
                     #[derive(Template)]
-                    #[template(path = "db/repositories/group/src/group/table.rs", escape = "none")]
+                    #[template(path = "db/repositories/src/group/table.rs", escape = "none")]
                     struct GroupTableTemplate<'a> {
                         pub db: &'a str,
                         pub base_group_name: &'a str,
@@ -241,7 +241,7 @@ pub fn write_group_files(
                 }
 
                 #[derive(Template)]
-                #[template(path = "db/repositories/group/src/group/base/_table.rs", escape = "none")]
+                #[template(path = "db/repositories/src/group/base/_table.rs", escape = "none")]
                 struct GroupBaseTableTemplate<'a> {
                     pub db: &'a str,
                     pub base_group_name: &'a str,
@@ -279,7 +279,7 @@ pub fn write_group_files(
                 } else {
                     output.push_str(&format!("pub mod _{} {{\n{}}}\n", mod_name, ret));
                 }
-            
+
                 if !exclude_from_domain {
                     impl_output.push_str(&impl_domain::write_entity(
                         &impl_domain_dir,

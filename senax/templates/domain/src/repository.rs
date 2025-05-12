@@ -1,7 +1,7 @@
 use ::anyhow::Result;
 use ::async_trait::async_trait;
 
-// Do not modify this line. (Mod:)
+// Do not modify this line. (Mod)
 
 // Do not modify this line. (UseRepo)
 

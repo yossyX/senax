@@ -35,7 +35,9 @@ use crate::api_generator::schema::{
     ApiConfigDef, ApiConfigJson, ApiDbDef, ApiDbJson, ApiModelDef, ApiModelJson,
 };
 use crate::common::{
-    fs_write, parse_yml, parse_yml_file, read_api_yml, read_group_yml, read_simple_vo_yml, set_api_config, simplify_yml, write_api_yml, write_group_yml, write_simple_vo_yml, AtomicLoad as _, BACKUP, READ_ONLY
+    AtomicLoad as _, BACKUP, READ_ONLY, fs_write, parse_yml, parse_yml_file, read_api_yml,
+    read_group_yml, read_simple_vo_yml, set_api_config, simplify_yml, write_api_yml,
+    write_group_yml, write_simple_vo_yml,
 };
 use crate::schema::{self, ConfigDef, ConfigJson, FieldDef, ModelDef, ModelJson, ValueObjectJson};
 use crate::{API_SCHEMA_PATH, SCHEMA_PATH};
@@ -65,7 +67,7 @@ pub async fn start(
     let app = Router::new()
         .route("/", get(root_handler))
         .nest("/api", api_routes())
-        .route("/*path", get(file_handler))
+        .route("/{*path}", get(file_handler))
         .layer(compression_layer);
 
     if std::env::var("AWS_LAMBDA_RUNTIME_API").is_ok() {
@@ -127,73 +129,73 @@ async fn shutdown_signal() {
 pub fn api_routes() -> Router {
     Router::new()
         .route("/db", get(get_db))
-        .route("/db/:db", get(get_db_config))
-        .route("/db/:db", post(save_db_config))
+        .route("/db/{db}", get(get_db_config))
+        .route("/db/{db}", post(save_db_config))
         .route("/config_schema", get(get_config_schema))
         .route("/model_schema", get(get_model_schema))
         .route("/vo_schema/simple", get(get_vo_schema))
         .route("/api_config_schema", get(get_api_config_schema))
         .route("/api_db_schema", get(get_api_db_schema))
         .route("/api_schema", get(get_api_schema))
-        .route("/model_names/:db", get(get_model_names))
-        .route("/models/:db/:group", get(get_models))
-        .route("/merged_models/:db/:group", get(get_merged_models))
-        .route("/models/:db/:group", post(create_model))
-        .route("/models/:db/:group/:model", put(save_model))
-        .route("/models/:db/:group/:model", delete(delete_model))
-        .route("/models/:db/:group", put(save_models))
+        .route("/model_names/{db}", get(get_model_names))
+        .route("/models/{db}/{group}", get(get_models))
+        .route("/merged_models/{db}/{group}", get(get_merged_models))
+        .route("/models/{db}/{group}", post(create_model))
+        .route("/models/{db}/{group}/{model}", put(save_model))
+        .route("/models/{db}/{group}/{model}", delete(delete_model))
+        .route("/models/{db}/{group}", put(save_models))
         .route("/vo/simple", get(get_simple_vo))
         .route("/vo/simple", put(save_simple_vo_list))
         .route("/vo/simple", post(create_simple_vo))
-        .route("/vo/simple/:vo", put(save_simple_vo))
-        .route("/vo/simple/:vo", delete(delete_simple_vo))
+        .route("/vo/simple/{vo}", put(save_simple_vo))
+        .route("/vo/simple/{vo}", delete(delete_simple_vo))
         .route("/api_server", get(get_api_server))
-        .route("/api_server/:server/_db", get(get_api_server_db))
-        .route("/api_server/:server/_config", get(get_api_server_config))
-        .route("/api_server/:server/_config", post(save_api_server_config))
+        .route("/api_server/{server}/_db", get(get_api_server_db))
+        .route("/api_server/{server}/_config", get(get_api_server_config))
+        .route("/api_server/{server}/_config", post(save_api_server_config))
         .route(
-            "/api_server/:server/:db/_groups",
+            "/api_server/{server}/{db}/_groups",
             get(get_api_server_groups),
         )
         .route(
-            "/api_server/:server/:db/_config",
+            "/api_server/{server}/{db}/_config",
             get(get_api_server_db_config),
         )
         .route(
-            "/api_server/:server/:db/_config",
+            "/api_server/{server}/{db}/_config",
             post(save_api_server_db_config),
         )
         .route(
-            "/api_server/:server/:db/:group/_models",
+            "/api_server/{server}/{db}/{group}/_models",
             get(get_api_server_models),
         )
         .route(
-            "/clean_api_server/:server/:db/:group",
+            "/clean_api_server/{server}/{db}/{group}",
             get(clean_api_server_models),
         )
         .route(
-            "/api_server/:server/:db/:group",
+            "/api_server/{server}/{db}/{group}",
             get(get_api_server_model_paths),
         )
         .route(
-            "/api_server/:server/:db/:group",
+            "/api_server/{server}/{db}/{group}",
             put(save_api_server_models),
         )
         .route(
-            "/api_server/:server/:db/:group",
+            "/api_server/{server}/{db}/{group}",
             post(create_api_server_model),
         )
         .route(
-            "/api_server/:server/:db/:group/:model",
+            "/api_server/{server}/{db}/{group}/{model}",
             put(update_api_server_model),
         )
         .route(
-            "/api_server/:server/:db/:group/:model",
+            "/api_server/{server}/{db}/{group}/{model}",
             delete(delete_api_server_model),
         )
         .route("/build/exec", post(build_exec))
         .route("/build/result", get(build_result))
-        .route("/git/exec/:cmd", post(git_exec))
+        .route("/git/exec/{cmd}", post(git_exec))
         .route("/git/result", get(git_result))
 }
 

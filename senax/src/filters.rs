@@ -695,7 +695,7 @@ pub fn strum_detailed4(s: &Option<String>) -> ::askama::Result<String> {
 }
 pub fn strum_props4(def: &FieldDef) -> ::askama::Result<String> {
     let mut def = def.clone();
-    def._name = None;
+    def._before_rename_name = None;
     Ok(format!(
         "    #[strum(props(def = {:?}))]\n",
         serde_json::to_string(&def).unwrap()

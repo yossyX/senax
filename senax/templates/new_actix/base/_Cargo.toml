@@ -9,7 +9,7 @@ js_updater = ["rquickjs"]
 
 [dependencies]
 @%- if session %@
-db_session = { path = "../../2_db/session" }
+_db_session = { path = "../../2_db/session/base" }
 @%- endif %@
 domain = { path = "../../1_domain" }
 

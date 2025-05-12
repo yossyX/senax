@@ -1,15 +1,58 @@
 [package]
-name = "db_@{ db|snake }@_repositories"
+name = "_repo_@{ db|snake }@_@{ group|snake }@"
 version = "0.0.0"
 edition = "2024"
 publish = false
 
 [features]
-cache_update_only = [ "db/cache_update_only"@%- for (name, (_, defs)) in groups %@, "_db_@{ db|snake }@_@{ name|snake }@/cache_update_only"@%- endfor %@ ]
+cache_update_only = []
 
 [dependencies]
-db = { package = "db_@{ db|snake }@", path = ".." }
-@%- for (name, (_, defs)) in groups %@
-_db_@{ db|snake }@_@{ name|snake }@ = { path = "@{ name|snake }@" }
-@%- endfor %@
+domain = { path = "../../../../1_domain" }
+db = { package = "_db_@{ db|snake }@", path = "../../base" }
+
+ahash.workspace = true
+anyhow.workspace = true
+arc-swap = "1.5.1"
+async-stream.workspace = true
+async-trait.workspace = true
+bytes = "1.4"
+chrono.workspace = true
+ciborium.workspace = true
+clap.workspace = true
+crossbeam = "0.8"
+derive_more.workspace = true
+derive-new.workspace = true
+dotenvy.workspace = true
+futures.workspace = true
+fxhash = "0.2"
+includedir = "0.6.0"
+indexmap = "2"
+log.workspace = true
+num-traits = "0.2"
+once_cell.workspace = true
+phf = "0.8.0"
+rand.workspace = true
+regex.workspace = true
+rust_decimal.workspace = true
+schemars.workspace = true
+senax-common.workspace = true
+senax-macros.workspace = true
+serde.workspace = true
+serde_bytes = "0.11.12"
+serde_json.workspace = true
+serde_repr.workspace = true
+serde_yaml.workspace = true
+sled = "0.34"
+sqlx.workspace = true
+strum.workspace = true
+strum_macros.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url = "2.2.2"
+utoipa.workspace = true
+uuid.workspace = true
+validator.workspace = true
+zstd = "0.13"
 @{-"\n"}@

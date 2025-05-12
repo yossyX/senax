@@ -88,7 +88,7 @@ pub fn make_table_def(
     let table_name = def.table_name();
     let mut table = Table {
         name: table_name.clone(),
-        old_name: def._name.clone(),
+        old_name: def._before_rename_name.clone(),
         engine: def.engine.clone().or_else(|| config.engine.clone()),
         // character_set: def.character_set.clone(),
         collation: def.collation.clone(),
@@ -219,7 +219,7 @@ pub fn make_table_def(
         table.columns.insert(
             col.get_col_name(col_name).to_string(),
             Column {
-                old_name: col._name.clone(),
+                old_name: col._before_rename_name.clone(),
                 sql_type: sql_type.clone(),
                 alt_type,
                 constraint,

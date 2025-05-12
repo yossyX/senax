@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 
 pub fn init() {
     @%- if session %@
-    db_session_repositories::init();
+    db_session::init();
     @%- endif %@
     // Do not modify this line. (DbInit)
 }
@@ -53,5 +53,51 @@ pub fn stop() {
     db_session::stop();
     @%- endif %@
     // Do not modify this line. (DbStop)
+}
+
+#[rustfmt::skip]
+pub async fn migrate(db: Option<&str>, use_test: bool, clean: bool, ignore_missing: bool) -> Result<()> {
+    let mut join_set = tokio::task::JoinSet::new();
+    @%- if session %@
+    if db.is_none() || db == Some("session") {
+        join_set.spawn_local(db_session::migrate(use_test, clean, ignore_missing));
+    }
+    @%- endif %@
+    // Do not modify this line. (migrate)
+    let mut error = None;
+    while let Some(res) = join_set.join_next().await {
+        if let Err(e) = res? {
+            if let Some(e) = error.replace(e) {
+                log::error!("{}", e);
+            }
+        }
+    }
+    if let Some(e) = error {
+        return Err(e);
+    }
+    Ok(())
+}
+
+pub fn gen_seed_schema() -> Result<()> {
+    // Do not modify this line. (gen_seed_schema)
+    panic!("The gen_seed_schema function needs to be modified");
+    // Ok(())
+}
+
+pub async fn seed(_db: Option<&str>, _use_test: bool) -> Result<()> {
+    // Do not modify this line. (seed)
+    panic!("The seed function needs to be modified");
+    // Ok(())
+}
+
+#[rustfmt::skip]
+pub async fn check(use_test: bool) -> Result<()> {
+    tokio::try_join!(
+        @%- if session %@
+        db_session::check(use_test),
+        @%- endif %@
+        // Do not modify this line. (check)
+    )?;
+    Ok(())
 }
 @{-"\n"}@

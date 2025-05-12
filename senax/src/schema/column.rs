@@ -443,8 +443,9 @@ pub struct FieldDef {
     pub in_abstract: bool,
 
     /// ### リネーム元カラム名
+    /// よくわからない場合は手動で修正しないこと。また、コピー&ペーストを行う場合は削除した方が良い。
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub _name: Option<String>,
+    pub _before_rename_name: Option<String>,
     /// ### 論理名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -567,7 +568,7 @@ pub struct FieldJson {
     pub name: String,
     /// ### リネーム元カラム名
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub _name: Option<String>,
+    pub _before_rename_name: Option<String>,
     /// ### 論理名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -756,7 +757,7 @@ impl From<FieldDef> for FieldJson {
     fn from(value: FieldDef) -> Self {
         Self {
             name: Default::default(),
-            _name: value._name,
+            _before_rename_name: value._before_rename_name,
             label: value.label,
             comment: value.comment,
             data_type: value.data_type,
@@ -793,7 +794,7 @@ impl From<FieldDef> for FieldJson {
 impl From<FieldJson> for FieldDef {
     fn from(value: FieldJson) -> Self {
         Self {
-            _name: value._name,
+            _before_rename_name: value._before_rename_name,
             id_class: Default::default(),
             enum_class: Default::default(),
             rel: Default::default(),
@@ -872,7 +873,7 @@ impl From<FieldDef> for ValueObjectJson {
 impl From<ValueObjectJson> for FieldDef {
     fn from(value: ValueObjectJson) -> Self {
         Self {
-            _name: None,
+            _before_rename_name: None,
             id_class: Default::default(),
             enum_class: Default::default(),
             rel: Default::default(),
@@ -920,7 +921,7 @@ impl From<ValueObjectJson> for FieldDef {
 impl FieldDef {
     pub fn overwrite(&mut self, org: Self, postfix: &str) {
         // data_type, signed, and other type-related items should not be overwritten.
-        self._name = org._name;
+        self._before_rename_name = org._before_rename_name;
         self.id_class = org.id_class;
         self.enum_class = org.enum_class;
         self.rel = org.rel;

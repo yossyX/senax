@@ -14,7 +14,7 @@ use std::{
 };
 
 use crate::api_generator::schema::{ApiFieldDef, ApiRelationDef};
-use crate::common::{hash, if_then_else, to_plural, yaml_value_to_str, AtomicLoad as _};
+use crate::common::{AtomicLoad as _, hash, if_then_else, to_plural, yaml_value_to_str};
 use crate::schema::_to_var_name;
 
 use super::*;
@@ -187,10 +187,12 @@ pub struct ModelDef {
     pub merged_indexes: IndexMap<String, IndexDef>,
 
     /// ### リネーム元テーブル名
+    /// よくわからない場合は手動で修正しないこと。また、コピー&ペーストを行う場合は削除した方が良い。
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub _name: Option<String>,
+    pub _before_rename_name: Option<String>,
     /// ### 変更前論理削除設定
-    /// 変更を検出してDDLにDELETE文を出力する
+    /// 変更を検出してDDLにDELETE文を出力する。
+    /// よくわからない場合は手動で修正しないこと。また、コピー&ペーストを行う場合は削除した方が良い。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub _soft_delete: Option<String>,
     /// ### 論理名
@@ -340,7 +342,7 @@ pub struct ModelJson {
     pub name: String,
     /// ### リネーム元テーブル名
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub _name: Option<String>,
+    pub _before_rename_name: Option<String>,
     /// ### 変更前論理削除設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub _soft_delete: Option<String>,
@@ -476,11 +478,12 @@ pub struct ModelJson {
 
 impl From<ModelDef> for ModelJson {
     fn from(value: ModelDef) -> Self {
+        let created = value._before_rename_name.is_some();
         Self {
             merged_fields: value.merged_fields.into_iter().collect(),
             merged_relations: value.merged_relations.into_iter().collect(),
             name: value.name,
-            _name: value._name,
+            _before_rename_name: value._before_rename_name,
             _soft_delete: value._soft_delete,
             label: value.label,
             comment: value.comment,
@@ -520,7 +523,10 @@ impl From<ModelDef> for ModelJson {
                 .into_iter()
                 .map(|(k, v)| {
                     let mut v: FieldJson = v.exact().into();
-                    v.name = k;
+                    v.name = k.clone();
+                    if created && v._before_rename_name.is_none() {
+                        v._before_rename_name = Some(k)
+                    }
                     v
                 })
                 .collect(),
@@ -586,7 +592,7 @@ impl TryFrom<ModelJson> for ModelDef {
     type Error = anyhow::Error;
     fn try_from(value: ModelJson) -> Result<Self, Self::Error> {
         Ok(Self {
-            _name: value._name,
+            _before_rename_name: value._before_rename_name,
             _soft_delete: value._soft_delete,
             db: Default::default(),
             group_name: Default::default(),
@@ -640,7 +646,10 @@ impl TryFrom<ModelJson> for ModelDef {
                 .into_iter()
                 .map(|v| {
                     let name = v.name.clone();
-                    let v: FieldDef = v.into();
+                    let mut v: FieldDef = v.into();
+                    if v._before_rename_name == Some(name.clone()) {
+                        v._before_rename_name = None;
+                    }
                     (name, FieldDefOrSubsetType::Exact(v))
                 })
                 .collect(),

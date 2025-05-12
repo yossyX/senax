@@ -111,9 +111,9 @@ function EditModel() {
     <>
       <ScrollRestoration />
       <Helmet>
-        <title>Senax Database Configuration</title>
+        <title>Senax Database Configuration ({data.name || 'New'})</title>
       </Helmet>
-      <ContentLayout header={<Header variant="h1">Model</Header>}>
+      <ContentLayout header={<Header variant="h1">{data.name || 'New'}</Header>}>
         <Container
           header={
             <Header

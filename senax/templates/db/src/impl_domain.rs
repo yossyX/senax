@@ -1,6 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use once_cell::sync::OnceCell;
 use crate::DbConn;
 use domain::repository::@{ db|snake|to_var_name }@ as _repository;
 use domain::repository::@{ db|snake|to_var_name }@::{@{ db|pascal }@QueryService, @{ db|pascal }@Repository};
@@ -8,9 +7,9 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 macro_rules! get_repo {
-    ($n:ident, $o:ty, $c:ident, $m:expr) => {
+    ($n:ident, $o:ty, $c:ty) => {
         fn $n(&self) -> Box<$o> {
-            $c.get().expect($m)(&self._conn)
+            Box::new(<$c>::new(self._conn.clone()))
         }
     };
 }

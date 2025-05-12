@@ -155,9 +155,9 @@ function EditApi() {
     <>
       <ScrollRestoration />
       <Helmet>
-        <title>Senax Database Configuration</title>
+        <title>Senax API Configuration ({data.name || 'New'})</title>
       </Helmet>
-      <ContentLayout header={<Header variant="h1">Api</Header>}>
+      <ContentLayout header={<Header variant="h1">{data.name || 'New'}</Header>}>
         <Container header={<Header variant="h2"></Header>}>
           <Form
             actions={

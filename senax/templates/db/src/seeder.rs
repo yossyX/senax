@@ -37,11 +37,7 @@ impl SeedSchema {
                 match name.as_str() {
                 @%- for (name, (_, defs)) in groups %@@% if !defs.is_empty() %@
                     Some("@{ name }@") => {
-                        crate::models::@{ name|upper }@_CTRL
-                            .get()
-                            .expect("@{ name|upper }@ Group is missing.")
-                            .seed(value, &mut conns)
-                            .await?
+                        _repo_@{ name|snake }@::seed(value, &mut conns).await?;
                     }
                 @%- endif %@@% endfor %@
                     _ => {}

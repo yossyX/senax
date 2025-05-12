@@ -21,15 +21,56 @@ import Toggle from "@cloudscape-design/components/toggle";
 import Icon from "@cloudscape-design/components/icon";
 import Table from "@cloudscape-design/components/table";
 import Box from "@cloudscape-design/components/box";
+import ButtonDropdown from "@cloudscape-design/components/button-dropdown";
 
 function Models() {
   const navigate = useNavigate();
   const params = useParams();
   const group = params.group;
+  const [db_data, _vo_list] = useRouteLoaderData("db") as any;
+  const groups = db_data.groups.filter((v: any) => v.name != group).map((v: any) => ({ text: v.name, id: v.name }));
   const [ini_models, _jsonSchema] = useRouteLoaderData("group") as any;
   const [models, setModels] = React.useState(ini_models);
   const [reordering, setReorder] = React.useState(false);
   const [selectedItems, setSelectedItems] = React.useState([] as any);
+  const handleMoveTo = async (move_to: string) => {
+    const msg =
+      selectedItems.length == 1
+        ? `Are you sure you want to move ${selectedItems[0].name} to ${move_to} group?`
+        : `Are you sure you want to move items to ${move_to} group?`;
+    if (!confirm(msg)) {
+      return;
+    }
+    for (const item of selectedItems) {
+      const move_res = await fetch(
+        `/api/models/${params.db}/${move_to}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item),
+        },
+      );
+      if (!move_res.ok) {
+        const response = await move_res.text();
+        alert(response);
+        return;
+      }
+
+      const del_res = await fetch(
+        `/api/models/${params.db}/${params.group}/${item.name}`,
+        {
+          method: "DELETE",
+        },
+      );
+      if (!del_res.ok) {
+        const response = await del_res.text();
+        alert(response);
+        return;
+      }
+      setModels(models.filter((v: any) => v.name !== item.name));
+    }
+    setSelectedItems([]);
+  };
   const handleDelete = async () => {
     const msg =
       selectedItems.length == 1
@@ -104,6 +145,12 @@ function Models() {
                   >
                     Reorder
                   </Toggle>
+                  <ButtonDropdown
+                    items={groups}
+                    onItemClick={({ detail }) => handleMoveTo(detail.id)}
+                  >
+                    Move to
+                  </ButtonDropdown>
                   <Button
                     onClick={() => handleDelete()}
                     disabled={reordering || selectedItems.length == 0}

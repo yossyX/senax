@@ -11,7 +11,7 @@ use anyhow::{ensure, Context, Result};
 use async_graphql::{EmptySubscription, Schema};
 use clap::{Parser, Subcommand};
 @%- if session %@
-use db_session_repositories::session::session::_SessionStore;
+use db_session::repositories::session::session::_SessionStore;
 @%- endif %@
 use dotenvy::dotenv;
 use mimalloc::MiMalloc;
@@ -193,11 +193,11 @@ async fn main() -> Result<()> {
                         "clean migrate is debug environment only"
                     );
                 }
-                _base::db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing).await?;
+                db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing).await?;
                 return Ok(());
             }
             Command::GenSeedSchema => {
-                _base::db::gen_seed_schema()?;
+                db::gen_seed_schema()?;
                 return Ok(());
             }
             Command::Seed {
@@ -212,9 +212,9 @@ async fn main() -> Result<()> {
                         force_delete_all_db || cfg!(debug_assertions),
                         "clean migrate is debug environment only"
                     );
-                    _base::db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing).await?;
+                    db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing).await?;
                 }
-                _base::db::seed(db.as_deref(), test).await?;
+                db::seed(db.as_deref(), test).await?;
                 return Ok(());
             }
             Command::OpenApi => {
@@ -222,7 +222,7 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
             Command::Check { test } => {
-                _base::db::check(test).await?;
+                db::check(test).await?;
                 return Ok(());
             }
             Command::GenGqlSchema { ts_dir } => {
@@ -240,7 +240,7 @@ async fn main() -> Result<()> {
     )?;
     if arg.auto_migrate {
         info!("Starting migration");
-        if let Err(e) = _base::db::migrate(None, false, false, true).await {
+        if let Err(e) = db::migrate(None, false, false, true).await {
             error!("{}", e);
             std::process::exit(1);
         }

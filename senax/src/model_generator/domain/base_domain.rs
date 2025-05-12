@@ -1,5 +1,5 @@
 use crate::common::OVERWRITTEN_MSG;
-use crate::schema::GroupsDef;
+use crate::schema::{_to_var_name, GroupsDef};
 use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{
     common::fs_write,
@@ -59,13 +59,10 @@ pub use @{ mod_name|to_var_name }@::@{ name }@;
     struct DomainValueObjectModsTemplate {
         pub mod_names: BTreeMap<String, String>,
     }
-    let tpl = DomainValueObjectModsTemplate {
-        mod_names,
-    }
-    .render()?;
+    let tpl = DomainValueObjectModsTemplate { mod_names }.render()?;
     let tpl = tpl.trim_start();
     if file_path.exists() {
-        let content = fs::read_to_string(&file_path)?;
+        let content = fs::read_to_string(&file_path)?.replace("\r\n", "\n");
         let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
         ensure!(
             re.is_match(&content),
@@ -109,9 +106,7 @@ pub use @{ mod_name|to_var_name }@::@{ name }@;
     }
 
     let mut output = String::new();
-    output.push_str(
-        OVERWRITTEN_MSG,
-    );
+    output.push_str(OVERWRITTEN_MSG);
     for (name, def) in VALUE_OBJECTS.read().unwrap().as_ref().unwrap() {
         let mod_name = name.to_case(Case::Snake);
         let mod_name = &mod_name;
@@ -153,12 +148,11 @@ pub fn write_models_rs(base_domain_src_dir: &Path, db: &str) -> Result<()> {
     #[template(
         source = r###"
 pub mod @{ db|snake|to_var_name }@;
-// Do not modify this line. (Mod:@{ all }@)"###,
+// Do not modify this line. (Mod)"###,
         ext = "txt",
         escape = "none"
     )]
     pub struct ModTemplate<'a> {
-        pub all: String,
         pub db: &'a str,
     }
 
@@ -170,26 +164,12 @@ pub mod @{ db|snake|to_var_name }@;
 
         DomainModelsTemplate.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let re = Regex::new(r"// Do not modify this line\. \(Mod:([_a-zA-Z0-9,]*)\)").unwrap();
-    let caps = re
-        .captures(&content)
-        .with_context(|| format!("Illegal file content:{}", &file_path.to_string_lossy()))?;
-    let mut all: BTreeSet<String> = caps
-        .get(1)
-        .unwrap()
-        .as_str()
-        .split(',')
-        .filter(|v| !v.is_empty())
-        .map(|v| v.to_string())
-        .collect();
-
-    if !all.contains(db) {
-        all.insert(db.to_string());
-        let all = all.iter().cloned().collect::<Vec<_>>().join(",");
-        let tpl = ModTemplate { all, db }.render()?;
-        content = re.replace(&content, tpl.trim_start()).to_string();
+    let chk = format!("\npub mod {};\n", _to_var_name(&db.to_case(Case::Snake)));
+    if !content.contains(&chk) {
+        let tpl = ModTemplate { db }.render()?;
+        content = content.replace("// Do not modify this line. (Mod)", tpl.trim_start());
     }
 
     fs_write(&file_path, &*content)?;
@@ -210,7 +190,7 @@ pub fn write_models_db_rs(
 
         DomainDbTemplate.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
 
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();

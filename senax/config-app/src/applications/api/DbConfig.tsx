@@ -77,9 +77,9 @@ function DbConfig() {
   return (
     <>
       <Helmet>
-        <title>Senax Api DB Configuration</title>
+        <title>Senax API DB Configuration</title>
       </Helmet>
-      <ContentLayout header={<Header variant="h1">Api DB Config</Header>}>
+      <ContentLayout header={<Header variant="h1">API DB Config</Header>}>
         <Container header={<Header variant="h2"></Header>}>
           <Form
             actions={

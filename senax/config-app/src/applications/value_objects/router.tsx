@@ -31,6 +31,9 @@ const routes: RouteObject[] = [
         fetch_json(`/api/vo_schema/simple`),
       ]);
     },
+    handle: {
+      crumb: (match: any) => ({ text: 'simple', href: match.pathname })
+    },
     children: [
       {
         path: "",
@@ -52,6 +55,9 @@ const routes: RouteObject[] = [
           const response = await res.text();
           return response;
         },
+        handle: {
+          crumb: () => ({ text: 'New', href: "#" })
+        },
       },
       {
         path: ":vo",
@@ -68,6 +74,9 @@ const routes: RouteObject[] = [
           }
           const response = await res.text();
           return response;
+        },
+        handle: {
+          crumb: (match: any) => ({ text: match.params.vo, href: match.pathname })
         },
       },
     ],

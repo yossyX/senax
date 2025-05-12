@@ -5,7 +5,9 @@ edition = "2024"
 publish = false
 
 [features]
-mock = ["mockall"]
+mock = [
+    "mockall",
+]
 
 [dependencies]
 anyhow.workspace = true

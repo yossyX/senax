@@ -10,34 +10,30 @@ use ::std::path::Path;
 use ::std::sync::Arc;
 use ::tokio::sync::{Mutex, Semaphore};
 
-pub use crate::_base::models::USE_FAST_CACHE;
-pub use crate::_base::models::CACHE_UPDATE_LOCK;
+pub use _base::models::USE_FAST_CACHE;
+pub use _base::models::CACHE_UPDATE_LOCK;
 // pub const USE_FAST_CACHE: bool = @{ config.use_fast_cache() }@;
 // pub const USE_STORAGE_CACHE: bool = @{ config.use_storage_cache }@;
 // pub static CACHE_UPDATE_LOCK: RwLock<()> = RwLock::const_new(());
 @{-"\n"}@
 @%- for (name, (_, defs)) in groups %@
-pub use crate::_base::models::@{ name|snake|to_var_name }@;
+pub use _base::models::@{ name|snake|to_var_name }@;
 @%- endfor %@
 
-pub use crate::_base::models::NotifyOp;
-pub use crate::_base::models::TableName;
-pub use crate::_base::models::Controller;
+pub use _base::models::NotifyOp;
+pub use _base::models::TableName;
+pub use _base::models::Handler;
 
 pub(crate) async fn start(db_dir: &Path) -> Result<()> {
 @%- for (name, (_, defs)) in groups %@
-    if let Some(g) = @{ name|upper }@_CTRL.get() {
-        g.start(db_dir).await?;
-    }
+    _repo_@{ name|snake }@::start(db_dir).await?;
 @%- endfor %@
     Ok(())
 }
 
 pub(crate) async fn start_test() -> Result<()> {
 @%- for (name, (_, defs)) in groups %@
-    if let Some(g) = @{ name|upper }@_CTRL.get() {
-        g.start_test().await?;
-    }
+    _repo_@{ name|snake }@::start_test().await?;
 @%- endfor %@
     Ok(())
 }
@@ -46,15 +42,13 @@ pub(crate) async fn start_test() -> Result<()> {
 pub(crate) async fn check() -> Result<()> {
     for shard_id in DbConn::shard_num_range() {
         @%- for (name, (_, defs)) in groups %@
-        if let Some(g) = @{ name|upper }@_CTRL.get() {
-            g.check(shard_id).await?;
-        }
+        _repo_@{ name|snake }@::check(shard_id).await?;
         @%- endfor %@
     }
     Ok(())
 }
 
-pub(crate) use crate::_base::models::_clear_cache;
+pub(crate) use _base::models::_clear_cache;
 
 pub(crate) async fn exec_ddl<'c, E>(sql: &str, conn: E) -> Result<()>
 where
@@ -119,10 +113,4 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
         .await?;
     Ok(())
 }
-@% for (name, (_, defs)) in groups %@
-pub(crate) use crate::_base::models::@{ name|upper }@_CTRL;
-pub fn set_@{ name|snake }@(tr: Box<dyn Controller + Send + Sync>) {
-    let _ = @{ name|upper }@_CTRL.set(tr);
-}
-@%- endfor %@
 @{-"\n"}@

@@ -15,10 +15,16 @@ use crate::filters;
 use crate::{API_SCHEMA_PATH, SCHEMA_PATH, common::fs_write};
 use crate::{api_generator::template::DbConfigTemplate, schema::CONFIG};
 
-pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> Result<()> {
+pub fn generate(
+    name: &str,
+    db_list: &[&str],
+    session: bool,
+    force: bool,
+    db_for_api: bool,
+) -> Result<()> {
     anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
     let non_snake_case = crate::common::check_non_snake_case()?;
-    for db in &db_list {
+    for db in db_list {
         crate::common::check_ascii_name(db);
         let path = Path::new(SCHEMA_PATH).join(format!("{db}.yml"));
         anyhow::ensure!(path.exists(), "{} DB is not found.", db);
@@ -49,7 +55,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         file_path = base_path.join(".env");
     }
     if file_path.exists() {
-        let content = fs::read_to_string(&file_path)?;
+        let content = fs::read_to_string(&file_path)?.replace("\r\n", "\n");
         fs_write(file_path, fix_env(&content, name, session, &session_key)?)?;
     }
 
@@ -58,7 +64,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         file_path = base_path.join(".env.example");
     }
     if file_path.exists() {
-        let content = fs::read_to_string(&file_path)?;
+        let content = fs::read_to_string(&file_path)?.replace("\r\n", "\n");
         fs_write(file_path, fix_env(&content, name, session, &session_key)?)?;
     }
 
@@ -68,7 +74,7 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
         fs_write(file_path, fix_build_sh(&content, name)?)?;
     }
 
-    write_base_files(&base_path, name, &db_list, session, force)?;
+    write_base_files(&base_path, name, db_list, session, force)?;
 
     #[derive(Template)]
     #[template(path = "new_actix/_Cargo.toml", escape = "none")]
@@ -81,19 +87,17 @@ pub fn generate(name: &str, db_list: Vec<&str>, session: bool, force: bool) -> R
     let mut content = if force || !file_path.exists() {
         CargoTemplate { name, session }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    for db in &db_list {
+    for db in db_list.iter().rev() {
         let db = &db.to_case(Case::Snake);
         let reg = Regex::new(&format!(r"(?m)^db_{}\s*=", db))?;
         if !reg.is_match(&content) {
             content = content.replace(
                 "[dependencies]",
                 &format!(
-                    "[dependencies]
-db_{} = {{ path = \"../2_db/{}\" }}
-db_{}_repositories = {{ path = \"../2_db/{}/repositories\" }}",
-                    db, db, db, db
+                    "[dependencies]\ndb_{} = {{ path = \"../2_db/{}\" }}",
+                    db, db
                 ),
             );
         }
@@ -110,11 +114,13 @@ db_{}_repositories = {{ path = \"../2_db/{}/repositories\" }}",
         let tpl = ConfigTemplate;
         fs_write(&config_path, tpl.render()?)?;
     }
-    for db in &db_list {
-        let db_config_path = schema_dir.join(format!("{db}.yml"));
-        if !db_config_path.exists() {
-            let tpl = DbConfigTemplate;
-            fs_write(&db_config_path, tpl.render()?)?;
+    if db_for_api {
+        for db in db_list {
+            let db_config_path = schema_dir.join(format!("{db}.yml"));
+            if !db_config_path.exists() {
+                let tpl = DbConfigTemplate;
+                fs_write(&db_config_path, tpl.render()?)?;
+            }
         }
     }
 
@@ -130,14 +136,17 @@ db_{}_repositories = {{ path = \"../2_db/{}/repositories\" }}",
     let mut content = if force || !file_path.exists() {
         DbTemplate { session }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    for db in &db_list {
-        let reg = Regex::new(&format!(r"(?m)^\s*db_{}::start", &db.to_case(Case::Snake)))?;
+    for db in db_list {
+        let reg = Regex::new(&format!(r"(?m)^\s*db_{}::init\(\);", &db.to_case(Case::Snake)))?;
         if !reg.is_match(&content) {
             crate::schema::parse(db, false, false)?;
             let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
-            let tpl = DbInitTemplate { db };
+            let tpl = DbInitTemplate {
+                db,
+                exclude_from_domain: config.exclude_from_domain,
+            };
             content = content.replace(
                 "// Do not modify this line. (DbInit)",
                 tpl.render()?.trim_start(),
@@ -157,68 +166,26 @@ db_{}_repositories = {{ path = \"../2_db/{}/repositories\" }}",
                 "// Do not modify this line. (DbStop)",
                 tpl.render()?.trim_start(),
             );
-            // let tpl = DbClearLocalCacheTemplate { db };
-            // content = content.replace(
-            //     "// Do not modify this line. (DbClearLocalCache)",
-            //     tpl.render()?.trim_start(),
-            // );
-            // let tpl = DbClearCacheTemplate { db };
-            // content = content.replace(
-            //     "// Do not modify this line. (DbClearCache)",
-            //     tpl.render()?.trim_start(),
-            // );
-            // if !config.exclude_from_domain {
-            //     let tpl = DbRepoTemplate { db };
-            //     content = content.replace(
-            //         "// Do not modify this line. (Repo)",
-            //         tpl.render()?.trim_start(),
-            //     );
-            //     let tpl = DbRepoNewTemplate { db };
-            //     content = content.replace(
-            //         "// Do not modify this line. (RepoNew)",
-            //         tpl.render()?.trim_start(),
-            //     );
-            //     let tpl = DbRepoImplTemplate { db };
-            //     content = content.replace(
-            //         "// Do not modify this line. (RepoImpl)",
-            //         tpl.render()?.trim_start(),
-            //     );
-            //     let tpl = DbRepoImplStartTemplate { db };
-            //     content = content.replace(
-            //         "// Do not modify this line. (RepoImplStart)",
-            //         tpl.render()?.trim_start(),
-            //     );
-            //     let tpl = DbRepoImplCommitTemplate { db };
-            //     content = content.replace(
-            //         "// Do not modify this line. (RepoImplCommit)",
-            //         tpl.render()?.trim_start(),
-            //     );
-            //     let tpl = DbRepoImplRollbackTemplate { db };
-            //     content = content.replace(
-            //         "// Do not modify this line. (RepoImplRollback)",
-            //         tpl.render()?.trim_start(),
-            //     );
-            //     let tpl = DbMigrateTemplate { db };
-            //     content = content.replace(
-            //         "// Do not modify this line. (migrate)",
-            //         tpl.render()?.trim_start(),
-            //     );
-            //     let tpl = DbGenSeedSchemaTemplate { db };
-            //     content = content.replace(
-            //         "// Do not modify this line. (gen_seed_schema)",
-            //         tpl.render()?.trim_start(),
-            //     );
-            //     let tpl = DbSeedTemplate { db };
-            //     content = content.replace(
-            //         "// Do not modify this line. (seed)",
-            //         tpl.render()?.trim_start(),
-            //     );
-            //     let tpl = DbCheckTemplate { db };
-            //     content = content.replace(
-            //         "// Do not modify this line. (check)",
-            //         tpl.render()?.trim_start(),
-            //     );
-            // }
+            let tpl = DbMigrateTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (migrate)",
+                tpl.render()?.trim_start(),
+            );
+            let tpl = DbGenSeedSchemaTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (gen_seed_schema)",
+                tpl.render()?.trim_start(),
+            );
+            let tpl = DbSeedTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (seed)",
+                tpl.render()?.trim_start(),
+            );
+            let tpl = DbCheckTemplate { db };
+            content = content.replace(
+                "// Do not modify this line. (check)",
+                tpl.render()?.trim_start(),
+            );
         }
     }
     fs_write(file_path, &*content)?;
@@ -329,16 +296,16 @@ pub fn write_base_files(
     let mut content = if force || !file_path.exists() {
         CargoTemplate { name, session }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    for db in db_list {
+    for db in db_list.iter().rev() {
         let db = &db.to_case(Case::Snake);
-        let reg = Regex::new(&format!(r"(?m)^db_{}\s*=", db))?;
+        let reg = Regex::new(&format!(r"(?m)^_db_{}\s*=", db))?;
         if !reg.is_match(&content) {
             content = content.replace(
                 "[dependencies]",
                 &format!(
-                    "[dependencies]\ndb_{} = {{ path = \"../../2_db/{}\" }}",
+                    "[dependencies]\n_db_{} = {{ path = \"../../2_db/{}/base\" }}",
                     db, db
                 ),
             );
@@ -377,33 +344,13 @@ pub fn write_base_files(
     let mut content = if force || !file_path.exists() {
         DbTemplate { session }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
     for db in db_list {
-        let reg = Regex::new(&format!(r"(?m)^\s*db_{}::start", &db.to_case(Case::Snake)))?;
-        if !reg.is_match(&content) {
+        let chk = format!("_db_{}::clear_local_cache().await;", &db.to_case(Case::Snake));
+        if !content.contains(&chk) {
             crate::schema::parse(db, false, false)?;
             let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
-            // let tpl = DbInitTemplate { db };
-            // content = content.replace(
-            //     "// Do not modify this line. (DbInit)",
-            //     tpl.render()?.trim_start(),
-            // );
-            // let tpl = DbStartTemplate { db };
-            // content = content.replace(
-            //     "// Do not modify this line. (DbStart)",
-            //     tpl.render()?.trim_start(),
-            // );
-            // let tpl = DbStartTestTemplate { db };
-            // content = content.replace(
-            //     "// Do not modify this line. (DbStartTest)",
-            //     tpl.render()?.trim_start(),
-            // );
-            // let tpl = DbStopTemplate { db };
-            // content = content.replace(
-            //     "// Do not modify this line. (DbStop)",
-            //     tpl.render()?.trim_start(),
-            // );
             let tpl = DbClearLocalCacheTemplate { db };
             content = content.replace(
                 "// Do not modify this line. (DbClearLocalCache)",
@@ -425,6 +372,11 @@ pub fn write_base_files(
                     "// Do not modify this line. (RepoNew)",
                     tpl.render()?.trim_start(),
                 );
+                let tpl = DbRepoStaticTemplate { db };
+                content = content.replace(
+                    "// Do not modify this line. (RepoStatic)",
+                    tpl.render()?.trim_start(),
+                );
                 let tpl = DbRepoImplTemplate { db };
                 content = content.replace(
                     "// Do not modify this line. (RepoImpl)",
@@ -443,26 +395,6 @@ pub fn write_base_files(
                 let tpl = DbRepoImplRollbackTemplate { db };
                 content = content.replace(
                     "// Do not modify this line. (RepoImplRollback)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbMigrateTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (migrate)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbGenSeedSchemaTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (gen_seed_schema)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbSeedTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (seed)",
-                    tpl.render()?.trim_start(),
-                );
-                let tpl = DbCheckTemplate { db };
-                content = content.replace(
-                    "// Do not modify this line. (check)",
                     tpl.render()?.trim_start(),
                 );
             }
@@ -559,11 +491,11 @@ SESSION_SECRET_KEY={}
 }
 
 fn fix_build_sh(content: &str, name: &str) -> Result<String> {
-    if !content.contains(&format!("senax api {}", name)) {
+    if !content.contains(&format!("senax actix api {}", name)) {
         let content = content.replace(
             "# Do not modify this line. (Api)",
             &format!(
-                "senax api {} -c ${}_client\n# Do not modify this line. (Api)",
+                "senax actix api {} -c ${}_client\n# Do not modify this line. (Api)",
                 name, name
             ),
         );
@@ -590,13 +522,18 @@ impl Secret {
 #[derive(Template)]
 #[template(
     source = r###"
-    db_@{ db|snake }@_repositories::init();
+    db_@{ db|snake }@::init();
+    @%- if !exclude_from_domain %@
+    let _ = crate::_base::db::@{ db|upper_snake }@_REPO.set(Box::new(|conn| Box::new(db_@{ db|snake }@::impl_domain::@{ db|pascal }@RepositoryImpl::new(conn.clone()))));
+    let _ = crate::_base::db::@{ db|upper_snake }@_QS.set(Box::new(|conn| Box::new(db_@{ db|snake }@::impl_domain::@{ db|pascal }@RepositoryImpl::new(conn.clone()))));
+    @%- endif %@
     // Do not modify this line. (DbInit)"###,
     ext = "txt",
     escape = "none"
 )]
 pub struct DbInitTemplate<'a> {
     pub db: &'a str,
+    pub exclude_from_domain: bool,
 }
 
 #[derive(Template)]
@@ -647,7 +584,7 @@ pub struct DbStopTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    db_@{ db|snake }@::clear_local_cache().await;
+    _db_@{ db|snake }@::clear_local_cache().await;
     // Do not modify this line. (DbClearLocalCache)"###,
     ext = "txt",
     escape = "none"
@@ -659,7 +596,7 @@ pub struct DbClearLocalCacheTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    db_@{ db|snake }@::clear_whole_cache().await;
+    _db_@{ db|snake }@::clear_whole_cache().await;
     // Do not modify this line. (DbClearCache)"###,
     ext = "txt",
     escape = "none"
@@ -671,7 +608,7 @@ pub struct DbClearCacheTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    @{ db|snake|to_var_name }@: Arc<Mutex<db_@{ db|snake }@::DbConn>>,
+    @{ db|snake|to_var_name }@: Arc<Mutex<_db_@{ db|snake }@::DbConn>>,
     // Do not modify this line. (Repo)"###,
     ext = "txt",
     escape = "none"
@@ -683,7 +620,7 @@ pub struct DbRepoTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-            @{ db|snake|to_var_name }@: Arc::new(Mutex::new(db_@{ db|snake }@::DbConn::new_with_time(ctx.ctx_no(), ctx.time()))),
+            @{ db|snake|to_var_name }@: Arc::new(Mutex::new(_db_@{ db|snake }@::DbConn::new_with_time(ctx.ctx_no(), ctx.time()))),
             // Do not modify this line. (RepoNew)"###,
     ext = "txt",
     escape = "none"
@@ -695,11 +632,24 @@ pub struct DbRepoNewTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
+pub static @{ db|upper_snake }@_REPO: OnceCell<Box<dyn Fn(&Arc<Mutex<_db_@{ db|snake }@::DbConn>>) -> Box<dyn domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository> + Send + Sync>> = OnceCell::new();
+pub static @{ db|upper_snake }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<_db_@{ db|snake }@::DbConn>>) -> Box<dyn domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@QueryService> + Send + Sync>> = OnceCell::new();
+// Do not modify this line. (RepoStatic)"###,
+    ext = "txt",
+    escape = "none"
+)]
+pub struct DbRepoStaticTemplate<'a> {
+    pub db: &'a str,
+}
+
+#[derive(Template)]
+#[template(
+    source = r###"
     fn @{ db|snake }@_repository(&self) -> Box<dyn domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository> {
-        Box::new(db_@{ db|snake }@::impl_domain::@{ db|pascal }@RepositoryImpl::new(self.@{ db|snake|to_var_name }@.clone()))
+        @{ db|upper_snake }@_REPO.get().expect("No @{ db|upper_snake }@_REPO")(&self.@{ db|snake|to_var_name }@)
     }
     fn @{ db|snake }@_query(&self) -> Box<dyn domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@QueryService> {
-        Box::new(db_@{ db|snake }@::impl_domain::@{ db|pascal }@RepositoryImpl::new(self.@{ db|snake|to_var_name }@.clone()))
+        @{ db|upper_snake }@_QS.get().expect("No @{ db|upper_snake }@_QS")(&self.@{ db|snake|to_var_name }@)
     }
     // Do not modify this line. (RepoImpl)"###,
     ext = "txt",

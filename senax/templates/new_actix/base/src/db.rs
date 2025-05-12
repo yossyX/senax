@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use domain::repository::Repository;
+use once_cell::sync::OnceCell;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -9,14 +10,14 @@ use crate::context::Ctx;
 #[allow(dead_code)]
 pub async fn clear_local_cache() {
     @%- if session %@
-    db_session::clear_local_cache().await;
+    _db_session::clear_local_cache().await;
     @%- endif %@
     // Do not modify this line. (DbClearLocalCache)
 }
 
 pub async fn clear_whole_cache() {
     @%- if session %@
-    db_session::clear_whole_cache().await;
+    _db_session::clear_whole_cache().await;
     @%- endif %@
     // Do not modify this line. (DbClearCache)
 }
@@ -45,6 +46,8 @@ impl RepositoryImpl {
     }
 }
 
+// Do not modify this line. (RepoStatic)
+
 #[rustfmt::skip]
 #[async_trait]
 impl Repository for RepositoryImpl {
@@ -61,51 +64,5 @@ impl Repository for RepositoryImpl {
         // Do not modify this line. (RepoImplRollback)
         Ok(())
     }
-}
-
-#[rustfmt::skip]
-pub async fn migrate(db: Option<&str>, use_test: bool, clean: bool, ignore_missing: bool) -> Result<()> {
-    let mut join_set = tokio::task::JoinSet::new();
-    @%- if session %@
-    if db.is_none() || db == Some("session") {
-        join_set.spawn_local(db_session::migrate(use_test, clean, ignore_missing));
-    }
-    @%- endif %@
-    // Do not modify this line. (migrate)
-    let mut error = None;
-    while let Some(res) = join_set.join_next().await {
-        if let Err(e) = res? {
-            if let Some(e) = error.replace(e) {
-                log::error!("{}", e);
-            }
-        }
-    }
-    if let Some(e) = error {
-        return Err(e);
-    }
-    Ok(())
-}
-
-pub fn gen_seed_schema() -> Result<()> {
-    // Do not modify this line. (gen_seed_schema)
-    panic!("The gen_seed_schema function needs to be modified");
-    // Ok(())
-}
-
-pub async fn seed(_db: Option<&str>, _use_test: bool) -> Result<()> {
-    // Do not modify this line. (seed)
-    panic!("The seed function needs to be modified");
-    // Ok(())
-}
-
-#[rustfmt::skip]
-pub async fn check(use_test: bool) -> Result<()> {
-    tokio::try_join!(
-        @%- if session %@
-        db_session::check(use_test),
-        @%- endif %@
-        // Do not modify this line. (check)
-    )?;
-    Ok(())
 }
 @{-"\n"}@

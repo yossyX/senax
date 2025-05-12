@@ -5,18 +5,17 @@ edition = "2024"
 publish = false
 
 [features]
-cache_update_only = []
-etcd = [ "senax-common/etcd", "_db_@{ db|snake }@/etcd"  ]
-seeder = [ "schemars", "_db_@{ db|snake }@/seeder" ]
+cache_update_only = [
+    "_base/cache_update_only",
+]
+etcd = [ "senax-common/etcd", "_base/etcd" ]
+seeder = [ "schemars", "_base/seeder" ]
 
 [dependencies]
-_db_@{ db|snake }@ = { path = "base" }
+_base = { package = "_db_@{ db|snake }@", path = "base" }
 @%- if !config.exclude_from_domain %@
 domain = { path = "../../1_domain" }
 @%- endif %@
-@%- for db in config.outer_db() %@
-db_@{ db|snake }@ = { path = "../@{ db|snake }@" }
-@%- endfor %@
 
 ahash.workspace = true
 anyhow.workspace = true
@@ -30,7 +29,6 @@ clap.workspace = true
 crossbeam = "0.8"
 derive_more.workspace = true
 derive-new.workspace = true
-dotenvy.workspace = true
 futures.workspace = true
 fxhash = "0.2"
 includedir = "0.6.0"

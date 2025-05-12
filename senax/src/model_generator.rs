@@ -42,7 +42,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let domain_repositories_src_dir = domain_repositories_dir.join("src");
 
     let file_path = model_dir.join("Cargo.toml");
-    if force || !file_path.exists() {
+    let mut content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "db/_Cargo.toml", escape = "none")]
         struct CargoTemplate<'a> {
@@ -50,12 +50,55 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             pub config: &'a ConfigDef,
         }
 
-        let tpl = CargoTemplate {
+        CargoTemplate {
             db,
             config: &config,
-        };
-        fs_write(file_path, tpl.render()?)?;
+        }
+        .render()?
+    } else {
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
+    };
+    let reg = Regex::new(r"(?m)^_repo_\w+\s*=.+\n")?;
+    content = reg.replace_all(&content, "").into_owned();
+    let reg = Regex::new(r#"[ \t]*"_repo_\w+/cache_update_only"[ \t]*,?[ \t]*\n?"#)?;
+    content = reg.replace_all(&content, "").into_owned();
+    for (group, (_, _)) in groups.iter().rev() {
+        let db = &db.to_case(Case::Snake);
+        let group = &group.to_case(Case::Snake);
+        content = content.replace(
+            "[dependencies]",
+            &format!(
+                "[dependencies]\n_repo_{} = {{ package = \"_repo_{}_{}\", path = \"repositories/{}\" }}",
+                group, db, group, group
+            ),
+        );
+        content = content.replace(
+            "\"_base/cache_update_only\"",
+            &format!(
+                "\"_base/cache_update_only\",\n    \"_repo_{}/cache_update_only\"",
+                group
+            ),
+        );
     }
+    let reg = Regex::new(r"(?m)^db_\w+\s*=.+\n")?;
+    content = reg.replace_all(&content, "").into_owned();
+    let reg = Regex::new(r#"[ \t]*"db_\w+/cache_update_only"[ \t]*,?[ \t]*\n?"#)?;
+    content = reg.replace_all(&content, "").into_owned();
+    for db in config.outer_db().iter().rev() {
+        let db = &db.to_case(Case::Snake);
+        content = content.replace(
+            "[dependencies]",
+            &format!("[dependencies]\ndb_{} = {{ path = \"../{}\" }}", db, db),
+        );
+        content = content.replace(
+            "\"_base/cache_update_only\",",
+            &format!(
+                "\"_base/cache_update_only\",\n    \"db_{}/cache_update_only\",",
+                db
+            ),
+        );
+    }
+    fs_write(file_path, &*content)?;
 
     let file_path = model_dir.join("build.rs");
     if force || !file_path.exists() {
@@ -70,36 +113,68 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let base_dir = model_dir.join("base");
     let base_src_dir = base_dir.join("src");
     let model_src_dir = model_dir.join("src");
+
     let file_path = model_src_dir.join("lib.rs");
-    if force || !file_path.exists() {
+    let mut content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "db/src/lib.rs", escape = "none")]
         struct LibTemplate<'a> {
             pub db: &'a str,
             pub config: &'a ConfigDef,
+            pub groups: &'a GroupsDef,
             pub non_snake_case: bool,
         }
 
-        let tpl = LibTemplate {
+        LibTemplate {
             db,
             config: &config,
+            groups,
             non_snake_case,
-        };
-        fs_write(file_path, tpl.render()?)?;
+        }
+        .render()?
+    } else {
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
+    };
+
+    let reg = Regex::new(r"(?m)^[ \t]*pub use _repo_\w+::repositories::[#\w]+;\n")?;
+    content = reg.replace_all(&content, "").into_owned();
+    let reg = Regex::new(
+        r"(?m)^[ \t]*let _ = _base::models::\w+_HANDLER.set\(Box::new\(_repo_\w+::repositories::Handler\)\);\n",
+    )?;
+    content = reg.replace_all(&content, "").into_owned();
+    for (group, (_, _)) in groups.iter().rev() {
+        let db = &db.to_case(Case::Snake);
+        let group = &group.to_case(Case::Snake);
+        content = content.replace(
+            "pub mod repositories {",
+            &format!(
+                "pub mod repositories {{\n    pub use _repo_{}::repositories::{};",
+                group,
+                _to_var_name(group)
+            ),
+        );
+        content = content.replace(
+            "pub fn init() {",
+            &format!(
+                "pub fn init() {{\n    let _ = _base::models::{}_HANDLER.set(Box::new(_repo_{}::repositories::Handler));",
+                group.to_case(Case::UpperSnake), group
+            ),
+        );
     }
+    fs_write(file_path, &*content)?;
 
     let file_path = model_src_dir.join("models.rs");
 
     #[derive(Template)]
     #[template(path = "db/src/models.rs", escape = "none")]
     struct ModelsTemplate<'a> {
-        pub groups: &'a GroupsDef,
         pub config: &'a ConfigDef,
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = ModelsTemplate {
-        groups,
         config: &config,
+        groups,
     };
     fs_write(file_path, tpl.render()?)?;
 
@@ -131,18 +206,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     }
 
     db::base::write_files(&base_dir, db, &groups, &config, force, non_snake_case)?;
-
-    let file_path = model_src_dir.join("main.rs");
-    if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(path = "db/src/main.rs", escape = "none")]
-        struct MainTemplate<'a> {
-            pub db: &'a str,
-        }
-
-        let tpl = MainTemplate { db };
-        fs_write(file_path, tpl.render()?)?;
-    }
 
     #[derive(Template)]
     #[template(path = "db/src/seeder.rs", escape = "none")]
@@ -202,31 +265,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             };
         }
     }
-
-    #[derive(Template)]
-    #[template(path = "db/repositories/_Cargo.toml", escape = "none")]
-    struct RepositoriesCargoTemplate<'a> {
-        pub db: &'a str,
-        pub groups: &'a GroupsDef,
-    }
-
-    let file_path = db_repositories_dir.join("Cargo.toml");
-    remove_files.remove(file_path.as_os_str());
-    let tpl = RepositoriesCargoTemplate { db, groups };
-    fs_write(file_path, tpl.render()?)?;
-
-    
-    #[derive(Template)]
-    #[template(path = "db/repositories/src/lib.rs", escape = "none")]
-    struct RepositoriesLibTemplate<'a> {
-        pub db: &'a str,
-        pub groups: &'a GroupsDef,
-    }
-
-    let file_path = db_repositories_dir.join("src/lib.rs");
-    remove_files.remove(file_path.as_os_str());
-    let tpl = RepositoriesLibTemplate { db, groups };
-    fs_write(file_path, tpl.render()?)?;
 
     for (group_name, (_, defs)) in groups {
         begin_traverse(&group_name);
@@ -328,7 +366,11 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     remove_files.remove(file_path.as_os_str());
                     fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, output))?;
                 } else {
-                    table_output.push_str(&format!("pub mod {} {{\n{}}}\n", _to_var_name(mod_name), output));
+                    table_output.push_str(&format!(
+                        "pub mod {} {{\n{}}}\n",
+                        _to_var_name(mod_name),
+                        output
+                    ));
                 }
 
                 if !exclude_from_domain {
@@ -403,7 +445,11 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     remove_files.remove(file_path.as_os_str());
                     fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, output))?;
                 } else {
-                    table_output.push_str(&format!("pub mod {} {{\n{}}}\n", _to_var_name(mod_name), output));
+                    table_output.push_str(&format!(
+                        "pub mod {} {{\n{}}}\n",
+                        _to_var_name(mod_name),
+                        output
+                    ));
                 }
 
                 if !exclude_from_domain {

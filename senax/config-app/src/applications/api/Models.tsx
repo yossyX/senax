@@ -60,7 +60,7 @@ function Models() {
   return (
     <>
       <Helmet>
-        <title>Senax Database Api Server ({group})</title>
+        <title>Senax Api Server ({group})</title>
       </Helmet>
       <ContentLayout header={<Header variant="h1">{group}</Header>}>
         <Container

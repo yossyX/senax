@@ -16,7 +16,7 @@ function Db() {
   return (
     <>
       <Helmet>
-        <title>Senax Database Api Server ({server})</title>
+        <title>Senax API Server ({server})</title>
       </Helmet>
       <ContentLayout
         header={

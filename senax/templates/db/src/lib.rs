@@ -14,7 +14,6 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-pub use _db_@{ db|snake }@ as _base;
 pub use _base::*;
 @%- if !config.exclude_from_domain %@
 #[rustfmt::skip]
@@ -28,6 +27,14 @@ pub mod models;
 #[rustfmt::skip]
 #[cfg(feature = "seeder")]
 pub mod seeder;
+
+#[rustfmt::skip]
+pub mod repositories {
+}
+
+#[rustfmt::skip]
+pub fn init() {
+}
 
 #[allow(unused_variables)]
 pub async fn start(

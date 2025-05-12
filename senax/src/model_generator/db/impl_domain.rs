@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::common::{OVERWRITTEN_MSG, fs_write};
-use crate::schema::{set_domain_mode, to_id_name, ConfigDef, GroupsDef, ModelDef, _to_var_name};
+use crate::schema::{_to_var_name, ConfigDef, GroupsDef, ModelDef, set_domain_mode, to_id_name};
 use crate::{SEPARATED_BASE_FILES, filters};
 
 pub fn write_impl_domain_rs(
@@ -29,7 +29,7 @@ pub fn write_impl_domain_rs(
 
         ImplDomainDbTemplate { db }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
 
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
@@ -44,9 +44,7 @@ pub fn write_impl_domain_rs(
         source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, (_, defs)) in groups %@
-pub use crate::_base::impl_domain::@{ name|snake|to_var_name }@;
-pub static NEW_@{ name|upper }@_REPO: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> Box<dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@Repository> + Send + Sync>> = OnceCell::new();
-pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> Box<dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryService> + Send + Sync>> = OnceCell::new();
+pub use _base::impl_domain::@{ name|snake|to_var_name }@;
 @%- endfor %@
 // Do not modify up to this line. (ModEnd)"###,
         ext = "txt",
@@ -72,7 +70,7 @@ pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> 
         source = r###"
     // Do not modify below this line. (RepoStart)
     @%- for (name, (_, defs)) in groups %@
-    get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@Repository, NEW_@{ name|upper }@_REPO, "The @{ name|pascal }@Repository is not configured.");
+    get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@Repository, _repo_@{ name|snake }@::impl_domain::@{ name|snake|to_var_name }@::@{ name|pascal }@RepositoryImpl);
     @%- endfor %@
     // Do not modify up to this line. (RepoEnd)"###,
         ext = "txt",
@@ -98,7 +96,7 @@ pub static NEW_@{ name|upper }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<DbConn>>) -> 
         source = r###"
     // Do not modify below this line. (QueryServiceStart)
     @%- for (name, (_, defs)) in groups %@
-    get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, NEW_@{ name|upper }@_QS, "The @{ name|pascal }@QueryService is not configured.");
+    get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, _repo_@{ name|snake }@::impl_domain::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryServiceImpl);
     @%- endfor %@
     // Do not modify up to this line. (QueryServiceEnd)"###,
         ext = "txt",
@@ -190,6 +188,10 @@ pub fn write_entity(
         fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, ret))?;
         Ok("".to_string())
     } else {
-        Ok(format!("pub mod {} {{\n{}}}\n", _to_var_name(mod_name), ret))
+        Ok(format!(
+            "pub mod {} {{\n{}}}\n",
+            _to_var_name(mod_name),
+            ret
+        ))
     }
 }

@@ -1,8 +1,9 @@
-use crate::{common::fs_write, model_generator::filters};
+use crate::{common::fs_write, model_generator::filters, schema::_to_var_name};
 use anyhow::{Context, Result};
 use askama::Template;
+use convert_case::{Case, Casing as _};
 use regex::Regex;
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{fs, path::Path};
 
 pub mod base_domain;
 pub mod repositories;
@@ -16,39 +17,29 @@ pub fn write_repositories_rs(domain_src_dir: &Path, db: &str) -> Result<()> {
 
         DomainRepositoryTemplate.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let re = Regex::new(r"// Do not modify this line\. \(Mod:([_a-zA-Z0-9,]*)\)").unwrap();
-    let caps = re
-        .captures(&content)
-        .with_context(|| format!("Illegal file content:{}", &file_path.to_string_lossy()))?;
-    let mut all: BTreeSet<String> = caps
-        .get(1)
-        .unwrap()
-        .as_str()
-        .split(',')
-        .filter(|v| !v.is_empty())
-        .map(|v| v.to_string())
-        .collect();
-    if !all.contains(db) {
-        all.insert(db.to_string());
-        let all = all.iter().cloned().collect::<Vec<_>>().join(",");
-
+    let db_snake = db.to_case(Case::Snake);
+    let chk = format!(
+        "\npub use repository_{} as {};\n",
+        db_snake,
+        _to_var_name(&db_snake)
+    );
+    if !content.contains(&chk) {
         #[derive(Template)]
         #[template(
             source = r###"
 pub use repository_@{ db|snake }@ as @{ db|snake|to_var_name }@;
-// Do not modify this line. (Mod:@{ all }@)"###,
+// Do not modify this line. (Mod)"###,
             ext = "txt",
             escape = "none"
         )]
         pub struct ModTemplate<'a> {
-            pub all: String,
             pub db: &'a str,
         }
 
-        let tpl = ModTemplate { all, db }.render()?;
-        content = re.replace(&content, tpl.trim_start()).to_string();
+        let tpl = ModTemplate { db }.render()?;
+        content = content.replace("// Do not modify this line. (Mod)", tpl.trim_start());
 
         #[derive(Template)]
         #[template(

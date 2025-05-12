@@ -5,7 +5,6 @@ use dotenvy::dotenv;
 use regex::Regex;
 use schemars::r#gen::SchemaSettings;
 use serde_json::Value;
-use std::fs;
 use std::path::Path;
 use std::{env, path::PathBuf};
 
@@ -58,7 +57,7 @@ pub const DEFAULT_CONFIG_HOST: &str = "0.0.0.0";
 pub const DEFAULT_CONFIG_PORT: u16 = 9100;
 pub const API_SCHEMA_PATH: &str = "api_schema";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const SEPARATED_BASE_FILES: bool = cfg!(feature="separated-base-files");
+pub const SEPARATED_BASE_FILES: bool = cfg!(feature = "separated-base-files");
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
 #[cfg(feature = "config")]
@@ -90,19 +89,10 @@ enum Commands {
         #[clap(long)]
         exclude_from_domain: bool,
     },
-    /// Generate an web server
-    NewServer {
-        /// Server name
-        name: String,
-        /// DB names
-        #[clap(long)]
-        db: String,
-        /// Use session
-        #[clap(long)]
-        session: bool,
-        /// Force overwrite
-        #[clap(short, long)]
-        force: bool,
+    /// Generate an web server with actix.
+    Actix {
+        #[clap(subcommand)]
+        command: Server,
     },
     /// Generate an client
     NewClient {
@@ -149,28 +139,6 @@ enum Commands {
         #[clap(long)]
         skip_version_check: bool,
     },
-    /// generate api
-    Api {
-        /// Server name
-        name: String,
-        /// Specify the DB
-        db: Option<String>,
-        /// Specify the group
-        group: Option<String>,
-        /// Specify the model
-        model: Option<String>,
-        #[clap(long)]
-        ts_dir: Option<PathBuf>,
-        /// Inquire about adding a model
-        #[clap(short, long)]
-        inquiry: bool,
-        /// Force overwrite
-        #[clap(short, long)]
-        force: bool,
-        /// Delete files under the directory before generating
-        #[clap(short, long)]
-        clean: bool,
-    },
     /// generate migration ddl
     GenMigrate {
         /// Specify description and generate a file
@@ -213,8 +181,8 @@ enum Commands {
     },
     /// generate a API document file
     ApiDoc {
-        /// Specify the server path
-        path: PathBuf,
+        /// Server name
+        name: String,
         /// Specify the db
         db: String,
         /// Specify the group
@@ -244,6 +212,57 @@ enum Commands {
         doc: bool,
     },
     StreamId,
+}
+
+#[derive(Subcommand)]
+enum Server {
+    /// Generate an web server
+    New {
+        /// Server name
+        name: String,
+        /// DB names
+        #[clap(long)]
+        db: String,
+        /// Use session
+        #[clap(long)]
+        session: bool,
+        /// Force overwrite
+        #[clap(short, long)]
+        force: bool,
+    },
+    /// Prepare to use DB
+    UseDb {
+        /// Server name
+        name: String,
+        /// DB names
+        #[clap(long)]
+        db: String,
+        /// Prepare to use API
+        #[clap(long)]
+        api: bool,
+    },
+    /// generate API
+    Api {
+        /// Server name
+        name: String,
+        /// Specify the DB
+        db: Option<String>,
+        /// Specify the group
+        group: Option<String>,
+        /// Specify the model
+        model: Option<String>,
+        #[clap(long)]
+        ts_dir: Option<PathBuf>,
+        /// Inquire about adding a model
+        #[clap(short, long)]
+        inquiry: bool,
+        /// Force overwrite
+        #[clap(short, long)]
+        force: bool,
+        /// Delete files under the directory before generating
+        #[clap(short, long)]
+        clean: bool,
+    },
 }
 
 #[tokio::main]
@@ -289,19 +308,48 @@ async fn exec(cli: Cli) -> Result<()> {
             ensure!(db_re.is_match(db), "bad db name!");
             db_generator::generate(db, *exclude_from_domain)?;
         }
-        Commands::NewServer {
-            name,
-            db,
-            session,
-            force,
-        } => {
-            if *session {
-                init_generator::session()?;
-                model_generator::generate("session", false, false, false)?;
+        Commands::Actix { command } => match command {
+            Server::New {
+                name,
+                db,
+                session,
+                force,
+            } => {
+                if *session {
+                    init_generator::session()?;
+                    model_generator::generate("session", false, false, false)?;
+                }
+                let db_list: Vec<_> = db.split(',').map(|v| v.trim()).collect();
+                actix_generator::generate(name, &db_list, *session, *force, true)?;
             }
-            let db_list = db.split(',').map(|v| v.trim()).collect();
-            actix_generator::generate(name, db_list, *session, *force)?;
-        }
+            Server::UseDb { name, db, api } => {
+                let db_list: Vec<_> = db.split(',').map(|v| v.trim()).collect();
+                actix_generator::generate(name, &db_list, false, false, *api)?;
+            }
+            Server::Api {
+                name,
+                db,
+                group,
+                model,
+                ts_dir,
+                inquiry,
+                force,
+                clean,
+            } => {
+                if let Some(db) = db {
+                    ensure!(db_re.is_match(db), "bad db name!");
+                    api_generator::generate(
+                        name, db, group, model, ts_dir, *inquiry, *force, *clean,
+                    )?;
+                } else {
+                    for db in crate::api_generator::api_db_list(Path::new(name))? {
+                        api_generator::generate(
+                            name, &db, group, model, ts_dir, *inquiry, *force, *clean,
+                        )?;
+                    }
+                }
+            }
+        },
         Commands::NewClient {
             name,
             server,
@@ -335,27 +383,6 @@ async fn exec(cli: Cli) -> Result<()> {
             } else {
                 for db in crate::db_generator::db_list(false)? {
                     model_generator::generate(&db, *force, *clean, *skip_version_check)?;
-                }
-            }
-        }
-        Commands::Api {
-            name,
-            db,
-            group,
-            model,
-            ts_dir,
-            inquiry,
-            force,
-            clean,
-        } => {
-            if let Some(db) = db {
-                ensure!(db_re.is_match(db), "bad db name!");
-                api_generator::generate(name, db, group, model, ts_dir, *inquiry, *force, *clean)?;
-            } else {
-                for db in crate::api_generator::api_db_list(Path::new(name))? {
-                    api_generator::generate(
-                        name, &db, group, model, ts_dir, *inquiry, *force, *clean,
-                    )?;
                 }
             }
         }
@@ -396,14 +423,14 @@ async fn exec(cli: Cli) -> Result<()> {
             db_document::generate(db, group, *er, history, output, template)?;
         }
         Commands::ApiDoc {
-            path,
+            name,
             db,
             group,
             output,
             template,
         } => {
             ensure!(db_re.is_match(db), "bad db name!");
-            let def = api_generator::serialize::generate(path, db, group)?;
+            let def = api_generator::serialize::generate(name, db, group)?;
             api_document::generate(def, output, template)?;
         }
         Commands::GenSchemaFromDb {

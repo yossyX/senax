@@ -2,7 +2,7 @@ use ::derive_more::Display;
 use ::serde::{Deserialize, Serialize};
 use ::serde_json::Value;
 
-// Do not modify this line. (Mod:)
+// Do not modify this line. (Mod)
 
 pub trait Check_<T: ?Sized> {
     fn check(&self, obj: &T) -> anyhow::Result<bool>;

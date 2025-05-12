@@ -2,7 +2,7 @@ use compact_str::CompactString;
 use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use strum_macros::{AsRefStr, EnumString};
 
 use super::{AGGREGATION_TYPE, CREATED_AT, DELETED, DELETED_AT, ModelDef, UPDATED_AT, VERSION};
@@ -510,8 +510,8 @@ impl ConfigDef {
             DbType::Mysql => 4 * 1024 * 1024 * 1024 - 1,
         }
     }
-    pub fn outer_db(&self) -> HashSet<String> {
-        let mut v = HashSet::new();
+    pub fn outer_db(&self) -> BTreeSet<String> {
+        let mut v = BTreeSet::new();
         let group_lock = super::GROUPS.read().unwrap();
         let groups = group_lock.as_ref().unwrap();
         for (_, models) in groups {

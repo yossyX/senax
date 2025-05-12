@@ -69,7 +69,7 @@ pub async fn generate(
         if config.collation != table.collation {
             model.collation = table.collation.clone();
         }
-        model._name = Some(model.table_name());
+        model._before_rename_name = Some(model.table_name());
         if let Some(primary) = &table.primary {
             match primary {
                 TableKey::PrimaryKey(cols) => {
@@ -306,7 +306,7 @@ pub async fn generate(
             } else {
                 field.sql_comment = column.comment.clone();
             }
-            field._name = Some(field.get_col_name(name).to_string());
+            field._before_rename_name = Some(field.get_col_name(name).to_string());
             model
                 .fields
                 .insert(name.clone(), FieldDefOrSubsetType::Exact(field));

@@ -200,7 +200,7 @@ pub fn generate(
         db_config.groups.iter().map(|(v, _)| v.clone()).collect()
     };
     let api_dir = server_dir.join("auto_api");
-    let mut db_file_group_names = Vec::new();
+    let mut group_route_names = Vec::new();
     let api_db_dir = api_dir.join(db_route.to_case(Case::Snake));
     let mut remove_files = HashSet::new();
     if clean && api_db_dir.exists() {
@@ -211,7 +211,27 @@ pub fn generate(
             };
         }
     }
-    for group_route in &group_routes {
+
+    let file_path = server_dir.join("Cargo.toml");
+    let mut content = fs::read_to_string(&file_path)
+        .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
+    let name = server.to_case(Case::Snake);
+    let reg = Regex::new(&format!(r"(?m)^_{}_\w+\s*=.+\n", name))?;
+    content = reg.replace_all(&content, "").into_owned();
+    for group_route in group_routes.iter().rev() {
+        let db_route = db_route.to_case(Case::Snake);
+        let group_route = group_route.to_case(Case::Snake);
+        content = content.replace(
+            "[dependencies]",
+            &format!(
+                "[dependencies]\n_{}_{}_{} = {{ path = \"auto_api/{}/{}\" }}",
+                name, db_route, group_route, db_route, group_route
+            ),
+        );
+    }
+    fs_write(file_path, &*content)?;
+
+    for group_route in group_routes.iter().rev() {
         let schema_path = schema_dir.join(format!("{group_route}.yml"));
         let mut api_model_map: IndexMap<String, Option<ApiModelDef>> = if schema_path.exists() {
             parse_yml_file(&schema_path)?
@@ -235,25 +255,6 @@ pub fn generate(
             .unwrap_or_else(|| panic!("The {db} DB does not have {group_name} group."));
         let group_route_mod_name = group_route.to_case(Case::Snake);
         let group_mod_name = group_name.to_case(Case::Snake);
-
-        let file_path = server_dir.join("Cargo.toml");
-        if file_path.exists() {
-            let mut content = fs::read_to_string(&file_path)?;
-            let name = server.to_case(Case::Snake);
-            let db_route = db_route.to_case(Case::Snake);
-            let group_route = group_route.to_case(Case::Snake);
-            let reg = Regex::new(&format!(r"(?m)^_{}_{}_{}\s*=", name, db_route, group_route))?;
-            if !reg.is_match(&content) {
-                content = content.replace(
-                    "[dependencies]",
-                    &format!(
-                        "[dependencies]\n_{}_{}_{} = {{ path = \"auto_api/{}/{}\" }}",
-                        name, db_route, group_route, db_route, group_route
-                    ),
-                );
-            }
-            fs_write(file_path, &*content)?;
-        }
 
         let api_group_dir = api_db_dir.join(&group_route_mod_name);
 
@@ -358,7 +359,7 @@ pub fn generate(
                 force || clean,
                 &mut remove_files,
             )?;
-            db_file_group_names.push(group_route.clone());
+            group_route_names.push(group_route.clone());
         }
         if !schema_path.exists() || update_group_def {
             let mut buf = "# yaml-language-server: $schema=../../../senax-schema.json#properties/api_model\n\n".to_string();
@@ -379,7 +380,7 @@ pub fn generate(
         server,
         &db,
         db_route,
-        &db_file_group_names,
+        &group_route_names,
         force || clean,
         &db_config,
     )?;
@@ -405,7 +406,7 @@ fn write_db_file(
     server: &str,
     db: &str,
     db_route: &str,
-    group_names: &[String],
+    group_route_names: &[String],
     force: bool,
     config: &ApiDbDef,
 ) -> Result<()> {
@@ -413,73 +414,133 @@ fn write_db_file(
     let file_path = path
         .join("auto_api")
         .join(format!("{}.rs", &db_route.to_case(Case::Snake)));
-    let content = if force || !file_path.exists() {
-        template::DbTemplate { db, db_route }.render()?
+    let mut content = if force || !file_path.exists() {
+        #[derive(Template)]
+        #[template(path = "api/db.rs", escape = "none")]
+        pub struct DbTemplate<'a> {
+            pub db: &'a str,
+            pub db_route: &'a str,
+        }
+
+        DbTemplate { db, db_route }.render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let re = Regex::new(r"\n// Do not modify this line\. \(GqlMod:([_a-zA-Z0-9,]*)\)").unwrap();
-    let caps = re
-        .captures(&content)
-        .with_context(|| format!("Illegal file content:{}", &file_path.to_string_lossy()))?;
-    let mut all: BTreeSet<String> = caps
-        .get(1)
-        .unwrap()
-        .as_str()
-        .split(',')
-        .filter(|v| !v.is_empty())
-        .map(|v| v.to_string())
-        .collect();
-    let add_groups: BTreeSet<String> = group_names
-        .iter()
-        .filter(|v| !all.contains(*v))
-        .map(|v| v.to_string())
-        .collect();
-    let add_groups = &add_groups;
-    add_groups.iter().for_each(|v| {
-        all.insert(v.clone());
-    });
-    let all = all.iter().cloned().collect::<Vec<_>>().join(",");
-    let tpl = template::DbModTemplate {
-        server,
-        db_route,
-        all,
-        add_groups,
-    };
-    let content = re.replace(&content, tpl.render()?);
-    let tpl = template::DbQueryTemplate {
-        db_route,
-        add_groups,
-        camel_case,
-    };
-    let mut content = content.replace(
-        "\n    // Do not modify this line. (GqlQuery)",
-        &tpl.render()?,
-    );
-    for group in add_groups {
-        let tpl = template::DbMutationTemplate {
-            db_route,
-            name: group,
-            camel_case,
-        };
-        content = content.replace(
-            "\n    // Do not modify this line. (GqlMutation)",
-            &tpl.render()?,
+    for group_route in group_route_names.iter().rev() {
+        let chk = format!(
+            "\npub use _{}_{}_{}::api as {};\n",
+            server.to_case(Case::Snake),
+            db_route.to_case(Case::Snake),
+            group_route.to_case(Case::Snake),
+            _to_var_name(&group_route.to_case(Case::Snake))
         );
-        content = content.replace(
-            "// Do not modify this line. (ApiRouteConfig)",
-            &format!(
-                "cfg.service(scope(\"/{}\").configure({}::route_config));\n    // Do not modify this line. (ApiRouteConfig)",
-                &group,
-                _to_var_name(&group.to_case(Case::Snake)),
-            ),
-        );
+        if !content.contains(&chk) {
+            #[derive(Template)]
+            #[template(
+                source = r###"
+pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as @{ group_route|snake|to_var_name }@;
+// Do not modify this line. (GqlMod)"###,
+                ext = "txt",
+                escape = "none"
+            )]
+            pub struct DbModTemplate<'a> {
+                pub server: &'a str,
+                pub db_route: &'a str,
+                pub group_route: &'a str,
+            }
+
+            let tpl = DbModTemplate {
+                server,
+                db_route,
+                group_route,
+            };
+            content = content.replace("\n// Do not modify this line. (GqlMod)", &tpl.render()?);
+
+            #[derive(Template)]
+            #[template(
+                source = r###"
+    @%- if !camel_case %@
+    #[graphql(name = "@{ group_route }@")]
+    @%- endif %@
+    async fn @{ group_route|to_var_name }@(&self) -> @{ group_route|snake|to_var_name }@::GqlQuery@{ db_route|pascal }@@{ group_route|pascal }@ {
+        @{ group_route|snake|to_var_name }@::GqlQuery@{ db_route|pascal }@@{ group_route|pascal }@
     }
-    let tpl = template::DbJsonSchemaTemplate { add_groups };
-    let content = content.replace(
-        "\n    // Do not modify this line. (JsonSchema)",
-        &tpl.render()?,
-    );
+    // Do not modify this line. (GqlQuery)"###,
+                ext = "txt",
+                escape = "none"
+            )]
+            pub struct DbQueryTemplate<'a> {
+                pub db_route: &'a str,
+                pub group_route: &'a str,
+                pub camel_case: bool,
+            }
+
+            let tpl = DbQueryTemplate {
+                db_route,
+                group_route,
+                camel_case,
+            };
+            content = content.replace(
+                "\n    // Do not modify this line. (GqlQuery)",
+                &tpl.render()?,
+            );
+
+            #[derive(Template)]
+            #[template(
+                source = r###"
+    @%- if !camel_case %@
+    #[graphql(name = "@{ group_route }@")]
+    @%- endif %@
+    async fn @{ group_route|to_var_name }@(&self) -> @{ group_route|snake|to_var_name }@::GqlMutation@{ db_route|pascal }@@{ group_route|pascal }@ {
+        @{ group_route|snake|to_var_name }@::GqlMutation@{ db_route|pascal }@@{ group_route|pascal }@
+    }
+    // Do not modify this line. (GqlMutation)"###,
+                ext = "txt",
+                escape = "none"
+            )]
+            pub struct DbMutationTemplate<'a> {
+                pub db_route: &'a str,
+                pub group_route: &'a str,
+                pub camel_case: bool,
+            }
+
+            let tpl = DbMutationTemplate {
+                db_route,
+                group_route,
+                camel_case,
+            };
+            content = content.replace(
+                "\n    // Do not modify this line. (GqlMutation)",
+                &tpl.render()?,
+            );
+            content = content.replace(
+                "// Do not modify this line. (ApiRouteConfig)",
+                &format!(
+                    "cfg.service(scope(\"/{}\").configure({}::route_config));\n    // Do not modify this line. (ApiRouteConfig)",
+                    &group_route,
+                    _to_var_name(&group_route.to_case(Case::Snake)),
+                ),
+            );
+
+            #[derive(Template)]
+            #[template(
+                source = r###"
+    @{ group_route|snake|to_var_name }@::gen_json_schema(&dir.join("@{ group_route }@"))?;
+    // Do not modify this line. (JsonSchema)"###,
+                ext = "txt",
+                escape = "none"
+            )]
+            pub struct DbJsonSchemaTemplate<'a> {
+                pub group_route: &'a str,
+            }
+
+            let tpl = DbJsonSchemaTemplate { group_route };
+            content = content.replace(
+                "\n    // Do not modify this line. (JsonSchema)",
+                &tpl.render()?,
+            );
+        }
+    }
     fs_write(file_path, &*content)?;
     Ok(())
 }
@@ -495,92 +556,108 @@ fn write_group_file(
 ) -> Result<()> {
     let file_path = path.join("src/api.rs");
     remove_files.remove(file_path.as_os_str());
-    let content = if force || !file_path.exists() {
+    let mut content = if force || !file_path.exists() {
         template::GroupTemplate {
             db: db_route,
             group: group_route,
         }
         .render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let re = Regex::new(r"\n// Do not modify this line\. \(GqlMod:([_a-zA-Z0-9,]*)\)").unwrap();
-    let caps = re
-        .captures(&content)
-        .with_context(|| format!("Illegal file content:{}", &file_path.to_string_lossy()))?;
-    let mut all: BTreeSet<String> = caps
-        .get(1)
-        .unwrap()
-        .as_str()
-        .split(',')
-        .filter(|v| !v.is_empty())
-        .map(|v| v.to_string())
-        .collect();
-    let add_models: BTreeSet<String> = model_routes
-        .iter()
-        .filter(|v| !all.contains(*v))
-        .map(|v| v.to_string())
-        .collect();
-    let add_models = &add_models;
-    add_models.iter().for_each(|v| {
-        all.insert(v.clone());
-    });
-    let all = all.iter().cloned().collect::<Vec<_>>().join(",");
+    for model_route in model_routes.iter() {
+        let chk = format!(
+            "\npub mod {};\n",
+            _to_var_name(&model_route.to_case(Case::Snake))
+        );
+        if !content.contains(&chk) {
+            #[derive(Template)]
+            #[template(
+                source = r###"
+pub mod @{ model_route|snake|to_var_name }@;
+// Do not modify this line. (GqlMod)"###,
+                ext = "txt",
+                escape = "none"
+            )]
+            pub struct GroupModTemplate<'a> {
+                pub model_route: &'a str,
+            }
 
-    #[derive(Template)]
-    #[template(
-        source = r###"
-@%- for name in add_models %@
-pub mod @{ name|snake|to_var_name }@;
-@%- endfor %@
-// Do not modify this line. (GqlMod:@{ all }@)"###,
-        ext = "txt",
-        escape = "none"
-    )]
-    pub struct GroupModTemplate<'a> {
-        pub all: String,
-        pub add_models: &'a BTreeSet<String>,
+            let tpl = GroupModTemplate { model_route };
+            content = content.replace("\n// Do not modify this line. (GqlMod)", &tpl.render()?);
+
+            #[derive(Template)]
+            #[template(
+                source = r###"
+    @%- if !camel_case %@
+    #[graphql(name = "@{ model_route }@")]
+    @%- endif %@
+    async fn @{ model_route|to_var_name }@(&self) -> @{ model_route|snake|to_var_name }@::Gql@{ mode }@@{ db|pascal }@@{ group|pascal }@@{ model_route|pascal }@ {
+        @{ model_route|snake|to_var_name }@::Gql@{ mode }@@{ db|pascal }@@{ group|pascal }@@{ model_route|pascal }@
     }
+    // Do not modify this line. (Gql@{ mode }@)"###,
+                ext = "txt",
+                escape = "none"
+            )]
+            pub struct GroupImplTemplate<'a> {
+                pub mode: &'a str,
+                pub db: &'a str,
+                pub group: &'a str,
+                pub model_route: &'a str,
+                pub camel_case: bool,
+            }
 
-    let tpl = GroupModTemplate { all, add_models };
-    let mut content = re.replace(&content, tpl.render()?).to_string();
-    let tpl = template::GroupImplTemplate {
-        db: db_route,
-        group: group_route,
-        add_models,
-        mode: "Query",
-        camel_case,
-    };
-    content = content.replace(
-        "\n    // Do not modify this line. (GqlQuery)",
-        &tpl.render()?,
-    );
-    let tpl = template::GroupImplTemplate {
-        db: db_route,
-        group: group_route,
-        add_models,
-        mode: "Mutation",
-        camel_case,
-    };
-    content = content.replace(
-        "\n    // Do not modify this line. (GqlMutation)",
-        &tpl.render()?,
-    );
-    for model in add_models.iter() {
-        content = content.replace(
+            let tpl = GroupImplTemplate {
+                mode: "Query",
+                db: db_route,
+                group: group_route,
+                model_route,
+                camel_case,
+            };
+            content = content.replace(
+                "\n    // Do not modify this line. (GqlQuery)",
+                &tpl.render()?,
+            );
+            let tpl = GroupImplTemplate {
+                mode: "Mutation",
+                db: db_route,
+                group: group_route,
+                model_route,
+                camel_case,
+            };
+            content = content.replace(
+                "\n    // Do not modify this line. (GqlMutation)",
+                &tpl.render()?,
+            );
+
+            content = content.replace(
             "// Do not modify this line. (ApiRouteConfig)",
             &format!(
                 "cfg.service(scope(\"/{}\").configure({}::_route_config));\n    // Do not modify this line. (ApiRouteConfig)",
-                &model,
-                _to_var_name(&model.to_case(Case::Snake)),
-            ),
-        );
+                &model_route,
+                _to_var_name(&model_route.to_case(Case::Snake)),
+                ),
+            );
+
+            #[derive(Template)]
+            #[template(
+                source = r###"
+    @{ model_route|snake|to_var_name }@::gen_json_schema(dir)?;
+    // Do not modify this line. (JsonSchema)"###,
+                ext = "txt",
+                escape = "none"
+            )]
+            pub struct GroupJsonSchemaTemplate<'a> {
+                pub model_route: &'a str,
+            }
+
+            let tpl = GroupJsonSchemaTemplate { model_route };
+            content = content.replace(
+                "\n    // Do not modify this line. (JsonSchema)",
+                &tpl.render()?,
+            );
+        }
     }
-    let tpl = template::GroupJsonSchemaTemplate { add_models };
-    content = content.replace(
-        "\n    // Do not modify this line. (JsonSchema)",
-        &tpl.render()?,
-    );
     fs_write(file_path, &*content)?;
     Ok(())
 }
@@ -647,7 +724,7 @@ fn write_model_file(
         }
         .render()?
     } else {
-        fs::read_to_string(&file_path)?
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
     let re = Regex::new(r"(?s)(// Do not modify below this line. \(GqlModelStart\)).+(// Do not modify up to this line. \(GqlModelEnd\))").unwrap();
     ensure!(
