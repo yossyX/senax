@@ -234,7 +234,8 @@ pub async fn graphql(
 pub async fn graphiql() -> Result<HttpResponse> {
     Ok(HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(GraphiQLSource::build().endpoint("/gql").finish()))
+        .body(GraphiQLSource::build().endpoint("/gql").finish()
+        .replace("graphiql/graphiql.", "graphiql@3.9.0/graphiql.")))
 }
 
 #[allow(unused_variables)]

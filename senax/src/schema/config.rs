@@ -154,6 +154,11 @@ pub struct ConfigDef {
     /// ### versionのラベル
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_of_version: Option<String>,
+    /// ### existsのNO_SEMIJOINを無効化
+    /// SEMIJOINはexistsをanyに変換するため、existsとanyの区別ができなくなる。
+    /// 明示的にexistsとanyを区別するのではなく、MySQLに任せる場合にdisable_no_semijoinをtureにする。
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_no_semijoin: bool,
     /// ### モデルグループ
     pub groups: IndexMap<String, Option<GroupDef>>,
 }
@@ -305,6 +310,11 @@ pub struct ConfigJson {
     /// ### versionのラベル
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_of_version: Option<String>,
+    /// ### existsのNO_SEMIJOINを無効化
+    /// SEMIJOINはexistsをanyに変換するため、existsとanyの区別ができなくなる。
+    /// 明示的にexistsとanyを区別するのではなく、MySQLに任せる場合にdisable_no_semijoinをtureにする。
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub disable_no_semijoin: bool,
     /// ### モデルグループ
     pub groups: Vec<GroupJson>,
 }
@@ -360,6 +370,7 @@ impl From<ConfigDef> for ConfigJson {
             label_of_aggregation_type: value.label_of_aggregation_type,
             rename_version: value.rename_version,
             label_of_version: value.label_of_version,
+            disable_no_semijoin: value.disable_no_semijoin,
             groups: value
                 .groups
                 .into_iter()
@@ -425,6 +436,7 @@ impl From<ConfigJson> for ConfigDef {
             label_of_aggregation_type: value.label_of_aggregation_type,
             rename_version: value.rename_version,
             label_of_version: value.label_of_version,
+            disable_no_semijoin: value.disable_no_semijoin,
             groups: value
                 .groups
                 .into_iter()

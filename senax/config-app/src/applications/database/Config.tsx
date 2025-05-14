@@ -215,6 +215,11 @@ function Config() {
                 hidden={!detail}
               />
               <AutoField
+                name="disable_no_semijoin"
+                {...formData}
+                hidden={!detail}
+              />
+              <AutoField
                 name="groups"
                 {...formData}
                 columns={[

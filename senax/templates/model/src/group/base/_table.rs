@@ -3691,7 +3691,7 @@ pub fn write_belonging_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols
     if without_key {
         write!(buf, r#"SELECT {} FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, Primary::cols(), idx + 1).unwrap();
     } else {
-        write!(buf, r#"SELECT /*+ NO_SEMIJOIN() */ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, Primary::cols_with_paren(), cols).unwrap();
+        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, Primary::cols_with_paren(), cols).unwrap();
     }
     let mut trash_mode = TrashMode::Not;
     if let Some(filter) = filter {
@@ -3721,7 +3721,7 @@ pub fn write_having_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols1: 
     if without_key {
         write!(buf, r#"SELECT {} FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, cols1, idx + 1).unwrap();
     } else {
-        write!(buf, r#"SELECT /*+ NO_SEMIJOIN() */ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, cols2, cols3).unwrap();
+        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, cols2, cols3).unwrap();
     }
     let mut trash_mode = TrashMode::Not;
     if let Some(filter) = filter {
@@ -4237,13 +4237,13 @@ impl QueryBuilder {
     fn _sql(&self, sql_cols: &str, for_update: bool, shard_id: ShardId, filter_digest: &str) -> String {
         let force_indexes = make_force_indexes(filter_digest);
         let mut sql = format!(
-            r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
-            sql_cols,
+            r#"SELECT {}{} FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             if !force_indexes.is_empty() {
-                format!(" FORCE INDEX({})", force_indexes.join(","))
+                format!("/*+ INDEX(_t1 {}) */ ", force_indexes.join(","))
             } else {
                 String::new()
             },
+            sql_cols,
             Filter_::write_where(
                 &self.filter,
                 self.trash_mode,
@@ -4348,9 +4348,9 @@ impl QueryBuilder {
         debug!("filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
-            r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
+            r#"SELECT {}@{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             if !force_indexes.is_empty() {
-                format!(" FORCE INDEX({})", force_indexes.join(","))
+                format!("/*+ INDEX(_t1 {}) */ ", force_indexes.join(","))
             } else {
                 String::new()
             },
@@ -4512,9 +4512,9 @@ impl QueryBuilder {
         assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "
         assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         let mut sql = format!(
-            r#"UPDATE @{ table_name|db_esc }@ as _t1{} SET {} {} {} {}"#,
+            r#"UPDATE {}@{ table_name|db_esc }@ as _t1 SET {} {} {} {}"#,
             if !force_indexes.is_empty() {
-                format!(" FORCE INDEX({})", force_indexes.join(","))
+                format!("/*+ INDEX(_t1 {}) */ ", force_indexes.join(","))
             } else {
                 String::new()
             },
@@ -4600,9 +4600,9 @@ impl QueryBuilder {
         debug!("filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
-            r#"DELETE FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
+            r#"DELETE {}FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             if !force_indexes.is_empty() {
-                format!(" FORCE INDEX({})", force_indexes.join(","))
+                format!("/*+ INDEX(_t1 {}) */ ", force_indexes.join(","))
             } else {
                 String::new()
             },
@@ -4660,9 +4660,9 @@ impl QueryBuilder {
         debug!("filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
-            r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1{} {} {} {}"#,
+            r#"SELECT {}@{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             if !force_indexes.is_empty() {
-                format!(" FORCE INDEX({})", force_indexes.join(","))
+                format!("/*+ INDEX(_t1 {}) */ ", force_indexes.join(","))
             } else {
                 String::new()
             },
@@ -5783,13 +5783,13 @@ impl _@{ pascal_name }@ {
         debug!("filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
-            r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1{} {} {}"#,
-            CacheData::_sql_cols(),
+            r#"SELECT {}{} FROM @{ table_name|db_esc }@ as _t1 {} {}"#,
             if !force_indexes.is_empty() {
-                format!(" FORCE INDEX({})", force_indexes.join(","))
+                format!("/*+ INDEX(_t1 {}) */ ", force_indexes.join(","))
             } else {
                 String::new()
             },
+            CacheData::_sql_cols(),
             Filter_::write_where(
                 &filter,
                 TrashMode::Not,
