@@ -550,11 +550,11 @@ pub struct DbConn {
     ctx_no: u64,
     time: SystemTime,
     shard_id: ShardId,
-    tx: FxHashMap<ShardId, sqlx::Transaction<'static, DbType>>,
+    tx: FxHashMap<ShardId, Transaction<'static, DbType>>,
     save_point: Vec<SavePoint>,
-    read_tx: FxHashMap<ShardId, sqlx::Transaction<'static, DbType>>,
+    read_tx: FxHashMap<ShardId, Transaction<'static, DbType>>,
     @%- if !config.force_disable_cache %@
-    cache_tx: FxHashMap<ShardId, (u64, sqlx::Transaction<'static, DbType>)>,
+    cache_tx: FxHashMap<ShardId, (u64, Transaction<'static, DbType>)>,
     @%- endif %@
     conn: FxHashMap<ShardId, PoolConnection<DbType>>,
     cache_internal_op_list: Vec<(ShardId, CacheOp)>,
@@ -723,10 +723,7 @@ impl DbConn {
 
     async fn _acquire_writer_tx(shard_id: ShardId) -> Result<Transaction<'static, DbType>> {
         let conn = Self::_acquire_writer(shard_id).await?;
-        Ok(
-            Transaction::begin(sqlx::pool::maybe::MaybePoolConnection::PoolConnection(conn))
-                .await?,
-        )
+        Ok(Transaction::begin(conn, None).await?)
     }
 
     pub async fn acquire_writer(&self) -> Result<PoolConnection<DbType>> {
@@ -801,12 +798,9 @@ impl DbConn {
         Self::_acquire_reader(self.shard_id).await
     }
 
-    async fn acquire_reader_tx(shard_id: ShardId) -> Result<sqlx::Transaction<'static, DbType>> {
+    async fn acquire_reader_tx(shard_id: ShardId) -> Result<Transaction<'static, DbType>> {
         let conn = Self::_acquire_reader(shard_id).await?;
-        Ok(
-            Transaction::begin(sqlx::pool::maybe::MaybePoolConnection::PoolConnection(conn))
-                .await?,
-        )
+        Ok(Transaction::begin(conn, None).await?)
     }
     @%- if !config.force_disable_cache %@
 
@@ -836,12 +830,9 @@ impl DbConn {
         }
     }
 
-    async fn acquire_cache_tx(shard_id: ShardId) -> Result<sqlx::Transaction<'static, DbType>> {
+    async fn acquire_cache_tx(shard_id: ShardId) -> Result<Transaction<'static, DbType>> {
         let conn = Self::_acquire_cache(shard_id).await?;
-        Ok(
-            Transaction::begin(sqlx::pool::maybe::MaybePoolConnection::PoolConnection(conn))
-                .await?,
-        )
+        Ok(Transaction::begin(conn, None).await?)
     }
     @%- endif %@
 
@@ -915,7 +906,7 @@ impl DbConn {
         !self.has_tx && self.wo_tx > 0
     }
 
-    pub async fn get_tx(&mut self) -> Result<&mut sqlx::Transaction<'static, DbType>> {
+    pub async fn get_tx(&mut self) -> Result<&mut Transaction<'static, DbType>> {
         ensure!(self.has_tx(), "No transaction is active.");
         match self.tx.entry(self.shard_id) {
             Entry::Occupied(tx) => Ok(tx.into_mut()),
@@ -1088,7 +1079,7 @@ impl DbConn {
         self.has_read_tx > 0
     }
 
-    pub async fn get_read_tx(&mut self) -> Result<&mut sqlx::Transaction<'static, DbType>> {
+    pub async fn get_read_tx(&mut self) -> Result<&mut Transaction<'static, DbType>> {
         ensure!(self.has_read_tx(), "No transaction is active");
         match self.read_tx.entry(self.shard_id) {
             Entry::Occupied(tx) => Ok(tx.into_mut()),
@@ -1131,7 +1122,7 @@ impl DbConn {
     }
 
     #[allow(dead_code)]
-    pub async fn get_cache_tx(&mut self) -> Result<&mut sqlx::Transaction<'static, DbType>> {
+    pub async fn get_cache_tx(&mut self) -> Result<&mut Transaction<'static, DbType>> {
         ensure!(!self.cache_tx.is_empty(), "No transaction is active");
         match self.cache_tx.entry(self.shard_id) {
             Entry::Occupied(tx) => Ok(&mut tx.into_mut().1),

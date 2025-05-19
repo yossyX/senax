@@ -222,7 +222,7 @@ pub(crate) fn db_options(options: connection::DbConnectOptions) -> connection::D
         .log_statements(log::LevelFilter::Trace)
         .set_names(false)
         .pipes_as_concat(false)
-        .no_engine_subsitution(false)
+        .no_engine_substitution(false)
         .statement_cache_capacity(5)
         .timezone(None)
 }

@@ -1252,7 +1252,16 @@ impl FieldDef {
                 )
             }
             _ => {
-                if self.column_name.is_some() || self.query.is_some() {
+                if self
+                    .collation
+                    .as_deref()
+                    .is_some_and(|v| v.ends_with("_bin"))
+                {
+                    format!(
+                        "    #[sql(query = {:?})]\n",
+                        &format!("CONVERT(\"{}\" USING utf8mb4)", self.get_col_name(name))
+                    )
+                } else if self.column_name.is_some() || self.query.is_some() {
                     format!(
                         "    #[sql(query = {:?})]\n",
                         &format!("\"{}\"", self.get_col_name(name))
@@ -1279,7 +1288,15 @@ impl FieldDef {
                 format!("ST_AsGeoJSON(\"{}\")", name)
             }
             _ => {
-                format!("\"{}\"", name)
+                if self
+                    .collation
+                    .as_deref()
+                    .is_some_and(|v| v.ends_with("_bin"))
+                {
+                    format!("CONVERT(\"{}\" USING utf8mb4)", name)
+                } else {
+                    format!("\"{}\"", name)
+                }
             }
         }
     }
