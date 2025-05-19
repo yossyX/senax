@@ -404,14 +404,11 @@ pub fn write_base_files(
 
     #[derive(Template)]
     #[template(path = "new_actix/base/src/auto_api.rs", escape = "none")]
-    pub struct AutoApiTemplate {
-        pub session: bool,
-    }
+    pub struct AutoApiTemplate;
 
     let file_path = src_path.join("auto_api.rs");
     if force || !file_path.exists() {
-        let tpl = AutoApiTemplate { session };
-        fs_write(&file_path, tpl.render()?)?;
+        fs_write(&file_path, AutoApiTemplate.render()?)?;
     }
 
     #[derive(Template)]

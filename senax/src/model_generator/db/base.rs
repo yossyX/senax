@@ -1,15 +1,12 @@
-use anyhow::{Result, ensure};
+use anyhow::Result;
 use askama::Template;
-use indexmap::IndexMap;
-use regex::Regex;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-use std::sync::Arc;
 
 use crate::common::fs_write;
 use crate::filters;
-use crate::schema::{ConfigDef, GroupsDef, ModelDef};
+use crate::schema::{ConfigDef, GroupsDef};
 
 pub fn write_files(
     base_dir: &Path,

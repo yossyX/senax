@@ -5,12 +5,12 @@ use crate::{
     common::fs_write,
     schema::{FieldDef, ModelDef, VALUE_OBJECTS, set_domain_mode, to_id_name},
 };
-use anyhow::{Context, Result, ensure};
+use anyhow::{Result, ensure};
 use askama::Template;
 use convert_case::{Case, Casing as _};
 use regex::Regex;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, HashSet},
     ffi::OsString,
     fs,
     path::Path,
@@ -229,7 +229,6 @@ pub fn write_abstract(
     db: &str,
     group_name: &String,
     mod_name: &str,
-    force: bool,
     model_name: &String,
     def: &Arc<ModelDef>,
     remove_files: &mut HashSet<OsString>,
@@ -276,7 +275,6 @@ pub fn write_entity(
     db: &str,
     group_name: &String,
     mod_name: &str,
-    force: bool,
     model_name: &String,
     def: &Arc<ModelDef>,
     remove_files: &mut HashSet<OsString>,
@@ -301,7 +299,6 @@ pub fn write_entity(
         pub db: &'a str,
         pub group_name: &'a str,
         pub mod_name: &'a str,
-        pub model_name: &'a str,
         pub pascal_name: &'a str,
         pub id_name: &'a str,
         pub def: &'a Arc<ModelDef>,
@@ -312,7 +309,6 @@ pub fn write_entity(
         db,
         group_name,
         mod_name,
-        model_name,
         pascal_name,
         id_name,
         def,

@@ -30,7 +30,6 @@ pub fn write_group_files(
     ref_groups: &[String],
     config: &ConfigDef,
     force: bool,
-    clean: bool,
     exclude_from_domain: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
@@ -87,7 +86,6 @@ pub fn write_group_files(
     #[template(path = "db/repositories/src/repositories.rs", escape = "none")]
     struct RepositoriesTemplate<'a> {
         pub db: &'a str,
-        pub config: &'a ConfigDef,
         pub groups: &'a GroupsDef,
         pub ref_groups: &'a [String],
     }
@@ -96,7 +94,6 @@ pub fn write_group_files(
     remove_files.remove(file_path.as_os_str());
     let tpl = RepositoriesTemplate {
         db,
-        config,
         groups,
         ref_groups,
     };
@@ -194,7 +191,6 @@ pub fn write_group_files(
                         pub base_group_name: &'a str,
                         pub group_name: &'a str,
                         pub mod_name: &'a str,
-                        pub model_name: &'a str,
                         pub pascal_name: &'a str,
                         pub id_name: &'a str,
                         pub def: &'a Arc<ModelDef>,
@@ -206,7 +202,6 @@ pub fn write_group_files(
                         base_group_name,
                         group_name,
                         mod_name,
-                        model_name,
                         pascal_name: &model_name.to_case(Case::Pascal),
                         id_name: &to_id_name(model_name),
                         def,

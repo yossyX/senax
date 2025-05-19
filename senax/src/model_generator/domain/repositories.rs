@@ -6,13 +6,12 @@ use crate::{
     common::fs_write,
     schema::{ModelDef, set_domain_mode, to_id_name},
 };
-use anyhow::{Context, Result, ensure};
+use anyhow::{Result, ensure};
 use askama::Template;
 use convert_case::{Case, Casing as _};
-use indexmap::IndexMap;
 use regex::Regex;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeSet, HashSet},
     ffi::OsString,
     fs,
     path::Path,
@@ -76,10 +75,8 @@ pub fn write_group_files(
             path = "domain/group_repositories/src/repositories.rs",
             escape = "none"
         )]
-        struct Template<'a> {
-            group_name: &'a str,
-        }
-        Template { group_name }.render()?
+        struct Template;
+        Template.render()?
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
@@ -222,7 +219,6 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     }
 
     let repositories_dir = src_dir.join("repositories");
-    let base_group_name = group_name;
     for (name, (f, defs)) in groups {
         let is_main_group = f.relaxed_load() == REL_START;
         IS_MAIN_GROUP.relaxed_store(is_main_group);
@@ -248,7 +244,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             )]
             struct Template<'a> {
                 group_name: &'a str,
-            };
+            }
             Template { group_name: &name }.render()?
         } else {
             fs::read_to_string(&file_path)?.replace("\r\n", "\n")
@@ -417,7 +413,6 @@ pub mod @{ mod_name|to_var_name }@;
                 output.push_str(&write_entity(
                     &repositories_dir,
                     db,
-                    base_group_name,
                     group_name,
                     mod_name,
                     force,
@@ -631,7 +626,6 @@ pub fn write_cargo_toml(
 pub fn write_entity(
     repositories_dir: &Path,
     db: &str,
-    base_group_name: &str,
     group_name: &str,
     mod_name: &str,
     force: bool,
@@ -645,13 +639,6 @@ pub fn write_entity(
     remove_files.remove(file_path.as_os_str());
     let pascal_name = &model_name.to_case(Case::Pascal);
     let id_name = &to_id_name(model_name);
-    let model_id: u64 = if let Some(model_id) = def.model_id {
-        model_id
-    } else {
-        use crc::{CRC_64_ECMA_182, Crc};
-        pub const CRC64: Crc<u64> = Crc::<u64>::new(&CRC_64_ECMA_182);
-        CRC64.checksum(format!("{db}:{group_name}:{mod_name}").as_bytes())
-    };
 
     #[derive(Template)]
     #[template(
@@ -660,25 +647,21 @@ pub fn write_entity(
     )]
     pub struct DomainEntityTemplate<'a> {
         pub db: &'a str,
-        pub base_group_name: &'a str,
         pub group_name: &'a str,
         pub mod_name: &'a str,
         pub pascal_name: &'a str,
         pub id_name: &'a str,
         pub def: &'a Arc<ModelDef>,
-        pub model_id: u64,
     }
 
     if force || !file_path.exists() {
         let tpl = DomainEntityTemplate {
             db,
-            base_group_name,
             group_name,
             mod_name,
             pascal_name,
             id_name,
             def,
-            model_id,
         };
         fs_write(file_path, tpl.render()?)?;
     }
@@ -690,23 +673,19 @@ pub fn write_entity(
     )]
     pub struct DomainBaseEntityTemplate<'a> {
         pub db: &'a str,
-        pub base_group_name: &'a str,
         pub group_name: &'a str,
         pub mod_name: &'a str,
         pub model_name: &'a str,
         pub pascal_name: &'a str,
-        pub id_name: &'a str,
         pub def: &'a Arc<ModelDef>,
     }
 
     let tpl = DomainBaseEntityTemplate {
         db,
-        base_group_name,
         group_name,
         mod_name,
         model_name,
         pascal_name,
-        id_name,
         def,
     };
     let ret = tpl.render()?;

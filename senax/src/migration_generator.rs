@@ -8,7 +8,6 @@ use senax_mysql_parser::common::{Literal, ReferenceOption, SqlType, TableKey};
 use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::fmt::Write;
-use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 

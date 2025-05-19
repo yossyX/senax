@@ -1,5 +1,5 @@
 use crate::{common::fs_write, model_generator::filters, schema::_to_var_name};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use askama::Template;
 use convert_case::{Case, Casing as _};
 use regex::Regex;

@@ -1,7 +1,6 @@
 use anyhow::{Result, ensure};
 use askama::Template;
 use convert_case::{Case, Casing};
-use indexmap::IndexMap;
 use regex::Regex;
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsString;
@@ -10,7 +9,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::common::{OVERWRITTEN_MSG, fs_write};
-use crate::schema::{_to_var_name, ConfigDef, GroupsDef, ModelDef, set_domain_mode, to_id_name};
+use crate::schema::{_to_var_name, ConfigDef, GroupsDef, ModelDef, set_domain_mode};
 use crate::{SEPARATED_BASE_FILES, filters};
 
 pub fn write_impl_domain_rs(
@@ -116,10 +115,8 @@ pub use _base::impl_domain::@{ name|snake|to_var_name }@;
 
 pub fn write_group_rs(
     impl_domain_dir: &Path,
-    db: &str,
     group_name: &String,
     entities_mod_names: &BTreeSet<(String, &String)>,
-    force: bool,
     impl_domain_output: String,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
@@ -150,14 +147,12 @@ pub fn write_entity(
     config: &ConfigDef,
     group_name: &str,
     mod_name: &str,
-    force: bool,
     model_name: &str,
     def: &Arc<ModelDef>,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<String, anyhow::Error> {
     set_domain_mode(true);
     let pascal_name = &model_name.to_case(Case::Pascal);
-    let id_name = &to_id_name(model_name);
     #[derive(Template)]
     #[template(path = "db/base/src/impl_domain/entities/entity.rs", escape = "none")]
     pub struct ImplDomainEntityTemplate<'a> {
@@ -166,7 +161,6 @@ pub fn write_entity(
         pub group_name: &'a str,
         pub mod_name: &'a str,
         pub pascal_name: &'a str,
-        pub id_name: &'a str,
         pub def: &'a Arc<ModelDef>,
     }
 
@@ -176,7 +170,6 @@ pub fn write_entity(
         group_name,
         mod_name,
         pascal_name,
-        id_name,
         def,
     };
     let ret = tpl.render()?;

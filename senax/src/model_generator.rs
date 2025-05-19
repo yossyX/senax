@@ -119,16 +119,12 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         #[derive(Template)]
         #[template(path = "db/src/lib.rs", escape = "none")]
         struct LibTemplate<'a> {
-            pub db: &'a str,
             pub config: &'a ConfigDef,
-            pub groups: &'a GroupsDef,
             pub non_snake_case: bool,
         }
 
         LibTemplate {
-            db,
             config: &config,
-            groups,
             non_snake_case,
         }
         .render()?
@@ -143,7 +139,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     )?;
     content = reg.replace_all(&content, "").into_owned();
     for (group, (_, _)) in groups.iter().rev() {
-        let db = &db.to_case(Case::Snake);
         let group = &group.to_case(Case::Snake);
         content = content.replace(
             "pub mod repositories {",
@@ -308,7 +303,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             &ref_groups,
             &config,
             force,
-            clean,
             exclude_from_domain,
             &mut remove_files,
         )?;
@@ -330,7 +324,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         let mut impl_domain_output = String::new();
 
         for (model_name, (_, def)) in defs {
-            let table_name = def.table_name();
             let mod_name = def.mod_name();
             let mod_name = &mod_name;
             base_domain_output.push_str(&format!("pub mod {}", _to_var_name(mod_name)));
@@ -338,25 +331,13 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 #[derive(Template)]
                 #[template(path = "db/base/src/group/abstract.rs", escape = "none")]
                 struct GroupAbstractTemplate<'a> {
-                    pub db: &'a str,
-                    pub group_name: &'a str,
-                    pub mod_name: &'a str,
-                    pub name: &'a str,
                     pub pascal_name: &'a str,
-                    pub id_name: &'a str,
-                    pub table_name: &'a str,
                     pub def: &'a Arc<ModelDef>,
                     pub config: &'a ConfigDef,
                 }
 
                 let tpl = GroupAbstractTemplate {
-                    db,
-                    group_name,
-                    mod_name,
-                    name: model_name,
                     pascal_name: &model_name.to_case(Case::Pascal),
-                    id_name: &to_id_name(model_name),
-                    table_name: &table_name,
                     def,
                     config: &config,
                 };
@@ -379,7 +360,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         db,
                         group_name,
                         mod_name,
-                        force,
                         model_name,
                         def,
                         &mut remove_files,
@@ -413,29 +393,21 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 #[derive(Template)]
                 #[template(path = "db/base/src/group/table.rs", escape = "none")]
                 struct GroupTableTemplate<'a> {
-                    pub db: &'a str,
                     pub group_name: &'a str,
-                    pub mod_name: &'a str,
                     pub model_name: &'a str,
                     pub pascal_name: &'a str,
                     pub id_name: &'a str,
-                    pub table_name: &'a str,
                     pub def: &'a Arc<ModelDef>,
-                    pub force_indexes: Vec<(String, String)>,
                     pub config: &'a ConfigDef,
                     pub version_col: CompactString,
                 }
 
                 let tpl = GroupTableTemplate {
-                    db,
                     group_name,
-                    mod_name,
                     model_name,
                     pascal_name: &model_name.to_case(Case::Pascal),
                     id_name: &to_id_name(model_name),
-                    table_name: &table_name,
                     def,
-                    force_indexes,
                     config: &config,
                     version_col: schema::ConfigDef::version(),
                 };
@@ -458,7 +430,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         db,
                         group_name,
                         mod_name,
-                        force,
                         model_name,
                         def,
                         &mut remove_files,
@@ -469,7 +440,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         &config,
                         group_name,
                         mod_name,
-                        force,
                         model_name,
                         def,
                         &mut remove_files,
@@ -490,7 +460,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             pub group_name: &'a str,
             pub mod_names: &'a BTreeSet<String>,
             pub models: IndexMap<&'a String, &'a (AtomicUsize, Arc<ModelDef>)>,
-            pub config: &'a ConfigDef,
             pub table_output: String,
         }
 
@@ -498,7 +467,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             group_name,
             mod_names: &mod_names,
             models: concrete_models,
-            config: &config,
             table_output,
         };
         fs_write(file_path, tpl.render()?)?;
@@ -512,10 +480,8 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             )?;
             db::impl_domain::write_group_rs(
                 &impl_domain_dir,
-                db,
                 group_name,
                 &entities_mod_names,
-                force,
                 impl_domain_output,
                 &mut remove_files,
             )?;

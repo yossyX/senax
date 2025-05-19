@@ -3,7 +3,7 @@ use crate::{
     schema::*,
 };
 use convert_case::{Case, Casing};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 
 pub static SHOW_LABEL: AtomicBool = AtomicBool::new(true);
 pub static SHOW_COMMNET: AtomicBool = AtomicBool::new(true);

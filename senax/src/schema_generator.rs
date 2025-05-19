@@ -8,7 +8,7 @@ use senax_mysql_parser::common::{ReferenceOption, SqlType, TableKey};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::{env, fs};
+use std::env;
 
 use crate::SCHEMA_PATH;
 use crate::common::{fs_write, simplify_yml, to_plural, to_singular};

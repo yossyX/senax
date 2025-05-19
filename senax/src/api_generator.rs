@@ -3,7 +3,7 @@ use askama::Template;
 use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use regex::{Captures, Regex};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fmt::Write as _;
 use std::fs;

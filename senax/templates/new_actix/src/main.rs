@@ -239,12 +239,13 @@ async fn main() -> Result<()> {
         !cfg!(debug_assertions),
     )?;
     if arg.auto_migrate {
-        info!("Starting migration");
+        info!("Starting database migration");
+        let now = std::time::Instant::now();
         if let Err(e) = db::migrate(None, false, false, true).await {
             error!("{}", e);
             std::process::exit(1);
         }
-        info!("Migration completed");
+        info!("Migration was completed in {} seconds.", now.elapsed().as_secs());
     }
     let port = env::var(HOST_PORT).unwrap_or_else(|_| DEFAULT_HOST_PORT.to_owned());
     info!("HOST_PORT: {:?}", port);

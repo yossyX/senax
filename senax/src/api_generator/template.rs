@@ -1,5 +1,5 @@
 use askama::Template;
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 
 use crate::{filters, schema::ModelDef};
 

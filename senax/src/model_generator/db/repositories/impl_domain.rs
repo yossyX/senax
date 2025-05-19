@@ -1,7 +1,6 @@
 use anyhow::{Result, ensure};
 use askama::Template;
 use convert_case::{Case, Casing};
-use indexmap::IndexMap;
 use regex::Regex;
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsString;
@@ -10,7 +9,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::common::{OVERWRITTEN_MSG, fs_write};
-use crate::schema::{ConfigDef, GroupsDef, ModelDef, set_domain_mode, to_id_name};
+use crate::schema::{ConfigDef, GroupsDef, ModelDef, set_domain_mode};
 use crate::{SEPARATED_BASE_FILES, filters};
 
 pub fn write_impl_domain_rs(
@@ -267,7 +266,6 @@ pub fn write_entity(
     let file_path = impl_domain_group_dir.join(format!("{}.rs", mod_name));
     remove_files.remove(file_path.as_os_str());
     let pascal_name = &model_name.to_case(Case::Pascal);
-    let id_name = &to_id_name(model_name);
     if force || !file_path.exists() {
         #[derive(Template)]
         #[template(
@@ -280,8 +278,6 @@ pub fn write_entity(
             group_name: &'a str,
             mod_name: &'a str,
             pascal_name: &'a str,
-            id_name: &'a str,
-            def: &'a Arc<ModelDef>,
         }
 
         let tpl = EntityTemplate {
@@ -290,8 +286,6 @@ pub fn write_entity(
             group_name,
             mod_name,
             pascal_name,
-            id_name,
-            def,
         };
         fs_write(file_path, tpl.render()?)?;
     }
@@ -308,7 +302,6 @@ pub fn write_entity(
         group_name: &'a str,
         mod_name: &'a str,
         pascal_name: &'a str,
-        id_name: &'a str,
         def: &'a Arc<ModelDef>,
     }
 
@@ -319,7 +312,6 @@ pub fn write_entity(
         group_name,
         mod_name,
         pascal_name,
-        id_name,
         def,
     };
     let ret = tpl.render()?;

@@ -95,12 +95,10 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
 
     #[derive(Template)]
     #[template(path = "domain/src/lib.rs", escape = "none")]
-    struct DomainLibTemplate {
-        pub non_snake_case: bool,
-    }
+    struct DomainLibTemplate;
 
     let file_path = domain_path.join("src/lib.rs");
-    let tpl = DomainLibTemplate { non_snake_case };
+    let tpl = DomainLibTemplate;
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
