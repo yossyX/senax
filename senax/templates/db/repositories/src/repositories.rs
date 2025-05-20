@@ -77,36 +77,36 @@ trait CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> {
 }
 
 #[allow(unused_variables)]
-pub trait IdFetcher<Model, Updater> {
-    fn fetch(&self, conn: &mut DbConn) -> impl std::future::Future<Output = Result<Option<Model>>> + Send;
-    fn fetch_with_trashed(&self, conn: &mut DbConn) -> impl std::future::Future<Output = Result<Option<Model>>> + Send {
-        Self::fetch(self, conn)
+pub trait IdFetcher<Model, Updater, Joiner> {
+    fn fetch(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Option<Model>>> + Send;
+    fn fetch_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Option<Model>>> + Send {
+        Self::fetch(self, conn, joiner)
     }
-    fn fetch_for_update(&self, conn: &mut DbConn) -> impl std::future::Future<Output = Result<Updater>> + Send {
+    fn fetch_for_update(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Updater>> + Send {
         async { unimplemented!("update is disabled.") }
     }
-    fn fetch_for_update_with_trashed(&self, conn: &mut DbConn) -> impl std::future::Future<Output = Result<Updater>> + Send {
-        Self::fetch_for_update(self, conn)
+    fn fetch_for_update_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Updater>> + Send {
+        Self::fetch_for_update(self, conn, joiner)
     }
 }
 
 #[allow(unused_variables)]
-pub trait IdFetcherWithCache<Model, Cache, Updater> {
-    fn fetch(&self, conn: &mut DbConn) -> impl std::future::Future<Output = Result<Option<Model>>> + Send;
-    fn fetch_with_trashed(&self, conn: &mut DbConn) -> impl std::future::Future<Output = Result<Option<Model>>> + Send {
-        Self::fetch(self, conn)
+pub trait IdFetcherWithCache<Model, Cache, Updater, Joiner> {
+    fn fetch(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Option<Model>>> + Send;
+    fn fetch_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Option<Model>>> + Send {
+        Self::fetch(self, conn, joiner)
     }
-    fn fetch_from_cache(&self, conn: &DbConn) -> impl std::future::Future<Output = Result<Option<Cache>>> + Send {
+    fn fetch_from_cache(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Option<Cache>>> + Send {
         async { unimplemented!("fetch_from_cache is disabled.") }
     }
-    fn fetch_from_cache_with_trashed(&self, conn: &DbConn) -> impl std::future::Future<Output = Result<Option<Cache>>> + Send {
-        Self::fetch_from_cache(self, conn)
+    fn fetch_from_cache_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Option<Cache>>> + Send {
+        Self::fetch_from_cache(self, conn, joiner)
     }
-    fn fetch_for_update(&self, conn: &mut DbConn) -> impl std::future::Future<Output = Result<Updater>> + Send {
+    fn fetch_for_update(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Updater>> + Send {
         async { unimplemented!("update is disabled.") }
     }
-    fn fetch_for_update_with_trashed(&self, conn: &mut DbConn) -> impl std::future::Future<Output = Result<Updater>> + Send {
-        Self::fetch_for_update(self, conn)
+    fn fetch_for_update_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Updater>> + Send {
+        Self::fetch_for_update(self, conn, joiner)
     }
 }
 @{-"\n"}@

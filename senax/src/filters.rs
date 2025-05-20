@@ -320,7 +320,6 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
     let asc = if_then_else!(rel.desc, "Desc", "Asc");
     let list_order = if_then_else!(rel.desc, ".reverse()", "");
     let class_mod = rel.get_group_mod_name();
-    let rel_name = _to_var_name(name);
     let additional_filter = if let Some(additional_filter) = &rel.additional_filter {
         format!(".and(join_{}::filter!({}))", class_mod, additional_filter)
     } else {
@@ -356,7 +355,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
             format!("l.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
             format!("l.sort_by(|v1, v2| v1._data.{col}.cmp(&v2._data.{col}){list_order});"),
             format!(
-                "cache.{rel_name}.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"
+                "rel.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"
             ),
         )
     } else {
@@ -374,7 +373,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
                 fmt_join(foreign_model.primaries(), &tmpl3, ".then").unwrap()
             ),
             format!(
-                "cache.{rel_name}.sort_by(|v1, v2| {}{list_order});",
+                "rel.sort_by(|v1, v2| {}{list_order});",
                 fmt_join(foreign_model.primaries(), &tmpl2, ".then").unwrap()
             ),
         )
@@ -382,7 +381,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
     let (limit, cache_list_limit, order_and_limit) = if let Some(limit) = rel.limit {
         (
             format!(".limit({limit})"),
-            format!("cache.{rel_name}.truncate({limit});"),
+            format!("rel.truncate({limit});"),
             format!(".order_by(vec![{order}]).limit({limit})"),
         )
     } else {
@@ -402,6 +401,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         crate::common::rel_hash(format!("{}::{}::{}", &model.group_name, &model.name, name));
     f.replace("{rel_name}", &_to_var_name(name))
         .replace("{raw_rel_name}", name)
+        .replace("{raw_var_rel_name}", &_to_raw_var_name(name))
         .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
         .replace("{rel_name_camel}", &name.to_case(Case::Camel))
         .replace("{rel_hash}", &rel_hash.to_string())
@@ -496,6 +496,7 @@ fn _fmt_rel_outer_db(
         crate::common::rel_hash(format!("{}::{}::{}", &model.group_name, &model.name, name));
     f.replace("{rel_name}", &_to_var_name(name))
         .replace("{raw_rel_name}", name)
+        .replace("{raw_var_rel_name}", &_to_raw_var_name(name))
         .replace("{raw_db}", rel.db())
         .replace("{db_mod_var}", &_to_var_name(rel.db()))
         .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))

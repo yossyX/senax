@@ -150,7 +150,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
             match msg {
                 CacheOp::None => {},
                 CacheOp::Insert { data, .. } => {
-                    obj = Some(Arc::new(CacheWrapper::_from_data(data.clone(), shard_id, time)));
+                    obj = Some(Arc::new(CacheWrapper::from_data(data.clone(), shard_id, time)));
                 }
                 CacheOp::BulkInsert { .. } => {},
                 CacheOp::Update { update, op, .. } => {
@@ -187,7 +187,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
             match msg {
                 CacheOp::None => {},
                 CacheOp::Insert { data, .. } => {
-                    map.insert(InnerPrimary::from(data), Arc::new(CacheWrapper::_from_data(data.clone(), shard_id, time)));
+                    map.insert(InnerPrimary::from(data), Arc::new(CacheWrapper::from_data(data.clone(), shard_id, time)));
                 }
                 CacheOp::BulkInsert { .. } => {},
                 CacheOp::Update { id, update, op, .. } => {
@@ -282,7 +282,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     let replace = replace.unwrap_or_default();
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
-                    let mut cache = CacheWrapper::_from_data(data.clone(), shard_id, time);
+                    let mut cache = CacheWrapper::from_data(data.clone(), shard_id, time);
                     let id = InnerPrimary::from(&cache._inner);
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         let op = if replace {
@@ -310,16 +310,20 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     let can_cache = true@{ def.relations_one_cache(false)|fmt_rel_join(" && _{rel_name}.is_some()", "") }@@{ def.relations_many_cache(false)|fmt_rel_join(" && _{rel_name}.is_some()", "") }@;
     @{- def.relations_one_cache(false)|fmt_rel_join("
                     if let Some(_{rel_name}) = _{rel_name} {
-                        cache.{rel_name} = rel_{class_mod}::CacheOp::apply_to_obj(&cache.{rel_name}, &_{rel_name}, shard_id, time){soft_delete_filter};
+                        if let Some(rel) = &mut cache.{rel_name} {
+                            *rel = rel_{class_mod}::CacheOp::apply_to_obj(rel, &_{rel_name}, shard_id, time){soft_delete_filter};
+                        }
                         for msg in _{rel_name} {
                             msg.handle_cache_msg(Arc::clone(&sync_map)).await;
                         }
                     }", "")|replace1("_inner") }@
     @{- def.relations_many_cache(false)|fmt_rel_join("
                     if let Some(_{rel_name}) = _{rel_name} {
-                        cache.{rel_name} = rel_{class_mod}::CacheOp::apply_to_list(&cache.{rel_name}, &_{rel_name}, shard_id, time).into_iter(){soft_delete_filter}.collect();
-                        {cache_list_sort}
-                        {cache_list_limit}
+                        if let Some(rel) = &mut cache.{rel_name} {
+                            *rel = rel_{class_mod}::CacheOp::apply_to_list(rel, &_{rel_name}, shard_id, time).into_iter(){soft_delete_filter}.collect();
+                            {cache_list_sort}
+                            {cache_list_limit}
+                        }
                         for msg in _{rel_name} {
                             msg.handle_cache_msg(Arc::clone(&sync_map)).await;
                         }
@@ -347,7 +351,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         db::models::NotifyOp::insert
                     };
                     for row in list {
-                        let mut cache = CacheWrapper::_from_data(row._data.clone(), shard_id, time);
+                        let mut cache = CacheWrapper::from_data(row._data.clone(), shard_id, time);
                         let id = InnerPrimary::from(&cache._inner);
                         if USE_UPDATE_NOTICE && DbConn::_has_update_notice() @% if def.has_auto_primary() %@&& !overwrite @% endif %@{
                             DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, op, &id).await;
@@ -399,7 +403,9 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         let can_cache = true@{ def.relations_one_cache(false)|fmt_rel_join(" && row.{rel_name}.is_some()", "") }@@{ def.relations_many_cache(false)|fmt_rel_join(" && row.{rel_name}.is_some()", "") }@;
                         @{- def.relations_one_cache(false)|fmt_rel_join("
                         if let Some(_{rel_name}) = row.{rel_name} {
-                            cache.{rel_name} = _{rel_name}.as_ref(){soft_delete_filter}.map(|v| Arc::new(rel_{class_mod}::CacheWrapper::_from_data(v._data.clone(), shard_id, time)));
+                            if let Some(rel) = &mut cache.{rel_name} {
+                                *rel = _{rel_name}.as_ref(){soft_delete_filter}.map(|v| Arc::new(rel_{class_mod}::CacheWrapper::from_data(v._data.clone(), shard_id, time)));
+                            }
                             if let Some(_{rel_name}) = _{rel_name} {
                                 rel_{class_mod}::CacheOp::BulkInsert {
                                     replace,
@@ -412,9 +418,11 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         }", "")|replace1("_data") }@
                         @{- def.relations_many_cache(false)|fmt_rel_join("
                         if let Some(_{rel_name}) = row.{rel_name} {
-                            cache.{rel_name} = _{rel_name}.iter(){soft_delete_filter}.map(|v| Arc::new(rel_{class_mod}::CacheWrapper::_from_data(v._data.clone(), shard_id, time))).collect();
-                            {cache_list_sort}
-                            {cache_list_limit}
+                            if let Some(rel) = &mut cache.{rel_name} {
+                                *rel = _{rel_name}.iter(){soft_delete_filter}.map(|v| Arc::new(rel_{class_mod}::CacheWrapper::from_data(v._data.clone(), shard_id, time))).collect();
+                                {cache_list_sort}
+                                {cache_list_limit}
+                            }
                             rel_{class_mod}::CacheOp::BulkInsert {
                                 replace,
                                 overwrite,
@@ -487,16 +495,20 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                             cache._inner = CacheOp::update_with_unique_cache(&id, cache._inner, &update, &op, time).await;
                             @{- def.relations_one_cache(false)|fmt_rel_join("
                             if let Some(_{rel_name}) = _{rel_name} {
-                                cache.{rel_name} = rel_{class_mod}::CacheOp::apply_to_obj(&cache.{rel_name}, &_{rel_name}, shard_id, time){soft_delete_filter};
+                                if let Some(rel) = &mut cache.{rel_name} {
+                                    *rel = rel_{class_mod}::CacheOp::apply_to_obj(rel, &_{rel_name}, shard_id, time){soft_delete_filter};
+                                }
                                 for msg in _{rel_name} {
                                     msg.handle_cache_msg(Arc::clone(&sync_map)).await;
                                 }
                             }", "")|replace1("_inner") }@
                             @{- def.relations_many_cache(false)|fmt_rel_join("
                             if let Some(_{rel_name}) = _{rel_name} {
-                                cache.{rel_name} = rel_{class_mod}::CacheOp::apply_to_list(&cache.{rel_name}, &_{rel_name}, shard_id, time).into_iter(){soft_delete_filter}.collect();
-                                {cache_list_sort}
-                                {cache_list_limit}
+                                if let Some(rel) = &mut cache.{rel_name} {
+                                    *rel = rel_{class_mod}::CacheOp::apply_to_list(rel, &_{rel_name}, shard_id, time).into_iter(){soft_delete_filter}.collect();
+                                    {cache_list_sort}
+                                    {cache_list_limit}
+                                }
                                 for msg in _{rel_name} {
                                     msg.handle_cache_msg(Arc::clone(&sync_map)).await;
                                 }
@@ -1846,9 +1858,8 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let mut obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, None).await?;
-            if let Some(mut obj) = obj {
-                repo_{class_mod}::{class}Joiner::join(&mut obj, conn, joiner).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None).await?;
+            if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
                 self.{rel_name} = Some(None);
@@ -1864,9 +1875,8 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let mut obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, None).await?;
-            if let Some(mut obj) = obj {
-                repo_{class_mod}::{class}Joiner::join(&mut obj, &mut conn._{raw_db}_db, joiner).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, joiner, None).await?;
+            if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
                 self.{rel_name} = Some(None);
@@ -1917,9 +1927,8 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let mut obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, None).await?;
-            if let Some(mut obj) = obj {
-                repo_{class_mod}::{class}Joiner::join(&mut obj, conn, joiner).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None).await?;
+            if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
                 self.{rel_name} = Some(None);
@@ -1935,9 +1944,8 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let mut obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, None).await?;
-            if let Some(mut obj) = obj {
-                repo_{class_mod}::{class}Joiner::join(&mut obj, &mut conn._{raw_db}_db, joiner).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, joiner, None).await?;
+            if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
                 self.{rel_name} = Some(None);
@@ -1983,7 +1991,8 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
 @%- if def.use_cache() %@
 #[cfg(not(feature="cache_update_only"))]
 trait CacheWrapperTr {
-    @{- def.relations_one_cache(false)|fmt_rel_join("
+    fn _has_join(&self, joiner: &Option<Box<Joiner_>>) -> bool;
+@{- def.relations_one_cache(false)|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()>;", "") }@
 @{- def.relations_many_cache_without_limit()|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()>;", "") }@
@@ -1993,10 +2002,16 @@ trait CacheWrapperTr {
 
 #[cfg(not(feature="cache_update_only"))]
 impl CacheWrapperTr for CacheWrapper {
+    fn _has_join(&self, joiner: &Option<Box<Joiner_>>) -> bool {
+        if let Some(joiner) = joiner {
+@{- def.relations_in_cache()|fmt_rel_join("\n            if self.{rel_name}.is_none() && joiner.{rel_name}.is_some() { return false; }", "") }@
+        }
+        true
+    }
 @{- def.relations_one_cache(false)|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
-        self.{rel_name} = repo_{class_mod}::{class}_::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).next();
+        self.{rel_name} = Some(repo_{class_mod}::{class}_::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).next());
         Ok(())
     }", "") }@
 @{- def.relations_many_cache_without_limit()|fmt_rel_join("
@@ -2004,14 +2019,14 @@ impl CacheWrapperTr for CacheWrapper {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         let mut l: Vec<_> = repo_{class_mod}::{class}_::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
         {list_sort}
-        self.{rel_name} = l;
+        self.{rel_name} = Some(l);
         Ok(())
     }", "") }@
 @{- def.relations_many_cache_with_limit()|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         let order = vec![{order}];
-        self.{rel_name} = repo_{class_mod}::{class}_::query().filter(filter).order_by(order){limit}.__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
+        self.{rel_name} = Some(repo_{class_mod}::{class}_::query().filter(filter).order_by(order){limit}.__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect());
         Ok(())
     }", "") }@
 }
@@ -2021,9 +2036,8 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
 @{- def.relations_belonging_cache(false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let mut obj = repo_{class_mod}::{class}_::find_optional_from_cache{with_trashed}(conn, id).await?;
-            if let Some(mut obj) = obj {
-                repo_{class_mod}::{class}Joiner::join(&mut obj, conn, joiner).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional_from_cache{with_trashed}(conn, id, joiner).await?;
+            if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
                 self.{rel_name} = Some(None);
@@ -2039,9 +2053,8 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let mut obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, None).await?;
-            if let Some(mut obj) = obj {
-                repo_{class_mod}::{class}Joiner::join(&mut obj, conn, joiner).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None).await?;
+            if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
                 self.{rel_name} = Some(None);
@@ -2057,9 +2070,8 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let mut obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, None).await?;
-            if let Some(mut obj) = obj {
-                repo_{class_mod}::{class}Joiner::join(&mut obj, &mut conn._{raw_db}_db, joiner).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, joiner, None).await?;
+            if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
                 self.{rel_name} = Some(None);
@@ -2074,11 +2086,10 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         if !matches!(joiner.as_ref().map(|v| v.has_some()), Some(true)) {
             return Ok(());
         }
-        if let Some(ref obj) = self._wrapper.{rel_name} {
+        if let Some(obj) = self._wrapper.{rel_name}.as_ref().expect(\"{raw_rel_name} is not loaded\") {
             let id: rel_{class_mod}::InnerPrimary = obj.into();
-            let mut obj = repo_{class_mod}::{class}_::find_optional_from_cache(conn, &id).await?;
-            if let Some(mut obj) = obj {
-                repo_{class_mod}::{class}Joiner::join(&mut obj, conn, joiner).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional_from_cache(conn, &id, joiner).await?;
+            if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
                 self.{rel_name} = Some(None);
@@ -2100,10 +2111,9 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         if !matches!(joiner.as_ref().map(|v| v.has_some()), Some(true)) {
             return Ok(());
         }
-        let ids: Vec<rel_{class_mod}::InnerPrimary> = self._wrapper.{rel_name}.iter().map(|v| v.into()).collect();
+        let ids: Vec<rel_{class_mod}::InnerPrimary> = self._wrapper.{rel_name}.as_ref().expect(\"{raw_rel_name} is not loaded\").iter().map(|v| v.into()).collect();
         if !ids.is_empty() {
-            let mut list = repo_{class_mod}::{class}_::find_many_from_cache(conn, ids.iter()).await?;
-            repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+            let list = repo_{class_mod}::{class}_::find_many_from_cache(conn, ids.iter(), joiner).await?;
             let mut map: AHashMap<_, _> = list.into_iter().map(|v| (rel_{class_mod}::InnerPrimary::from(&v), v)).collect();
             self.{rel_name} = Some(ids.iter().flat_map(|id| map.remove(id)).collect());
         } else {
@@ -2142,8 +2152,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), None).await?;
-        repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), joiner, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2158,8 +2167,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{raw_db}_db, ids.iter(), None).await?;
-        repo_{class_mod}::{class}Joiner::join(&mut list, &mut conn._{raw_db}_db, joiner).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{raw_db}_db, ids.iter(), joiner, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2176,8 +2184,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         let mut map = AHashMap::default();
         for chunk in self.chunks(IN_CONDITION_LIMIT) {
             let filter = RelFil{rel_name_pascal}::in_filter(chunk){additional_filter};
-            let mut list = repo_{class_mod}::{class}_::query().filter(filter).select(conn).await?;
-            repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner.clone()).await?;
+            let list = repo_{class_mod}::{class}_::query().filter(filter).join(joiner.clone()).select(conn).await?;
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
                     map.insert(id, Box::new(row));
@@ -2195,8 +2202,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
         for chunk in self.chunks(IN_CONDITION_LIMIT) {
             let filter = RelFil{rel_name_pascal}::in_filter(chunk){additional_filter};
-            let mut list = repo_{class_mod}::{class}_::query().filter(filter).select(conn).await?;
-            repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner.clone()).await?;
+            let list = repo_{class_mod}::{class}_::query().filter(filter).join(joiner.clone()).select(conn).await?;
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
                     map.entry(id).or_default().push(row);
@@ -2241,8 +2247,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), None).await?;
-        repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), joiner, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2257,8 +2262,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{raw_db}_db, ids.iter(), None).await?;
-        repo_{class_mod}::{class}Joiner::join(&mut list, &mut conn._{raw_db}_db, joiner).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{raw_db}_db, ids.iter(), joiner, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2275,8 +2279,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
         for chunk in self.chunks(IN_CONDITION_LIMIT) {
             let filter = RelFil{rel_name_pascal}::in_filter(chunk){additional_filter};
-            let mut list = repo_{class_mod}::{class}_::query().filter(filter).select_for_update(conn).await?;
-            repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner.clone()).await?;
+            let list = repo_{class_mod}::{class}_::query().filter(filter).join(joiner.clone()).select_for_update(conn).await?;
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._data) {
                     map.entry(id).or_default().push(row);
@@ -2296,8 +2299,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
         for chunk in self.chunks(IN_CONDITION_LIMIT) {
             let filter = RelFil{rel_name_pascal}::in_filter(chunk){additional_filter};
-            let mut list = repo_{class_mod}::{class}_::query().filter(filter).select_for_update(conn).await?;
-            repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner.clone()).await?;
+            let list = repo_{class_mod}::{class}_::query().filter(filter).join(joiner.clone()).select_for_update(conn).await?;
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._data) {
                     map.entry(id).or_default().push(row);
@@ -2364,7 +2366,7 @@ impl CacheWrapperVecTr for CacheWrapper {
             }
         }
         for val in vec.iter_mut() {
-            val.{rel_name} = map.remove(&(&*val).into());
+            val.{rel_name} = Some(map.remove(&(&*val).into()));
         }
         Ok(())
     }", "") }@
@@ -2384,7 +2386,7 @@ impl CacheWrapperVecTr for CacheWrapper {
         for val in vec.iter_mut() {
             let mut l = map.remove(&(&*val).into()).unwrap_or_default();
             {list_sort}
-            val.{rel_name} = l;
+            val.{rel_name} = Some(l);
         }
         Ok(())
     }", "") }@
@@ -2406,7 +2408,7 @@ impl CacheWrapperVecTr for CacheWrapper {
         for val in vec.iter_mut() {
             let mut l = map.remove(&(&*val).into()).unwrap_or_default();
             {list_sort}
-            val.{rel_name} = l;
+            val.{rel_name} = Some(l);
         }
         Ok(())
     }", "") }@
@@ -2419,13 +2421,12 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         if !matches!(joiner.as_ref().map(|v| v.has_some()), Some(true)) {
             return Ok(());
         }
-        let ids: Vec<rel_{class_mod}::InnerPrimary> = self.iter().flat_map(|v| &v._wrapper.{rel_name}).map(|v| v.into()).collect();
+        let ids: Vec<rel_{class_mod}::InnerPrimary> = self.iter().flat_map(|v| v._wrapper.{rel_name}.as_ref().expect(\"{raw_rel_name} is not loaded\")).map(|v| v.into()).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = repo_{class_mod}::{class}_::find_many_from_cache(conn, ids.iter()).await?;
-        repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let list = repo_{class_mod}::{class}_::find_many_from_cache(conn, ids.iter(), joiner).await?;
         let mut map: AHashMap<_, _> = list.into_iter().map(|v| (rel_{class_mod}::InnerPrimary::from(&v), v)).collect();
         for val in self.iter_mut() {
-            if let Some(v) = &val._wrapper.{rel_name} {
+            if let Some(v) = &val._wrapper.{rel_name}.as_ref().expect(\"{raw_rel_name} is not loaded\") {
                 val.{rel_name} = Some(map.remove(&v.into()).map(Box::new));
             } else {
                 val.{rel_name} = Some(None);
@@ -2439,8 +2440,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         let mut map = AHashMap::default();
         for chunk in self.chunks(IN_CONDITION_LIMIT) {
             let filter = RelFil{rel_name_pascal}::in_filter(chunk){additional_filter};
-            let mut list = repo_{class_mod}::{class}_::query().filter(filter).select(conn).await?;
-            repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner.clone()).await?;
+            let list = repo_{class_mod}::{class}_::query().filter(filter).join(joiner.clone()).select(conn).await?;
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
                     map.insert(id, Box::new(row));
@@ -2457,13 +2457,12 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         if !matches!(joiner.as_ref().map(|v| v.has_some()), Some(true)) {
             return Ok(());
         }
-        let ids: Vec<rel_{class_mod}::InnerPrimary> = self.iter().flat_map(|v| &v._wrapper.{rel_name}).map(|v| v.into()).collect();
+        let ids: Vec<rel_{class_mod}::InnerPrimary> = self.iter().flat_map(|v| v._wrapper.{rel_name}.as_ref().expect(\"{raw_rel_name} is not loaded\")).map(|v| v.into()).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = repo_{class_mod}::{class}_::find_many_from_cache(conn, ids.iter()).await?;
-        repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let list = repo_{class_mod}::{class}_::find_many_from_cache(conn, ids.iter(), joiner).await?;
         let mut map: AHashMap<_, _> = list.into_iter().map(|v| (rel_{class_mod}::InnerPrimary::from(&v), v)).collect();
         for val in self.iter_mut() {
-            val.{rel_name} = Some(val._wrapper.{rel_name}.iter().flat_map(|v| map.remove(&v.into())).collect());
+            val.{rel_name} = Some(val._wrapper.{rel_name}.as_ref().expect(\"{raw_rel_name} is not loaded\").iter().flat_map(|v| map.remove(&v.into())).collect());
         }
         Ok(())
     }", "") }@
@@ -2473,8 +2472,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
         for chunk in self.chunks(IN_CONDITION_LIMIT) {
             let filter = RelFil{rel_name_pascal}::in_filter(chunk){additional_filter};
-            let mut list = repo_{class_mod}::{class}_::query().filter(filter).select(conn).await?;
-            repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner.clone()).await?;
+            let list = repo_{class_mod}::{class}_::query().filter(filter).join(joiner.clone()).select(conn).await?;
             for row in list {
                 if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
                     map.entry(id).or_default().push(row);
@@ -2514,8 +2512,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = repo_{class_mod}::{class}_::find_many_from_cache{with_trashed}(conn, ids.iter()).await?;
-        repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let list = repo_{class_mod}::{class}_::find_many_from_cache{with_trashed}(conn, ids.iter(), joiner).await?;
         let map = repo_{class_mod}::{class}_::cache_list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2530,8 +2527,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let mut list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), None).await?;
-        repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), joiner, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -3796,8 +3792,7 @@ impl QueryBuilder {
         let result = result?;
         let ids: Vec<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> = result.iter().map(|id| id.into()).collect();
         conn.release_cache_tx();
-        let mut list = _@{ pascal_name }@_::find_many_from_cache(conn, ids).await?;
-        list.join(conn, joiner).await?;
+        let list = _@{ pascal_name }@_::find_many_from_cache(conn, ids, joiner).await?;
         let mut map = _@{ pascal_name }@_::cache_list_to_map(list);
         let list: Vec<_@{ pascal_name }@Cache> = result
             .iter()
@@ -3871,7 +3866,7 @@ impl QueryBuilder {
     pub(crate) async fn __select_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         let result: Vec<CacheData> = self._select(conn).await?;
         let time = MSec::now();
-        let list = result.into_iter().map(|v| Arc::new(CacheWrapper::_from_inner(v, conn.shard_id(), time)).into()).collect();
+        let list = result.into_iter().map(|v| Arc::new(CacheWrapper::from_inner(v, conn.shard_id(), time)).into()).collect();
         Ok(list)
     }
     @%- endif %@
@@ -4212,7 +4207,7 @@ impl _UnionBuilder for Vec<QueryBuilder> {
         let result = _union(self, conn, CacheData::_sql_cols(), None, None, None, false).await?;
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
-        let list = result?.into_iter().map(|v| Arc::new(CacheWrapper::_from_inner(v, conn.shard_id(), time)).into()).collect();
+        let list = result?.into_iter().map(|v| Arc::new(CacheWrapper::from_inner(v, conn.shard_id(), time)).into()).collect();
         Ok(list)
     }
 }
@@ -4220,61 +4215,61 @@ impl _UnionBuilder for Vec<QueryBuilder> {
 
 @% for (name, column_def) in def.id() -%@
 @%- if def.primaries().len() == 1 %@
-impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% if def.use_cache() %@_@{pascal_name}@Cache,@% endif %@ _@{pascal_name}@Updater> for @{ id_name }@ {
-    async fn fetch(&self, conn: &mut DbConn) -> Result<Option<_@{ pascal_name }@>> {
-        _@{ pascal_name }@_::find_optional(conn, self, None).await
+impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% if def.use_cache() %@_@{pascal_name}@Cache,@% endif %@ _@{pascal_name}@Updater, Joiner_> for @{ id_name }@ {
+    async fn fetch(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@>> {
+        _@{ pascal_name }@_::find_optional(conn, self, joiner, None).await
     }
 @%- if def.is_soft_delete() %@
-    async fn fetch_with_trashed(&self, conn: &mut DbConn) -> Result<Option<_@{ pascal_name }@>> {
-        _@{ pascal_name }@_::find_optional_with_trashed(conn, self, None).await
+    async fn fetch_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@>> {
+        _@{ pascal_name }@_::find_optional_with_trashed(conn, self, joiner, None).await
     }
 @%- endif %@
 @%- if def.use_cache() %@
     #[cfg(not(feature="cache_update_only"))]
-    async fn fetch_from_cache(&self, conn: &DbConn) -> Result<Option<_@{ pascal_name }@Cache>> {
-        _@{ pascal_name }@_::find_optional_from_cache(conn, self).await
+    async fn fetch_from_cache(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
+        _@{ pascal_name }@_::find_optional_from_cache(conn, self, joiner).await
     }
 @%- if def.is_soft_delete() %@
     #[cfg(not(feature="cache_update_only"))]
-    async fn fetch_from_cache_with_trashed(&self, conn: &DbConn) -> Result<Option<_@{ pascal_name }@Cache>> {
-        _@{ pascal_name }@_::find_optional_from_cache_with_trashed(conn, self).await
+    async fn fetch_from_cache_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
+        _@{ pascal_name }@_::find_optional_from_cache_with_trashed(conn, self, joiner).await
     }
 @%- endif %@
 @%- endif %@
 @%- if !def.disable_update() %@
-    async fn fetch_for_update(&self, conn: &mut DbConn) -> Result<_@{ pascal_name }@Updater> {
-        _@{ pascal_name }@_::find_for_update(conn, self, None).await
+    async fn fetch_for_update(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Updater> {
+        _@{ pascal_name }@_::find_for_update(conn, self, joiner, None).await
     }
 @%- if def.is_soft_delete() %@
-    async fn fetch_for_update_with_trashed(&self, conn: &mut DbConn) -> Result<_@{ pascal_name }@Updater> {
-        _@{ pascal_name }@_::find_for_update_with_trashed(conn, self, None).await
+    async fn fetch_for_update_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Updater> {
+        _@{ pascal_name }@_::find_for_update_with_trashed(conn, self, joiner, None).await
     }
 @%- endif %@
 @%- endif %@
 }
 
-impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% if def.use_cache() %@_@{pascal_name}@Cache,@% endif %@ _@{pascal_name}@Updater> for Option<@{ id_name }@> {
-    async fn fetch(&self, conn: &mut DbConn) -> Result<Option<_@{ pascal_name }@>> {
+impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% if def.use_cache() %@_@{pascal_name}@Cache,@% endif %@ _@{pascal_name}@Updater, Joiner_> for Option<@{ id_name }@> {
+    async fn fetch(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@>> {
         if let Some(id) = self {
-            _@{ pascal_name }@_::find_optional(conn, id, None).await
+            _@{ pascal_name }@_::find_optional(conn, id, joiner, None).await
         } else {
             Ok(None)
         }
     }
 @%- if def.use_cache() %@
     #[cfg(not(feature="cache_update_only"))]
-    async fn fetch_from_cache(&self, conn: &DbConn) -> Result<Option<_@{ pascal_name }@Cache>> {
+    async fn fetch_from_cache(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
         if let Some(id) = self {
-            _@{ pascal_name }@_::find_optional_from_cache(conn, id).await
+            _@{ pascal_name }@_::find_optional_from_cache(conn, id, joiner).await
         } else {
             Ok(None)
         }
     }
     @%- if def.is_soft_delete() %@
     #[cfg(not(feature="cache_update_only"))]
-    async fn fetch_from_cache_with_trashed(&self, conn: &DbConn) -> Result<Option<_@{ pascal_name }@Cache>> {
+    async fn fetch_from_cache_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
         if let Some(id) = self {
-            _@{ pascal_name }@_::find_from_cache_with_trashed(conn, id)
+            _@{ pascal_name }@_::find_from_cache_with_trashed(conn, id, joiner)
                 .await
                 .map(Some)
         } else {
@@ -4343,7 +4338,7 @@ impl _@{ pascal_name }@Cache_ {
             @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
             @%- if def.use_cache() %@
             if !conn.clear_whole_cache {
-                if let Some(obj) = _@{ pascal_name }@_::find_optional_from_cache(conn, &id).await? {
+                if let Some(obj) = _@{ pascal_name }@_::find_optional_from_cache(conn, &id, None).await? {
                     @{- def.cache_owners|fmt_cache_owners("
                     if let Some(v) = crate::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._wrapper._inner) {
                         crate::repositories::{base_mod}::_{model_name}Cache_::__push_notify_cache_op(conn, v).await?;
@@ -4380,11 +4375,11 @@ impl _@{ pascal_name }@Cache_ {
     }
     @%- if def.use_cache() %@
     #[cfg(not(feature="cache_update_only"))]
-    pub async fn find_self(_self: &_@{ pascal_name }@Cache, conn: &DbConn) -> Result<_@{ pascal_name }@Cache> {
+    pub async fn find_self(_self: &_@{ pascal_name }@Cache, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Cache> {
         @%- if def.is_soft_delete() %@
-        _@{ pascal_name }@_::find_from_cache_with_trashed(conn, Primary::from(_self)).await
+        _@{ pascal_name }@_::find_from_cache_with_trashed(conn, Primary::from(_self), joiner).await
         @%- else %@
-        _@{ pascal_name }@_::find_from_cache(conn, Primary::from(_self)).await
+        _@{ pascal_name }@_::find_from_cache(conn, Primary::from(_self), joiner).await
         @%- endif %@
     }
     @%- endif %@
@@ -4526,7 +4521,7 @@ impl _@{ pascal_name }@_ {
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
-        let mut list: Vec<CacheWrapper> = result?.into_iter().map(|data| CacheWrapper::_from_inner(data, shard_id, time)).collect();
+        let mut list: Vec<CacheWrapper> = result?.into_iter().map(|data| CacheWrapper::from_inner(data, shard_id, time)).collect();
         @{- def.relations_in_cache()|fmt_rel_join("\n        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut list, &mut conn).await?;", "") }@
         let list: Vec<_@{ pascal_name }@Cache> = list.into_iter().map(|v| Arc::new(v).into()).collect();
         let arc = Arc::new(list);
@@ -4574,7 +4569,7 @@ impl _@{ pascal_name }@_ {
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
         #[allow(clippy::needless_collect)]
-        let mut list: Vec<CacheWrapper> = result?.into_iter().map(|data| CacheWrapper::_from_inner(data, shard_id, time)).collect();
+        let mut list: Vec<CacheWrapper> = result?.into_iter().map(|data| CacheWrapper::from_inner(data, shard_id, time)).collect();
         @{- def.relations_in_cache()|fmt_rel_join("\n        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut list, &mut conn).await?;", "") }@
         let list: Vec<_@{ pascal_name }@Cache> = list.into_iter().map(|v| Arc::new(v).into()).collect();
         let arc = Arc::new(list);
@@ -4609,23 +4604,23 @@ impl _@{ pascal_name }@_ {
     }
     @%- endif %@
 
-    pub async fn find<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<_@{ pascal_name }@>
+    pub async fn find<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<_@{ pascal_name }@>
     where
         T: Into<Primary>,
     {
         let id: Primary = id.into();
-        Self::find_optional(conn, id.clone(), filter)
+        Self::find_optional(conn, id.clone(), joiner, filter)
             .await?
             .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&(&id).into())))
     }
     @%- if def.is_soft_delete() %@
 
-    pub async fn find_with_trashed<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<_@{ pascal_name }@>
+    pub async fn find_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<_@{ pascal_name }@>
     where
         T: Into<Primary>,
     {
         let id: Primary = id.into();
-        Self::find_optional_with_trashed(conn, id.clone(), filter)
+        Self::find_optional_with_trashed(conn, id.clone(), joiner, filter)
             .await?
             .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&(&id).into())))
     }
@@ -4633,12 +4628,12 @@ impl _@{ pascal_name }@_ {
     @%- if def.use_cache() %@
 
     #[cfg(not(feature="cache_update_only"))]
-    pub async fn find_from_cache<T>(conn: &DbConn, id: T) -> Result<_@{ pascal_name }@Cache>
+    pub async fn find_from_cache<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Cache>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        __find_optional_from_cache(conn, id.clone())
+        __find_optional_from_cache(conn, id.clone(), joiner)
             .await?
 @{- def.soft_delete_tpl("","
             .filter(|data| data._wrapper._inner.deleted_at.is_none())","
@@ -4648,12 +4643,12 @@ impl _@{ pascal_name }@_ {
     @%- if def.is_soft_delete() %@
 
     #[cfg(not(feature="cache_update_only"))]
-    pub async fn find_from_cache_with_trashed<T>(conn: &DbConn, id: T) -> Result<_@{ pascal_name }@Cache>
+    pub async fn find_from_cache_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Cache>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        __find_optional_from_cache(conn, id.clone())
+        __find_optional_from_cache(conn, id.clone(), joiner)
             .await?
             .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&id)))
     }
@@ -4686,51 +4681,55 @@ impl _@{ pascal_name }@_ {
         map
     }
 
-    pub async fn find_many<I, T>(conn: &mut DbConn, ids: I, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@>>
+    pub async fn find_many<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        Ok(__find_many(conn, &ids, TrashMode::Not, filter).await?.into_iter().map(|v| v.into()).collect())
+        let mut list = __find_many(conn, &ids, TrashMode::Not, filter).await?.into_iter().map(|v| v.into()).collect();
+        _@{ pascal_name }@Joiner::join(&mut list, conn, joiner).await?;
+        Ok(list)
     }
     @%- if def.is_soft_delete() %@
 
-    pub async fn find_many_with_trashed<I, T>(conn: &mut DbConn, ids: I, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@>>
+    pub async fn find_many_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        Ok(__find_many(conn, &ids, TrashMode::With, filter).await?.into_iter().map(|v| v.into()).collect())
+        let mut list = __find_many(conn, &ids, TrashMode::With, filter).await?.into_iter().map(|v| v.into()).collect();
+        _@{ pascal_name }@Joiner::join(&mut list, conn, joiner).await?;
+        Ok(list)
     }
     @%- endif %@
     @%- if def.use_cache() %@
 
     #[cfg(not(feature="cache_update_only"))]
-    pub async fn find_many_from_cache<I, T>(conn: &DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Cache>>
+    pub async fn find_many_from_cache<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>) -> Result<Vec<_@{ pascal_name }@Cache>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        Ok(__find_many_from_cache(conn, ids).await?.into_iter()@{ def.soft_delete_tpl("",".filter(|data| data._wrapper._inner.deleted_at.is_none())",".filter(|data| data._wrapper._inner.deleted == 0)")}@.collect())
+        Ok(__find_many_from_cache(conn, ids, joiner).await?.into_iter()@{ def.soft_delete_tpl("",".filter(|data| data._wrapper._inner.deleted_at.is_none())",".filter(|data| data._wrapper._inner.deleted == 0)")}@.collect())
     }
     @%- if def.is_soft_delete() %@
 
     #[cfg(not(feature="cache_update_only"))]
-    pub async fn find_many_from_cache_with_trashed<I, T>(conn: &DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Cache>>
+    pub async fn find_many_from_cache_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>) -> Result<Vec<_@{ pascal_name }@Cache>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        __find_many_from_cache(conn, ids).await
+        __find_many_from_cache(conn, ids, joiner).await
     }
     @%- endif %@
     @%- endif %@
 
-    pub async fn find_optional<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@>>
+    pub async fn find_optional<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@>>
     where
         T: Into<Primary>,
     {
@@ -4744,7 +4743,11 @@ impl _@{ pascal_name }@_ {
         @%- else %@
         let data: Option<Data> = __find_optional(conn, Data::_sql_cols(), id, TrashMode::Not, filter).await?.map(|v| Data::from_row(&v)).transpose()?;
         @%- endif %@
-        Ok(data.map(_@{ pascal_name }@::from))
+        let mut obj = data.map(_@{ pascal_name }@::from);
+        if let Some(obj) = obj.as_mut() {
+            _@{ pascal_name }@Joiner::join(obj, conn, joiner).await?;
+        }
+        Ok(obj)
     }
 
     pub async fn exists<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<bool>
@@ -4761,18 +4764,22 @@ impl _@{ pascal_name }@_ {
     }
     @%- if !def.disable_update() %@
 
-    pub async fn find_optional_for_update<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@Updater>>
+    pub async fn find_optional_for_update<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@Updater>>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
         let result = __find_for_update(conn, &id, TrashMode::Not, filter).await?;
-        Ok(result.map(__Updater__::from))
+        let mut obj = result.map(__Updater__::from);
+        if let Some(obj) = obj.as_mut() {
+            _@{ pascal_name }@Joiner::join(obj, conn, joiner).await?;
+        }
+        Ok(obj)
     }
     @%- endif %@
     @%- if def.is_soft_delete() %@
 
-    pub async fn find_optional_with_trashed<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@>>
+    pub async fn find_optional_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@>>
     where
         T: Into<Primary>,
     {
@@ -4786,7 +4793,11 @@ impl _@{ pascal_name }@_ {
         @%- else %@
         let data: Option<Data> = __find_optional(conn, Data::_sql_cols(), id, TrashMode::With, filter).await?.map(|v| Data::from_row(&v)).transpose()?;
         @%- endif %@
-        Ok(data.map(_@{ pascal_name }@::from))
+        let mut obj = data.map(_@{ pascal_name }@::from);
+        if let Some(obj) = obj.as_mut() {
+            _@{ pascal_name }@Joiner::join(obj, conn, joiner).await?;
+        }
+        Ok(obj)
     }
 
     pub async fn exists_with_trashed<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<bool>
@@ -4806,71 +4817,75 @@ impl _@{ pascal_name }@_ {
 
     #[cfg(not(feature="cache_update_only"))]
     #[allow(clippy::needless_question_mark)]
-    pub async fn find_optional_from_cache<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
+    pub async fn find_optional_from_cache<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        Ok(__find_optional_from_cache(conn, id).await?@{- def.soft_delete_tpl("",".filter(|data| data._wrapper._inner.deleted_at.is_none())",".filter(|data| data._wrapper._inner.deleted == 0)")}@)
+        Ok(__find_optional_from_cache(conn, id, joiner).await?@{- def.soft_delete_tpl("",".filter(|data| data._wrapper._inner.deleted_at.is_none())",".filter(|data| data._wrapper._inner.deleted == 0)")}@)
     }
     @%- if def.is_soft_delete() %@
 
     #[cfg(not(feature="cache_update_only"))]
-    pub async fn find_optional_from_cache_with_trashed<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
+    pub async fn find_optional_from_cache_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        __find_optional_from_cache(conn, id).await
+        __find_optional_from_cache(conn, id, joiner).await
     }
     @%- endif %@
     @%- endif %@
     @%- if !def.disable_update() %@
 
-    pub async fn find_for_update<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<_@{ pascal_name }@Updater>
+    pub async fn find_for_update<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<_@{ pascal_name }@Updater>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
         let result = __find_for_update(conn, &id, TrashMode::Not, filter).await?@{ def.soft_delete_tpl("",".filter(|data| data.deleted_at.is_none())",".filter(|data| data.deleted == 0)")}@;
         let data = result.with_context(|| err::RowNotFound::new("@{ table_name }@", id.to_string()))?;
-        Ok(__Updater__::from(data))
+        let mut obj = __Updater__::from(data);
+        _@{ pascal_name }@Joiner::join(&mut obj, conn, joiner).await?;
+        Ok(obj)
     }
     @%- endif %@
     @%- if !def.disable_update() && def.is_soft_delete() %@
 
-    pub async fn find_for_update_with_trashed<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<_@{ pascal_name }@Updater>
+    pub async fn find_for_update_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<_@{ pascal_name }@Updater>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
         let result = __find_for_update(conn, &id, TrashMode::With, filter).await?;
         let data = result.with_context(|| err::RowNotFound::new("@{ table_name }@", id.to_string()))?;
-        Ok(__Updater__::from(data))
+        let mut obj = __Updater__::from(data);
+        _@{ pascal_name }@Joiner::join(&mut obj, conn, joiner).await?;
+        Ok(obj)
     }
     @%- endif %@
 @%- if !def.disable_update() %@
 
-    pub async fn find_many_for_update<I, T>(conn: &mut DbConn, ids: I, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
+    pub async fn find_many_for_update<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        __find_many_for_update(conn, &ids, TrashMode::Not, filter).await
+        __find_many_for_update(conn, &ids, TrashMode::Not, joiner, filter).await
     }
 
-    pub async fn find_many_for_update_with_trashed<I, T>(conn: &mut DbConn, ids: I, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
+    pub async fn find_many_for_update_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        __find_many_for_update(conn, &ids, TrashMode::With, filter).await
+        __find_many_for_update(conn, &ids, TrashMode::With, joiner, filter).await
     }
 @%- endif %@
 @%- for (index_name, index) in def.unique_index() %@
-    pub async fn find_by_@{ index_name }@<@{ index.fields(index_name, def)|fmt_index_col("T{index}", ", ") }@>(conn: &mut DbConn, @{ index.fields(index_name, def)|fmt_index_col("_{name}: T{index}", ", ") }@) -> Result<_@{ pascal_name }@>
+    pub async fn find_by_@{ index_name }@<@{ index.fields(index_name, def)|fmt_index_col("T{index}", ", ") }@>(conn: &mut DbConn, @{ index.fields(index_name, def)|fmt_index_col("_{name}: T{index}", ", ") }@, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@>
     where
     @{- index.fields(index_name, def)|fmt_index_col("
         T{index}: Into<{filter_type}>,", "") }@
@@ -4878,14 +4893,14 @@ impl _@{ pascal_name }@_ {
         @{- index.fields(index_name, def)|fmt_index_col("
         let val{index}: {filter_type} = _{name}.into();", "") }@
         let filter = Filter_::And(vec![@{- index.fields(index_name, def)|fmt_index_col("Filter_::EqKey(ColKey_::{var}(val{index}.clone().into()))", ", ") }@]);
-        Self::query().filter(filter).select(conn).await?.pop()
+        Self::query().filter(filter).join(joiner).select(conn).await?.pop()
             .with_context(|| err::RowNotFound::new("@{ table_name }@", format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("val{index}", ", ") }@)))
     }
 @%- endfor %@
 @%- if def.use_cache() %@
 @%- for (index_name, index) in def.unique_index() %@
     #[cfg(feature="cache_update_only")]
-    pub async fn find_by_@{ index_name }@_from_cache<@{ index.fields(index_name, def)|fmt_index_col("T{index}", ", ") }@>(conn: &DbConn, @{ index.fields(index_name, def)|fmt_index_col("_{name}: T{index}", ", ") }@) -> Result<_@{ pascal_name }@Cache>
+    pub async fn find_by_@{ index_name }@_from_cache<@{ index.fields(index_name, def)|fmt_index_col("T{index}", ", ") }@>(conn: &mut DbConn, @{ index.fields(index_name, def)|fmt_index_col("_{name}: T{index}", ", ") }@, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Cache>
     where
     @{- index.fields(index_name, def)|fmt_index_col("
         T{index}: Into<{filter_type}>,", "") }@
@@ -4893,7 +4908,7 @@ impl _@{ pascal_name }@_ {
         unimplemented!("cache_update_only feature disables fetching from cache.")
     }
     #[cfg(not(feature="cache_update_only"))]
-    pub async fn find_by_@{ index_name }@_from_cache<@{ index.fields(index_name, def)|fmt_index_col("T{index}", ", ") }@>(conn: &DbConn, @{ index.fields(index_name, def)|fmt_index_col("_{name}: T{index}", ", ") }@) -> Result<_@{ pascal_name }@Cache>
+    pub async fn find_by_@{ index_name }@_from_cache<@{ index.fields(index_name, def)|fmt_index_col("T{index}", ", ") }@>(conn: &mut DbConn, @{ index.fields(index_name, def)|fmt_index_col("_{name}: T{index}", ", ") }@, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Cache>
     where
     @{- index.fields(index_name, def)|fmt_index_col("
         T{index}: Into<{filter_type}>,", "") }@
@@ -4902,7 +4917,7 @@ impl _@{ pascal_name }@_ {
         let c{index}: {filter_type} = _{name}.into();", "") }@
         let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col("ColKey_::{var}(c{index}.clone().into())", ", ") }@]);
         if let Some(id) = Cache::get::<PrimaryWrapper>(&key, conn.shard_id(), true).await {
-            if let Some(obj) = Self::find_optional_from_cache(conn, &id.0).await? {
+            if let Some(obj) = Self::find_optional_from_cache(conn, &id.0, joiner.clone()).await? {
                 if @{ index.fields(index_name, def)|fmt_index_col("obj._{raw_var}(){filter_check_eq}", " && ") }@ {
                     return Ok(obj);
                 }
@@ -4911,7 +4926,7 @@ impl _@{ pascal_name }@_ {
         let filter = Filter_::And(vec![@{- index.fields(index_name, def)|fmt_index_col("Filter_::EqKey(ColKey_::{var}(c{index}.clone().into()))", ", ") }@]);
         let mut conn = DbConn::_new_with_ctx(conn.ctx_no(), conn.shard_id());
         conn.begin_cache_tx().await?;
-        let obj = Self::query().filter(filter).select_from_cache(&mut conn).await?.pop()
+        let obj = Self::query().filter(filter).join(joiner).select_from_cache(&mut conn).await?.pop()
             .with_context(|| err::RowNotFound::new("@{ table_name }@", format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("c{index}", ", ") }@)))?;
         let id = PrimaryWrapper(InnerPrimary::from(&obj), conn.shard_id(), MSec::now());
         Cache::insert_long(&key, Arc::new(id), true).await;
@@ -5787,23 +5802,23 @@ async fn ___find_many_for_cache(
         @%- endif %@
     }
     let time = MSec::now();
-    let list = result.into_iter().map(|v| CacheWrapper::_from_inner(v, conn.shard_id(), time)).collect();
+    let list = result.into_iter().map(|v| CacheWrapper::from_inner(v, conn.shard_id(), time)).collect();
     Ok(list)
 }
 
 #[cfg(not(feature="cache_update_only"))]
-async fn __find_many_from_cache<I, T>(conn: &DbConn, ids: I) -> Result<Vec<_@{ pascal_name }@Cache>>
+async fn __find_many_from_cache<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>) -> Result<Vec<_@{ pascal_name }@Cache>>
 where
     I: IntoIterator<Item = T>,
     T: Into<InnerPrimary>,
 {
     let shard_id = conn.shard_id();
     let ids: Vec<_> = ids.into_iter().map(|id| PrimaryHasher(id.into(), shard_id)).collect();
-    ___find_many_from_cache(conn, ids).await
+    ___find_many_from_cache(conn, ids, joiner).await
 }
 #[cfg(not(feature="cache_update_only"))]
 #[allow(clippy::collapsible_if)]
-async fn ___find_many_from_cache(conn: &DbConn, ids: Vec<PrimaryHasher>) -> Result<Vec<_@{ pascal_name }@Cache>> {
+async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joiner: Option<Box<Joiner_>>) -> Result<Vec<_@{ pascal_name }@Cache>> {
     let mut list: Vec<_@{ pascal_name }@Cache> = Vec::new();
     let mut rest_ids = Vec::new();
     let shard_id = conn.shard_id();
@@ -5812,7 +5827,11 @@ async fn ___find_many_from_cache(conn: &DbConn, ids: Vec<PrimaryHasher>) -> Resu
     let cache_map = Cache::get_many::<CacheWrapper>(&hash_and_id.iter().map(|(hash, id)| *hash).collect(), shard_id, USE_FAST_CACHE).await;
     for (hash, id) in hash_and_id {
         if let Some(obj) = cache_map.get(&hash).filter(|o| InnerPrimary::from(*o) == id.0) {
-            list.push(obj.clone().into());
+            if obj._has_join(&joiner) {
+                list.push(obj.clone().into());
+            } else {
+                rest_ids.push(id);
+            }
         } else {
             rest_ids.push(id);
         }
@@ -5828,7 +5847,11 @@ async fn ___find_many_from_cache(conn: &DbConn, ids: Vec<PrimaryHasher>) -> Resu
         let mut rest_ids2 = FxHashSet::with_capacity_and_hasher(rest_ids.len() * 2, Default::default());
         for id in rest_ids.into_iter() {
             if let Some(obj) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
-                list.push(obj.into());
+                if obj._has_join(&joiner) {
+                    list.push(obj.into());
+                } else {
+                    rest_ids2.insert(id);
+                }
             } else {
                 rest_ids2.insert(id);
             }
@@ -5854,8 +5877,12 @@ async fn ___find_many_from_cache(conn: &DbConn, ids: Vec<PrimaryHasher>) -> Resu
             let mut ids: Vec<InnerPrimary> = ids.drain().collect();
             #[allow(unused_mut)]
             let mut result = ___find_many_for_cache(&mut conn, &ids).await?;
+            if let Some(joiner) = &joiner {
 @{- def.relations_in_cache()|fmt_rel_join("
-            CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut result, &mut conn).await?;", "") }@
+                if joiner.{rel_name}.is_some() {
+                    CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut result, &mut conn).await?;
+                }", "") }@
+            }
             let _lock = db::models::CACHE_UPDATE_LOCK.read().await;
             for v in result.into_iter() {
                 let arc = Arc::new(v);
@@ -5913,6 +5940,7 @@ async fn ___find_many_from_cache(conn: &DbConn, ids: Vec<PrimaryHasher>) -> Resu
         }
         conn.release_cache_tx();
     }
+    _@{ pascal_name }@Joiner::join(&mut list, conn, joiner).await?;
     Ok(list)
 }
 @%- endif %@
@@ -5939,12 +5967,12 @@ async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, tr
 @%- if def.use_cache() %@
 
 #[cfg(not(feature="cache_update_only"))]
-async fn __find_optional_from_cache<T>(conn: &DbConn, id: T) -> Result<Option<_@{ pascal_name }@Cache>>
+async fn __find_optional_from_cache<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>>
 where
     T: Into<InnerPrimary>,
 {
     let id: InnerPrimary = id.into();
-    let mut result = __find_many_from_cache(conn, [id]).await?;
+    let mut result = __find_many_from_cache(conn, [id], joiner).await?;
     Ok(result.pop())
 }
 @%- endif %@
@@ -5974,7 +6002,7 @@ async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: Tra
 }
 
 #[allow(clippy::needless_borrow)]
-async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
+async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_mode: TrashMode, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
 {
     if ids.is_empty() {
         return Ok(Vec::new());
@@ -6014,6 +6042,7 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
             .map(__Updater__::from)
             .for_each(|obj| list.push(obj));
     }
+    _@{ pascal_name }@Joiner::join(&mut list, conn, joiner).await?;
     Ok(list)
 }
 @%- endif %@
@@ -6352,7 +6381,7 @@ async fn __update_many(conn: &mut DbConn, ids: Vec<InnerPrimary>, mut obj: __Upd
             || obj._op.{var} == Op::Add || obj._op.{var} == Op::Sub", "", "") }@;
         if has_add {
             for ids in ids.chunks(IN_CONDITION_LIMIT) {
-                _@{ pascal_name }@_::find_many_for_update(conn, ids.iter(), None).await?.into_iter()
+                _@{ pascal_name }@_::find_many_for_update(conn, ids.iter(), None, None).await?.into_iter()
                     .for_each(|v| {
                         let mut data = v._data;
                         @{- def.non_primaries_addable()|fmt_join_cache_or_not("

@@ -146,9 +146,9 @@ pub struct _@{ pascal_name }@Store;
 #[async_trait::async_trait]
 impl SessionStore for _@{ pascal_name }@Store {
     async fn load(&self, session_key: &SessionKey) -> Result<Option<SessionData>> {
-        let conn = DbConn::_new(calc_shard_id(session_key) as ShardId);
+        let mut conn = DbConn::_new(calc_shard_id(session_key) as ShardId);
         let id: String = session_key.into();
-        let session = _@{ pascal_name }@_::find_optional_from_cache(&conn, id)
+        let session = _@{ pascal_name }@_::find_optional_from_cache(&mut conn, id, None)
             .await?
             .map(|s| SessionData::new(s._data(), (s._eol() as u64) << EOL_SHIFT, s._@{ ConfigDef::version() }@()));
         Ok(session)
@@ -157,7 +157,7 @@ impl SessionStore for _@{ pascal_name }@Store {
     async fn reload(&self, session_key: &SessionKey) -> Result<Option<SessionData>> {
         let mut conn = DbConn::_new(calc_shard_id(session_key) as ShardId);
         let id: String = session_key.into();
-        let session = _@{ pascal_name }@_::find_optional(&mut conn, id, None)
+        let session = _@{ pascal_name }@_::find_optional(&mut conn, id, None, None)
             .await?
             .map(|s| SessionData::new(s._data(), (s._eol() as u64) << EOL_SHIFT, s._@{ ConfigDef::version() }@()));
         Ok(session)

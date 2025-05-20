@@ -576,8 +576,8 @@ pub struct CacheWrapper {
     pub _inner: CacheData,
     _shard_id: ShardId,
     _time: MSec,
-@{ def.relations_one_cache(false)|fmt_rel_join("    pub {rel_name}: Option<Arc<rel_{class_mod}::CacheWrapper>>,\n", "") -}@
-@{ def.relations_many_cache(false)|fmt_rel_join("    pub {rel_name}: Vec<Arc<rel_{class_mod}::CacheWrapper>>,\n", "") -}@
+@{ def.relations_one_cache(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Arc<rel_{class_mod}::CacheWrapper>>>,\n", "") -}@
+@{ def.relations_many_cache(false)|fmt_rel_join("    pub {rel_name}: Option<Vec<Arc<rel_{class_mod}::CacheWrapper>>>,\n", "") -}@
 }
 
 #[derive(Clone, Debug)]
@@ -1476,15 +1476,15 @@ impl _@{ pascal_name }@Getter for _@{ pascal_name }@ {
     }", "") }@
     @{- def.relations_one_and_belonging(false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
     @{- def.relations_many(false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
-        self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")
+        self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")
     }", "") }@
     @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
 }
 
@@ -1500,11 +1500,11 @@ impl crate::models::@{ parent.group_name|snake|to_var_name }@::@{ parent.name|sn
     }", "") }@
     @{- parent.relations_one_and_belonging(false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
     @{- parent.relations_many(false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref())
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref())
     }", "") }@
 }
 @%- endfor %@
@@ -1521,9 +1521,9 @@ impl CacheVal for CacheWrapper {
         @{- def.cache_cols_null_sized()|fmt_join("
         size += self._inner.{var}.as_ref().map(|v| v._size()).unwrap_or(0);", "") }@
         @{- def.relations_one_cache(false)|fmt_rel_join("
-        size += self.{rel_name}.as_ref().map(|v| v._size() as usize).unwrap_or(0);", "") }@
+        size += self.{rel_name}.as_ref().map(|l| l.as_ref().map(|v| v._size() as usize).unwrap_or(0)).unwrap_or(0);", "") }@
         @{- def.relations_many_cache(false)|fmt_rel_join("
-        size += self.{rel_name}.iter().fold(0, |i, v| i + v._size() as usize);", "") }@
+        size += self.{rel_name}.as_ref().map(|l| l.iter().fold(0, |i, v| i + v._size() as usize)).unwrap_or(0);", "") }@
         size.try_into().unwrap_or(u32::MAX)
     }
     fn _type_id(&self) -> u64 {
@@ -1562,12 +1562,12 @@ impl CacheWrapper {
         {convert_outer_prefix}self._inner.{var}{clone_for_outer}{convert_outer}
     }", "") }@
     @{- def.relations_one_cache(false)|fmt_rel_join("
-    fn _{raw_rel_name}(&self) -> Option<&Arc<rel_{class_mod}::CacheWrapper>> {
-        self.{rel_name}.as_ref()
+    fn _{raw_rel_name}(&self) -> Result<Option<&Arc<rel_{class_mod}::CacheWrapper>>> {
+        self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\").map(|v| v.as_ref())
     }", "") }@
     @{- def.relations_many_cache(false)|fmt_rel_join("
-    fn _{raw_rel_name}(&self) -> &Vec<Arc<rel_{class_mod}::CacheWrapper>> {
-        self.{rel_name}.as_ref()
+    fn _{raw_rel_name}(&self) -> Result<&Vec<Arc<rel_{class_mod}::CacheWrapper>>> {
+        self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")
     }", "") }@
 }
 
@@ -1581,36 +1581,36 @@ impl _@{ pascal_name }@Cache {
         if let Some(v) = &self.{rel_name} {
             Ok(v.as_ref().map(|v| (**v).clone()))
         } else {
-            Ok(self._wrapper._{raw_rel_name}().map(|v| v.clone().into()))
+            Ok(self._wrapper._{raw_rel_name}()?.map(|v| v.clone().into()))
         }
     }", "") }@
     @{- def.relations_one_uncached(false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|v| (**v).clone()))
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|v| (**v).clone()))
     }", "") }@
     @{- def.relations_many_cache(false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Vec<rel_{class_mod}::{class}Cache>> {
         if let Some(v) = &self.{rel_name} {
             Ok(v.to_vec())
         } else {
-            Ok(self._wrapper._{raw_rel_name}().iter().map(|v| v.clone().into()).collect())
+            Ok(self._wrapper._{raw_rel_name}()?.iter().map(|v| v.clone().into()).collect())
         }
     }", "") }@
     @{- def.relations_many_uncached(false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Vec<rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.to_vec())
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.to_vec())
     }", "") }@
     @{- def.relations_belonging_cache(false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}Cache>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
     }", "") }@
     @{- def.relations_belonging_uncached(false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
     }", "") }@
     @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
     }", "") }@
 }
 @%- endif %@
@@ -1684,24 +1684,24 @@ impl _@{ pascal_name }@Updater {
 @{- def.relations_one(false)|fmt_rel_join("
 {label}{comment}    pub fn mut_{raw_rel_name}(&mut self) -> AccessorHasOne<rel_{class_mod}::{class}Updater> {
         AccessorHasOne {
-            name: \"{rel_name}\",
+            name: \"{raw_rel_name}\",
             val: &mut self.{rel_name},
         }
     }", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
 {label}{comment}    pub fn mut_{raw_rel_name}(&mut self) -> AccessorHasMany<rel_{class_mod}::{class}Updater> {
         AccessorHasMany {
-            name: \"{rel_name}\",
+            name: \"{raw_rel_name}\",
             val: &mut self.{rel_name},
         }
     }", "") }@
 @{- def.relations_belonging(false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{rel_name} is not loaded\")?.as_ref().map(|b| &**b))
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
 }
 #[async_trait::async_trait]
@@ -1853,16 +1853,16 @@ impl From<Arc<CacheWrapper>> for _@{ pascal_name }@Cache {
 }
 
 impl CacheWrapper {
-    pub fn _from_inner(inner: CacheData, shard_id: ShardId, time: MSec) -> Self {
+    pub fn from_inner(inner: CacheData, shard_id: ShardId, time: MSec) -> Self {
         Self {
             _inner: inner,
             _shard_id: shard_id,
             _time: time,
 @{- def.relations_one_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n            {rel_name}: Vec::new(),", "") }@
+@{- def.relations_many_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
         }
     }
-    pub fn _from_data(data: Data, shard_id: ShardId, time: MSec) -> Self {
+    pub fn from_data(data: Data, shard_id: ShardId, time: MSec) -> Self {
         Self {
             _inner: CacheData {
 @{- def.cache_cols()|fmt_join("\n                {var}: data.{var},", "") }@
@@ -1870,7 +1870,7 @@ impl CacheWrapper {
             _shard_id: shard_id,
             _time: time,
 @{- def.relations_one_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n            {rel_name}: Vec::new(),", "") }@
+@{- def.relations_many_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -1900,16 +1900,16 @@ impl Serialize for _@{ pascal_name }@ {
         @{- def.serializable()|fmt_join("
         state.serialize_field(\"{var}\", &(self._inner.{var}{convert_serialize}))?;", "") }@
         @{- def.relations_one_and_belonging(false)|fmt_rel_join("
-        if self.{rel_name}.is_some() {
-            state.serialize_field(\"{rel_name}\", &self.{rel_name})?;
+        if let Some(v) = &self.{rel_name} {
+            state.serialize_field(\"{raw_rel_name}\", v)?;
         }", "") }@
         @{- def.relations_many(false)|fmt_rel_join("
-        if self.{rel_name}.is_some() {
-            state.serialize_field(\"{rel_name}\", &self.{rel_name})?;
+        if let Some(v) = &self.{rel_name} {
+            state.serialize_field(\"{raw_rel_name}\", v)?;
         }", "") }@
         @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-        if self.{rel_name}.is_some() {
-            state.serialize_field(\"{rel_name}\", &self.{rel_name})?;
+        if let Some(v) = &self.{rel_name} {
+            state.serialize_field(\"{raw_rel_name}\", v)?;
         }", "") }@
         state.end()
     }
@@ -1928,15 +1928,15 @@ impl Serialize for _@{ pascal_name }@Cache {
         state.serialize_field(\"{var}\", &(self._wrapper._inner.{var}{convert_serialize}))?;", "") }@
         @{- def.relations_one_cache(false)|fmt_rel_join("
         if let Ok(v) = &self._{raw_rel_name}() {
-            state.serialize_field(\"{rel_name}\", v)?;
+            state.serialize_field(\"{raw_var_rel_name}\", v)?;
         }", "") }@
         @{- def.relations_many_cache(false)|fmt_rel_join("
         if let Ok(v) = &self._{raw_rel_name}() {
-            state.serialize_field(\"{rel_name}\", v)?;
+            state.serialize_field(\"{raw_var_rel_name}\", v)?;
         }", "") }@
         @{- def.relations_belonging_cache(false)|fmt_rel_join("
         if self.{rel_name}.is_some() {
-            state.serialize_field(\"{rel_name}\", &self.{rel_name})?;
+            state.serialize_field(\"{raw_var_rel_name}\", &self.{rel_name})?;
         }", "") }@
         state.end()
     }

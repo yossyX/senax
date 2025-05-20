@@ -855,7 +855,14 @@ pub fn _to_var_name(s: &str) -> String {
         name.to_owned()
     }
 }
-
+pub fn _to_raw_var_name(s: &str) -> String {
+    let name = s;
+    if BAD_KEYWORDS.iter().any(|&x| x == name) {
+        format!("_{}", name)
+    } else {
+        name.to_owned()
+    }
+}
 static KEYWORDS: &[&str] = &[
     "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for",
     "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return",
