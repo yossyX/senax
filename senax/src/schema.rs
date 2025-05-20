@@ -1,6 +1,5 @@
 use anyhow::{Context as _, Result, bail, ensure};
 use compact_str::CompactString;
-use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -28,6 +27,7 @@ pub use selector::*;
 pub mod json_schema;
 
 use crate::api_generator::schema::{ApiConfigDef, ApiDbDef, ApiModelDef};
+use crate::common::ToCase as _;
 use crate::common::{DEFAULT_SRID, parse_yml_file, to_singular};
 use crate::{SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE};
 
@@ -84,7 +84,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
     for (name, def) in config.groups.iter_mut() {
         if let Some(def) = def {
             if def.label.is_none() {
-                def.label = Some(name.to_case(Case::Title));
+                def.label = Some(name.to_title());
             }
         }
     }
@@ -319,9 +319,9 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     column_def.enum_class = Some(EnumClass {
                         outer_crate,
                         db: db.to_string(),
-                        group: group_name.to_case(Case::Snake),
+                        group: group_name.to_snake(),
                         mod_name: def.mod_name().to_string(),
-                        name: col_name.to_case(Case::Pascal),
+                        name: col_name.to_pascal(),
                     });
                 }
                 if column_def.srid.is_none() {
@@ -431,9 +431,9 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     column_def.id_class = Some(IdClass {
                         outer_crate,
                         db: db.to_string(),
-                        group: group_name.to_case(Case::Snake),
+                        group: group_name.to_snake(),
                         mod_name,
-                        name: cur_model_name.to_case(Case::Pascal),
+                        name: cur_model_name.to_pascal(),
                     });
                     column_def.main_primary = true;
                     column_def.value_object = None;
@@ -579,8 +579,8 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                                 get_model(&rel_def.model, cur_group_name, &groups).borrow_mut();
                             model.on_delete_list.insert(format!(
                                 "{}::_base::_{}",
-                                &_to_var_name(&cur_group_name.to_case(Case::Snake)),
-                                &cur_model_name.to_case(Case::Snake)
+                                &_to_var_name(&cur_group_name.to_snake()),
+                                &cur_model_name.to_snake()
                             ));
                         }
                         if rel_def.in_cache {
@@ -840,9 +840,16 @@ pub fn domain_mode() -> bool {
 
 pub fn to_id_name(name: &str) -> String {
     if domain_mode() {
-        format!("{}Id", name.to_case(Case::Pascal))
+        format!("{}Id", name.to_pascal())
     } else {
-        format!("_{}Id", name.to_case(Case::Pascal))
+        format!("_{}Id", name.to_pascal())
+    }
+}
+pub fn to_id_name_skip_pascal(name: &str) -> String {
+    if domain_mode() {
+        format!("{}Id", name)
+    } else {
+        format!("_{}Id", name)
     }
 }
 pub fn _to_var_name(s: &str) -> String {

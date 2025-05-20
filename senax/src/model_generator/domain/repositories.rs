@@ -1,3 +1,4 @@
+use crate::common::ToCase as _;
 use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
 use crate::model_generator::REL_START;
 use crate::schema::{GroupsDef, IS_MAIN_GROUP};
@@ -8,7 +9,6 @@ use crate::{
 };
 use anyhow::{Result, ensure};
 use askama::Template;
-use convert_case::{Case, Casing as _};
 use regex::Regex;
 use std::{
     collections::{BTreeSet, HashSet},
@@ -27,7 +27,7 @@ pub fn write_group_files(
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
-    let base_dir = domain_repositories_dir.join(group_name.to_case(Case::Snake));
+    let base_dir = domain_repositories_dir.join(group_name.to_snake());
     let file_path = base_dir.join("Cargo.toml");
     remove_files.remove(file_path.as_os_str());
     let mut content = if force || !file_path.exists() {
@@ -44,8 +44,8 @@ pub fn write_group_files(
     let reg = Regex::new(r"(?m)^repository_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
     for group in ref_groups {
-        let db = &db.to_case(Case::Snake);
-        let group = &group.to_case(Case::Snake);
+        let db = &db.to_snake();
+        let group = &group.to_snake();
         content = content.replace(
             "[dependencies]",
             &format!(
@@ -234,7 +234,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             .map(|(model_name, (_, def))| (def.mod_name(), model_name))
             .collect();
         let entities_mod_names = &entities_mod_names;
-        let file_path = repositories_dir.join(&format!("{}.rs", name.to_case(Case::Snake)));
+        let file_path = repositories_dir.join(format!("{}.rs", name.to_snake()));
         remove_files.remove(file_path.as_os_str());
         let content = if force || !file_path.exists() {
             #[derive(Template)]
@@ -245,7 +245,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             struct Template<'a> {
                 group_name: &'a str,
             }
-            Template { group_name: &name }.render()?
+            Template { group_name: name }.render()?
         } else {
             fs::read_to_string(&file_path)?.replace("\r\n", "\n")
         };
@@ -423,7 +423,7 @@ pub mod @{ mod_name|to_var_name }@;
             }
         }
         if !SEPARATED_BASE_FILES {
-            let group_dir = repositories_dir.join(name.to_case(Case::Snake));
+            let group_dir = repositories_dir.join(name.to_snake());
             let file_path = group_dir.join("_base.rs");
             remove_files.remove(file_path.as_os_str());
             fs_write(file_path, output)?;
@@ -597,8 +597,8 @@ pub fn write_cargo_toml(
     let reg = Regex::new(r#"[ \t]*"repository_\w+/mock"[ \t]*,?[ \t]*\n?"#)?;
     content = reg.replace_all(&content, "").into_owned();
     for (group, (_, _)) in groups.iter().rev() {
-        let db = &db.to_case(Case::Snake);
-        let group = &group.to_case(Case::Snake);
+        let db = &db.to_snake();
+        let group = &group.to_snake();
         content = content.replace(
             "\"mockall\"",
             &format!("\"mockall\",\n    \"repository_{}_{}/mock\"", db, group),
@@ -634,10 +634,10 @@ pub fn write_entity(
     remove_files: &mut HashSet<OsString>,
 ) -> Result<String, anyhow::Error> {
     set_domain_mode(true);
-    let domain_group_dir = repositories_dir.join(group_name.to_case(Case::Snake));
+    let domain_group_dir = repositories_dir.join(group_name.to_snake());
     let file_path = domain_group_dir.join(format!("{}.rs", mod_name));
     remove_files.remove(file_path.as_os_str());
-    let pascal_name = &model_name.to_case(Case::Pascal);
+    let pascal_name = &model_name.to_pascal();
     let id_name = &to_id_name(model_name);
 
     #[derive(Template)]
@@ -694,7 +694,7 @@ pub fn write_entity(
         let domain_group_base_dir = domain_group_dir.join("_base");
         let file_path = domain_group_base_dir.join(format!("_{}.rs", mod_name));
         remove_files.remove(file_path.as_os_str());
-        fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, ret))?;
+        fs_write(file_path, format!("{}{}", OVERWRITTEN_MSG, ret))?;
         Ok("".to_string())
     } else {
         Ok(format!("pub mod _{} {{\n{}}}\n", mod_name, ret))

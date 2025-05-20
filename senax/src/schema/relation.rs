@@ -1,8 +1,8 @@
-use convert_case::{Case, Casing};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::common::ToCase as _;
 use crate::common::to_singular;
 use crate::schema::_to_var_name;
 
@@ -697,9 +697,9 @@ impl RelDef {
     }
     pub fn get_foreign_class_name(&self) -> String {
         if domain_mode() {
-            self.get_foreign_model_name().to_case(Case::Pascal)
+            self.get_foreign_model_name().to_pascal()
         } else {
-            format!("_{}", self.get_foreign_model_name().to_case(Case::Pascal))
+            format!("_{}", self.get_foreign_model_name().to_pascal())
         }
     }
     pub fn get_id_name(&self) -> String {
@@ -717,23 +717,23 @@ impl RelDef {
         to_id_name(&self.get_foreign_model_name())
     }
     pub fn get_group_var(&self) -> String {
-        _to_var_name(&self.get_group_name().to_case(Case::Snake))
+        _to_var_name(&self.get_group_name().to_snake())
     }
     pub fn get_mod_name(&self) -> String {
-        self.get_foreign_model_name().to_case(Case::Snake)
+        self.get_foreign_model_name().to_snake()
     }
     pub fn get_group_mod_name(&self) -> String {
         if let Some(db) = &self.db {
             format!(
                 "{}_{}_{}",
                 db,
-                self.get_group_name().to_case(Case::Snake),
+                self.get_group_name().to_snake(),
                 self.get_mod_name()
             )
         } else {
             format!(
                 "{}_{}",
-                self.get_group_name().to_case(Case::Snake),
+                self.get_group_name().to_snake(),
                 self.get_mod_name()
             )
         }
@@ -741,14 +741,14 @@ impl RelDef {
     pub fn get_group_mod_var(&self) -> String {
         format!(
             "{}::{}",
-            _to_var_name(&self.get_group_name().to_case(Case::Snake)),
+            _to_var_name(&self.get_group_name().to_snake()),
             _to_var_name(&self.get_mod_name())
         )
     }
     pub fn get_base_group_mod_var(&self) -> String {
         format!(
             "{}::_base::_{}",
-            _to_var_name(&self.get_group_name().to_case(Case::Snake)),
+            _to_var_name(&self.get_group_name().to_snake()),
             &self.get_mod_name()
         )
     }

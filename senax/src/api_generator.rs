@@ -1,6 +1,5 @@
 use anyhow::{Context, Result, ensure};
 use askama::Template;
-use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use regex::{Captures, Regex};
 use std::collections::HashSet;
@@ -13,6 +12,7 @@ use std::sync::atomic::Ordering;
 
 use crate::api_generator::schema::{API_CONFIG, ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef};
 use crate::api_generator::template::{DbConfigTemplate, MutationRootTemplate, QueryRootTemplate};
+use crate::common::ToCase as _;
 use crate::common::{fs_write, parse_yml_file, simplify_yml};
 use crate::filters;
 use crate::schema::{_to_var_name, GROUPS, ModelDef, to_id_name};
@@ -74,7 +74,7 @@ pub fn generate(
     let file_path = src_dir.join("auto_api.rs");
     let mut content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
-    let db_var_name = _to_var_name(&db_route.to_case(Case::Snake));
+    let db_var_name = _to_var_name(&db_route.to_snake());
     let reg = Regex::new(&format!(r"pub mod {};", db_var_name))?;
     if !reg.is_match(&content) {
         content = content.replace(
@@ -94,7 +94,7 @@ pub fn generate(
         );
         content = content.replace(
             "    // Do not modify this line. (ApiJsonSchema)",
-            &format!("    {}::gen_json_schema(&dir.join(\"{}\"))?;\n    // Do not modify this line. (ApiJsonSchema)", db_var_name, &db_route.to_case(Case::Snake)),
+            &format!("    {}::gen_json_schema(&dir.join(\"{}\"))?;\n    // Do not modify this line. (ApiJsonSchema)", db_var_name, &db_route.to_snake()),
         );
         let tpl = QueryRootTemplate {
             db_route,
@@ -173,7 +173,7 @@ pub fn generate(
                 ts_dir
                     .join("src")
                     .join("gql_query")
-                    .join(db_route.to_case(Case::Snake)),
+                    .join(db_route.to_snake()),
             )
         } else {
             eprintln!("The ts-dir directory does not exist.: {}", ts_dir.display());
@@ -201,7 +201,7 @@ pub fn generate(
     };
     let api_dir = server_dir.join("auto_api");
     let mut group_route_names = Vec::new();
-    let api_db_dir = api_dir.join(db_route.to_case(Case::Snake));
+    let api_db_dir = api_dir.join(db_route.to_snake());
     let mut remove_files = HashSet::new();
     if clean && api_db_dir.exists() {
         for entry in glob::glob(&format!("{}/**/*.*", api_db_dir.display()))? {
@@ -215,12 +215,12 @@ pub fn generate(
     let file_path = server_dir.join("Cargo.toml");
     let mut content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
-    let name = server.to_case(Case::Snake);
+    let name = server.to_snake();
     let reg = Regex::new(&format!(r"(?m)^_{}_\w+\s*=.+\n", name))?;
     content = reg.replace_all(&content, "").into_owned();
     for group_route in group_routes.iter().rev() {
-        let db_route = db_route.to_case(Case::Snake);
-        let group_route = group_route.to_case(Case::Snake);
+        let db_route = db_route.to_snake();
+        let group_route = group_route.to_snake();
         content = content.replace(
             "[dependencies]",
             &format!(
@@ -253,8 +253,8 @@ pub fn generate(
         let (_, group) = groups
             .get(group_name)
             .unwrap_or_else(|| panic!("The {db} DB does not have {group_name} group."));
-        let group_route_mod_name = group_route.to_case(Case::Snake);
-        let group_mod_name = group_name.to_case(Case::Snake);
+        let group_route_mod_name = group_route.to_snake();
+        let group_mod_name = group_name.to_snake();
 
         let api_group_dir = api_db_dir.join(&group_route_mod_name);
 
@@ -413,7 +413,7 @@ fn write_db_file(
     let camel_case = config.camel_case();
     let file_path = path
         .join("auto_api")
-        .join(format!("{}.rs", &db_route.to_case(Case::Snake)));
+        .join(format!("{}.rs", &db_route.to_snake()));
     let mut content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "api/db.rs", escape = "none")]
@@ -429,10 +429,10 @@ fn write_db_file(
     for group_route in group_route_names.iter().rev() {
         let chk = format!(
             "\npub use _{}_{}_{}::api as {};\n",
-            server.to_case(Case::Snake),
-            db_route.to_case(Case::Snake),
-            group_route.to_case(Case::Snake),
-            _to_var_name(&group_route.to_case(Case::Snake))
+            server.to_snake(),
+            db_route.to_snake(),
+            group_route.to_snake(),
+            _to_var_name(&group_route.to_snake())
         );
         if !content.contains(&chk) {
             #[derive(Template)]
@@ -518,7 +518,7 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
                 &format!(
                     "cfg.service(scope(\"/{}\").configure({}::route_config));\n    // Do not modify this line. (ApiRouteConfig)",
                     &group_route,
-                    _to_var_name(&group_route.to_case(Case::Snake)),
+                    _to_var_name(&group_route.to_snake()),
                 ),
             );
 
@@ -566,10 +566,7 @@ fn write_group_file(
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
     for model_route in model_routes.iter() {
-        let chk = format!(
-            "\npub mod {};\n",
-            _to_var_name(&model_route.to_case(Case::Snake))
-        );
+        let chk = format!("\npub mod {};\n", _to_var_name(&model_route.to_snake()));
         if !content.contains(&chk) {
             #[derive(Template)]
             #[template(
@@ -635,7 +632,7 @@ pub mod @{ model_route|snake|to_var_name }@;
             &format!(
                 "cfg.service(scope(\"/{}\").configure({}::_route_config));\n    // Do not modify this line. (ApiRouteConfig)",
                 &model_route,
-                _to_var_name(&model_route.to_case(Case::Snake)),
+                _to_var_name(&model_route.to_snake()),
                 ),
             );
 
@@ -697,13 +694,13 @@ fn write_model_file(
 
     let mod_name = def.mod_name();
     let mod_name = &mod_name;
-    let model_route_mod_name = model_route.to_case(Case::Snake);
-    let pascal_name = &model_name.to_case(Case::Pascal);
+    let model_route_mod_name = model_route.to_snake();
+    let pascal_name = &model_name.to_pascal();
     let graphql_name = &format!(
         "{}{}{}",
-        db_route.to_case(Case::Pascal),
-        group_route.to_case(Case::Pascal),
-        model_route.to_case(Case::Pascal)
+        db_route.to_pascal(),
+        group_route.to_pascal(),
+        model_route.to_pascal()
     );
     let file_path = path.join(format!("{}.rs", &model_route_mod_name));
     remove_files.remove(file_path.as_os_str());
@@ -715,7 +712,7 @@ fn write_model_file(
             group,
             group_route,
             mod_name,
-            pascal_name: &model_name.to_case(Case::Pascal),
+            pascal_name: &model_name.to_pascal(),
             graphql_name,
             id_name: &to_id_name(model_name),
             def,
@@ -794,18 +791,18 @@ fn write_model_file(
         let tpl = template::ModelTsTemplate {
             path: format!(
                 "{}_{}_{}",
-                db_route.to_case(Case::Snake),
-                group_route.to_case(Case::Snake),
-                model_route.to_case(Case::Snake)
+                db_route.to_snake(),
+                group_route.to_snake(),
+                model_route.to_snake()
             ),
             model_route,
             curly_begin: format!("{}{{{}{{{}", db_case, group_case, model_case),
             curly_end: "}}",
             pascal_name: format!(
                 "{}{}{}",
-                &db.to_case(Case::Pascal),
-                &group.to_case(Case::Pascal),
-                &model_name.to_case(Case::Pascal)
+                &db.to_pascal(),
+                &group.to_pascal(),
+                &model_name.to_pascal()
             ),
             graphql_name,
             id_name: &to_id_name(model_name),
@@ -821,7 +818,7 @@ fn write_model_file(
 fn make_gql_fields(def: &ModelDef, camel_case: bool) -> Vec<String> {
     let mut gql_fields = vec!["_id".to_string()];
     let conv_case = if camel_case {
-        |v: &str| v.to_case(Case::Camel)
+        |v: &str| v.to_camel()
     } else {
         |v: &str| v.to_string()
     };
@@ -925,8 +922,8 @@ fn write_relation(
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
         ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
-        let pascal_name = &rel_model.name.to_case(Case::Pascal);
-        let graphql_name = &format!("{}{}", graphql_name, rel_name.to_case(Case::Pascal));
+        let pascal_name = &rel_model.name.to_pascal();
+        let graphql_name = &format!("{}{}", graphql_name, rel_name.to_pascal());
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
         relation_buf.push_str(
             &template::RelationTemplate {
@@ -976,8 +973,8 @@ fn write_relation(
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
         ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
-        let pascal_name = &rel_model.name.to_case(Case::Pascal);
-        let graphql_name = &format!("{}{}", graphql_name, rel_name.to_case(Case::Pascal));
+        let pascal_name = &rel_model.name.to_pascal();
+        let graphql_name = &format!("{}{}", graphql_name, rel_name.to_pascal());
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
         relation_buf.push_str(
             &template::RelationTemplate {
@@ -1026,8 +1023,8 @@ fn write_relation(
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
         ApiFieldDef::push(api_relation.fields(&rel_model, &[])?);
-        let pascal_name = &rel_model.name.to_case(Case::Pascal);
-        let graphql_name = &format!("{}{}", graphql_name, rel_name.to_case(Case::Pascal));
+        let pascal_name = &rel_model.name.to_pascal();
+        let graphql_name = &format!("{}{}", graphql_name, rel_name.to_pascal());
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
         relation_buf.push_str(
             &template::ReferenceTemplate {

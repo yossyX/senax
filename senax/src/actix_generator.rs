@@ -1,6 +1,5 @@
 use anyhow::{Context as _, Result};
 use askama::Template;
-use convert_case::{Case, Casing};
 use rand::{
     RngCore,
     distr::{Alphanumeric, SampleString},
@@ -12,7 +11,7 @@ use std::{
 };
 
 use crate::filters;
-use crate::{API_SCHEMA_PATH, SCHEMA_PATH, common::fs_write};
+use crate::{API_SCHEMA_PATH, SCHEMA_PATH, common::ToCase as _, common::fs_write};
 use crate::{api_generator::template::DbConfigTemplate, schema::CONFIG};
 
 pub fn generate(
@@ -90,7 +89,7 @@ pub fn generate(
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
     for db in db_list.iter().rev() {
-        let db = &db.to_case(Case::Snake);
+        let db = &db.to_snake();
         let reg = Regex::new(&format!(r"(?m)^db_{}\s*=", db))?;
         if !reg.is_match(&content) {
             content = content.replace(
@@ -139,7 +138,7 @@ pub fn generate(
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
     for db in db_list {
-        let reg = Regex::new(&format!(r"(?m)^\s*db_{}::init\(\);", &db.to_case(Case::Snake)))?;
+        let reg = Regex::new(&format!(r"(?m)^\s*db_{}::init\(\);", &db.to_snake()))?;
         if !reg.is_match(&content) {
             crate::schema::parse(db, false, false)?;
             let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
@@ -299,7 +298,7 @@ pub fn write_base_files(
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
     for db in db_list.iter().rev() {
-        let db = &db.to_case(Case::Snake);
+        let db = &db.to_snake();
         let reg = Regex::new(&format!(r"(?m)^_db_{}\s*=", db))?;
         if !reg.is_match(&content) {
             content = content.replace(
@@ -347,7 +346,7 @@ pub fn write_base_files(
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
     for db in db_list {
-        let chk = format!("_db_{}::clear_local_cache().await;", &db.to_case(Case::Snake));
+        let chk = format!("_db_{}::clear_local_cache().await;", &db.to_snake());
         if !content.contains(&chk) {
             crate::schema::parse(db, false, false)?;
             let config = CONFIG.read().unwrap().as_ref().unwrap().clone();

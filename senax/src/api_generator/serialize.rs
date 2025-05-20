@@ -1,5 +1,4 @@
 use anyhow::{Result, ensure};
-use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use inflector::Inflector;
 use serde::Serialize;
@@ -9,6 +8,7 @@ use std::sync::Arc;
 
 use crate::API_SCHEMA_PATH;
 use crate::api_generator::schema::{API_CONFIG, ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef};
+use crate::common::ToCase as _;
 use crate::common::parse_yml_file;
 use crate::schema::{
     CONFIG, DataType, FilterDef, FilterSortDirection, FilterType, GROUPS, ModelDef,
@@ -153,7 +153,7 @@ pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef
 
     let mut api_def = ApiDef {
         cased_db_name: if db_config.camel_case() {
-            db.to_case(Case::Camel)
+            db.to_camel()
         } else {
             db.to_string()
         },
@@ -206,7 +206,7 @@ pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef
                 eprintln!("There is no {} model in the {} group.", k, org_group_name)
             }
         }
-        let group_name = org_group_name.to_case(Case::Snake);
+        let group_name = org_group_name.to_snake();
         let group_name = &group_name;
         let mut api_models: Vec<DocModel> = Vec::new();
 
@@ -270,9 +270,9 @@ fn make_model(
 
     let gql_name = format!(
         "{}{}{}",
-        db.to_case(Case::Pascal),
-        group.to_case(Case::Pascal),
-        mod_name.to_case(Case::Pascal)
+        db.to_pascal(),
+        group.to_pascal(),
+        mod_name.to_pascal()
     );
 
     let mut all_fields = Vec::new();
@@ -393,7 +393,7 @@ fn make_relation(
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
         ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
-        let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
+        let gql_name = format!("{}{}", gql_name, rel_name.to_pascal());
         let index = all_relations.len();
         all_fields.push(Field {
             name: rel_name.to_string(),
@@ -451,7 +451,7 @@ fn make_relation(
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
         ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
-        let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
+        let gql_name = format!("{}{}", gql_name, rel_name.to_pascal());
         let index = all_relations.len();
         all_fields.push(Field {
             name: rel_name.to_string(),
@@ -508,7 +508,7 @@ fn make_relation(
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
         ApiFieldDef::push(api_relation.fields(&rel_model, &[])?);
-        let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
+        let gql_name = format!("{}{}", gql_name, rel_name.to_pascal());
         let index = all_relations.len();
         all_fields.push(Field {
             name: rel_name.to_string(),

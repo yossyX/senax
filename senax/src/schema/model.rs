@@ -1,5 +1,4 @@
 use compact_str::CompactString;
-use convert_case::{Case, Casing};
 use fancy_regex::Regex;
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
@@ -754,7 +753,7 @@ impl ModelDef {
     }
 
     pub fn mod_name(&self) -> String {
-        self.name.to_case(Case::Snake)
+        self.name.to_snake()
     }
 
     pub fn full_name(&self) -> String {
@@ -1026,16 +1025,14 @@ impl ModelDef {
         let flag = Self::replace_deleted(flag);
         match op {
             None => none.to_owned(),
-            Some(SoftDelete::None) => {
-                none.replace("{pascal_name}", &self.name.to_case(Case::Pascal))
-            }
+            Some(SoftDelete::None) => none.replace("{pascal_name}", &self.name.to_pascal()),
             Some(SoftDelete::Time) => {
                 let col = self
                     .merged_fields
                     .get(ConfigDef::deleted_at().as_str())
                     .unwrap();
                 time.replace("{filter_type}", &col.get_filter_type(false))
-                    .replace("{pascal_name}", &self.name.to_case(Case::Pascal))
+                    .replace("{pascal_name}", &self.name.to_pascal())
                     .replace(
                         "{val}",
                         if_then_else!(
@@ -1045,12 +1042,8 @@ impl ModelDef {
                         ),
                     )
             }
-            Some(SoftDelete::Flag) => {
-                flag.replace("{pascal_name}", &self.name.to_case(Case::Pascal))
-            }
-            Some(SoftDelete::UnixTime) => {
-                flag.replace("{pascal_name}", &self.name.to_case(Case::Pascal))
-            }
+            Some(SoftDelete::Flag) => flag.replace("{pascal_name}", &self.name.to_pascal()),
+            Some(SoftDelete::UnixTime) => flag.replace("{pascal_name}", &self.name.to_pascal()),
         }
     }
 
@@ -1062,9 +1055,7 @@ impl ModelDef {
             Some(SoftDelete::None) => self.soft_delete_tpl(none, time, flag),
             Some(SoftDelete::Time) => self.soft_delete_tpl(none, time, flag),
             Some(SoftDelete::Flag) => self.soft_delete_tpl(none, time, flag),
-            Some(SoftDelete::UnixTime) => {
-                time_num.replace("{pascal_name}", &self.name.to_case(Case::Pascal))
-            }
+            Some(SoftDelete::UnixTime) => time_num.replace("{pascal_name}", &self.name.to_pascal()),
         }
     }
 
@@ -1588,7 +1579,7 @@ impl ModelDef {
                     let mut def = def.clone();
                     def.fields.truncate(i);
                     let fields: Vec<_> = def.fields.iter().map(|(n, _)| n.to_string()).collect();
-                    let names: Vec<_> = fields.iter().map(|v| v.to_case(Case::Pascal)).collect();
+                    let names: Vec<_> = fields.iter().map(|v| v.to_pascal()).collect();
                     map.insert(names.join("_"), def);
                 }
             }
@@ -1606,7 +1597,7 @@ impl ModelDef {
                         }
                     })
                     .collect();
-                let names: Vec<_> = fields.iter().map(|v| v.to_case(Case::Pascal)).collect();
+                let names: Vec<_> = fields.iter().map(|v| v.to_pascal()).collect();
                 map.insert(
                     names.join("_"),
                     IndexDef {
@@ -1631,7 +1622,7 @@ impl ModelDef {
                     })
                 {
                     let fields: Vec<_> = order.fields.iter().map(|(n, _)| n.to_string()).collect();
-                    let names: Vec<_> = fields.iter().map(|v| v.to_case(Case::Pascal)).collect();
+                    let names: Vec<_> = fields.iter().map(|v| v.to_pascal()).collect();
                     map.insert(
                         names.join("_"),
                         IndexDef {
@@ -2001,7 +1992,7 @@ impl ModelDef {
             .iter()
             .filter(|v| !v.1.is_type_of_belongs_to_outer_db() && v.1.rel_type.is_some())
         {
-            let group_name = rel.get_group_name().to_case(Case::Snake);
+            let group_name = rel.get_group_name().to_snake();
             let mod_name = rel.get_mod_name();
             if let std::collections::btree_map::Entry::Vacant(e) = mods.entry(group_name.clone()) {
                 let mut list = BTreeSet::new();

@@ -1,7 +1,6 @@
 use anyhow::Result;
 use askama::Template;
 use compact_str::CompactString;
-use convert_case::{Case, Casing as _};
 use indexmap::IndexMap;
 use regex::Regex;
 use std::sync::atomic::AtomicUsize;
@@ -14,6 +13,7 @@ use std::{
 };
 
 use crate::common::AtomicLoad as _;
+use crate::common::ToCase as _;
 use crate::common::{OVERWRITTEN_MSG, fs_write};
 use crate::model_generator::REL_START;
 use crate::schema::IS_MAIN_GROUP;
@@ -22,6 +22,7 @@ use crate::{SEPARATED_BASE_FILES, filters};
 
 mod impl_domain;
 
+#[allow(clippy::too_many_arguments)]
 pub fn write_group_files(
     db_repositories_dir: &Path,
     db: &str,
@@ -33,7 +34,7 @@ pub fn write_group_files(
     exclude_from_domain: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
-    let base_dir = db_repositories_dir.join(group.to_case(Case::Snake));
+    let base_dir = db_repositories_dir.join(group.to_snake());
     let file_path = base_dir.join("Cargo.toml");
     remove_files.remove(file_path.as_os_str());
     let mut content = if force || !file_path.exists() {
@@ -50,8 +51,8 @@ pub fn write_group_files(
     let reg = Regex::new(r"(?m)^_repo_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
     for group in ref_groups {
-        let db = &db.to_case(Case::Snake);
-        let group = &group.to_case(Case::Snake);
+        let db = &db.to_snake();
+        let group = &group.to_snake();
         content = content.replace(
             "[dependencies]",
             &format!(
@@ -130,7 +131,7 @@ pub fn write_group_files(
             .map(|(model_name, (_, def))| (def.mod_name(), model_name))
             .collect();
 
-        let file_path = model_models_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
+        let file_path = model_models_dir.join(format!("{}.rs", group_name.to_snake()));
         remove_files.remove(file_path.as_os_str());
         let concrete_models = defs
             .iter()
@@ -151,7 +152,7 @@ pub fn write_group_files(
             group_name,
             mod_names: &mod_names,
             models: concrete_models,
-            config: &config,
+            config,
             is_main_group,
         };
         fs_write(file_path, tpl.render()?)?;
@@ -174,7 +175,7 @@ pub fn write_group_files(
         let mut output = String::new();
         output.push_str(OVERWRITTEN_MSG);
 
-        let model_group_dir = model_models_dir.join(group_name.to_case(Case::Snake));
+        let model_group_dir = model_models_dir.join(group_name.to_snake());
         let model_group_base_dir = model_group_dir.join("_base");
         for (model_name, (_, def)) in defs {
             let table_name = def.table_name();
@@ -202,16 +203,16 @@ pub fn write_group_files(
                         base_group_name,
                         group_name,
                         mod_name,
-                        pascal_name: &model_name.to_case(Case::Pascal),
+                        pascal_name: &model_name.to_pascal(),
                         id_name: &to_id_name(model_name),
                         def,
-                        config: &config,
+                        config,
                     };
                     fs_write(file_path, tpl.render()?)?;
                 }
 
                 let mut force_indexes = Vec::new();
-                let (_, _, idx_map) = crate::migration_generator::make_table_def(def, &config)?;
+                let (_, _, idx_map) = crate::migration_generator::make_table_def(def, config)?;
                 for (index_name, index_def) in &def.merged_indexes {
                     for (force_index_name, force_index_def) in &index_def.force_index_on {
                         let force_index_def = force_index_def.clone().unwrap_or_default();
@@ -258,19 +259,19 @@ pub fn write_group_files(
                     group_name,
                     mod_name,
                     model_name,
-                    pascal_name: &model_name.to_case(Case::Pascal),
+                    pascal_name: &model_name.to_pascal(),
                     id_name: &to_id_name(model_name),
                     table_name: &table_name,
                     def,
                     force_indexes,
-                    config: &config,
+                    config,
                     version_col: ConfigDef::version(),
                 };
                 let ret = tpl.render()?;
                 if SEPARATED_BASE_FILES {
                     let file_path = model_group_base_dir.join(format!("_{}.rs", mod_name));
                     remove_files.remove(file_path.as_os_str());
-                    fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, ret))?;
+                    fs_write(file_path, format!("{}{}", OVERWRITTEN_MSG, ret))?;
                 } else {
                     output.push_str(&format!("pub mod _{} {{\n{}}}\n", mod_name, ret));
                 }
@@ -279,7 +280,7 @@ pub fn write_group_files(
                     impl_output.push_str(&impl_domain::write_entity(
                         &impl_domain_dir,
                         db,
-                        &config,
+                        config,
                         base_group_name,
                         group_name,
                         mod_name,
@@ -296,7 +297,7 @@ pub fn write_group_files(
             remove_files.remove(file_path.as_os_str());
             fs_write(file_path, output)?;
 
-            let group_dir = impl_domain_dir.join(group_name.to_case(Case::Snake));
+            let group_dir = impl_domain_dir.join(group_name.to_snake());
             let file_path = group_dir.join("_base.rs");
             remove_files.remove(file_path.as_os_str());
             fs_write(file_path, impl_output)?;

@@ -1,5 +1,4 @@
 use anyhow::{Context as _, Result, ensure};
-use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -7,10 +6,11 @@ use senax_mysql_parser::column::Column;
 use senax_mysql_parser::common::{ReferenceOption, SqlType, TableKey};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 use std::env;
+use std::path::Path;
 
 use crate::SCHEMA_PATH;
+use crate::common::ToCase as _;
 use crate::common::{fs_write, simplify_yml, to_plural, to_singular};
 use crate::ddl::table::parse;
 use crate::schema::{
@@ -30,7 +30,7 @@ pub async fn generate(
     schema::parse(db, false, true)?;
     let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
     ensure!(!config.groups.is_empty(), "The groups are empty.");
-    let url_name = format!("{}_DB_URL", db.to_case(Case::UpperSnake));
+    let url_name = format!("{}_DB_URL", db.to_upper_snake());
     let db_url = if let Some(db_url) = db_url {
         db_url.to_owned()
     } else {
@@ -792,7 +792,7 @@ fn to_singular_name(config: &ConfigDef, table_name: &str, non_snake_case: bool) 
     static LOWER: Lazy<Regex> = Lazy::new(|| Regex::new(r"[a-z]").unwrap());
     if !non_snake_case && UPPER.is_match(&singular_name) {
         if LOWER.is_match(&singular_name) {
-            singular_name = singular_name.to_case(Case::Snake);
+            singular_name = singular_name.to_snake();
         } else {
             singular_name = singular_name.to_lowercase();
         }

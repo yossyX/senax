@@ -1,4 +1,3 @@
-use convert_case::{Case, Casing};
 use schemars::{
     JsonSchema,
     schema::{InstanceType, Schema, SchemaObject, SingleOrVec},
@@ -9,13 +8,14 @@ use serde::{
 };
 use std::{borrow::Cow, fmt};
 
+use crate::{common::ToCase as _, schema::to_id_name_skip_pascal};
 use crate::{
     api_generator::schema::ApiFieldDef,
     common::{if_then_else, yaml_value_to_str},
     migration_generator::UTF8_BYTE_LEN,
 };
 
-use super::{_to_var_name, CONFIG, TimeZone, domain_mode, to_id_name};
+use super::{_to_var_name, CONFIG, TimeZone, domain_mode};
 
 pub const DEFAULT_VARCHAR_LENGTH: u32 = 255;
 pub const DEFAULT_PRECISION: u16 = 36;
@@ -380,7 +380,7 @@ impl std::fmt::Display for IdClass {
                 &self.name
             )
         } else {
-            write!(f, "{}", to_id_name(&self.name))
+            write!(f, "{}", to_id_name_skip_pascal(&self.name))
         }
     }
 }
@@ -1415,7 +1415,7 @@ impl FieldDef {
     }
 
     pub fn get_api_validate_const(&self, name: &str) -> String {
-        let name = name.to_case(Case::UpperSnake);
+        let name = name.to_upper_snake();
         let typ = self.get_inner_type(true, false);
         match self.data_type {
             DataType::Char | DataType::Varchar => {
@@ -1699,7 +1699,7 @@ impl FieldDef {
 
     pub fn get_filter_type(&self, is_domain: bool) -> String {
         if is_domain && self.value_object.is_some() {
-            let name = self.value_object.as_ref().unwrap().to_case(Case::Pascal);
+            let name = self.value_object.as_ref().unwrap().to_pascal();
             return format!("value_objects::{}", name);
         }
         if let Some(ref class) = self.id_class {
@@ -2098,7 +2098,7 @@ impl FieldDef {
         let mut typ = typ.to_owned();
         if let Some(ref name) = self.value_object {
             if self.enum_values.is_some() {
-                let name = name.to_case(Case::Pascal);
+                let name = name.to_pascal();
                 typ = format!("value_objects::{}", name);
             }
         } else if let Some(ref class) = self.enum_class {
@@ -2148,7 +2148,7 @@ impl FieldDef {
                 && self.data_type != DataType::Varchar
                 && self.data_type != DataType::Text
             {
-                let name = name.to_case(Case::Pascal);
+                let name = name.to_pascal();
                 typ = format!("Vo{}", name);
             }
         }
@@ -2360,7 +2360,7 @@ impl FieldDef {
 
     pub fn get_outer_type(&self, is_domain: bool) -> String {
         let typ = if is_domain && self.value_object.is_some() {
-            let name = self.value_object.as_ref().unwrap().to_case(Case::Pascal);
+            let name = self.value_object.as_ref().unwrap().to_pascal();
             format!("value_objects::{}", name)
         } else if let Some(ref class) = self.id_class {
             class.to_string()
@@ -2515,7 +2515,7 @@ impl FieldDef {
     }
     pub fn get_outer_owned_type(&self, is_domain: bool, factory: bool) -> String {
         let typ = if is_domain && self.value_object.is_some() {
-            let name = self.value_object.as_ref().unwrap().to_case(Case::Pascal);
+            let name = self.value_object.as_ref().unwrap().to_pascal();
             format!("value_objects::{}", name)
         } else if let Some(ref class) = self.id_class {
             class.to_string()

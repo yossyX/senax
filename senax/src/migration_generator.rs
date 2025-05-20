@@ -1,6 +1,5 @@
 use anyhow::{Context as _, Result};
 use chrono::Utc;
-use convert_case::{Case, Casing};
 use derive_more::Display;
 use indexmap::IndexMap;
 use senax_mysql_parser::column;
@@ -11,6 +10,7 @@ use std::fmt::Write;
 use std::path::Path;
 use std::str::FromStr;
 
+use crate::common::ToCase as _;
 use crate::common::fs_write;
 use crate::ddl::table::{Column, Constraint, Table};
 use crate::schema::{self, AutoGeneration, CONFIG, GROUPS, SoftDelete, SortDirection};
@@ -38,9 +38,9 @@ pub async fn generate(
         }
     }
     let url_name = if use_test_db {
-        format!("{}_TEST_DB_URL", db.to_case(Case::UpperSnake))
+        format!("{}_TEST_DB_URL", db.to_upper_snake())
     } else {
-        format!("{}_DB_URL", db.to_case(Case::UpperSnake))
+        format!("{}_DB_URL", db.to_upper_snake())
     };
     let db_url = env::var(&url_name)
         .with_context(|| format!("{} is required in the .env file.", url_name))?;

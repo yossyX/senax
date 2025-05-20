@@ -1,10 +1,10 @@
 use anyhow::Result;
 use askama::Template;
-use convert_case::{Case, Casing};
 use regex::Regex;
 use std::fmt::Write;
 use std::{fs, path::Path};
 
+use crate::common::ToCase as _;
 use crate::common::fs_write;
 use crate::filters;
 use crate::{DOMAIN_PATH, SCHEMA_PATH};
@@ -71,7 +71,7 @@ pub fn generate(db: &str, exclude_from_domain: bool) -> Result<()> {
         if file_path.exists() {
             let mut content = fs::read_to_string(&file_path)?.replace("\r\n", "\n");
 
-            let db = &db.to_case(Case::Snake);
+            let db = &db.to_snake();
             content = content.replace(
                 "\"mockall\"",
                 &format!("\"mockall\",\"repository_{}/mock\"", db),
@@ -143,18 +143,13 @@ fn fix_env(content: &str, db: &str) -> Result<String> {
         let conf = caps.get(2).unwrap().as_str();
         re.replace(
             content,
-            format!(
-                "RUST_LOG{}={},db_{}=debug",
-                sp,
-                conf,
-                db.to_case(Case::Snake)
-            ),
+            format!("RUST_LOG{}={},db_{}=debug", sp, conf, db.to_snake()),
         )
         .to_string()
     } else {
         content.to_owned()
     };
-    let upper = db.to_case(Case::UpperSnake);
+    let upper = db.to_upper_snake();
     write!(
         &mut content,
         r#"

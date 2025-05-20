@@ -1,8 +1,8 @@
+use crate::common::ToCase as _;
 use crate::{
     common::{AtomicLoad as _, if_then_else},
     schema::*,
 };
-use convert_case::{Case, Casing};
 use std::sync::atomic::AtomicBool;
 
 pub static SHOW_LABEL: AtomicBool = AtomicBool::new(true);
@@ -25,14 +25,14 @@ pub fn to_var_name<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
 }
 
 pub fn to_pascal_name(s: &str) -> ::askama::Result<String> {
-    Ok(_to_var_name(&s.to_case(Case::Pascal)))
+    Ok(_to_var_name(&s.to_pascal()))
 }
 pub fn pascal(s: &str) -> ::askama::Result<String> {
-    Ok(s.to_case(Case::Pascal))
+    Ok(s.to_pascal())
 }
 #[allow(dead_code)]
 pub fn camel(s: &str) -> ::askama::Result<String> {
-    Ok(s.to_case(Case::Camel))
+    Ok(s.to_camel())
 }
 pub fn gql_pascal(s: &str) -> ::askama::Result<String> {
     use inflector::Inflector;
@@ -43,10 +43,10 @@ pub fn gql_camel(s: &str) -> ::askama::Result<String> {
     Ok(s.to_camel_case())
 }
 pub fn snake<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
-    Ok(s.as_ref().to_case(Case::Snake))
+    Ok(s.as_ref().to_snake())
 }
 pub fn upper_snake(s: &str) -> ::askama::Result<String> {
-    Ok(s.to_case(Case::UpperSnake))
+    Ok(s.to_upper_snake())
 }
 pub fn db_esc(s: &str) -> ::askama::Result<String> {
     Ok(_to_db_col(s, true))
@@ -178,8 +178,8 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
         .replace("{col_query}", &col.get_col_query(&col.get_col_name(name)))
         .replace("{var}", &_to_var_name(name))
         .replace("{raw_var}", &_raw_var_name(name))
-        .replace("{var_pascal}", &name.to_case(Case::Pascal))
-        .replace("{upper}", &name.to_case(Case::UpperSnake))
+        .replace("{var_pascal}", &name.to_pascal())
+        .replace("{upper}", &name.to_upper_snake())
         .replace("{raw_inner}", &col.get_inner_type(true, false))
         .replace(
             "{raw_inner_without_option}",
@@ -354,9 +354,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
             format!("repo_{class_mod}::Order_::{asc}(repo_{class_mod}::Col_::{col})"),
             format!("l.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
             format!("l.sort_by(|v1, v2| v1._data.{col}.cmp(&v2._data.{col}){list_order});"),
-            format!(
-                "rel.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"
-            ),
+            format!("rel.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
         )
     } else {
         let tmpl1 = format!("repo_{class_mod}::Order_::{asc}(repo_{class_mod}::Col_::{{var}})");
@@ -402,8 +400,8 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
     f.replace("{rel_name}", &_to_var_name(name))
         .replace("{raw_rel_name}", name)
         .replace("{raw_var_rel_name}", &_to_raw_var_name(name))
-        .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
-        .replace("{rel_name_camel}", &name.to_case(Case::Camel))
+        .replace("{rel_name_pascal}", &name.to_pascal())
+        .replace("{rel_name_camel}", &name.to_camel())
         .replace("{rel_hash}", &rel_hash.to_string())
         .replace("{class}", &rel.get_foreign_class_name())
         .replace("{class_mod}", &rel.get_group_mod_name())
@@ -441,7 +439,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         .replace("{list_sort_for_update}", &list_sort_for_update)
         .replace("{cache_list_sort}", &cache_list_sort)
         .replace("{cache_list_limit}", &cache_list_limit)
-        .replace("{pascal_name}", &model.name.to_case(Case::Pascal))
+        .replace("{pascal_name}", &model.name.to_pascal())
         .replace("{id_name}", &to_id_name(&model.name))
         .replace("{with_trashed}", with_trashed)
         .replace("{soft_delete_filter}", &soft_delete_filter)
@@ -499,8 +497,8 @@ fn _fmt_rel_outer_db(
         .replace("{raw_var_rel_name}", &_to_raw_var_name(name))
         .replace("{raw_db}", rel.db())
         .replace("{db_mod_var}", &_to_var_name(rel.db()))
-        .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
-        .replace("{rel_name_camel}", &name.to_case(Case::Camel))
+        .replace("{rel_name_pascal}", &name.to_pascal())
+        .replace("{rel_name_camel}", &name.to_camel())
         .replace("{rel_hash}", &rel_hash.to_string())
         .replace("{class}", &rel.get_foreign_class_name())
         .replace("{class_mod}", &rel.get_group_mod_name())
@@ -528,7 +526,7 @@ fn _fmt_rel_outer_db(
             ))
             .unwrap(),
         )
-        .replace("{pascal_name}", &model.name.to_case(Case::Pascal))
+        .replace("{pascal_name}", &model.name.to_pascal())
         .replace("{id_name}", &to_id_name(&model.name))
         .replace("{with_trashed}", with_trashed)
         // .replace("{soft_delete_filter}", &soft_delete_filter)
@@ -571,7 +569,7 @@ fn _fmt_index_col(name: &&String, col: &&FieldDef, f: &str, index: usize) -> Str
     f.replace("{name}", name)
         .replace("{col_name}", &col.get_col_name(name))
         .replace("{col_esc}", &_to_db_col(&col.get_col_name(name), true))
-        .replace("{col_pascal}", &name.to_case(Case::Pascal))
+        .replace("{col_pascal}", &name.to_pascal())
         .replace("{var}", &_to_var_name(name))
         .replace("{raw_var}", name)
         .replace("{bind_as_for_filter}", col.get_bind_as_for_filter())
@@ -588,20 +586,20 @@ pub fn fmt_cache_owners(v: &[(String, String, String, u64)], f: &str) -> ::askam
                 "{mod}",
                 &format!(
                     "{}::{}",
-                    &_to_var_name(&group_name.to_case(Case::Snake)),
-                    &_to_var_name(&model_name.to_case(Case::Snake))
+                    &_to_var_name(&group_name.to_snake()),
+                    &_to_var_name(&model_name.to_snake())
                 ),
             )
             .replace(
                 "{base_mod}",
                 &format!(
                     "{}::_base::_{}",
-                    &_to_var_name(&group_name.to_case(Case::Snake)),
-                    &model_name.to_case(Case::Snake)
+                    &_to_var_name(&group_name.to_snake()),
+                    &model_name.to_snake()
                 ),
             )
-            .replace("{model_name}", &model_name.to_case(Case::Pascal))
-            .replace("{rel_name_pascal}", &name.to_case(Case::Pascal))
+            .replace("{model_name}", &model_name.to_pascal())
+            .replace("{rel_name_pascal}", &name.to_pascal())
             .replace("{rel_hash}", &rel_hash.to_string())
         })
         .collect::<Vec<_>>()

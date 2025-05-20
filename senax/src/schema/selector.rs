@@ -1,4 +1,3 @@
-use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -7,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use super::{_to_var_name, FieldDef, ModelDef};
+use crate::common::ToCase as _;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -193,26 +193,26 @@ impl FilterDef {
         selector: &str,
         nested_name: &str,
     ) -> String {
-        let filter_name = filter.to_case(Case::Pascal);
+        let filter_name = filter.to_pascal();
         let ty = match self._type {
             FilterType::Range => format!(
                 "{}Query{}Range{}_{}",
                 pascal_name,
-                selector.to_case(Case::Pascal),
+                selector.to_pascal(),
                 nested_name,
                 filter_name
             ),
             FilterType::Identity => format!(
                 "{}Query{}Identity{}_{}",
                 pascal_name,
-                selector.to_case(Case::Pascal),
+                selector.to_pascal(),
                 nested_name,
                 filter_name
             ),
             FilterType::Exists if !self.relation_fields.is_empty() => format!(
                 "{}Query{}{}_{}Filter",
                 pascal_name,
-                selector.to_case(Case::Pascal),
+                selector.to_pascal(),
                 nested_name,
                 filter_name
             ),
@@ -220,7 +220,7 @@ impl FilterDef {
             FilterType::EqAny if !self.relation_fields.is_empty() => format!(
                 "{}Query{}{}_{}Filter",
                 pascal_name,
-                selector.to_case(Case::Pascal),
+                selector.to_pascal(),
                 nested_name,
                 filter_name
             ),
@@ -546,8 +546,8 @@ impl FilterDef {
             FilterType::Exists => {
                 let relation = self.relation.as_deref().unwrap_or(name);
                 let _relation = _to_var_name(relation);
-                let group = _to_var_name(&model.group_name.to_case(Case::Snake));
-                let mod_name = model.name.to_case(Case::Snake);
+                let group = _to_var_name(&model.group_name.to_snake());
+                let mod_name = model.name.to_snake();
                 if self.relation_fields.is_empty() {
                     format!(
             "
@@ -567,8 +567,8 @@ impl FilterDef {
             FilterType::EqAny => {
                 let relation = self.relation.as_deref().unwrap_or(name);
                 let _relation = _to_var_name(relation);
-                let group = _to_var_name(&model.group_name.to_case(Case::Snake));
-                let mod_name = model.name.to_case(Case::Snake);
+                let group = _to_var_name(&model.group_name.to_snake());
+                let mod_name = model.name.to_snake();
                 if self.relation_fields.is_empty() {
                     format!(
             "
@@ -1114,19 +1114,16 @@ impl FilterMap {
             if filter._type == FilterType::Range {
                 let fields = filter.fields(&self.model);
                 if fields.len() == 1 {
-                    vec.push((
-                        name.to_case(Case::Pascal),
-                        fields[0].1.get_filter_type(true),
-                    ))
+                    vec.push((name.to_pascal(), fields[0].1.get_filter_type(true)))
                 } else {
                     vec.push((
-                        name.to_case(Case::Pascal),
+                        name.to_pascal(),
                         format!(
                             "{}Query{}RangeValues{}_{}",
                             pascal_name,
-                            selector.to_case(Case::Pascal),
+                            selector.to_pascal(),
                             nested_name,
-                            name.to_case(Case::Pascal),
+                            name.to_pascal(),
                         ),
                     ))
                 };
@@ -1141,7 +1138,7 @@ impl FilterMap {
                 let fields = filter.fields(&self.model);
                 if fields.len() > 1 {
                     vec.push((
-                        name.to_case(Case::Pascal),
+                        name.to_pascal(),
                         fields
                             .into_iter()
                             .map(|v| (v.0, v.1.get_filter_type(true)))
@@ -1163,19 +1160,16 @@ impl FilterMap {
             if filter._type == FilterType::Identity {
                 let fields = filter.fields(&self.model);
                 if fields.len() == 1 {
-                    vec.push((
-                        name.to_case(Case::Pascal),
-                        fields[0].1.get_filter_type(true),
-                    ))
+                    vec.push((name.to_pascal(), fields[0].1.get_filter_type(true)))
                 } else {
                     vec.push((
-                        name.to_case(Case::Pascal),
+                        name.to_pascal(),
                         format!(
                             "{}Query{}IdentityValues{}_{}",
                             pascal_name,
-                            selector.to_case(Case::Pascal),
+                            selector.to_pascal(),
                             nested_name,
-                            name.to_case(Case::Pascal),
+                            name.to_pascal(),
                         ),
                     ))
                 };
@@ -1190,7 +1184,7 @@ impl FilterMap {
                 let fields = filter.fields(&self.model);
                 if fields.len() > 1 {
                     vec.push((
-                        name.to_case(Case::Pascal),
+                        name.to_pascal(),
                         fields
                             .into_iter()
                             .map(|v| (v.0, v.1.get_filter_type(true)))
@@ -1239,7 +1233,7 @@ impl SelectorDef {
                     let foreign = relation.get_foreign_model();
                     Self::_nested_filters(
                         vec,
-                        format!("{}_{}", &pascal_name, name.to_case(Case::Pascal)),
+                        format!("{}_{}", &pascal_name, name.to_pascal()),
                         format!("{}_{}", &suffix, name),
                         foreign,
                         &filter.relation_fields,

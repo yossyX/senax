@@ -1,6 +1,5 @@
 use anyhow::{Result, ensure};
 use askama::Template;
-use convert_case::{Case, Casing};
 use regex::Regex;
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsString;
@@ -8,6 +7,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::common::ToCase as _;
 use crate::common::{OVERWRITTEN_MSG, fs_write};
 use crate::schema::{ConfigDef, GroupsDef, ModelDef, set_domain_mode};
 use crate::{SEPARATED_BASE_FILES, filters};
@@ -126,7 +126,7 @@ pub fn write_group_rs(
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
-    let file_path = impl_domain_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
+    let file_path = impl_domain_dir.join(format!("{}.rs", group_name.to_snake()));
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
         #[derive(Template)]
@@ -262,10 +262,10 @@ pub fn write_entity(
     remove_files: &mut HashSet<OsString>,
 ) -> Result<String, anyhow::Error> {
     set_domain_mode(true);
-    let impl_domain_group_dir = impl_domain_dir.join(group_name.to_case(Case::Snake));
+    let impl_domain_group_dir = impl_domain_dir.join(group_name.to_snake());
     let file_path = impl_domain_group_dir.join(format!("{}.rs", mod_name));
     remove_files.remove(file_path.as_os_str());
-    let pascal_name = &model_name.to_case(Case::Pascal);
+    let pascal_name = &model_name.to_pascal();
     if force || !file_path.exists() {
         #[derive(Template)]
         #[template(
@@ -320,7 +320,7 @@ pub fn write_entity(
         let path = impl_domain_group_dir.join("_base");
         let file_path = path.join(format!("_{}.rs", mod_name));
         remove_files.remove(file_path.as_os_str());
-        fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, ret))?;
+        fs_write(file_path, format!("{}{}", OVERWRITTEN_MSG, ret))?;
         Ok("".to_string())
     } else {
         Ok(format!("pub mod _{} {{\n{}}}\n", mod_name, ret))

@@ -1,4 +1,5 @@
 use crate::common::OVERWRITTEN_MSG;
+use crate::common::ToCase as _;
 use crate::schema::{_to_var_name, GroupsDef};
 use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{
@@ -7,7 +8,6 @@ use crate::{
 };
 use anyhow::{Result, ensure};
 use askama::Template;
-use convert_case::{Case, Casing as _};
 use regex::Regex;
 use std::{
     collections::{BTreeMap, HashSet},
@@ -30,7 +30,7 @@ pub fn write_value_objects_rs(
         .as_ref()
         .unwrap()
         .iter()
-        .map(|(name, _def)| (name.to_case(Case::Snake), name.to_case(Case::Pascal)))
+        .map(|(name, _def)| (name.to_snake(), name.to_pascal()))
         .collect();
 
     #[derive(Template)]
@@ -108,18 +108,18 @@ pub use @{ mod_name|to_var_name }@::@{ name }@;
     let mut output = String::new();
     output.push_str(OVERWRITTEN_MSG);
     for (name, def) in VALUE_OBJECTS.read().unwrap().as_ref().unwrap() {
-        let mod_name = name.to_case(Case::Snake);
+        let mod_name = name.to_snake();
         let mod_name = &mod_name;
         let tpl = DomainValueObjectBaseTemplate {
             mod_name,
-            pascal_name: &name.to_case(Case::Pascal),
+            pascal_name: &name.to_pascal(),
             def,
         }
         .render()?;
         if SEPARATED_BASE_FILES {
             let file_path = value_objects_base_dir.join(format!("_{}.rs", mod_name));
             remove_files.remove(file_path.as_os_str());
-            fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, tpl))?;
+            fs_write(file_path, format!("{}{}", OVERWRITTEN_MSG, tpl))?;
         } else {
             output.push_str(&format!("pub mod _{} {{\n{}}}\n", mod_name, tpl));
         }
@@ -128,7 +128,7 @@ pub use @{ mod_name|to_var_name }@::@{ name }@;
         remove_files.remove(file_path.as_os_str());
         let tpl = DomainValueObjectWrapperTemplate {
             mod_name,
-            pascal_name: &name.to_case(Case::Pascal),
+            pascal_name: &name.to_pascal(),
         }
         .render()?;
         if force || !file_path.exists() {
@@ -166,7 +166,7 @@ pub mod @{ db|snake|to_var_name }@;
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let chk = format!("\npub mod {};\n", _to_var_name(&db.to_case(Case::Snake)));
+    let chk = format!("\npub mod {};\n", _to_var_name(&db.to_snake()));
     if !content.contains(&chk) {
         let tpl = ModTemplate { db }.render()?;
         content = content.replace("// Do not modify this line. (Mod)", tpl.trim_start());
@@ -182,7 +182,7 @@ pub fn write_models_db_rs(
     groups: &GroupsDef,
     force: bool,
 ) -> Result<()> {
-    let file_path = domain_models_dir.join(format!("{}.rs", &db.to_case(Case::Snake)));
+    let file_path = domain_models_dir.join(format!("{}.rs", &db.to_snake()));
     let content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "domain/base_domain/src/models/db.rs", escape = "none")]
@@ -234,7 +234,7 @@ pub fn write_abstract(
     remove_files: &mut HashSet<OsString>,
 ) -> Result<String, anyhow::Error> {
     set_domain_mode(true);
-    let pascal_name = &model_name.to_case(Case::Pascal);
+    let pascal_name = &model_name.to_pascal();
     #[derive(Template)]
     #[template(
         path = "domain/base_domain/src/models/entities/abstract.rs",
@@ -259,10 +259,10 @@ pub fn write_abstract(
 
     set_domain_mode(false);
     if SEPARATED_BASE_FILES {
-        let domain_group_dir = domain_db_dir.join(group_name.to_case(Case::Snake));
+        let domain_group_dir = domain_db_dir.join(group_name.to_snake());
         let file_path = domain_group_dir.join(format!("{}.rs", mod_name));
         remove_files.remove(file_path.as_os_str());
-        fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, ret))?;
+        fs_write(file_path, format!("{}{}", OVERWRITTEN_MSG, ret))?;
         Ok(";\n".to_string())
     } else {
         Ok(format!(" {{\n{}}}\n", ret))
@@ -280,7 +280,7 @@ pub fn write_entity(
     remove_files: &mut HashSet<OsString>,
 ) -> Result<String, anyhow::Error> {
     set_domain_mode(true);
-    let pascal_name = &model_name.to_case(Case::Pascal);
+    let pascal_name = &model_name.to_pascal();
     let id_name = &to_id_name(model_name);
     let model_id: u64 = if let Some(model_id) = def.model_id {
         model_id
@@ -317,10 +317,10 @@ pub fn write_entity(
     let ret = tpl.render()?;
     set_domain_mode(false);
     if SEPARATED_BASE_FILES {
-        let domain_group_dir = domain_db_dir.join(group_name.to_case(Case::Snake));
+        let domain_group_dir = domain_db_dir.join(group_name.to_snake());
         let file_path = domain_group_dir.join(format!("{}.rs", mod_name));
         remove_files.remove(file_path.as_os_str());
-        fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, ret))?;
+        fs_write(file_path, format!("{}{}", OVERWRITTEN_MSG, ret))?;
         Ok(";\n".to_string())
     } else {
         Ok(format!(" {{\n{}}}\n", ret))
@@ -333,7 +333,7 @@ pub fn write_group_rs(
     base_domain_output: String,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
-    let file_path = domain_db_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
+    let file_path = domain_db_dir.join(format!("{}.rs", group_name.to_snake()));
     remove_files.remove(file_path.as_os_str());
     #[derive(Template)]
     #[template(path = "domain/base_domain/src/models/group.rs", escape = "none")]

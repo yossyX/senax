@@ -1,7 +1,7 @@
+use crate::common::ToCase as _;
 use crate::{common::fs_write, model_generator::filters, schema::_to_var_name};
 use anyhow::Result;
 use askama::Template;
-use convert_case::{Case, Casing as _};
 use regex::Regex;
 use std::{fs, path::Path};
 
@@ -19,7 +19,7 @@ pub fn write_repositories_rs(domain_src_dir: &Path, db: &str) -> Result<()> {
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let db_snake = db.to_case(Case::Snake);
+    let db_snake = db.to_snake();
     let chk = format!(
         "\npub use repository_{} as {};\n",
         db_snake,

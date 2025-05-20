@@ -1,6 +1,6 @@
+use crate::common::ToCase as _;
 use anyhow::Result;
 use chrono::Local;
-use convert_case::{Case, Casing};
 use serde_json::Value;
 use std::path::PathBuf;
 use std::{collections::HashMap, env};
@@ -55,35 +55,35 @@ struct Title;
 impl Filter for Title {
     fn filter(&self, value: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
         let v = value.as_str().unwrap_or_default();
-        Ok(v.to_case(Case::Title).into())
+        Ok(v.to_title().into())
     }
 }
 struct Pascal;
 impl Filter for Pascal {
     fn filter(&self, value: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
         let v = value.as_str().unwrap_or_default();
-        Ok(v.to_case(Case::Pascal).into())
+        Ok(v.to_pascal().into())
     }
 }
 struct Camel;
 impl Filter for Camel {
     fn filter(&self, value: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
         let v = value.as_str().unwrap_or_default();
-        Ok(v.to_case(Case::Camel).into())
+        Ok(v.to_camel().into())
     }
 }
 struct Snake;
 impl Filter for Snake {
     fn filter(&self, value: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
         let v = value.as_str().unwrap_or_default();
-        Ok(v.to_case(Case::Snake).into())
+        Ok(v.to_snake().into())
     }
 }
 struct UpperSnake;
 impl Filter for UpperSnake {
     fn filter(&self, value: &Value, _args: &HashMap<String, Value>) -> tera::Result<Value> {
         let v = value.as_str().unwrap_or_default();
-        Ok(v.to_case(Case::UpperSnake).into())
+        Ok(v.to_upper_snake().into())
     }
 }
 struct GqlPascal;

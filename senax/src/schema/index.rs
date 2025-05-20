@@ -1,4 +1,3 @@
-use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -99,7 +98,7 @@ pub enum Parser {
 
 impl From<&String> for Parser {
     fn from(p: &String) -> Self {
-        match p.to_case(Case::Lower).as_str() {
+        match p.to_lowercase().as_str() {
             "ngram" => Parser::Ngram,
             "mecab" => Parser::Mecab,
             _ => error_exit!("unsupported parser: {}", p),

@@ -27,7 +27,7 @@ pub fn write_files(
 
         let tpl = CargoTemplate {
             db,
-            config: &config,
+            config,
         };
         fs_write(file_path, tpl.render()?)?;
     }
@@ -45,7 +45,7 @@ pub fn write_files(
 
         let tpl = LibTemplate {
             db,
-            config: &config,
+            config,
             non_snake_case,
         };
         fs_write(file_path, tpl.render()?)?;
@@ -78,7 +78,7 @@ pub fn write_files(
     }
 
     let file_path = src_dir.join("misc.rs");
-    let tpl = MiscTemplate { config: &config };
+    let tpl = MiscTemplate { config };
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
@@ -94,8 +94,8 @@ pub fn write_files(
     let file_path = src_dir.join("connection.rs");
     let tpl = ConnectionTemplate {
         db,
-        config: &config,
-        groups: &groups,
+        config,
+        groups,
         tx_isolation: config.tx_isolation.map(|v| v.as_str()),
         read_tx_isolation: config.read_tx_isolation.map(|v| v.as_str()),
     };
@@ -118,8 +118,8 @@ pub fn write_files(
         }
     }
     let tpl = ModelsTemplate {
-        groups: &groups,
-        config: &config,
+        groups,
+        config,
         table_names,
     };
     fs_write(file_path, tpl.render()?)?;

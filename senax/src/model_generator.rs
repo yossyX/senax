@@ -1,7 +1,6 @@
 use anyhow::{Context, Result, ensure};
 use askama::Template;
 use compact_str::CompactString;
-use convert_case::{Case, Casing};
 use indexmap::IndexMap;
 use regex::Regex;
 use std::collections::{BTreeSet, HashSet};
@@ -10,6 +9,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
+use crate::common::ToCase as _;
 use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
 use crate::schema::{_to_var_name, ConfigDef, GroupsDef, StringOrArray, Timestampable};
 use crate::{BASE_DOMAIN_PATH, DOMAIN_REPOSITORIES_PATH};
@@ -34,11 +34,11 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let exclude_from_domain = config.exclude_from_domain;
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
-    let model_dir = Path::new(DB_PATH).join(db.to_case(Case::Snake));
+    let model_dir = Path::new(DB_PATH).join(db.to_snake());
     let db_repositories_dir = model_dir.join("repositories");
     let domain_src_dir = Path::new(DOMAIN_PATH).join("src");
     let base_domain_src_dir = Path::new(BASE_DOMAIN_PATH).join("src");
-    let domain_repositories_dir = Path::new(DOMAIN_REPOSITORIES_PATH).join(db.to_case(Case::Snake));
+    let domain_repositories_dir = Path::new(DOMAIN_REPOSITORIES_PATH).join(db.to_snake());
     let domain_repositories_src_dir = domain_repositories_dir.join("src");
 
     let file_path = model_dir.join("Cargo.toml");
@@ -63,8 +63,8 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let reg = Regex::new(r#"[ \t]*"_repo_\w+/cache_update_only"[ \t]*,?[ \t]*\n?"#)?;
     content = reg.replace_all(&content, "").into_owned();
     for (group, (_, _)) in groups.iter().rev() {
-        let db = &db.to_case(Case::Snake);
-        let group = &group.to_case(Case::Snake);
+        let db = &db.to_snake();
+        let group = &group.to_snake();
         content = content.replace(
             "[dependencies]",
             &format!(
@@ -85,7 +85,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let reg = Regex::new(r#"[ \t]*"db_\w+/cache_update_only"[ \t]*,?[ \t]*\n?"#)?;
     content = reg.replace_all(&content, "").into_owned();
     for db in config.outer_db().iter().rev() {
-        let db = &db.to_case(Case::Snake);
+        let db = &db.to_snake();
         content = content.replace(
             "[dependencies]",
             &format!("[dependencies]\ndb_{} = {{ path = \"../{}\" }}", db, db),
@@ -139,7 +139,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     )?;
     content = reg.replace_all(&content, "").into_owned();
     for (group, (_, _)) in groups.iter().rev() {
-        let group = &group.to_case(Case::Snake);
+        let group = &group.to_snake();
         content = content.replace(
             "pub mod repositories {",
             &format!(
@@ -152,7 +152,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             "pub fn init() {",
             &format!(
                 "pub fn init() {{\n    let _ = _base::models::{}_HANDLER.set(Box::new(_repo_{}::repositories::Handler));",
-                group.to_case(Case::UpperSnake), group
+                group.to_upper_snake(), group
             ),
         );
     }
@@ -182,7 +182,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     )?;
 
     if !exclude_from_domain {
-        db::impl_domain::write_impl_domain_rs(&model_src_dir, db, &groups, force)?;
+        db::impl_domain::write_impl_domain_rs(&model_src_dir, db, groups, force)?;
     }
     let domain_models_dir = base_domain_src_dir.join("models");
     let impl_domain_dir = base_src_dir.join("impl_domain");
@@ -195,12 +195,12 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         }
     }
     if !exclude_from_domain {
-        domain::base_domain::write_models_db_rs(&domain_models_dir, db, &groups, force)?;
-        domain::repositories::write_lib_rs(&domain_repositories_src_dir, db, &groups, force)?;
-        domain::repositories::write_cargo_toml(&domain_repositories_dir, db, &groups, force)?;
+        domain::base_domain::write_models_db_rs(&domain_models_dir, db, groups, force)?;
+        domain::repositories::write_lib_rs(&domain_repositories_src_dir, db, groups, force)?;
+        domain::repositories::write_cargo_toml(&domain_repositories_dir, db, groups, force)?;
     }
 
-    db::base::write_files(&base_dir, db, &groups, &config, force, non_snake_case)?;
+    db::base::write_files(&base_dir, db, groups, &config, force, non_snake_case)?;
 
     #[derive(Template)]
     #[template(path = "db/src/seeder.rs", escape = "none")]
@@ -234,7 +234,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         }
     }
 
-    let domain_db_dir = domain_models_dir.join(db.to_case(Case::Snake));
+    let domain_db_dir = domain_models_dir.join(db.to_snake());
     if clean && domain_db_dir.exists() {
         for entry in glob::glob(&format!("{}/**/*.rs", domain_db_dir.display()))? {
             match entry {
@@ -262,7 +262,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     }
 
     for (group_name, (_, defs)) in groups {
-        begin_traverse(&group_name);
+        begin_traverse(group_name);
         let repo_include_groups: GroupsDef = groups
             .iter()
             .filter(|(_, (f, _))| f.relaxed_load() >= REL_INCLUDE)
@@ -293,7 +293,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             .map(|(model_name, (_, def))| (def.mod_name(), model_name))
             .collect();
 
-        let model_group_dir = model_models_dir.join(group_name.to_case(Case::Snake));
+        let model_group_dir = model_models_dir.join(group_name.to_snake());
 
         db::repositories::write_group_files(
             &db_repositories_dir,
@@ -337,7 +337,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 }
 
                 let tpl = GroupAbstractTemplate {
-                    pascal_name: &model_name.to_case(Case::Pascal),
+                    pascal_name: &model_name.to_pascal(),
                     def,
                     config: &config,
                 };
@@ -345,7 +345,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 if SEPARATED_BASE_FILES {
                     let file_path = model_group_dir.join(format!("{}.rs", mod_name));
                     remove_files.remove(file_path.as_os_str());
-                    fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, output))?;
+                    fs_write(file_path, format!("{}{}", OVERWRITTEN_MSG, output))?;
                 } else {
                     table_output.push_str(&format!(
                         "pub mod {} {{\n{}}}\n",
@@ -405,7 +405,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 let tpl = GroupTableTemplate {
                     group_name,
                     model_name,
-                    pascal_name: &model_name.to_case(Case::Pascal),
+                    pascal_name: &model_name.to_pascal(),
                     id_name: &to_id_name(model_name),
                     def,
                     config: &config,
@@ -415,7 +415,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 if SEPARATED_BASE_FILES {
                     let file_path = model_group_dir.join(format!("{}.rs", mod_name));
                     remove_files.remove(file_path.as_os_str());
-                    fs_write(file_path, &format!("{}{}", OVERWRITTEN_MSG, output))?;
+                    fs_write(file_path, format!("{}{}", OVERWRITTEN_MSG, output))?;
                 } else {
                     table_output.push_str(&format!(
                         "pub mod {} {{\n{}}}\n",
@@ -447,7 +447,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 }
             }
         }
-        let file_path = model_models_dir.join(format!("{}.rs", group_name.to_case(Case::Snake)));
+        let file_path = model_models_dir.join(format!("{}.rs", group_name.to_snake()));
         remove_files.remove(file_path.as_os_str());
         let concrete_models = defs
             .iter()
@@ -509,7 +509,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
 }
 
 pub fn check_version(db: &str) -> Result<()> {
-    let model_dir = Path::new(DB_PATH).join(db.to_case(Case::Snake));
+    let model_dir = Path::new(DB_PATH).join(db.to_snake());
     let model_src_dir = model_dir.join("src");
     let file_path = model_src_dir.join("models.rs");
     if file_path.exists() {
