@@ -539,10 +539,10 @@ pub struct BelongsToOuterDbDef {
     /// ### 結合先のデータベース
     pub db: String,
     /// ### 結合先のグループ
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub group: Option<String>,
+    pub group: String,
     /// ### 結合先のモデル
-    pub model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     /// ### 結合するローカルのフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub local: Option<StringOrArray>,
@@ -571,10 +571,10 @@ pub struct BelongsToOuterDbJson {
     /// ### 結合先のデータベース
     pub db: String,
     /// ### 結合先のグループ
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub group: Option<String>,
+    pub group: String,
     /// ### 結合先のモデル
-    pub model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
     /// ### 結合するローカルのフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(inner(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$")))]
@@ -623,11 +623,7 @@ impl From<&BelongsToOuterDbDef> for RelDef {
             label: value.label.clone(),
             comment: value.comment.clone(),
             db: Some(value.db.clone()),
-            model: if let Some(group) = &value.group {
-                format!("{}::{}", group, value.model)
-            } else {
-                value.model.clone()
-            },
+            model: format!("{}::{}", value.group, value.model.as_deref().unwrap_or_default()),
             rel_type: Some(RelationsType::BelongsToOuterDb),
             local: value.local.as_ref().map(|v| v.to_vec()),
             with_trashed: value.with_trashed,
@@ -637,12 +633,16 @@ impl From<&BelongsToOuterDbDef> for RelDef {
     }
 }
 impl BelongsToOuterDbDef {
-    pub fn convert(rel: &BelongsToOuterDbDef, group: &str) -> RelDef {
+    pub fn convert(rel: &BelongsToOuterDbDef, group: &str, name: &str) -> RelDef {
         let mut d: RelDef = rel.into();
         if d.model.contains(MODEL_NAME_SPLITTER) {
             let (group_name, stem_name) = d.model.split_once(MODEL_NAME_SPLITTER).unwrap();
             crate::common::check_name(group_name);
-            crate::common::check_name(stem_name);
+            if stem_name.is_empty() {
+                d.model = format!("{}::{}", group_name, name);
+            } else {
+                crate::common::check_name(stem_name);
+            }
         } else {
             crate::common::check_name(&d.model);
             d.model = format!("{}::{}", group, d.model);
@@ -752,9 +752,15 @@ impl RelDef {
             &self.get_mod_name()
         )
     }
-    pub fn get_local_id(&self, name: &str) -> Vec<String> {
+    pub fn get_local_id(&self, name: &str, model: &ModelDef) -> Vec<String> {
         match self.local {
-            None => vec![format!("{}_id", name)],
+            None => {
+                let id = format!("{}_id", name);
+                if model.merged_fields.contains_key(&id) {
+                    return vec![format!("{}_id", name)];
+                }
+                error_exit!("The {} model does not have a local ID for the {} relation.", model.name, name);
+            },
             Some(ref local) => local.to_owned(),
         }
     }
@@ -763,7 +769,7 @@ impl RelDef {
         name: &'a str,
         model: &'a ModelDef,
     ) -> Vec<(&'a String, &'a FieldDef)> {
-        let ids = self.get_local_id(name);
+        let ids = self.get_local_id(name, model);
         let mut result = Vec::new();
         for id in &ids {
             if let Some(v) = model.merged_fields.get_key_value(id) {
@@ -789,7 +795,7 @@ impl RelDef {
                     .get_key_value(id)
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .unwrap_or_else(|| {
-                        error_exit!("{} is not defined in {} model", id, target_model.name)
+                        error_exit!("{} is not defined in the {} model", id, target_model.name)
                     }),
             )
         }

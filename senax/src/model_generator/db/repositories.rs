@@ -29,6 +29,7 @@ pub fn write_group_files(
     group: &str,
     groups: &GroupsDef,
     ref_groups: &[String],
+    ref_db: &BTreeSet<(String, String)>,
     config: &ConfigDef,
     force: bool,
     exclude_from_domain: bool,
@@ -50,6 +51,28 @@ pub fn write_group_files(
     };
     let reg = Regex::new(r"(?m)^_repo_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
+    let mut db_chk = HashSet::new();
+    for (db, group) in ref_db {
+        let db = &db.to_snake();
+        if !db_chk.contains(db) {
+            db_chk.insert(db.to_string());
+            content = content.replace(
+                "[dependencies]",
+                &format!(
+                    "[dependencies]\ndb_{} = {{ package = \"_db_{}\", path = \"../../../{}/base\" }}",
+                    db, db, db
+                ),
+            );
+        }
+        let group = &group.to_snake();
+        content = content.replace(
+            "[dependencies]",
+            &format!(
+                "[dependencies]\n_repo_{}_{} = {{ path = \"../../../{}/repositories/{}\" }}",
+                db, group, db, group
+            ),
+        );
+    }
     for group in ref_groups {
         let db = &db.to_snake();
         let group = &group.to_snake();

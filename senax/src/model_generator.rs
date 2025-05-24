@@ -285,6 +285,19 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             .filter(|(_, (f, _))| f.relaxed_load() == REL_USE)
             .map(|(n, _)| n.to_string())
             .collect();
+        let ref_db: BTreeSet<(String, String)> = groups
+            .iter()
+            .filter(|(_, (f, _))| f.relaxed_load() != 0)
+            .flat_map(|(_, (_, d))| {
+                d.iter().flat_map(|v| {
+                    v.1.1
+                        .belongs_to_outer_db()
+                        .iter()
+                        .map(|v| (v.1.db().to_string(), v.1.get_group_name()))
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect();
 
         let mod_names: BTreeSet<String> = defs.iter().map(|(_, (_, d))| d.mod_name()).collect();
         let entities_mod_names: BTreeSet<(String, &String)> = defs
@@ -301,6 +314,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             group_name,
             &repo_include_groups,
             &ref_groups,
+            &ref_db,
             &config,
             force,
             exclude_from_domain,
@@ -314,6 +328,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 group_name,
                 &repo_include_groups,
                 &ref_groups,
+                &ref_db,
                 force,
                 &mut remove_files,
             )?;

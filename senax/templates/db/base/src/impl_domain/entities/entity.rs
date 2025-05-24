@@ -21,7 +21,7 @@ use std::ops::{Deref as _, DerefMut as _};
 #[allow(unused_imports)]
 use domain::models::@{ db|snake|to_var_name }@ as _model_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
-use domain::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
+use domain::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 
 type __Getter__ = dyn crate::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::_@{ pascal_name }@Getter;
@@ -128,8 +128,8 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     }", "") }@
 @{- parent.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>))
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_var}::{class}>>> {
+        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _{db_snake}_model_::{class_mod_var}::{class}>))
     }", "") }@}
 @%- endif %@
 impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@ for _@{ pascal_name }@ {
@@ -149,8 +149,8 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     }", "") }@
 @{- parent.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{raw_db}_model_::{class_mod_var}::{class}>> {
-        Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{raw_db}_model_::{class_mod_var}::{class}))
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_var}::{class}>> {
+        Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_var}::{class}))
     }", "") }@
 }
 #[allow(clippy::useless_conversion)]
@@ -287,8 +287,8 @@ impl @{ pascal_name }@Cache for _@{ pascal_name }@Cache {
     }", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>))
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_var}::{class}>>> {
+        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _{db_snake}_model_::{class_mod_var}::{class}>))
     }", "") }@
 }
 @%- endif %@
@@ -310,8 +310,8 @@ impl @{ pascal_name }@ for _@{ pascal_name }@ {
     }", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{raw_db}_model_::{class_mod_var}::{class}>> {
-        Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{raw_db}_model_::{class_mod_var}::{class}))
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_var}::{class}>> {
+        Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_var}::{class}))
     }", "") }@
 }
 

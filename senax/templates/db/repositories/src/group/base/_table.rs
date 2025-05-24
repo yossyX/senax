@@ -55,20 +55,23 @@ pub use ::db::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_nam
 use ::domain::value_objects;
 pub use ::domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{join, Joiner_};
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
-use ::domain::models::@{ rel_def.db()|to_var_name }@::@{ rel_def.get_group_mod_var() }@ as join_@{ rel_def.get_group_mod_name() }@;
+use ::db_@{ rel_def.db()|snake }@::models::@{ rel_def.get_group_mod_var() }@ as rel_@{ rel_def.get_group_mod_name() }@;
+@%- if !config.exclude_from_domain %@
+use ::domain::repository::@{ rel_def.db()|snake|to_var_name }@::@{ rel_def.get_group_name()|snake|to_var_name }@::_super::@{ rel_def.get_group_mod_var() }@ as join_@{ rel_def.get_group_mod_name() }@;
+@%- else %@
+use ::db_@{ rel_def.db()|snake }@::repository::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name()|snake }@ as join_@{ rel_def.get_group_mod_name() }@;
+@%- endif %@
+use _repo_@{ rel_def.db()|snake }@_@{ rel_def.get_group_name()|snake }@::repositories::@{ rel_def.get_base_group_mod_var() }@ as repo_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 @%- endif %@
 @%- for mod_name in def.relation_mods() %@
-use db::models::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use ::db::models::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
 use crate::repositories::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as repo_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- if !config.exclude_from_domain %@
 use ::domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- else %@
 use crate::repository::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- endif %@
-@%- endfor %@
-@%- for (name, rel_def) in def.belongs_to_outer_db() %@
-use db_@{ rel_def.db()|snake }@::models::@{ rel_def.get_base_group_mod_var() }@ as rel_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 const USE_CACHE: bool = @{ def.use_cache() }@;
 const USE_ALL_ROWS_CACHE: bool = @{ def.use_all_rows_cache() }@;
@@ -86,7 +89,6 @@ static ALL_ROWS_CACHE: OnceCell<Vec<ArcSwapOption<Vec<()>>>> = OnceCell::new();
 static CACHE_RESET_SYNC: OnceCell<Vec<RwLock<u64>>> = OnceCell::new();
 static CACHE_RESET_SYNC_ALL_ROWS: OnceCell<Vec<Mutex<u64>>> = OnceCell::new();
 static BULK_FETCH_QUEUE: OnceCell<Vec<SegQueue<InnerPrimary>>> = OnceCell::new();
-static COL_KEY_TYPE_ID: u64 = @{ def.get_type_id("COL_KEY_TYPE_ID") }@;
 @%- if def.act_as_job_queue() %@
 pub static QUEUE_NOTIFIER: tokio::sync::Notify = tokio::sync::Notify::const_new();
 @%- endif %@
@@ -1400,21 +1402,21 @@ impl RelCol@{ rel_name|pascal }@ {
 }
 
 trait RelPk@{ rel_name|pascal }@ {
-    fn primary(&self) -> Option<rel_@{ rel.db() }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary>;
+    fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary>;
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
-    fn primary(&self) -> Option<rel_@{ rel.db() }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
+    fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
     }
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
-    fn primary(&self) -> Option<rel_@{ rel.db() }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
+    fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
-    fn primary(&self) -> Option<rel_@{ rel.db() }@_@{ rel.get_group_name() }@_@{ rel.get_mod_name() }@::Primary> {
+    fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
     }
 }
@@ -1875,7 +1877,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, joiner, None).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None).await?;
             if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
@@ -1944,7 +1946,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, joiner, None).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None).await?;
             if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
@@ -2070,7 +2072,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{raw_db}_db, id, joiner, None).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None).await?;
             if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
@@ -2167,7 +2169,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{raw_db}_db, ids.iter(), joiner, None).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{db_snake}_db, ids.iter(), joiner, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2262,7 +2264,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{raw_db}_db, ids.iter(), joiner, None).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{db_snake}_db, ids.iter(), joiner, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {

@@ -338,8 +338,8 @@ pub fn make_table_def(
                 .insert(index_name.clone(), TableKey::Key(index_name, cols));
         }
     }
-    for (_model, name, rel) in def.relation_constraint() {
-        let local_id = rel.get_local_id(name);
+    for (model, name, rel) in def.relation_constraint() {
+        let local_id = rel.get_local_id(name, model);
         let foreign_table = rel.get_foreign_table_name();
         let key_name = format!("FK_{}_{}_{}", &table_name, name, foreign_table);
         let local_cols: Vec<_> = local_id
@@ -410,8 +410,8 @@ pub fn make_table_def(
             );
         }
     }
-    for (_model, name, rel) in def.outer_db_relation_constraint() {
-        let local_id = rel.get_local_id(name);
+    for (model, name, rel) in def.outer_db_relation_constraint() {
+        let local_id = rel.get_local_id(name, model);
         let local_cols: Vec<_> = local_id
             .iter()
             .map(|local_id| {

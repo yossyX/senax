@@ -8,7 +8,7 @@ use crate::value_objects;
 #[allow(unused_imports)]
 use crate::models::@{ db|snake|to_var_name }@ as _model_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
-pub use crate::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
+pub use crate::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 
 pub const MODEL_ID: u64 = @{ model_id }@;
@@ -253,7 +253,7 @@ pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common + dyn_clone::DynClone 
         Some({local_keys}.into())
     }", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_{raw_db}_model_::{class_mod_var}::{class}Primary> {
+    fn _{raw_rel_name}_id(&self) -> Option<_{db_snake}_model_::{class_mod_var}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
 @{- def.relations_belonging_cache(true)|fmt_rel_join("
@@ -261,7 +261,7 @@ pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common + dyn_clone::DynClone 
 @{- def.relations_belonging_uncached(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}>>>;", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_var}::{class}>>>;", "") }@
 }
 
 @{ def.label|label0 -}@
@@ -274,7 +274,7 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent 
         Some({local_keys}.into())
     }", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_{raw_db}_model_::{class_mod_var}::{class}Primary> {
+    fn _{raw_rel_name}_id(&self) -> Option<_{db_snake}_model_::{class_mod_var}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
 @{- def.relations_one_and_belonging(true)|fmt_rel_join("
@@ -282,7 +282,7 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent 
 @{- def.relations_many(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_var}::{class}> + '_>>;", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{raw_db}_model_::{class_mod_var}::{class}>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_var}::{class}>>;", "") }@
 }
 
 @{ def.label|label0 -}@
@@ -315,7 +315,7 @@ pub struct @{ pascal_name }@Entity {
 @{- def.relations_many(false)|fmt_rel_join("
     pub {rel_name}: Vec<Box<_model_::{class_mod_var}::{class}Entity>>,", "") }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-    pub {rel_name}: Option<Box<_{raw_db}_model_::{class_mod_var}::{class}Entity>>,", "") }@
+    pub {rel_name}: Option<Box<_{db_snake}_model_::{class_mod_var}::{class}Entity>>,", "") }@
     #[serde(skip)]
     pub _delete: bool,
 }
@@ -464,8 +464,8 @@ impl @{ pascal_name }@Cache for @{ pascal_name }@Entity {
         Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_var}::{class}>::from(v.clone())))
     }", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{raw_db}_model_::{class_mod_var}::{class}>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _{raw_db}_model_::{class_mod_var}::{class}>::from(v.clone())))
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_var}::{class}>>> {
+        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _{db_snake}_model_::{class_mod_var}::{class}>::from(v.clone())))
     }", "") }@
 }
 
@@ -485,8 +485,8 @@ impl @{ pascal_name }@ for @{ pascal_name }@Entity {
         Ok(Box::new(self.{rel_name}.iter().map(|v| v.as_ref() as &dyn _model_::{class_mod_var}::{class})))
     }", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{raw_db}_model_::{class_mod_var}::{class}>> {
-        Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _{raw_db}_model_::{class_mod_var}::{class}))
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_var}::{class}>> {
+        Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _{db_snake}_model_::{class_mod_var}::{class}))
     }", "") }@
 }
 

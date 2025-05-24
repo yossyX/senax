@@ -1584,8 +1584,8 @@ impl ModelDef {
                 }
             }
         }
-        for (_model, name, rel) in self.relations_belonging(false) {
-            let local_id = rel.get_local_id(name);
+        for (model, name, rel) in self.relations_belonging(false) {
+            let local_id = rel.get_local_id(name, &model);
             if local_id.len() > 1 {
                 let fields: Vec<_> = local_id
                     .iter()
@@ -1963,7 +1963,7 @@ impl ModelDef {
                 let mod_name = rel.get_group_mod_name();
                 let mode = rel.on_delete.unwrap();
                 let local: Vec<_> = rel
-                    .get_local_id(rel_name)
+                    .get_local_id(rel_name, self)
                     .iter()
                     .filter(|v| !pk.contains(v))
                     .cloned()

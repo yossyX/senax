@@ -1,16 +1,9 @@
 #[allow(unused_imports)]
 use db::misc::{Updater as _, ToJsonBlob as _};
-// #[allow(unused_imports)]
-// use anyhow::Context as _;
 use async_trait::async_trait;
 #[allow(unused_imports)]
 use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::{self, *};
 use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
-// use domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
-// #[allow(unused_imports)]
-// use domain::models::{self, ToGeoPoint as _, ToPoint as _};
-// #[allow(unused_imports)]
-// use domain::value_objects;
 #[allow(unused_imports)]
 use senax_common::types::geo_point::ToGeoPoint as _;
 #[allow(unused_imports)]
@@ -20,7 +13,8 @@ use std::ops::{Deref as _, DerefMut as _};
 #[allow(unused_imports)]
 use domain::models::@{ db|snake|to_var_name }@ as _model_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
-use domain::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
+#[allow(unused_imports)]
+use domain::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 
 use crate::repositories::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;

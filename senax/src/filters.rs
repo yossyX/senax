@@ -325,18 +325,21 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
     } else {
         "".to_string()
     };
-    let mut local_keys: Vec<_> = rel
-        .get_local_cols(name, model)
-        .iter()
-        .map(|(k, v)| {
-            let name = _to_var_name(k);
-            if v.not_null {
-                format!("self.{name}()")
-            } else {
-                format!("self.{name}()?")
-            }
-        })
-        .collect();
+    let mut local_keys: Vec<_> = if rel.is_type_of_belongs_to() {
+        rel.get_local_cols(name, model)
+            .iter()
+            .map(|(k, v)| {
+                let name = _to_var_name(k);
+                if v.not_null {
+                    format!("self.{name}()")
+                } else {
+                    format!("self.{name}()?")
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
     let local_keys = if local_keys.len() == 1 {
         local_keys.pop().unwrap()
     } else {
@@ -405,6 +408,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         .replace("{rel_hash}", &rel_hash.to_string())
         .replace("{class}", &rel.get_foreign_class_name())
         .replace("{class_mod}", &rel.get_group_mod_name())
+        .replace("{group_snake}", &rel.get_group_name().to_snake())
         .replace("{group_var}", &rel.get_group_var())
         .replace("{class_mod_var}", &rel.get_group_mod_var())
         .replace("{base_class_mod_var}", &rel.get_base_group_mod_var())
@@ -495,13 +499,14 @@ fn _fmt_rel_outer_db(
     f.replace("{rel_name}", &_to_var_name(name))
         .replace("{raw_rel_name}", name)
         .replace("{raw_var_rel_name}", &_to_raw_var_name(name))
-        .replace("{raw_db}", rel.db())
-        .replace("{db_mod_var}", &_to_var_name(rel.db()))
+        .replace("{db_snake}", &rel.db().to_snake())
+        .replace("{db_mod_var}", &_to_var_name(&rel.db().to_snake()))
         .replace("{rel_name_pascal}", &name.to_pascal())
         .replace("{rel_name_camel}", &name.to_camel())
         .replace("{rel_hash}", &rel_hash.to_string())
         .replace("{class}", &rel.get_foreign_class_name())
         .replace("{class_mod}", &rel.get_group_mod_name())
+        .replace("{group_snake}", &rel.get_group_name().to_snake())
         .replace("{group_var}", &rel.get_group_var())
         .replace("{class_mod_var}", &rel.get_group_mod_var())
         .replace("{base_class_mod_var}", &rel.get_base_group_mod_var())

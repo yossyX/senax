@@ -5,7 +5,7 @@ use base_domain as domain;
 use base_domain::models::@{ db|snake|to_var_name }@ as _model_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
 #[allow(unused_imports)]
-pub use base_domain::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
+pub use base_domain::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 @%- for (enum_name, column_def) in def.num_enums(true) %@
 #[rustfmt::skip]
@@ -53,7 +53,7 @@ pub use base_domain::models::--1--::{class_mod_var} as _{raw_rel_name}_model_;
 pub use crate::repositories::{class_mod_var} as _{raw_rel_name}_repository_;", "")|replace1(db|snake|to_var_name) }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
 pub use base_domain::models::{db_mod_var}::{class_mod_var} as _{raw_rel_name}_model_;
-pub use repository_{raw_db}::repositories::{class_mod_var} as _{raw_rel_name}_repository_;", "") }@
+pub use repository_{db_snake}_{group_snake}::repositories::{class_mod_var} as _{raw_rel_name}_repository_;", "") }@
 
 pub async fn create(
     repo: Box<dyn crate::repositories::Repository_>,

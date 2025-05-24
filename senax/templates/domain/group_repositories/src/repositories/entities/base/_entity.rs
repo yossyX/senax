@@ -15,8 +15,8 @@ use ::base_domain::models::@{ db|snake|to_var_name }@ as _model_;
 #[allow(unused_imports)]
 use crate::repositories as _repository_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
-pub use base_domain::models::@{ rel_def.db()|to_var_name }@ as _@{ rel_def.db() }@_model_;
-pub use repository_@{ rel_def.db() }@::repositories as _@{ rel_def.db() }@_repository_;
+pub use base_domain::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
+pub use repository_@{ rel_def.db()|snake }@_@{ rel_def.get_group_name()|snake }@::repositories as _@{ rel_def.db()|snake }@_repository_;
 @%- endfor %@
 #[cfg(any(feature = "mock", test))]
 use ::base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Entity;
@@ -43,7 +43,7 @@ pub struct Joiner_ {
 @{- def.relations()|fmt_rel_join("
     pub {rel_name}: Option<Box<_repository_::{class_mod_var}::Joiner_>>,", "") }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-    pub {rel_name}: Option<Box<_{raw_db}_repository_::{class_mod_var}::Joiner_>>,", "") }@
+    pub {rel_name}: Option<Box<_{db_snake}_repository_::{class_mod_var}::Joiner_>>,", "") }@
 }
 impl Joiner_ {
     #[allow(clippy::nonminimal_bool)]
@@ -62,7 +62,7 @@ impl Joiner_ {
                     @{- def.relations()|fmt_rel_join("
                     {rel_name}: _repository_::{class_mod_var}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
                     @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-                    {rel_name}: _{raw_db}__repository_model_::{class_mod_var}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
+                    {rel_name}: _{db_snake}_repository_::{class_mod_var}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
                 }))
             } else {
                 Some(lhs)
@@ -81,8 +81,8 @@ macro_rules! _join_@{ fetch_macro_name }@ {
     ({rel_name}) => ($crate::models::--1--::{group_var}::{mod_var}::join!({}));
     ({rel_name}: $p:tt) => ($crate::models::--1--::{group_var}::{mod_var}::join!($p));", "")|replace1(db|snake|to_var_name) }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-    ({rel_name}) => (--1--::_{raw_db}_model_::{group_var}::{mod_var}::join!({}));
-    ({rel_name}: $p:tt) => (--1--::_{raw_db}_model_::{group_var}::{mod_var}::join!($p));", "")|replace1(base_path) }@
+    ({rel_name}) => (--1--::_{db_snake}_model_::{group_var}::{mod_var}::join!({}));
+    ({rel_name}: $p:tt) => (--1--::_{db_snake}_model_::{group_var}::{mod_var}::join!($p));", "")|replace1(base_path) }@
     () => ();
 }
 pub use _join_@{ fetch_macro_name }@ as _join;
@@ -622,7 +622,7 @@ pub enum ColRel_ {
 @{- def.relations_many(false)|fmt_rel_join("
     {rel_name}(Option<Box<_repository_::{base_class_mod_var}::Filter_>>),", "") }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-    {rel_name}(Option<Box<_{raw_db}_repository_::{base_class_mod_var}::Filter_>>),", "") }@
+    {rel_name}(Option<Box<_{db_snake}_repository_::{base_class_mod_var}::Filter_>>),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -1049,7 +1049,7 @@ macro_rules! @{ filter_macro_name }@_rel {
 @%- endfor %@
 @%- for (model_def, col_name, rel_def) in def.relations_belonging_outer_db(false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(None));
-    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(Some(Box::new(@{ model_path }@::_@{ rel_def.db() }@_model_::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
+    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(Some(Box::new(@{ model_path }@::_@{ rel_def.db()|snake }@_model_::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
     () => ();
 }

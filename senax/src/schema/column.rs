@@ -8,7 +8,7 @@ use serde::{
 };
 use std::{borrow::Cow, fmt};
 
-use crate::{common::ToCase as _, schema::to_id_name_skip_pascal};
+use crate::{common::ToCase as _, schema::to_id_name_wo_pascal};
 use crate::{
     api_generator::schema::ApiFieldDef,
     common::{if_then_else, yaml_value_to_str},
@@ -380,7 +380,7 @@ impl std::fmt::Display for IdClass {
                 &self.name
             )
         } else {
-            write!(f, "{}", to_id_name_skip_pascal(&self.name))
+            write!(f, "{}", to_id_name_wo_pascal(&self.name))
         }
     }
 }
@@ -1724,7 +1724,7 @@ impl FieldDef {
             let name = def.get_id_name();
             if domain_mode() {
                 let mod_name = def.get_group_mod_var();
-                return format!("_{}_model_::{}::{}", def.db(), mod_name, name);
+                return format!("_{}_model_::{}::{}", def.db().to_snake(), mod_name, name);
             } else {
                 let mod_name = def.get_group_mod_name();
                 return format!("rel_{}::{}", mod_name, name);
@@ -2381,7 +2381,7 @@ impl FieldDef {
             let name = def.get_id_name();
             if domain_mode() {
                 let mod_name = def.get_group_mod_var();
-                format!("_{}_model_::{}::{}", def.db(), mod_name, name)
+                format!("_{}_model_::{}::{}", def.db().to_snake(), mod_name, name)
             } else {
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)
@@ -2462,7 +2462,7 @@ impl FieldDef {
             let name = def.get_id_name();
             if domain_mode() {
                 let mod_name = def.get_group_mod_var();
-                return format!("&_{}_model_::{}::{}", def.db(), mod_name, name);
+                return format!("&_{}_model_::{}::{}", def.db().to_snake(), mod_name, name);
             } else {
                 let mod_name = def.get_group_mod_name();
                 return format!("&rel_{}::{}", mod_name, name);
@@ -2536,7 +2536,7 @@ impl FieldDef {
             let name = def.get_id_name();
             if domain_mode() {
                 let mod_name = def.get_group_mod_var();
-                format!("_{}_model_::{}::{}", def.db(), mod_name, name)
+                format!("_{}_model_::{}::{}", def.db().to_snake(), mod_name, name)
             } else {
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)

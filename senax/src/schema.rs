@@ -354,7 +354,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
             }
             for (name, rel) in &def.belongs_to_outer_db {
                 def.relations
-                    .insert(name.clone(), BelongsToOuterDbDef::convert(rel, group_name));
+                    .insert(name.clone(), BelongsToOuterDbDef::convert(rel, group_name, name));
             }
             def.merged_relations.clone_from(&def.relations);
             def.merged_indexes =
@@ -447,7 +447,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 let mut model = def.borrow_mut();
                 for (rel_name, rel_def) in model.merged_relations.clone().iter() {
                     if rel_def.is_type_of_belongs_to_outer_db() {
-                        let local_ids = rel_def.get_local_id(rel_name);
+                        let local_ids = rel_def.get_local_id(rel_name, &model);
                         if local_ids.len() == 1 {
                             let col_name = &local_ids[0];
                             if let Some(column_def) = model.merged_fields.get_mut(col_name) {
@@ -460,7 +460,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         }
                     }
                     if rel_def.is_type_of_belongs_to() {
-                        let local_ids = rel_def.get_local_id(rel_name);
+                        let local_ids = rel_def.get_local_id(rel_name, &model);
                         if local_ids.len() == 1 {
                             let col_name = &local_ids[0];
                             let self_local = model.relation_primaries(col_name.to_string());
@@ -506,7 +506,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                             }
                         }
                         let rel_def = model.merged_relations.get(rel_name).unwrap();
-                        let local_ids = rel_def.get_local_id(rel_name);
+                        let local_ids = rel_def.get_local_id(rel_name, &model);
                         if !local_ids.is_empty() {
                             if model.full_name().eq(&rel_def.model) {
                                 ensure!(
@@ -610,6 +610,9 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
             let model = def.borrow();
             for (rel_name, rel_def) in model.merged_relations.iter() {
                 if rel_def.is_type_of_belongs_to() {
+                    if model.merged_fields.contains_key(rel_name) {
+                        error_exit!("The same relation name as the {} field in the {} model cannot be used.", rel_name, model.name);
+                    }
                     if !model.full_name().eq(&rel_def.model) {
                         let mut rel_model =
                             get_model(&rel_def.model, cur_group_name, &groups).borrow_mut();
@@ -629,14 +632,16 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     }
                 }
                 if rel_def.is_type_of_has() {
+                    if model.merged_fields.contains_key(rel_name) {
+                        error_exit!("The same relation name as the {} field in the {} model cannot be used.", rel_name, model.name);
+                    }
                     let foreign_ids = rel_def.get_foreign_id(&model);
                     if model.full_name().eq(&rel_def.model) {
                         ensure!(
                             model.merged_relations.iter().any(|(k, v)| {
-                                let local_ids = v.get_local_id(k);
                                 v.is_type_of_belongs_to()
                                     && v.model == model.full_name()
-                                    && local_ids == foreign_ids
+                                    && v.get_local_id(k, &model) == foreign_ids
                             }),
                             "The {} relation in the {} model requires a corresponding belongs_to.",
                             rel_name,
@@ -646,10 +651,9 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         let rel_model = get_model(&rel_def.model, cur_group_name, &groups).borrow();
                         ensure!(
                             rel_model.merged_relations.iter().any(|(k, v)| {
-                                let local_ids = v.get_local_id(k);
                                 v.is_type_of_belongs_to()
                                     && v.model == model.full_name()
-                                    && local_ids == foreign_ids
+                                    && v.get_local_id(k, &rel_model) == foreign_ids
                             }),
                             "The {} relation in the {} model requires a corresponding belongs_to.",
                             rel_name,
@@ -839,13 +843,9 @@ pub fn domain_mode() -> bool {
 }
 
 pub fn to_id_name(name: &str) -> String {
-    if domain_mode() {
-        format!("{}Id", name.to_pascal())
-    } else {
-        format!("_{}Id", name.to_pascal())
-    }
+    to_id_name_wo_pascal(&name.to_pascal())
 }
-pub fn to_id_name_skip_pascal(name: &str) -> String {
+pub fn to_id_name_wo_pascal(name: &str) -> String {
     if domain_mode() {
         format!("{}Id", name)
     } else {

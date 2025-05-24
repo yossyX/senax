@@ -24,6 +24,7 @@ pub fn write_group_files(
     group_name: &str,
     groups: &GroupsDef,
     ref_groups: &[String],
+    ref_db: &BTreeSet<(String, String)>,
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
@@ -43,6 +44,17 @@ pub fn write_group_files(
     };
     let reg = Regex::new(r"(?m)^repository_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
+    for (db, group) in ref_db {
+        let db = &db.to_snake();
+        let group = &group.to_snake();
+        content = content.replace(
+            "[dependencies]",
+            &format!(
+                "[dependencies]\nrepository_{}_{} = {{ path = \"../../../{}/groups/{}\" }}",
+                db, group, db, group
+            ),
+        );
+    }
     for group in ref_groups {
         let db = &db.to_snake();
         let group = &group.to_snake();
