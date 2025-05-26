@@ -24,7 +24,6 @@ async-stream.workspace = true
 async-trait.workspace = true
 bytes = "1.4"
 chrono.workspace = true
-ciborium.workspace = true
 crossbeam = "0.8"
 derive_more.workspace = true
 derive-new.workspace = true

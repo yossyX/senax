@@ -27,7 +27,8 @@ regex = "1"
 rust_decimal = "1.19"
 rust_decimal_macros = "1.19"
 schemars = { version = "0.8.22", features = ["chrono", "uuid1", "rust_decimal", "indexmap2", "preserve_order"] }
-senax-common = "=0.3.2"
+senax-common = "=0.4.0"
+senax-encoder = { version = "0.1.15", features = ["indexmap", "chrono", "rust_decimal", "uuid", "ulid", "serde_json", "fxhash", "pack"] }
 senax-macros = "=0.2.1"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }

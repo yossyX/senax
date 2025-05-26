@@ -192,6 +192,7 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
         .replace("{may_null}", col.get_may_null())
         .replace("{null_question}", col.get_null_question())
         .replace("{serde}", &col.get_serde_default())
+        .replace("{encode_attr}", col.get_encoder_default())
         .replace("{default}", &col.get_default())
         .replace("{column_query}", &col.get_column_query(name))
         .replace("{validate}", &col.get_validate(name))

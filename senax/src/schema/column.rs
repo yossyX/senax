@@ -8,12 +8,12 @@ use serde::{
 };
 use std::{borrow::Cow, fmt};
 
-use crate::{common::ToCase as _, schema::to_id_name_wo_pascal};
 use crate::{
     api_generator::schema::ApiFieldDef,
     common::{if_then_else, yaml_value_to_str},
     migration_generator::UTF8_BYTE_LEN,
 };
+use crate::{common::ToCase as _, schema::to_id_name_wo_pascal};
 
 use super::{_to_var_name, CONFIG, TimeZone, domain_mode};
 
@@ -1112,6 +1112,20 @@ impl FieldDef {
             result
         } else {
             "    #[serde(skip_serializing_if = \"Option::is_none\")]\n".to_owned()
+        }
+    }
+
+    pub fn get_encoder_default(&self) -> &'static str {
+        let result = match self.data_type {
+            _ if self.enum_class.is_some() => "",
+            _ => "    #[senax(skip_default)]\n",
+        };
+        if self.primary {
+            ""
+        } else if self.not_null {
+            result
+        } else {
+            "    #[senax(skip_default)]\n"
         }
     }
 

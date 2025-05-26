@@ -447,17 +447,15 @@ async fn get_merged_models(AxumPath(path): AxumPath<(String, String)>) -> impl I
         let groups = group_lock.as_ref().unwrap();
         let models: Vec<_> = groups
             .get(&path.1)
-            .and_then(|(_, models)| {
-                Some(
-                    models
-                        .iter()
-                        .map(|(k, (_, v))| {
-                            let mut model: ModelJson = v.as_ref().clone().into();
-                            model.name = k.to_string();
-                            model
-                        })
-                        .collect(),
-                )
+            .map(|(_, models)| {
+                models
+                    .iter()
+                    .map(|(k, (_, v))| {
+                        let mut model: ModelJson = v.as_ref().clone().into();
+                        model.name = k.to_string();
+                        model
+                    })
+                    .collect()
             })
             .unwrap_or_default();
         Ok(models)
@@ -811,17 +809,15 @@ async fn get_api_server_models(
         let groups = group_lock.as_ref().unwrap();
         let models: Vec<_> = groups
             .get(group)
-            .and_then(|(_, models)| {
-                Some(
-                    models
-                        .iter()
-                        .map(|(k, (_, v))| {
-                            let mut model: ModelJson = v.as_ref().clone().into();
-                            model.name = k.to_string();
-                            model
-                        })
-                        .collect(),
-                )
+            .map(|(_, models)| {
+                models
+                    .iter()
+                    .map(|(k, (_, v))| {
+                        let mut model: ModelJson = v.as_ref().clone().into();
+                        model.name = k.to_string();
+                        model
+                    })
+                    .collect()
             })
             .unwrap_or_default();
         Ok(models)

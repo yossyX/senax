@@ -623,7 +623,11 @@ impl From<&BelongsToOuterDbDef> for RelDef {
             label: value.label.clone(),
             comment: value.comment.clone(),
             db: Some(value.db.clone()),
-            model: format!("{}::{}", value.group, value.model.as_deref().unwrap_or_default()),
+            model: format!(
+                "{}::{}",
+                value.group,
+                value.model.as_deref().unwrap_or_default()
+            ),
             rel_type: Some(RelationsType::BelongsToOuterDb),
             local: value.local.as_ref().map(|v| v.to_vec()),
             with_trashed: value.with_trashed,
@@ -759,8 +763,12 @@ impl RelDef {
                 if model.merged_fields.contains_key(&id) {
                     return vec![format!("{}_id", name)];
                 }
-                error_exit!("The {} model does not have a local ID for the {} relation.", model.name, name);
-            },
+                error_exit!(
+                    "The {} model does not have a local ID for the {} relation.",
+                    model.name,
+                    name
+                );
+            }
             Some(ref local) => local.to_owned(),
         }
     }

@@ -601,11 +601,11 @@ fn traverse_rel_flags(target_group: &str, target_model: &str) -> usize {
                     for r in &def.merged_relations {
                         let g = r.1.get_group_name();
                         let m = r.1.get_foreign_model_name();
-                        if !r.1.is_type_of_belongs_to_outer_db() {
-                            if traverse_rel_flags(&g, &m) == REL_INCLUDE {
-                                group_flag.relaxed_store(REL_INCLUDE);
-                                ret = REL_INCLUDE;
-                            }
+                        if !r.1.is_type_of_belongs_to_outer_db()
+                            && traverse_rel_flags(&g, &m) == REL_INCLUDE
+                        {
+                            group_flag.relaxed_store(REL_INCLUDE);
+                            ret = REL_INCLUDE;
                         }
                     }
                 }

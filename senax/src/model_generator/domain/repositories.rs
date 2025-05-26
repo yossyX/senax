@@ -18,6 +18,8 @@ use std::{
     sync::Arc,
 };
 
+#[allow(clippy::regex_creation_in_loops)]
+#[allow(clippy::too_many_arguments)]
 pub fn write_group_files(
     domain_repositories_dir: &Path,
     db: &str,

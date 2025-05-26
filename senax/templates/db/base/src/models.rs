@@ -6,7 +6,7 @@ use ::fxhash::FxHashMap;
 use ::log::error;
 use ::once_cell::sync::OnceCell;
 use ::senax_common::ShardId;
-use ::serde::{Deserialize, Serialize};
+use ::senax_encoder::{Encode, Decode};
 use ::std::sync::Arc;
 use ::tokio::sync::RwLock;
 
@@ -42,11 +42,11 @@ pub enum TableName {
 
 pub(crate) struct CacheActor;
 
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Encode, Decode, Clone, Debug)]
 pub struct CacheMsg(pub Vec<CacheOp>, pub FxHashMap<ShardId, u64>);
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Encode, Decode, Clone, Debug)]
 pub enum CacheOp {
 @%- for (name, (_, defs)) in groups %@
     @{ name|to_pascal_name }@(@{ name|snake|to_var_name }@::CacheOp),

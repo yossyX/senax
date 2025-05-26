@@ -24,7 +24,6 @@ async-stream.workspace = true
 async-trait.workspace = true
 bytes = "1.4"
 chrono.workspace = true
-ciborium.workspace = true
 crossbeam = "0.8"
 derive_more.workspace = true
 derive-new.workspace = true
@@ -41,6 +40,7 @@ regex.workspace = true
 rust_decimal.workspace = true
 schemars = { workspace = true, optional = true }
 senax-common.workspace = true
+senax-encoder.workspace = true
 senax-macros.workspace = true
 serde.workspace = true
 serde_bytes = "0.11.12"

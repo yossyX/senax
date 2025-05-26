@@ -1159,7 +1159,7 @@ impl ModelDef {
             .iter()
             .filter(|(k, _v)| !except.contains(*k))
             .map(|(name, _)| name.as_str())
-            .last()
+            .next_back()
             .unwrap_or_else(|| {
                 error_exit!(
                     "{} model must have a primary key other than the key for the relation.",
@@ -1171,7 +1171,7 @@ impl ModelDef {
         self.primaries()
             .iter()
             .filter(|(k, _v)| !except.contains(*k))
-            .last()
+            .next_back()
             .map(|(_, def)| def.auto.is_some())
             .unwrap_or_else(|| {
                 error_exit!(
@@ -1585,7 +1585,7 @@ impl ModelDef {
             }
         }
         for (model, name, rel) in self.relations_belonging(false) {
-            let local_id = rel.get_local_id(name, &model);
+            let local_id = rel.get_local_id(name, model);
             if local_id.len() > 1 {
                 let fields: Vec<_> = local_id
                     .iter()

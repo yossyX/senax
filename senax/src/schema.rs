@@ -353,8 +353,10 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     .insert(name.clone(), BelongsToDef::convert(rel, group_name, name));
             }
             for (name, rel) in &def.belongs_to_outer_db {
-                def.relations
-                    .insert(name.clone(), BelongsToOuterDbDef::convert(rel, group_name, name));
+                def.relations.insert(
+                    name.clone(),
+                    BelongsToOuterDbDef::convert(rel, group_name, name),
+                );
             }
             def.merged_relations.clone_from(&def.relations);
             def.merged_indexes =
@@ -611,7 +613,11 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
             for (rel_name, rel_def) in model.merged_relations.iter() {
                 if rel_def.is_type_of_belongs_to() {
                     if model.merged_fields.contains_key(rel_name) {
-                        error_exit!("The same relation name as the {} field in the {} model cannot be used.", rel_name, model.name);
+                        error_exit!(
+                            "The same relation name as the {} field in the {} model cannot be used.",
+                            rel_name,
+                            model.name
+                        );
                     }
                     if !model.full_name().eq(&rel_def.model) {
                         let mut rel_model =
@@ -623,8 +629,10 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                                 .iter()
                                 .any(|(__, v)| v.model == m_name)
                         {
-                            let mut r = RelDef::default();
-                            r.model = m_name;
+                            let r = RelDef {
+                                model: m_name,
+                                ..Default::default()
+                            };
                             rel_model
                                 .merged_relations
                                 .insert(format!("_{}_{}_", cur_group_name, cur_model_name), r);
@@ -633,7 +641,11 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 }
                 if rel_def.is_type_of_has() {
                     if model.merged_fields.contains_key(rel_name) {
-                        error_exit!("The same relation name as the {} field in the {} model cannot be used.", rel_name, model.name);
+                        error_exit!(
+                            "The same relation name as the {} field in the {} model cannot be used.",
+                            rel_name,
+                            model.name
+                        );
                     }
                     let foreign_ids = rel_def.get_foreign_id(&model);
                     if model.full_name().eq(&rel_def.model) {

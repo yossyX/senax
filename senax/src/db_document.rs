@@ -318,6 +318,7 @@ impl Filter for UpperSnake {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn gen_er(
     group_name: &str,
     models: &Option<&(AtomicUsize, IndexMap<String, (AtomicUsize, Arc<ModelDef>)>)>,

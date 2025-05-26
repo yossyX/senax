@@ -25,10 +25,7 @@ pub fn write_files(
             pub config: &'a ConfigDef,
         }
 
-        let tpl = CargoTemplate {
-            db,
-            config,
-        };
+        let tpl = CargoTemplate { db, config };
         fs_write(file_path, tpl.render()?)?;
     }
 

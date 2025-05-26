@@ -8,7 +8,7 @@ use log::kv::ToValue;
 use num_traits::{CheckedAdd, CheckedSub, Float, SaturatingAdd, SaturatingSub};
 use rust_decimal::Decimal;
 use serde::{Serialize, de::DeserializeOwned};
-use serde_repr::{Deserialize_repr, Serialize_repr};
+use senax_encoder::{Encode, Decode};
 use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::ops::{BitAnd, BitOr};
@@ -17,20 +17,26 @@ use std::{fmt, fmt::Display, marker::PhantomData};
 
 use crate::misc::{JsonBlob, ToJsonBlob as _, Updater};
 
-#[derive(
-    Serialize_repr, Deserialize_repr, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash,
-)]
-#[repr(u8)]
+#[derive(Encode, Decode, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash)]
 pub enum Op {
     #[default]
+    #[senax(id = 1)]
     None,
+    #[senax(id = 2)]
     Skip,
+    #[senax(id = 3)]
     Set,
+    #[senax(id = 4)]
     Add,
+    #[senax(id = 5)]
     Sub,
+    #[senax(id = 6)]
     Max,
+    #[senax(id = 7)]
     Min,
+    #[senax(id = 8)]
     BitAnd,
+    #[senax(id = 9)]
     BitOr,
 }
 
@@ -164,10 +170,6 @@ impl Op {
             Op::BitAnd => 1,
             Op::BitOr => 1,
         }
-    }
-
-    pub fn is_none(&self) -> bool {
-        *self == Op::None
     }
 }
 

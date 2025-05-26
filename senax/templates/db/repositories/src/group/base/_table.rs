@@ -281,7 +281,6 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 CacheOp::Insert { replace, shard_id, data
                     @{- def.relations_one_cache(false)|fmt_rel_join(", _{rel_name}", "") -}@ 
                     @{- def.relations_many_cache(false)|fmt_rel_join(", _{rel_name}", "") }@ } => {
-                    let replace = replace.unwrap_or_default();
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
                     let mut cache = CacheWrapper::from_data(data.clone(), shard_id, time);
@@ -1079,7 +1078,8 @@ async fn handle_delayed_msg_insert_from_disk(shard_id: ShardId) -> Result<()> {
     let max_size = *BULK_INSERT_MAX_SIZE.get().unwrap();
     while let Ok(x) = db.pop_min() {
         if let Some(x) = x {
-            let list: Vec<ForInsert> = ciborium::from_reader(decode_all::<&[u8]>(x.1.borrow())?.as_slice())?;
+            let mut bytes = bytes::Bytes::from(decode_all::<&[u8]>(x.1.borrow())?);
+            let list: Vec<ForInsert> = senax_encoder::decode(&mut bytes)?;
             for data in list {
                 total_size += data._data._size();
                 vec.push(data);
@@ -1110,9 +1110,8 @@ async fn handle_delayed_msg_insert_from_disk(shard_id: ShardId) -> Result<()> {
 fn push_delayed_db(list: &Vec<ForInsert>) -> Result<()> {
     if let Some(db) = INSERT_DELAYED_DB.get() {
         let no = DELAYED_DB_NO.fetch_add(1, Ordering::SeqCst);
-        let mut buf = Vec::new();
-        ciborium::into_writer(list, &mut buf)?;
-        let mut buf = encode_all(buf.as_slice(), 3)?;
+        let bytes = senax_encoder::encode(&list)?;
+        let mut buf = encode_all(bytes.as_ref(), 3)?;
         db.insert(no.to_be_bytes(), buf)?;
         tokio::spawn(async move {
             let _guard = db::get_shutdown_guard();
@@ -4941,7 +4940,7 @@ impl _@{ pascal_name }@_ {
     pub async fn insert_dummy_cache(conn: &DbConn, obj: _@{ pascal_name }@Updater) -> Result<()> {
         let _lock = db::models::CACHE_UPDATE_LOCK.write().await;
         let cache_msg = CacheOp::Insert {
-            replace: None,
+            replace: false,
             shard_id: conn.shard_id(),
             data: obj._data,
 @{- def.relations_one_cache(false)|fmt_rel_join("\n            _{rel_name}: None,", "") }@
@@ -5020,7 +5019,7 @@ impl _@{ pascal_name }@_ {
         @%- else %@
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             let cache_msg = CacheOp::Insert {
-                replace: None,
+                replace: false,
                 shard_id: conn.shard_id(),
                 data: obj._data.clone(),
 @{- def.relations_one_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
@@ -6164,7 +6163,7 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, re
     @{- def.relations_many(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
     @%- else if !config.force_disable_cache && !def.use_clear_whole_cache() %@
     let cache_msg = CacheOp::Insert {
-        replace: if replace { Some(true) } else { None },
+        replace,
         shard_id: conn.shard_id(),
         data: obj._data,
 @{- def.relations_one_cache(false)|fmt_rel_join("\n            _{rel_name}: save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?,", "") }@
@@ -6311,7 +6310,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         let mut obj2: _@{ pascal_name }@ = obj._data.clone().into();
         @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
         let cache_msg = Some(CacheOp::Insert {
-            replace: None,
+            replace: false,
             shard_id: conn.shard_id(),
             data: obj._data,
 @{- def.relations_one_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
