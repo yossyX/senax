@@ -453,7 +453,7 @@ fn u40_less_than(lhs: u64, rhs: u64) -> bool {
 
 async fn write(file: &File, mut pos: u64, mut buf: BytesMut) -> Result<()> {
     loop {
-        let (res, _buf) = file.write_at(buf, pos).await;
+        let (res, _buf) = file.write_at(buf, pos).submit().await;
         buf = _buf;
         let len = res?;
         if len == 0 {

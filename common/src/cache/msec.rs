@@ -1,3 +1,4 @@
+use senax_encoder::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
@@ -5,7 +6,7 @@ use super::CycleCounter;
 
 pub const MSEC_SHR: u8 = 20;
 
-#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default)]
+#[derive(Deserialize, Serialize, Encode, Decode, Clone, Copy, Debug, Default)]
 pub struct MSec(u64);
 
 impl MSec {

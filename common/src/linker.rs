@@ -1,5 +1,5 @@
 use anyhow::{Context as _, Result, bail};
-use serde::{Serialize, de::DeserializeOwned};
+use bytes::Bytes;
 use std::marker::PhantomData;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
@@ -13,41 +13,38 @@ mod unix_client;
 
 #[derive(Debug, Clone)]
 pub struct Sender<T> {
-    tx: UnboundedSender<Vec<u8>>,
+    tx: UnboundedSender<Bytes>,
     _phantom: PhantomData<T>,
 }
 impl<T> Sender<T>
 where
-    T: Serialize,
+    T: senax_encoder::Encoder,
 {
     pub fn send(&self, data: &T) -> Result<()> {
-        let mut buf = Vec::new();
-        ciborium::into_writer(data, &mut buf)?;
-        self.tx.send(buf)?;
+        let bytes = senax_encoder::encode(data)?;
+        self.tx.send(bytes)?;
         Ok(())
     }
 }
 #[derive(Debug)]
 pub struct Receiver<T> {
-    rx: UnboundedReceiver<Vec<u8>>,
+    rx: UnboundedReceiver<Bytes>,
     _phantom: PhantomData<T>,
 }
 impl<T> Receiver<T>
 where
-    T: DeserializeOwned,
+    T: senax_encoder::Decoder,
 {
     /// Receive data from the Linker.
     /// If the connection with the Linker is disconnected, return None.
     /// If there is an abnormal disconnection between Linkers and it reconnects, return Some(None).
     pub async fn recv(&mut self) -> Option<Option<Result<T>>> {
         match self.rx.recv().await {
-            Some(v) => {
+            Some(mut v) => {
                 if v.is_empty() {
                     Some(None)
                 } else {
-                    Some(Some(
-                        ciborium::from_reader::<T, _>(v.as_slice()).context("parse error"),
-                    ))
+                    Some(Some(senax_encoder::decode(&mut v).context("parse error")))
                 }
             }
             None => None,
@@ -63,7 +60,7 @@ pub fn link<T>(
     send_only: bool,
 ) -> Result<(Sender<T>, Receiver<T>)>
 where
-    T: Serialize + DeserializeOwned,
+    T: senax_encoder::Encoder + senax_encoder::Decoder,
 {
     let (to_linker, from_linker) = LinkerClient::start(port, stream_id, pw, exit_tx, send_only)?;
     Ok((
@@ -88,7 +85,7 @@ impl LinkerClient {
         pw: &str,
         exit_tx: mpsc::Sender<i32>,
         send_only: bool,
-    ) -> Result<(UnboundedSender<Vec<u8>>, UnboundedReceiver<Vec<u8>>)> {
+    ) -> Result<(UnboundedSender<Bytes>, UnboundedReceiver<Bytes>)> {
         let (to_linker, from_local) = mpsc::unbounded_channel();
         let (to_local, from_linker) = mpsc::unbounded_channel();
         if port.starts_with('/') {
@@ -140,7 +137,7 @@ impl LinkerClient {
         _pw: &str,
         _exit_tx: mpsc::Sender<i32>,
         _send_only: bool,
-    ) -> Result<(UnboundedSender<Vec<u8>>, UnboundedReceiver<Vec<u8>>)> {
+    ) -> Result<(UnboundedSender<Bytes>, UnboundedReceiver<Bytes>)> {
         bail!("linker is not supported");
     }
 }

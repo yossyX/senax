@@ -46,7 +46,7 @@ impl CycleCounter for u64 {
 /// assuming MiMalloc
 pub fn calc_mem_size(size: usize) -> usize {
     if size >= 512 * 1024 {
-        return (size + 4095) / 4096 * 4096;
+        return size.div_ceil(4096) * 4096;
     }
     let uintptr_t = std::mem::size_of::<usize>();
     let mut wsize = size.div_ceil(uintptr_t);
@@ -59,7 +59,7 @@ pub fn calc_mem_size(size: usize) -> usize {
     wsize -= 1;
     let b = uintptr_t * 8 - 1 - wsize.leading_zeros() as usize;
     let bin = ((b << 2) + ((wsize >> (b - 2)) & 0x03)) - 3;
-    let rank = (bin + 3) / 4;
+    let rank = bin.div_ceil(4);
     (16 << rank) - (rank * 4 - bin) * (2 << rank)
 }
 
