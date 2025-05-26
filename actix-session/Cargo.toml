@@ -1,6 +1,6 @@
 [package]
 name = "senax-actix-session"
-version = "0.4.3"
+version = "0.5.0"
 edition = "2024"
 authors = ["yossyX"]
 description = "Senax actix session library"
@@ -16,7 +16,7 @@ ciborium = "0.2.1"
 derive_more = { version = "2", features = ["from"] }
 log = "0.4"
 serde = "1"
-senax-common = { path = "../common", version = "0.3.2" }
+senax-common = { path = "../common", version = "0.4.0" }
 sha2 = "0.10.6"
 time = "0.3.19"
 tokio = { version = "1.28", features = ["time"] }
