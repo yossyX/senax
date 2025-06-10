@@ -366,11 +366,12 @@ pub fn parse_default_value(value: &serde_yaml::Value, sql_type: &SqlType) -> Res
     let value: String = yaml_value_to_str(value)?;
     match sql_type {
         SqlType::Bool => {
-            let t: bool = value.parse()?;
-            if t {
+            if value.eq_ignore_ascii_case("true") || value.eq("1") {
                 Ok(Literal::Integer(1))
-            } else {
+            } else if value.eq_ignore_ascii_case("false") || value.eq("0") {
                 Ok(Literal::Integer(0))
+            } else {
+                anyhow::bail!("{:?} is not bool", value);
             }
         }
         SqlType::Char(_) => Ok(Literal::String(value)),
@@ -381,8 +382,26 @@ pub fn parse_default_value(value: &serde_yaml::Value, sql_type: &SqlType) -> Res
         SqlType::UnsignedSmallint => Ok(Literal::UnsignedInteger(value.parse()?)),
         SqlType::Bigint => Ok(Literal::Integer(value.parse()?)),
         SqlType::UnsignedBigint => Ok(Literal::UnsignedInteger(value.parse()?)),
-        SqlType::Tinyint => Ok(Literal::Integer(value.parse()?)),
-        SqlType::UnsignedTinyint => Ok(Literal::UnsignedInteger(value.parse()?)),
+        SqlType::Tinyint => {
+            let v = if value.eq_ignore_ascii_case("true") {
+                1
+            } else if value.eq_ignore_ascii_case("false") {
+                0
+            } else {
+                value.parse()?
+            };
+            Ok(Literal::Integer(v))
+        }
+        SqlType::UnsignedTinyint => {
+            let v = if value.eq_ignore_ascii_case("true") {
+                1
+            } else if value.eq_ignore_ascii_case("false") {
+                0
+            } else {
+                value.parse()?
+            };
+            Ok(Literal::UnsignedInteger(v))
+        }
         SqlType::Blob => Ok(Literal::Null),
         SqlType::Longblob => Ok(Literal::Null),
         SqlType::Mediumblob => Ok(Literal::Null),
