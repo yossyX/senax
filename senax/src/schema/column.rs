@@ -1142,7 +1142,14 @@ impl FieldDef {
                     format!("{}f64", yaml_value_to_str(value).unwrap())
                 }
                 DataType::Decimal => yaml_value_to_str(value).unwrap(),
-                DataType::Boolean => yaml_value_to_str(value).unwrap(),
+                DataType::Boolean => {
+                    let v = yaml_value_to_str(value).unwrap();
+                    if v.eq_ignore_ascii_case("true") || v.eq("1") {
+                        "1".to_string()
+                    } else {
+                        "0".to_string()
+                    }
+                }
                 DataType::Binary | DataType::Varbinary | DataType::Blob => {
                     yaml_value_to_str(value).unwrap()
                 }
@@ -1187,7 +1194,10 @@ impl FieldDef {
                     format!("{}f64", yaml_value_to_str(value).unwrap())
                 }
                 DataType::Decimal => yaml_value_to_str(value).unwrap(),
-                DataType::Boolean => yaml_value_to_str(value).unwrap(),
+                DataType::Boolean => {
+                    let v = yaml_value_to_str(value).unwrap();
+                    format!("{}", v.eq_ignore_ascii_case("true") || v.eq("1"))
+                }
                 DataType::Binary | DataType::Varbinary | DataType::Blob => {
                     yaml_value_to_str(value).unwrap()
                 }
