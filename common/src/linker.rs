@@ -18,10 +18,10 @@ pub struct Sender<T> {
 }
 impl<T> Sender<T>
 where
-    T: senax_encoder::Encoder,
+    T: senax_encoder::Packer,
 {
     pub fn send(&self, data: &T) -> Result<()> {
-        let bytes = senax_encoder::encode(data)?;
+        let bytes = senax_encoder::pack(data)?;
         self.tx.send(bytes)?;
         Ok(())
     }
@@ -33,7 +33,7 @@ pub struct Receiver<T> {
 }
 impl<T> Receiver<T>
 where
-    T: senax_encoder::Decoder,
+    T: senax_encoder::Unpacker,
 {
     /// Receive data from the Linker.
     /// If the connection with the Linker is disconnected, return None.
@@ -44,7 +44,7 @@ where
                 if v.is_empty() {
                     Some(None)
                 } else {
-                    Some(Some(senax_encoder::decode(&mut v).context("parse error")))
+                    Some(Some(senax_encoder::unpack(&mut v).context("parse error")))
                 }
             }
             None => None,
@@ -60,7 +60,7 @@ pub fn link<T>(
     send_only: bool,
 ) -> Result<(Sender<T>, Receiver<T>)>
 where
-    T: senax_encoder::Encoder + senax_encoder::Decoder,
+    T: senax_encoder::Packer + senax_encoder::Unpacker,
 {
     let (to_linker, from_linker) = LinkerClient::start(port, stream_id, pw, exit_tx, send_only)?;
     Ok((

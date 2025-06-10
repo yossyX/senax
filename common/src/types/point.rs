@@ -1,12 +1,12 @@
 use anyhow::ensure;
 use bytes::{BufMut, BytesMut};
 use schemars::JsonSchema;
-use senax_encoder::{Decode, Encode};
+use senax_encoder::{Decode, Encode, Pack, Unpack};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, fmt::Display, str::FromStr};
 
 #[derive(
-    Deserialize, Serialize, Encode, Decode, Copy, Clone, Debug, Default, PartialEq, JsonSchema,
+    Deserialize, Serialize, Encode, Decode, Pack, Unpack, Copy, Clone, Debug, Default, PartialEq, JsonSchema,
 )]
 #[cfg_attr(
     feature = "graphql6",

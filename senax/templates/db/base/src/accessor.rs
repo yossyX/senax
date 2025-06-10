@@ -6,9 +6,8 @@ use anyhow::{Result, ensure};
 use derive_more::Display;
 use log::kv::ToValue;
 use num_traits::{CheckedAdd, CheckedSub, Float, SaturatingAdd, SaturatingSub};
-use rust_decimal::Decimal;
 use serde::{Serialize, de::DeserializeOwned};
-use senax_encoder::{Encode, Decode};
+use senax_encoder::{Pack, Unpack};
 use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::ops::{BitAnd, BitOr};
@@ -17,7 +16,7 @@ use std::{fmt, fmt::Display, marker::PhantomData};
 
 use crate::misc::{JsonBlob, ToJsonBlob as _, Updater};
 
-#[derive(Encode, Decode, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash)]
+#[derive(Pack, Unpack, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash)]
 pub enum Op {
     #[default]
     #[senax(id = 1)]
@@ -183,64 +182,6 @@ pub trait AccessorForDb<I> {
         op: Op,
         value: &I,
     ) -> fmt::Result;
-}
-
-pub(crate) struct Empty;
-impl Empty {
-    pub fn is_zero_u8(val: &u8) -> bool {
-        *val == 0
-    }
-    pub fn is_zero_i8(val: &i8) -> bool {
-        *val == 0
-    }
-    pub fn is_zero_u16(val: &u16) -> bool {
-        *val == 0
-    }
-    pub fn is_zero_i16(val: &i16) -> bool {
-        *val == 0
-    }
-    pub fn is_zero_u32(val: &u32) -> bool {
-        *val == 0
-    }
-    pub fn is_zero_i32(val: &i32) -> bool {
-        *val == 0
-    }
-    pub fn is_zero_u64(val: &u64) -> bool {
-        *val == 0
-    }
-    pub fn is_zero_i64(val: &i64) -> bool {
-        *val == 0
-    }
-    pub fn is_zero_f32(val: &f32) -> bool {
-        *val == 0.0
-    }
-    pub fn is_zero_f64(val: &f64) -> bool {
-        *val == 0.0
-    }
-    pub fn is_zero_decimal(val: &Decimal) -> bool {
-        val.is_zero()
-    }
-    pub fn is_zero_len<T>(val: &std::sync::Arc<Vec<T>>) -> bool {
-        val.is_empty()
-    }
-    pub fn is_zero_json_len<T>(val: &[T]) -> bool {
-        val.is_empty()
-    }
-    pub fn is_default<T: Default + PartialEq>(val: &T) -> bool {
-        *val == T::default()
-    }
-    pub fn is_default_utc_date_time(val: &chrono::DateTime<chrono::offset::Utc>) -> bool {
-        *val == chrono::DateTime::<chrono::offset::Utc>::default()
-    }
-    pub fn is_default_local_date_time(val: &chrono::DateTime<chrono::offset::Local>) -> bool {
-        *val == chrono::DateTime::<chrono::offset::Local>::default()
-    }
-    pub fn is_default_date(val: &chrono::NaiveDate) -> bool {
-        *val == chrono::NaiveDate::default()
-    }
-    pub fn is_default_time(val: &chrono::NaiveTime) -> bool {
-        *val == chrono::NaiveTime::default()
-    }
 }
 
 pub struct AccessorPrimary<'a, I: Clone + Debug, O>

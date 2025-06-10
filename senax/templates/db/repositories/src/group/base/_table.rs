@@ -1038,13 +1038,11 @@ async fn _handle_delayed_msg_insert_from_memory(mut conn: DbConn, vec: Vec<ForIn
                     return;
                 }
                 _ => {
-                    let data = serde_json::to_string(&buf.0).unwrap();
-                    error!(table = TABLE_NAME, data = data; "INSERT DELAYED FAILED:{}", err);
+                    error!(table = TABLE_NAME; "INSERT DELAYED FAILED:{}", err);
                 }
             }
         } else {
-            let data = serde_json::to_string(&buf.0).unwrap();
-            error!(table = TABLE_NAME, data = data; "INSERT DELAYED FAILED:{}", err);
+            error!(table = TABLE_NAME; "INSERT DELAYED FAILED:{}", err);
         }
     }
     let result = conn.commit().await;
@@ -1079,7 +1077,7 @@ async fn handle_delayed_msg_insert_from_disk(shard_id: ShardId) -> Result<()> {
     while let Ok(x) = db.pop_min() {
         if let Some(x) = x {
             let mut bytes = bytes::Bytes::from(decode_all::<&[u8]>(x.1.borrow())?);
-            let list: Vec<ForInsert> = senax_encoder::decode(&mut bytes)?;
+            let list: Vec<ForInsert> = senax_encoder::unpack(&mut bytes)?;
             for data in list {
                 total_size += data._data._size();
                 vec.push(data);
@@ -1110,7 +1108,7 @@ async fn handle_delayed_msg_insert_from_disk(shard_id: ShardId) -> Result<()> {
 fn push_delayed_db(list: &Vec<ForInsert>) -> Result<()> {
     if let Some(db) = INSERT_DELAYED_DB.get() {
         let no = DELAYED_DB_NO.fetch_add(1, Ordering::SeqCst);
-        let bytes = senax_encoder::encode(&list)?;
+        let bytes = senax_encoder::pack(&list)?;
         let mut buf = encode_all(bytes.as_ref(), 3)?;
         db.insert(no.to_be_bytes(), buf)?;
         tokio::spawn(async move {

@@ -4418,7 +4418,7 @@ dependencies = [
 
 [[package]]
 name = "senax-common"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -4459,9 +4459,9 @@ dependencies = [
 
 [[package]]
 name = "senax-encoder"
-version = "0.1.15"
+version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7b384212a7a9580624b19ef999458693824ee66d72211df1eb780d7257f7645"
+checksum = "e34f96e1b2a729bb9ceb0f270f9f878b7d31df2253e487747002405ed46d8089"
 dependencies = [
  "bytes",
  "senax-encoder-derive",
@@ -4470,9 +4470,9 @@ dependencies = [
 
 [[package]]
 name = "senax-encoder-derive"
-version = "0.1.15"
+version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca6a19c72d2657eb5c477d01b128151465434f31568121fd5b4af649adac7ade"
+checksum = "4a191a1867525f930f7095c2a1b689593ddd32644ad3dd69a145cbfdb77c22b0"
 dependencies = [
  "crc",
  "itertools 0.13.0",

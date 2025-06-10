@@ -12,7 +12,7 @@ use senax_common::cache::msec::MSec;
 use senax_common::cache::calc_mem_size;
 use senax_common::ShardId;
 use senax_common::{types::blob::*, types::geo_point::*, types::point::*, SqlColumns};
-use senax_encoder::{Encode, Decode};
+use senax_encoder::{Pack, Unpack};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::boxed::Box;
@@ -54,7 +54,7 @@ static CACHE_SYNC_TYPE_ID: u64 = @{ def.get_type_id("CACHE_SYNC_TYPE_ID") }@;
 static CACHE_TYPE_ID: u64 = @{ def.get_type_id("CACHE_TYPE_ID") }@;
 pub static COL_KEY_TYPE_ID: u64 = @{ def.get_type_id("COL_KEY_TYPE_ID") }@;
 
-#[derive(Encode, Decode, Clone, Debug)]
+#[derive(Pack, Unpack, Clone, Debug)]
 pub enum CacheOp {
     #[senax(id = 1)]
     None,
@@ -65,9 +65,9 @@ pub enum CacheOp {
 @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
     #[senax(id = 3)]
     Insert {
-        #[senax(skip_default, id = 1)]
+        #[senax(id = 1)]
         replace: bool,
-        #[senax(skip_default, id = 2)]
+        #[senax(id = 2)]
         shard_id: ShardId,
         #[senax(id = 3)]
         data: Data,
@@ -78,13 +78,13 @@ pub enum CacheOp {
     },
     #[senax(id = 4)]
     BulkInsert {
-        #[senax(skip_default, id = 1)]
+        #[senax(id = 1)]
         replace: bool,
-        #[senax(skip_default, id = 2)]
+        #[senax(id = 2)]
         overwrite: bool,
-        #[senax(skip_default, id = 3)]
+        #[senax(id = 3)]
         ignore: bool,
-        #[senax(skip_default, id = 4)]
+        #[senax(id = 4)]
         shard_id: ShardId,
         #[senax(id = 5)]
         list: Vec<ForInsert>,
@@ -93,9 +93,9 @@ pub enum CacheOp {
     Update {
         #[senax(id = 1)]
         id: InnerPrimary,
-        #[senax(skip_default, id = 2)]
+        #[senax(id = 2)]
         shard_id: ShardId,
-        #[senax(skip_default, id = 3)]
+        #[senax(id = 3)]
         update: Data,
         #[senax(id = 4)]
         op: OpData,
@@ -108,7 +108,7 @@ pub enum CacheOp {
     UpdateMany {
         #[senax(id = 1)]
         ids: Vec<InnerPrimary>,
-        #[senax(skip_default, id = 2)]
+        #[senax(id = 2)]
         shard_id: ShardId,
         #[senax(id = 3)]
         update: Data,
@@ -119,7 +119,7 @@ pub enum CacheOp {
     },
     #[senax(id = 7)]
     BulkUpsert {
-        #[senax(skip_default, id = 1)]
+        #[senax(id = 1)]
         shard_id: ShardId,
         #[senax(id = 2)]
         data_list: Vec<Data>,
@@ -132,47 +132,47 @@ pub enum CacheOp {
     Delete {
         #[senax(id = 1)]
         id: InnerPrimary,
-        #[senax(skip_default, id = 2)]
+        #[senax(id = 2)]
         shard_id: ShardId,
     },
     #[senax(id = 9)]
     DeleteMany {
         #[senax(id = 1)]
         ids: Vec<InnerPrimary>,
-        #[senax(skip_default, id = 2)]
+        #[senax(id = 2)]
         shard_id: ShardId,
     },
     #[senax(id = 10)]
     DeleteAll {
-        #[senax(skip_default, id = 1)]
+        #[senax(id = 1)]
         shard_id: ShardId,
     },
     #[senax(id = 11)]
     Cascade {
         #[senax(id = 1)]
         ids: Vec<InnerPrimary>,
-        #[senax(skip_default, id = 2)]
+        #[senax(id = 2)]
         shard_id: ShardId,
     },
     #[senax(id = 12)]
     Invalidate {
         #[senax(id = 1)]
         id: InnerPrimary,
-        #[senax(skip_default, id = 2)]
+        #[senax(id = 2)]
         shard_id: ShardId,
     },
     #[senax(id = 13)]
     Notify {
         #[senax(id = 1)]
         id: InnerPrimary,
-        #[senax(skip_default, id = 2)]
+        #[senax(id = 2)]
         shard_id: ShardId,
     },
 @%- for (mod_name, rel_name, local, val, val2, rel) in def.relations_on_delete_not_cascade() %@
     Reset@{ rel_name|pascal }@@{ val|pascal }@ {
         #[senax(id = 1)]
         ids: Vec<InnerPrimary>,
-        #[senax(skip_default, id = 2)]
+        #[senax(id = 2)]
         shard_id: ShardId,
     },
 @%- endfor %@
@@ -275,7 +275,7 @@ impl Primary {
     }
 }
 #[derive(
-    Hash, PartialEq, Eq, Serialize, Encode, Decode, Clone, Debug, PartialOrd, Ord,
+    Hash, PartialEq, Eq, Serialize, Pack, Unpack, Clone, Debug, PartialOrd, Ord,
 )]
 pub struct InnerPrimary(@{ def.primaries()|fmt_join("pub {inner}", ", ") }@);
 impl sqlx::FromRow<'_, DbRow> for InnerPrimary {
@@ -292,7 +292,7 @@ impl SqlColumns for InnerPrimary {
     }
 }
 
-#[derive(Hash, PartialEq, Eq, Encode, Decode, Clone)]
+#[derive(Hash, PartialEq, Eq, Pack, Unpack, Clone)]
 pub struct PrimaryHasher(pub InnerPrimary, pub ShardId);
 @%- if !config.force_disable_cache %@
 
@@ -322,7 +322,7 @@ impl PrimaryHasher {
     }
 }
 
-#[derive(Encode, Decode, Clone, Debug)]
+#[derive(Pack, Unpack, Clone, Debug)]
 pub struct PrimaryWrapper(pub InnerPrimary, pub ShardId, pub MSec);
 @%- if !config.force_disable_cache %@
 
@@ -347,18 +347,18 @@ impl CacheVal for PrimaryWrapper {
         calc_mem_size(std::mem::size_of::<Self>())
     }
     fn _encode(&self) -> Result<Vec<u8>> {
-        Ok(senax_encoder::encode(self)?.to_vec())
+        Ok(senax_encoder::pack(self)?.to_vec())
     }
     fn _decode(v: &[u8]) -> Result<Self> {
         let mut bytes = Bytes::from(v.to_vec());
-        Ok(senax_encoder::decode(&mut bytes)?)
+        Ok(senax_encoder::unpack(&mut bytes)?)
     }
 }
 @%- endif %@
 
-#[derive(Serialize, Encode, Decode, PartialEq, Clone, Debug, senax_macros::SqlCol)]
+#[derive(Pack, Unpack, PartialEq, Clone, Debug, senax_macros::SqlCol)]
 pub struct Data {
-@{ def.all_fields()|fmt_join("{encode_attr}{serde}{column_query}    pub {var}: {inner},\n", "") -}@
+@{ def.all_fields()|fmt_join("{column_query}    pub {var}: {inner},\n", "") -}@
 }
 impl Data {
     fn validate(&self) -> Result<(), validator::ValidationErrors> {
@@ -414,17 +414,16 @@ impl Data {
     }
 }
 
-#[derive(Encode, Decode, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Pack, Unpack, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct OpData {
 @{- def.all_fields()|fmt_join("
-    #[senax(skip_default)]
     pub {var}: Op,", "") }@
 }
 @%- if !config.force_disable_cache %@
 
-#[derive(Encode, Decode, Clone, Debug, Default, senax_macros::SqlCol)]
+#[derive(Pack, Unpack, Clone, Debug, Default, senax_macros::SqlCol)]
 pub struct CacheData {
-@{ def.cache_cols()|fmt_join("{encode_attr}{column_query}    pub {var}: {inner},\n", "") -}@
+@{ def.cache_cols()|fmt_join("{column_query}    pub {var}: {inner},\n", "") -}@
 }
 impl sqlx::FromRow<'_, DbRow> for CacheData {
     fn from_row(row: &DbRow) -> sqlx::Result<Self> {
@@ -439,7 +438,7 @@ impl sqlx::FromRow<'_, DbRow> for CacheData {
 
 @% for (name, column_def) in def.num_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(Encode, Decode, Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, FromRepr, EnumMessage, EnumString, IntoStaticStr)]
+#[derive(Pack, Unpack, Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, FromRepr, EnumMessage, EnumString, IntoStaticStr)]
 #[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
 #[repr(@{ column_def.get_inner_type(true, true) }@)]
 #[allow(non_camel_case_types)]
@@ -508,7 +507,7 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 @% endfor -%@
 @% for (name, column_def) in def.str_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(Encode, Decode, Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
+#[derive(Pack, Unpack, Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
 #[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
@@ -570,7 +569,7 @@ pub enum _@{ pascal_name }@Info {
 }
 @%- if !config.force_disable_cache %@
 
-#[derive(Encode, Decode, Clone, Debug)]
+#[derive(Pack, Unpack, Clone, Debug)]
 pub struct CacheWrapper {
     pub _inner: CacheData,
     _shard_id: ShardId,
@@ -591,7 +590,7 @@ pub struct _@{ pascal_name }@Cache {
 @{ def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 
-#[derive(Encode, Decode, Clone, Debug)]
+#[derive(Pack, Unpack, Clone, Debug)]
 pub struct VersionWrapper {
     pub id: InnerPrimary,
     pub shard_id: ShardId,
@@ -620,11 +619,11 @@ impl CacheVal for VersionWrapper {
         calc_mem_size(std::mem::size_of::<Self>())
     }
     fn _encode(&self) -> Result<Vec<u8>> {
-        Ok(senax_encoder::encode(self)?.to_vec())
+        Ok(senax_encoder::pack(self)?.to_vec())
     }
     fn _decode(v: &[u8]) -> Result<Self> {
         let mut bytes = Bytes::from(v.to_vec());
-        Ok(senax_encoder::decode(&mut bytes)?)
+        Ok(senax_encoder::unpack(&mut bytes)?)
     }
 }
 impl HashVal for VersionWrapper {
@@ -643,7 +642,7 @@ impl HashVal for VersionWrapper {
     }
 }
 
-#[derive(Encode, Decode, Clone, Debug)]
+#[derive(Pack, Unpack, Clone, Debug)]
 pub struct CacheSyncWrapper {
     pub id: InnerPrimary,
     pub shard_id: ShardId,
@@ -672,11 +671,11 @@ impl CacheVal for CacheSyncWrapper {
         calc_mem_size(std::mem::size_of::<Self>())
     }
     fn _encode(&self) -> Result<Vec<u8>> {
-        Ok(senax_encoder::encode(self)?.to_vec())
+        Ok(senax_encoder::pack(self)?.to_vec())
     }
     fn _decode(v: &[u8]) -> Result<Self> {
         let mut bytes = Bytes::from(v.to_vec());
-        Ok(senax_encoder::decode(&mut bytes)?)
+        Ok(senax_encoder::unpack(&mut bytes)?)
     }
 }
 impl HashVal for CacheSyncWrapper {
@@ -720,15 +719,13 @@ pub struct _@{ pascal_name }@Updater {
 @{ def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 
-#[derive(Serialize, Encode, Decode, Clone, Debug)]
+#[derive(Pack, Unpack, Clone, Debug)]
 pub struct ForInsert {
     #[senax(id = 1)]
     pub _data: Data,
 @{- def.relations_one(false)|fmt_rel_join("
-    #[serde(skip_serializing_if = \"Option::is_none\")]
     pub {rel_name}: Option<Option<Box<rel_{class_mod}::ForInsert>>>,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
-    #[serde(skip_serializing_if = \"Option::is_none\")]
     pub {rel_name}: Option<Vec<rel_{class_mod}::ForInsert>>,", "") }@
 }
 
@@ -1540,7 +1537,7 @@ impl CacheVal for CacheWrapper {
         CACHE_WRAPPER_AVG.load(Ordering::Relaxed)
     }
     fn _encode(&self) -> Result<Vec<u8>> {
-        let bytes = senax_encoder::encode(self)?;
+        let bytes = senax_encoder::pack(self)?;
         let vec = encode_all(bytes.as_ref(), 1)?;
         let num = CACHE_WRAPPER_AVG_NUM.load(Ordering::Relaxed);
         let ave = (CACHE_WRAPPER_AVG.load(Ordering::Relaxed) * num + vec.len()) / num.saturating_add(1);
@@ -1550,7 +1547,7 @@ impl CacheVal for CacheWrapper {
     }
     fn _decode(v: &[u8]) -> Result<Self> {
         let mut bytes = Bytes::from(decode_all(v)?.to_vec());
-        Ok(senax_encoder::decode(&mut bytes)?)
+        Ok(senax_encoder::unpack(&mut bytes)?)
     }
 }
 

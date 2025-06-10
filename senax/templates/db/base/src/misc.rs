@@ -3,7 +3,7 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use rust_decimal::Decimal;
 use senax_common::cache::calc_mem_size;
-use ::senax_encoder::{Encode, Decode};
+use ::senax_encoder::{Pack, Unpack};
 use serde_json::Value;
 use sqlx::query::Query;
 use std::convert::TryFrom;
@@ -187,7 +187,7 @@ impl_decimal!(Decimal);
 impl_try_decimal!(f32);
 impl_try_decimal!(f64);
 
-#[derive(serde::Serialize, Encode, Decode, Clone, Default, PartialEq)] // TODO このSerializeは無意味なデータ？
+#[derive(serde::Serialize, Pack, Unpack, Clone, Default, PartialEq)]
 pub struct JsonBlob(std::sync::Arc<Vec<u8>>);
 impl TryFrom<serde_json::Value> for JsonBlob {
     type Error = Box<dyn std::error::Error + Send + Sync>;
