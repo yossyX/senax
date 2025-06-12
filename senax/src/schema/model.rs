@@ -1135,10 +1135,37 @@ impl ModelDef {
             .collect()
     }
     pub fn primary_except(&self, except: &[String]) -> &str {
+        if self
+            .primaries()
+            .iter()
+            .filter(|(k, _v)| !except.contains(*k))
+            .count()
+            != 1
+        {
+            error_exit!(
+                "{} model must have only one primary key other than the key for the relation.",
+                self.name
+            )
+        }
         self.primaries()
             .iter()
             .filter(|(k, _v)| !except.contains(*k))
             .map(|(name, _)| name.as_str())
+            .last()
+            .unwrap_or_else(|| {
+                error_exit!(
+                    "{} model must have a primary key other than the key for the relation.",
+                    self.name
+                )
+            })
+    }
+    pub fn primary_except_has_inner(&self, except: &[String]) -> bool {
+        self.primaries()
+            .iter()
+            .filter(|(k, _v)| !except.contains(*k))
+            .map(|(_, def)| {
+                def.id_class.is_some() || def.rel.is_some() || def.outer_db_rel.is_some()
+            })
             .last()
             .unwrap_or_else(|| {
                 error_exit!(
