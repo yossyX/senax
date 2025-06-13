@@ -1,6 +1,6 @@
 [package]
 name = "senax"
-version = "0.3.27"
+version = "0.3.28"
 edition = "2024"
 authors = ["yossyX"]
 license = "MIT OR Apache-2.0"

@@ -243,7 +243,7 @@ pub fn update_list(
     let mut map: HashMap<_, _> = list
         .into_iter()
         .map(|mut v| { v.mark_for_delete(); v} )
-        .map(|v| (v.@{ def.primary_except(rel_id)|to_var_name }@().inner(), v))
+        .map(|v| (v.@{ def.primary_except(rel_id)|to_var_name }@()@% if def.primary_except_has_inner(rel_id) %@.inner()@% endif %@, v))
         .collect();
     let mut list = Vec::new();
     for row in data_list.into_iter() {
