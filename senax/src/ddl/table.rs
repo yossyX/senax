@@ -157,8 +157,8 @@ impl PartialEq for Constraint {
     fn eq(&self, other: &Self) -> bool {
         self.not_null == other.not_null
             && (self.collation == other.collation
-                || self.default_collation == other.collation
-                || self.collation == other.default_collation)
+                || (self.default_collation == other.collation && self.collation.is_none())
+                || (self.collation == other.default_collation && other.collation.is_none()))
             && self.default_value == other.default_value
             && self.auto_increment == other.auto_increment
             && self.primary_key == other.primary_key
