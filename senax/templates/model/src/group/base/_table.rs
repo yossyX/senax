@@ -8117,6 +8117,11 @@ fn make_force_indexes(filter_digest: &str) -> Vec<&'static str> {
         force_indexes.push(@{ idx }@);
     }
     @%- endfor %@
+    @%- if !force_indexes.is_empty() %@
+    if !force_indexes.is_empty()@{ def.primaries()|fmt_join(" && filter_digest.contains(\"`{col}`\")", "") }@ {
+        force_indexes.push("\"PRIMARY\"");
+    }
+    @%- endif %@
     force_indexes
 }
 
