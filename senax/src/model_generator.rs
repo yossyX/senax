@@ -388,7 +388,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                         let force_index_def = force_index_def.clone().unwrap_or_default();
                         let includes = force_index_def
                             .includes
-                            .unwrap_or(StringOrArray::One(force_index_name.clone()));
+                            .unwrap_or_else(|| StringOrArray::One(format!("`{}`", force_index_name)));
                         let mut cond: Vec<_> = includes
                             .to_vec()
                             .iter()

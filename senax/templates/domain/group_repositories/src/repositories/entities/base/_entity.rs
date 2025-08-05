@@ -422,7 +422,7 @@ impl Col_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields()|fmt_join("
-            Col_::{var} => \"{col}\",", "") }@
+            Col_::{var} => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -451,9 +451,9 @@ impl ColOne_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_without_json()|fmt_join("
-            ColOne_::{var}(_) => \"{col}\",", "") }@
+            ColOne_::{var}(_) => \"`{col}`\",", "") }@
             @%- for (index_name, index) in def.multi_index(false) %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "{name}", ", ") }@>",
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "`{name}`", ", ") }@>",
             @%- endfor %@
             _ => unimplemented!(),
         }
@@ -502,7 +502,7 @@ impl ColKey_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.unique_key()|fmt_join("
-            ColKey_::{var}(_) => \"{col}\",", "") }@
+            ColKey_::{var}(_) => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -522,9 +522,9 @@ impl ColMany_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_without_json()|fmt_join("
-            ColMany_::{var}(_) => \"{col}\",", "") }@
+            ColMany_::{var}(_) => \"`{col}`\",", "") }@
             @%- for (index_name, index) in def.multi_index(false) %@
-            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "{name}", ", ") }@>",
+            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "`{name}`", ", ") }@>",
             @%- endfor %@
             _ => unimplemented!(),
         }
@@ -554,7 +554,7 @@ impl ColJson_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_json()|fmt_join("
-            ColJson_::{var}(_) => \"{col}\",", "") }@
+            ColJson_::{var}(_) => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -572,7 +572,7 @@ impl ColJsonArray_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_json()|fmt_join("
-            ColJsonArray_::{var}(_) => \"{col}\",", "") }@
+            ColJsonArray_::{var}(_) => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -590,7 +590,7 @@ impl ColGeo_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_geo()|fmt_join("
-            ColGeo_::{var}(_, _) => \"{col}\",", "") }@
+            ColGeo_::{var}(_, _) => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -608,7 +608,7 @@ impl ColGeoDistance_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_geo()|fmt_join("
-            ColGeoDistance_::{var}(_, _, _) => \"{col}\",", "") }@
+            ColGeoDistance_::{var}(_, _, _) => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -825,15 +825,15 @@ impl std::fmt::Display for Filter_ {
             Filter_::Intersects(col) => write!(f, "Intersects:{}", col._name()),
             Filter_::Crosses(col) => write!(f, "Crosses:{}", col._name()),
             Filter_::DWithin(col) => write!(f, "DWithin:{}", col._name()),
-            Filter_::Not(filter) => write!(f, "Not:<{}>", filter),
+            Filter_::Not(_filter) => write!(f, "Not:<...>"),
             Filter_::And(filters) => write!(f, "And:<{}>", filters.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")),
             Filter_::Or(filters) => write!(f, "Or:<{}>", filters.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(",")),
-            Filter_::Exists(col_rel) => write!(f, "Exists:<{}>", col_rel),
-            Filter_::NotExists(col_rel) => write!(f, "NotExists:<{}>", col_rel),
-            Filter_::EqAny(col_rel) => write!(f, "EqAny:<{}>", col_rel),
-            Filter_::NotAll(col_rel) => write!(f, "NotAll:<{}>", col_rel),
-            Filter_::Raw(sql) => write!(f, "Raw:<{}>", sql),
-            Filter_::RawWithParam(sql, _) => write!(f, "Raw:<{}>", sql),
+            Filter_::Exists(_col_rel) => write!(f, "Exists:<...>"),
+            Filter_::NotExists(_col_rel) => write!(f, "NotExists:<...>"),
+            Filter_::EqAny(_col_rel) => write!(f, "EqAny:<...>"),
+            Filter_::NotAll(_col_rel) => write!(f, "NotAll:<...>"),
+            Filter_::Raw(_sql) => write!(f, "Raw:<...>"),
+            Filter_::RawWithParam(_sql, _) => write!(f, "Raw:<...>"),
             Filter_::Boolean(v) => write!(f, "Boolean:{}", v),
         }
     }
