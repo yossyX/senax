@@ -50,7 +50,7 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 serde_yaml = "0.9"
 sha2 = "0.10.6"
 shell-escape = "0.1.5"
-sqlx = { version = "0.7.3", features = ["runtime-tokio", "tls-rustls", "mysql"] }
+sqlx = { version = "0.7.3", features = ["runtime-tokio", "tls-rustls", "mysql", "postgres"] }
 strum = "0.27"
 strum_macros = "0.27"
 syn = "2.0.48"

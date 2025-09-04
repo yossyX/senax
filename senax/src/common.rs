@@ -354,6 +354,11 @@ pub fn write_group_yml(
     let mut buf =
         "# yaml-language-server: $schema=../../senax-schema.json#properties/model\n\n".to_string();
     buf.push_str(&simplify_yml(serde_yaml::to_string(&data)?)?);
+    if let Some(parent) = path.parent() {
+        if !parent.eq(Path::new("")) && !parent.exists() {
+            fs::create_dir_all(parent)?;
+        }
+    }
     fs::write(path, &buf)?;
     Ok(())
 }

@@ -1,4 +1,3 @@
-import Container from "@cloudscape-design/components/container";
 import ContentLayout from "@cloudscape-design/components/content-layout";
 import Header from "@cloudscape-design/components/header";
 import { Helmet } from "react-helmet-async";

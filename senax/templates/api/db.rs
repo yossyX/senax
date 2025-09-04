@@ -9,12 +9,20 @@ use crate::_base::auto_api::{Role, RoleGuard};
 pub struct GqlQuery@{ db_route|pascal }@;
 #[Object]
 impl GqlQuery@{ db_route|pascal }@ {
+    // This function can be removed.
+    async fn _dummy(&self) -> bool {
+        false
+    }
     // Do not modify this line. (GqlQuery)
 }
 
 pub struct GqlMutation@{ db_route|pascal }@;
 #[Object]
 impl GqlMutation@{ db_route|pascal }@ {
+    // This function can be removed.
+    async fn _dummy(&self) -> bool {
+        false
+    }
     // Do not modify this line. (GqlMutation)
 }
 

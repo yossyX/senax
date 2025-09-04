@@ -3,7 +3,7 @@
 title: 
 author: 
 db_id: @{ db_id }@
-db: mysql
+db: @{ db_type }@
 ignore_foreign_key: true
 timestampable: real_time
 time_zone: local

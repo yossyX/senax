@@ -79,6 +79,7 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
     )
     .await?;
     @%- endif %@
+    @%- if config.is_mysql() %@
     exec_ddl(
         r#"
             CREATE TABLE IF NOT EXISTS _sqlx_migrations (
@@ -93,7 +94,9 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
         writer.as_mut(),
     )
     .await?;
+    @%- endif %@
     @%- if config.use_sequence || !config.force_disable_cache %@
+    @%- if config.is_mysql() %@
     exec_ddl(
         r#"
             CREATE TABLE IF NOT EXISTS "_sequence" (
@@ -106,6 +109,20 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
         writer.as_mut(),
     )
     .await?;
+    @%- else %@
+    exec_ddl(
+        r#"
+            CREATE TABLE IF NOT EXISTS "_sequence" (
+                "id" INT NOT NULL PRIMARY KEY,
+                "seq" BIGINT NOT NULL
+            );
+            INSERT INTO "_sequence" VALUES (1, 0) ON CONFLICT DO NOTHING;
+            INSERT INTO "_sequence" VALUES (2, 0) ON CONFLICT DO NOTHING;
+        "#,
+        writer.as_mut(),
+    )
+    .await?;
+    @%- endif %@
     @%- endif %@
     sqlx::migrate!()
         .set_ignore_missing(ignore_missing)

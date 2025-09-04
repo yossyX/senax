@@ -7,6 +7,7 @@ use std::{fs, path::Path};
 use crate::common::ToCase as _;
 use crate::common::fs_write;
 use crate::filters;
+use crate::schema::DbType;
 use crate::{DOMAIN_PATH, SCHEMA_PATH};
 
 pub fn db_list(dir_type_only: bool) -> Result<Vec<String>> {
@@ -30,7 +31,7 @@ pub fn db_list(dir_type_only: bool) -> Result<Vec<String>> {
     Ok(dbs)
 }
 
-pub fn generate(db: &str, exclude_from_domain: bool) -> Result<()> {
+pub fn generate(db_type: DbType,db: &str, exclude_from_domain: bool) -> Result<()> {
     anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
     let schema_path = Path::new(SCHEMA_PATH);
 
@@ -38,6 +39,7 @@ pub fn generate(db: &str, exclude_from_domain: bool) -> Result<()> {
     #[template(path = "db.yml", escape = "none")]
     struct DbTemplate {
         pub db_id: u64,
+        pub db_type: DbType,
         pub exclude_from_domain: bool,
     }
 
@@ -48,6 +50,7 @@ pub fn generate(db: &str, exclude_from_domain: bool) -> Result<()> {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_micros() as u64,
+            db_type,
             exclude_from_domain,
         };
         fs_write(file_path, tpl.render()?)?;
@@ -56,13 +59,13 @@ pub fn generate(db: &str, exclude_from_domain: bool) -> Result<()> {
     let file_path = Path::new("./.env");
     if file_path.exists() {
         let content = fs::read_to_string(file_path)?;
-        fs_write(file_path, fix_env(&content, db)?)?;
+        fs_write(file_path, fix_env(&content, db, db_type)?)?;
     }
 
     let file_path = Path::new("./.env.example");
     if file_path.exists() {
         let content = fs::read_to_string(file_path)?;
-        fs_write(file_path, fix_env(&content, db)?)?;
+        fs_write(file_path, fix_env(&content, db, db_type)?)?;
     }
 
     if !exclude_from_domain {
@@ -115,28 +118,14 @@ fn repositories(path: &Path, db: &str) -> Result<()> {
     let tpl = DomainCargoTemplate { db };
     fs_write(file_path, tpl.render()?)?;
 
-    // #[derive(Template)]
-    // #[template(path = "domain/db_repositories/src/lib.rs", escape = "none")]
-    // struct DomainLibTemplate<'a> {
-    //     db: &'a str,
-    // }
-
     let file_path = path.join("src/lib.rs");
     let tpl = DomainDbLibTemplate { db };
     fs_write(file_path, tpl.render()?)?;
 
-    // #[derive(Template)]
-    // #[template(path = "domain/db_repositories/src/repositories.rs", escape = "none")]
-    // struct DomainRepositoriesTemplate;
-
-    // let file_path = path.join("src/repositories.rs");
-    // let tpl = DomainRepositoriesTemplate;
-    // fs_write(file_path, tpl.render()?)?;
-
     Ok(())
 }
 
-fn fix_env(content: &str, db: &str) -> Result<String> {
+fn fix_env(content: &str, db: &str, db_type: DbType) -> Result<String> {
     let re = Regex::new(r"RUST_LOG(\s*)=(.+)").unwrap();
     let mut content = if let Some(caps) = re.captures(content) {
         let sp = caps.get(1).unwrap().as_str();
@@ -150,16 +139,19 @@ fn fix_env(content: &str, db: &str) -> Result<String> {
         content.to_owned()
     };
     let upper = db.to_upper_snake();
+    let (user, pw) = match db_type {
+        DbType::Mysql => ("root", "root"),
+        DbType::Postgres => ("postgres", "postgres"),
+    };
     write!(
         &mut content,
         r#"
-{}_DB_URL=mysql://root:root@db/{}
-{}_TEST_DB_URL=mysql://root:root@db/{}_test
-{}_DB_MAX_CONNECTIONS_FOR_WRITE=50
-{}_DB_MAX_CONNECTIONS_FOR_READ=50
-{}_DB_MAX_CONNECTIONS_FOR_CACHE=10
-"#,
-        upper, db, upper, db, upper, upper, upper
+{upper}_DB_URL={db_type}://{user}:{pw}@db/{db}
+{upper}_TEST_DB_URL={db_type}://{user}:{pw}@db/{db}_test
+{upper}_DB_MAX_CONNECTIONS_FOR_WRITE=50
+{upper}_DB_MAX_CONNECTIONS_FOR_READ=50
+{upper}_DB_MAX_CONNECTIONS_FOR_CACHE=10
+"#
     )?;
     Ok(content)
 }

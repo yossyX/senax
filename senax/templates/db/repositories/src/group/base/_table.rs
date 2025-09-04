@@ -4990,20 +4990,16 @@ impl _@{ pascal_name }@_ {
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__set_default_value(conn).await?;
         let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) 
-            VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
+            VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#;
         let query = bind_to_query(sqlx::query(sql), &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        let result = if conn.wo_tx() {
-            query.execute(conn.acquire_writer().await?.as_mut()).await?
-        } else {
-            query.execute(conn.get_tx().await?.as_mut()).await?
-        };
-        if result.rows_affected() == 0 {
+        let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
+        if rows_affected == 0 {
             return Ok(None);
         }
 @{- def.auto_inc()|fmt_join("
         if obj._data.{var} == 0 {
-            obj._data.{var} = result.last_insert_id() as {inner};
+            obj._data.{var} = _last_insert_id as {inner};
         }", "") }@
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "insert_ignore", ctx = conn.ctx_no(); "{}", &obj);
         debug!("{:?}", &obj);
@@ -6133,20 +6129,16 @@ pub(crate) fn ___save(
 #[allow(clippy::unnecessary_cast)]
 async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, replace: bool) -> Result<(_@{ pascal_name }@, CacheOp)> {
     let sql = if replace {
-        r#"REPLACE INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#
+        r#"REPLACE INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#
     } else {
-        r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#
+        r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#
     };
     let query = bind_to_query(sqlx::query(sql), &obj._data);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-    let result = if conn.wo_tx() {
-        query.execute(conn.acquire_writer().await?.as_mut()).await?
-    } else {
-        query.execute(conn.get_tx().await?.as_mut()).await?
-    };
+    let (_, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
 @{- def.auto_inc()|fmt_join("
     if obj._data.{var} == 0 {
-        obj._data.{var} = result.last_insert_id() as {inner};
+        obj._data.{var} = _last_insert_id as {inner};
     }", "") }@
     info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = if replace { "replace" } else { "insert" }, ctx = conn.ctx_no(); "{}", &obj);
     debug!("{:?}", &obj);
@@ -6191,16 +6183,22 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @{- def.non_primaries_wo_invisible_and_read_only(false)|fmt_join_cache_or_not("
         crate::misc::assign_sql!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, update_cache, \"{placeholder}\");", "
         crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
+        @%- if config.is_mysql() %@
         @%- if def.versioned %@
         vec.push(r#"\"@{ version_col }@\" = LAST_INSERT_ID(IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0))"#.to_string());
         @%- endif %@
         @%- if def.counting.is_some() %@
         vec.push(r#"\"@{ def.get_counting_col() }@\" = LAST_INSERT_ID(\"@{ def.get_counting_col() }@\")"#.to_string());
         @%- endif %@
-        @%- if def.versioned %@
-        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ AND \"@{ version_col }@\"=?"#, &vec.join(","));
         @%- else %@
-        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#, &vec.join(","));
+        @%- if def.versioned %@
+        vec.push(r#"\"@{ version_col }@\" = IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0)"#.to_string());
+        @%- endif %@
+        @%- endif %@
+        @%- if def.versioned %@
+        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ AND \"@{ version_col }@\"=?@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
+        @%- else %@
+        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
         @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
@@ -6214,21 +6212,17 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @%- endif %@
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "update", ctx = conn.ctx_no(); "{}", &obj);
         debug!("{:?}", &obj);
-        let result = if conn.wo_tx() {
-            query.execute(conn.acquire_writer().await?.as_mut()).await?
-        } else {
-            query.execute(conn.get_tx().await?.as_mut()).await?
-        };
-        if result.rows_affected() == 0 {
+        let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
+        if rows_affected == 0 {
             anyhow::bail!(err::RowNotFound::new("@{ table_name }@", id.to_string()));
         }
         @%- if def.versioned %@
-        obj.mut_@{ version_col }@().set(result.last_insert_id() as u32);
+        obj.mut_@{ version_col }@().set(_last_insert_id as u32);
         @%- endif %@
         @%- if def.counting.is_some() %@
         if obj._op.@{ def.get_counting() }@ == Op::Add {
             obj._op.@{ def.get_counting() }@ = Op::Max;
-            obj._update.@{ def.get_counting() }@ = result.last_insert_id().try_into().unwrap_or(@{ def.get_counting_type() }@::MAX);
+            obj._update.@{ def.get_counting() }@ = _last_insert_id.try_into().unwrap_or(@{ def.get_counting_type() }@::MAX);
         }
         @%- endif %@
     }
@@ -6281,29 +6275,31 @@ fn bind_non_primaries<'a>(obj: &'a _@{ pascal_name }@Updater, mut query: Query<'
 #[allow(clippy::unnecessary_cast)]
 async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<(_@{ pascal_name }@, Option<CacheOp>)> {
     let (mut vec, _) = assign_non_primaries(&obj);
+    @%- if config.is_mysql() %@
     @%- if def.versioned %@
     vec.push(r#"\"@{ version_col }@\" = LAST_INSERT_ID(IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0))"#.to_string());
     @%- endif %@
     @%- if def.counting.is_some() %@
     vec.push(r#"\"@{ def.get_counting_col() }@\" = LAST_INSERT_ID(\"@{ def.get_counting_col() }@\")"#.to_string());
     @%- endif %@
+    @%- else %@
+    @%- if def.versioned %@
+    vec.push(r#"\"@{ version_col }@\" = IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0)"#.to_string());
+    @%- endif %@
+    @%- endif %@
     let sql = format!(r#"INSERT INTO @{ table_name|db_esc }@ 
         (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) 
-        VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@) ON DUPLICATE KEY UPDATE {}"#, &vec.join(","));
+        VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
     let query = bind_to_query(sqlx::query(&sql), &obj._data);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     let query = bind_non_primaries(&obj, query, &sql);
-    let result = if conn.wo_tx() {
-        query.execute(conn.acquire_writer().await?.as_mut()).await?
-    } else {
-        query.execute(conn.get_tx().await?.as_mut()).await?
-    };
+    let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
     info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "upsert", ctx = conn.ctx_no(); "{}", &obj);
     debug!("{:?}", &obj);
-    if result.rows_affected() == 1 {
+    if rows_affected == 1 {
         @{- def.auto_inc()|fmt_join("
         if obj._data.{var} == 0 {
-            obj._data.{var} = result.last_insert_id() as {inner};
+            obj._data.{var} = _last_insert_id as {inner};
         }", "") }@
         let mut obj2: _@{ pascal_name }@ = obj._data.clone().into();
         @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
@@ -6318,14 +6314,14 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         let cache_msg = None;
         @%- endif %@
         Ok((obj2, cache_msg))
-    } else if result.rows_affected() == 2 {
+    } else if rows_affected == 2 {
         @%- if def.versioned %@
-        obj.mut_@{ version_col }@().set(result.last_insert_id() as u32);
+        obj.mut_@{ version_col }@().set(_last_insert_id as u32);
         @%- endif %@
         @%- if def.counting.is_some() %@
         if obj._op.@{ def.get_counting() }@ == Op::Add {
             obj._op.@{ def.get_counting() }@ = Op::Max;
-            obj._update.@{ def.get_counting() }@ = result.last_insert_id().try_into().unwrap_or(@{ def.get_counting_type() }@::MAX);
+            obj._update.@{ def.get_counting() }@ = _last_insert_id.try_into().unwrap_or(@{ def.get_counting_type() }@::MAX);
         }
         @%- endif %@
         let id = InnerPrimary::from(&obj);
@@ -6518,10 +6514,16 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         const SQL_NORMAL: &str = r#"INSERT "#; 
         const SQL_IGNORE: &str = r#"INSERT IGNORE "#; 
         const SQL_REPLACE: &str = r#"REPLACE "#; 
+        @%- if config.is_mysql() %@
         const SQL1: &str = r#"INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES "#;
         const SQL2: &str = r#"(@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
         const SQL3: &str = r#" AS new ON DUPLICATE KEY UPDATE @{ def.non_primaries_without_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@"#;
-        let mut sql = String::with_capacity(SQL_IGNORE.len() + SQL1.len() + (SQL2.len() + 1) * list.len() + SQL3.len());
+        @%- else %@
+        const SQL1: &str = r#"INTO @{ table_name|db_esc }@ AS new (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES "#;
+        const SQL2: &str = r#"(@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
+        const SQL3: &str = r#" ON CONFLICT DO UPDATE @{ def.non_primaries_without_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@"#;
+        @%- endif %@
+        let mut sql = String::with_capacity(SQL_IGNORE.len() + SQL1.len() + (SQL2.len() + 1) * list.len() + SQL3.len()@% if !config.is_mysql() && def.is_auto_inc() %@ + 30@% endif %@);
         if ignore {
             sql.push_str(SQL_IGNORE);
         } else if replace {
@@ -6538,11 +6540,15 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         if overwrite {
             sql.push_str(SQL3);
         }
+    @%- if !config.is_mysql() && def.is_auto_inc() %@
+        sql.push_str(r#" RETURNING @{ def.auto_inc()|fmt_join("{col_esc}", "") }@"#);
+    @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for data in list {
             query = bind_to_query(query, &data._data);
         }
+    @%- if config.is_mysql() %@
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await?
         } else {
@@ -6550,6 +6556,17 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         };
         @{- def.auto_inc()|fmt_join("
         let mut id = result.last_insert_id() as {inner};", "") }@
+    @%- else %@
+        let result = if conn.wo_tx() {
+            query.@% if def.is_auto_inc() %@fetch_all@% else %@execute@% endif %@(conn.acquire_writer().await?.as_mut()).await?
+        } else {
+            query.@% if def.is_auto_inc() %@fetch_all@% else %@execute@% endif %@(conn.get_tx().await?.as_mut()).await?
+        };
+        @{- def.auto_inc()|fmt_join("
+        use sqlx::Row;
+        let ids: Vec<_> = result.iter().map(|v| v.get::<{inner}, usize>(0)).collect();
+        let mut ids_iter = ids.iter();", "") }@
+    @%- endif %@
         let mut data_list = Vec::new();
         @{- def.relations_one(false)|fmt_rel_join("
         let mut _{rel_name} = Vec::new();
@@ -6561,12 +6578,17 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
             info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "bulk_insert", ctx = conn.ctx_no(); "{}", &row);
             debug!("{:?}", &row);
             let mut obj = row.clone();
+    @%- if config.is_mysql() %@
             @{- def.auto_inc()|fmt_join("
             if obj._data.{var} == 0 {
                 obj._data.{var} = id;
                 // innodb_autoinc_lock_mode must be 0 or 1
                 id += 1;
             }", "") }@
+    @%- else %@
+            @{- def.auto_inc()|fmt_join("
+            obj._data.{var} = *ids_iter.next().unwrap();", "") }@
+    @%- endif %@
             @{- def.relations_one(false)|fmt_rel_join("
             obj.{rel_name}.map(|v| v.map(|v| {
                 let mut v = v.as_ref().clone();
@@ -6653,7 +6675,7 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     @%- if def.versioned %@
     vec.push(r#"\"@{ version_col }@\" = IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0)"#.to_string());
     @%- endif %@
-    write!(sql, " ON DUPLICATE KEY UPDATE {}", &vec.join(","))?;
+    write!(sql, " @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE") }@ {}", &vec.join(","))?;
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     for data in list {

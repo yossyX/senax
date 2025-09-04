@@ -25,10 +25,10 @@ pub struct @{ pascal_name }@RepositoryImpl {
 }
 
 #[allow(clippy::needless_update)]
-fn updater_from_factory(v: domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Factory) -> _@{ pascal_name }@Updater {
+fn updater_from_factory(_v: domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Factory) -> _@{ pascal_name }@Updater {
     _@{ pascal_name }@Updater {
         _data: ::db::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::Data {
-@{ def.for_factory()|fmt_join("            {var}: v.{var}{convert_domain_factory}{convert_from_entity},", "\n") }@
+@{ def.for_factory()|fmt_join("            {var}: _v.{var}{convert_domain_factory}{convert_from_entity},", "\n") }@
             ..Default::default()
         },
         _update: Default::default(),

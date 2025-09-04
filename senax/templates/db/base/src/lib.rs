@@ -6,7 +6,6 @@ use anyhow::{Context as _, Result};
 use log::warn;
 use once_cell::sync::{Lazy, OnceCell};
 use senax_common::linker;
-use sqlx::Row;
 use std::{
     path::Path,
     sync::{
@@ -152,6 +151,8 @@ pub async fn _start(
 
 async fn set_bulk_insert_max_size() -> Result<(), anyhow::Error> {
     if BULK_INSERT_MAX_SIZE.get().is_none() {
+@%- if config.is_mysql() %@
+        use sqlx::Row;
         let conn = DbConn::_new(0);
         let mut writer = conn.acquire_writer().await?;
         let row = sqlx::query("SHOW VARIABLES LIKE 'max_allowed_packet';")
@@ -161,6 +162,9 @@ async fn set_bulk_insert_max_size() -> Result<(), anyhow::Error> {
         BULK_INSERT_MAX_SIZE
             .set(max_allowed_packet.parse::<usize>()? / 8)
             .unwrap();
+@%- else %@
+        BULK_INSERT_MAX_SIZE.set(1 * 1024 * 1024).unwrap();
+@%- endif %@
     }
     Ok(())
 }
@@ -219,12 +223,12 @@ pub async fn clear_whole_cache() {
 pub(crate) fn db_options(options: connection::DbConnectOptions) -> connection::DbConnectOptions {
     use sqlx::ConnectOptions;
     options
-        .log_statements(log::LevelFilter::Trace)
+        .log_statements(log::LevelFilter::Trace)@{ config.db_type_switch("
         .set_names(false)
         .pipes_as_concat(false)
         .no_engine_substitution(false)
+        .timezone(None)", "") }@
         .statement_cache_capacity(5)
-        .timezone(None)
 }
 
 pub(crate) fn db_options_for_write() -> sqlx::pool::PoolOptions<connection::DbType> {

@@ -1464,14 +1464,15 @@ impl FieldDef {
                 }
             }
         }
+        let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
         let typ = match self.data_type {
-            DataType::TinyInt if self.signed => "i8",
+            DataType::TinyInt if self.signed || signed_only => "i8",
             DataType::TinyInt => "u8",
-            DataType::SmallInt if self.signed => "i16",
+            DataType::SmallInt if self.signed || signed_only => "i16",
             DataType::SmallInt => "u16",
-            DataType::Int if self.signed => "i32",
+            DataType::Int if self.signed || signed_only => "i32",
             DataType::Int => "u32",
-            DataType::BigInt if self.signed => "i64",
+            DataType::BigInt if self.signed || signed_only => "i64",
             DataType::BigInt => "u64",
             DataType::Float => "f32",
             DataType::Double => "f64",
@@ -1530,14 +1531,15 @@ impl FieldDef {
     }
 
     pub fn get_deref_type(&self, without_option: bool) -> String {
+        let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
         let typ = match self.data_type {
-            DataType::TinyInt if self.signed => "i8",
+            DataType::TinyInt if self.signed || signed_only => "i8",
             DataType::TinyInt => "u8",
-            DataType::SmallInt if self.signed => "i16",
+            DataType::SmallInt if self.signed || signed_only => "i16",
             DataType::SmallInt => "u16",
-            DataType::Int if self.signed => "i32",
+            DataType::Int if self.signed || signed_only => "i32",
             DataType::Int => "u32",
-            DataType::BigInt if self.signed => "i64",
+            DataType::BigInt if self.signed || signed_only => "i64",
             DataType::BigInt => "u64",
             DataType::Float => "f32",
             DataType::Double => "f64",
@@ -3198,16 +3200,17 @@ impl FieldDef {
     }
 
     pub fn get_from_row(&self, name: &&String, index: i32) -> String {
+        let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
         if let Some(ref class) = self.enum_class {
             if self.is_integer() {
                 let typ = match self.data_type {
-                    DataType::TinyInt if self.signed => "i8",
+                    DataType::TinyInt if self.signed || signed_only => "i8",
                     DataType::TinyInt => "u8",
-                    DataType::SmallInt if self.signed => "i16",
+                    DataType::SmallInt if self.signed || signed_only => "i16",
                     DataType::SmallInt => "u16",
-                    DataType::Int if self.signed => "i32",
+                    DataType::Int if self.signed || signed_only => "i32",
                     DataType::Int => "u32",
-                    DataType::BigInt if self.signed => "i64",
+                    DataType::BigInt if self.signed || signed_only => "i64",
                     DataType::BigInt => "u64",
                     _ => panic!("unsupported type"),
                 };

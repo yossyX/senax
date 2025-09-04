@@ -84,6 +84,8 @@ enum Commands {
     },
     /// Prepare to use DB
     NewDb {
+        /// DB type
+        db_type: schema::DbType,
         /// DB name
         db: String,
         #[clap(long)]
@@ -302,11 +304,12 @@ async fn exec(cli: Cli) -> Result<()> {
             init_generator::generate(name, *non_snake_case)?;
         }
         Commands::NewDb {
+            db_type,
             db,
             exclude_from_domain,
         } => {
             ensure!(db_re.is_match(db), "bad db name!");
-            db_generator::generate(db, *exclude_from_domain)?;
+            db_generator::generate(*db_type, db, *exclude_from_domain)?;
         }
         Commands::Actix { command } => match command {
             Server::New {

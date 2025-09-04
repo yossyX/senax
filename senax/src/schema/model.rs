@@ -228,7 +228,8 @@ pub struct ModelDef {
     /// ### キャッシュ整合性のためのバージョンを使用する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub versioned: bool,
-    /// ### save_delayedのカウンターに使用するフィールド
+    /// ### save_delayed のカウンターに使用するフィールド
+    /// versioned との同時使用は不可
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub counting: Option<String>,
     /// ### キャッシュを使用する
@@ -379,7 +380,8 @@ pub struct ModelJson {
     /// ### キャッシュ整合性のためのバージョンを使用する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub versioned: bool,
-    /// ### save_delayedのカウンターに使用するフィールド
+    /// ### save_delayed のカウンターに使用するフィールド
+    /// versionedとの同時使用は不可
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub counting: Option<String>,
     /// ### キャッシュを使用する
@@ -1064,6 +1066,9 @@ impl ModelDef {
     }
 
     pub fn get_counting_col(&self) -> String {
+        if self.versioned {
+            error_exit!("In the {} model, both versioned and counting cannot be set.", &self.name)
+        }
         let name = self.counting.as_ref().unwrap();
         self.merged_fields
             .get(name)
@@ -1478,6 +1483,11 @@ impl ModelDef {
             .iter()
             .filter(|(_k, v)| v.auto == Some(AutoGeneration::AutoIncrement))
             .collect()
+    }
+    pub fn is_auto_inc(&self) -> bool {
+        self.merged_fields
+            .iter()
+            .any(|(_k, v)| v.auto == Some(AutoGeneration::AutoIncrement))
     }
     pub fn auto_seq(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields

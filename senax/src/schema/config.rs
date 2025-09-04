@@ -1,3 +1,4 @@
+use clap::ValueEnum;
 use compact_str::CompactString;
 use indexmap::IndexMap;
 use schemars::JsonSchema;
@@ -21,7 +22,6 @@ pub struct ConfigDef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub db_id: Option<u64>,
     /// ### データベース
-    /// 現在のところmysqlのみ対応
     pub db: DbType,
     /// ### デフォルトで外部キー制約をマイグレーションのDDLに出力しない
     #[serde(default, skip_serializing_if = "super::is_false")]
@@ -177,7 +177,6 @@ pub struct ConfigJson {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub db_id: Option<u64>,
     /// ### データベース
-    /// 現在のところ、mysqlのみ対応
     pub db: DbType,
     /// ### デフォルトで外部キー制約をマイグレーションのDDLに出力しない
     #[serde(default, skip_serializing_if = "super::is_false")]
@@ -489,6 +488,38 @@ impl ConfigDef {
         self.db_id.unwrap_or(now)
     }
 
+    pub fn db_type_short(&self) -> &str {
+        match self.db {
+            DbType::Mysql => "MySql",
+            DbType::Postgres => "Pg",
+        }
+    }
+
+    pub fn db_type_long(&self) -> &str {
+        match self.db {
+            DbType::Mysql => "MySql",
+            DbType::Postgres => "Postgres",
+        }
+    }
+
+    pub fn db_type_switch(&self, mysql: &'static str, pgsql: &'static str) -> &'static str {
+        match self.db {
+            DbType::Mysql => mysql,
+            DbType::Postgres => pgsql,
+        }
+    }
+
+    pub fn is_mysql(&self) -> bool {
+        self.db == DbType::Mysql
+    }
+
+    pub fn signed_only(&self) -> bool {
+        match self.db {
+            DbType::Mysql => false,
+            DbType::Postgres => true,
+        }
+    }
+
     pub fn use_fast_cache(&self) -> bool {
         self.use_fast_cache
     }
@@ -520,6 +551,7 @@ impl ConfigDef {
     pub fn max_db_str_len(&self) -> u64 {
         match self.db {
             DbType::Mysql => 4 * 1024 * 1024 * 1024 - 1,
+            DbType::Postgres => 1 * 1024 * 1024 * 1024 - 1,
         }
     }
     pub fn outer_db(&self) -> BTreeSet<String> {
@@ -595,13 +627,15 @@ impl From<GroupJson> for GroupDef {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, Default, JsonSchema)]
+#[derive(Debug, derive_more::Display, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, Default, JsonSchema, ValueEnum)]
 #[serde(rename_all = "lowercase")]
 /// ### データベースタイプ
 pub enum DbType {
     #[default]
+    #[display("mysql")]
     Mysql,
-    // PgSql
+    #[display("postgres")]
+    Postgres,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]

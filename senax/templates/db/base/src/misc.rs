@@ -95,7 +95,7 @@ pub enum BindValue {
     Time(Option<NaiveTime>),
     Blob(Option<Vec<u8>>),
     Json(Option<Value>),
-    Uuid(Option<uuid::fmt::Hyphenated>),
+    Uuid(Option<uuid::@{ config.db_type_switch("fmt::Hyphenated", "Uuid") }@>),
     BinaryUuid(Option<uuid::Uuid>),
 }
 

@@ -10,9 +10,9 @@ use log::LevelFilter;
 use once_cell::sync::{Lazy, OnceCell};
 use senax_common::ShardId;
 use sqlx::migrate::MigrateDatabase;
-use sqlx::mysql::{MySqlConnectOptions, MySqlPool};
+use sqlx::@{ config.db }@::{@{ config.db_type_short() }@ConnectOptions, @{ config.db_type_short() }@Pool};
 use sqlx::pool::PoolConnection;
-use sqlx::{ConnectOptions, Executor, MySqlConnection, Row, Transaction};
+use sqlx::{ConnectOptions, Executor, @{ config.db_type_short() }@Connection, Row, Transaction};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, VecDeque};
 use std::net::SocketAddr;
@@ -29,21 +29,26 @@ use tokio::task::JoinSet;
 use crate::models::{CacheOp, NotifyOp, TableName};
 use crate::*;
 
-pub type DbType = sqlx::MySql;
-pub type DbPool = MySqlPool;
-pub type DbConnection = MySqlConnection;
-pub type DbConnectOptions = MySqlConnectOptions;
-pub type DbArguments = sqlx::mysql::MySqlArguments;
-pub type DbRow = sqlx::mysql::MySqlRow;
+pub type DbType = sqlx::@{ config.db_type_long() }@;
+pub type DbPool = @{ config.db_type_short() }@Pool;
+pub type DbConnection = @{ config.db_type_short() }@Connection;
+pub type DbConnectOptions = @{ config.db_type_short() }@ConnectOptions;
+pub type DbArguments = sqlx::@{ config.db }@::@{ config.db_type_short() }@Arguments;
+pub type DbRow = sqlx::@{ config.db }@::@{ config.db_type_short() }@Row;
 pub const TX_ISOLATION: Option<&'static str> = @{ tx_isolation|disp_opt }@;
 pub const READ_TX_ISOLATION: Option<&'static str> = @{ read_tx_isolation|disp_opt }@;
+@%- if config.is_mysql() %@
 const CHECK_SQL: &str = "select @@innodb_read_only OR @@read_only OR @@super_read_only";
 const CHECK_SQL_WRITABLE_RESULT: i8 = 0;
+@%- else %@
+const CHECK_SQL: &str = "SHOW transaction_read_only";
+const CHECK_SQL_WRITABLE_RESULT: &str = "off";
+@%- endif %@
 @%- if config.use_sequence %@
-const ID_OF_SEQUENCE: u32 = 1;
+const ID_OF_SEQUENCE: @{ config.db_type_switch("u32", "i32") }@ = 1;
 @%- endif %@
 @%- if !config.force_disable_cache %@
-const ID_OF_CACHE_SYNC: u32 = 2;
+const ID_OF_CACHE_SYNC: @{ config.db_type_switch("u32", "i32") }@ = 2;
 @%- endif %@
 const DISABLE_CACHE: bool = @{ config.force_disable_cache }@ || cfg!(feature = "cache_update_only");
 
@@ -691,11 +696,19 @@ impl DbConn {
             .clone()
             .context("There are no writable database connections.(code:2)")?;
         let mut conn = pool.acquire().await?;
+@%- if config.is_mysql() %@
         let row: (i8,) = sqlx::query_as(CHECK_SQL).fetch_one(conn.as_mut()).await?;
         ensure!(
             row.0 == CHECK_SQL_WRITABLE_RESULT,
             "There are no writable database connections.(code:3)"
         );
+@%- else %@
+        let row: (String,) = sqlx::query_as(CHECK_SQL).fetch_one(conn.as_mut()).await?;
+        ensure!(
+            row.0.eq_ignore_ascii_case(CHECK_SQL_WRITABLE_RESULT),
+            "There are no writable database connections.(code:3)"
+        );
+@%- endif %@
         Ok(conn)
     }
 
@@ -1110,8 +1123,8 @@ impl DbConn {
             let mut tx = Self::acquire_cache_tx(self.shard_id).await?;
             set_read_tx_isolation(&mut tx).await?;
             let sql = "SELECT seq FROM _sequence where id = 2";
-            let sync: (u64,) = sqlx::query_as(sql).fetch_one(tx.as_mut()).await?;
-            self.cache_tx.insert(self.shard_id, (sync.0, tx));
+            let sync: (@{ config.db_type_switch("u64", "i64") }@,) = sqlx::query_as(sql).fetch_one(tx.as_mut()).await?;
+            self.cache_tx.insert(self.shard_id, (sync.0 as u64, tx));
         }
         Ok(())
     }
@@ -1130,8 +1143,8 @@ impl DbConn {
                 let mut tx = Self::acquire_cache_tx(self.shard_id).await?;
                 set_read_tx_isolation(&mut tx).await?;
                 let sql = "SELECT seq FROM _sequence where id = 2";
-                let sync: (u64,) = sqlx::query_as(sql).fetch_one(tx.as_mut()).await?;
-                Ok(&mut v.insert((sync.0, tx)).1)
+                let sync: (@{ config.db_type_switch("u64", "i64") }@,) = sqlx::query_as(sql).fetch_one(tx.as_mut()).await?;
+                Ok(&mut v.insert((sync.0 as u64, tx)).1)
             }
         }
     }
@@ -1167,10 +1180,10 @@ impl DbConn {
         if seq + num > ceiling {
             let base = SEQUENCE_FETCH_NUM.load(Ordering::Relaxed) as u64;
             let fetch_num = (num / base + 1) * base;
-            let sql = "UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;";
+            let sql = "@{ config.db_type_switch("UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;", "UPDATE _sequence SET seq = seq + ? where id = ? RETURNING seq;") }@";
             let query = sqlx::query(sql).bind(fetch_num).bind(ID_OF_SEQUENCE);
-            let result = query.execute(self.acquire_writer().await?.as_mut()).await?;
-            let ceiling = result.last_insert_id();
+            let result = query.@{ config.db_type_switch("execute", "fetch_one") }@(self.acquire_writer().await?.as_mut()).await?;
+            let ceiling = result.@{ config.db_type_switch("last_insert_id()", "get::<i64, usize>(0) as u64") }@;
             let ret = ceiling - fetch_num + 1;
             *cur = (ret + num - 1, ceiling);
             Ok(ret)
@@ -1189,13 +1202,45 @@ impl DbConn {
         }
         sync_map
     }
+
+    pub async fn execute(&mut self, query: sqlx::query::Query<'_, DbType, DbArguments>) -> Result<(u64, u64)> {
+        let result = if self.wo_tx() {
+            query.execute(self.acquire_writer().await?.as_mut()).await?
+        } else {
+            query.execute(self.get_tx().await?.as_mut()).await?
+        };
+        Ok((result.rows_affected(), 0))
+    }
+    @%- if config.is_mysql() %@
+
+    pub async fn execute_with_last_insert_id(&mut self, query: sqlx::query::Query<'_, DbType, DbArguments>) -> Result<(u64, u64)> {
+        let result = if self.wo_tx() {
+            query.execute(self.acquire_writer().await?.as_mut()).await?
+        } else {
+            query.execute(self.get_tx().await?.as_mut()).await?
+        };
+        Ok((result.rows_affected(), result.last_insert_id()))
+    }
+    @%- else %@
+
+    pub async fn execute_with_last_insert_id(&mut self, query: sqlx::query::Query<'_, DbType, DbArguments>) -> Result<(u64, u64)> {
+        let result = if self.wo_tx() {
+            query.fetch_all(self.acquire_writer().await?.as_mut()).await?
+        } else {
+            query.fetch_all(self.get_tx().await?.as_mut()).await?
+        };
+        let rows_affected = result.len() as u64;
+        let last_insert_id = result.first().map(|v| v.get::<i64, usize>(0) as u64).unwrap_or_default();
+        Ok((rows_affected, last_insert_id))
+    }
+    @%- endif %@
     @%- if !config.force_disable_cache %@
 
     async fn ___inc_cache_sync(mut pool: PoolConnection<DbType>) -> Result<u64> {
-        let sql = "UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;";
+        let sql = "@{ config.db_type_switch("UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;", "UPDATE _sequence SET seq = seq + ? where id = ? RETURNING seq;") }@";
         let query = sqlx::query(sql).bind(1).bind(ID_OF_CACHE_SYNC);
-        let result = query.execute(pool.as_mut()).await?;
-        Ok(result.last_insert_id())
+        let result = query.@{ config.db_type_switch("execute", "fetch_one") }@(pool.as_mut()).await?;
+        Ok(result.@{ config.db_type_switch("last_insert_id()", "get::<i64, usize>(0) as u64") }@)
     }
 
     async fn __inc_cache_sync(shard_id: ShardId) -> Result<u64> {
@@ -1432,8 +1477,13 @@ async fn check_if_writable(options: &DbConnectOptions) -> Result<Option<bool>> {
         Ok(conn) => conn,
     };
     let conn = conn.acquire().await?;
+@%- if config.is_mysql() %@
     let row: (i8,) = sqlx::query_as(CHECK_SQL).fetch_one(conn).await?;
     Ok(Some(row.0 == CHECK_SQL_WRITABLE_RESULT))
+@%- else %@
+    let row: (String,) = sqlx::query_as(CHECK_SQL).fetch_one(conn).await?;
+    Ok(Some(row.0.eq_ignore_ascii_case(CHECK_SQL_WRITABLE_RESULT)))
+@%- endif %@
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1737,6 +1787,8 @@ async fn reset_writer_pool(
     Ok(())
 }
 
+@%- if config.is_mysql() %@
+
 async fn writer_connect_with(
     pool_option: sqlx::pool::PoolOptions<connection::DbType>,
     options: DbConnectOptions,
@@ -1778,6 +1830,26 @@ async fn writer_connect_with(
         .connect_with(options)
         .await?)
 }
+@%- else %@
+
+async fn writer_connect_with(
+    pool_option: sqlx::pool::PoolOptions<connection::DbType>,
+    options: DbConnectOptions,
+) -> Result<DbPool> {
+    Ok(pool_option
+        .after_connect(|conn, _meta| {
+            Box::pin(async move {
+                let row: (String,) = sqlx::query_as(CHECK_SQL).fetch_one(conn).await?;
+                if !row.0.eq_ignore_ascii_case(CHECK_SQL_WRITABLE_RESULT) {
+                    return Err(sqlx::Error::Protocol("There are no writable database connections.(code:4)".to_string()));
+                }
+                Ok(())
+            })
+        })
+        .connect_with(options)
+        .await?)
+}
+@%- endif %@
 
 #[allow(clippy::too_many_arguments)]
 async fn reset_reader_pool(
@@ -1916,6 +1988,7 @@ async fn reset_reader_pool(
     }
     Ok(())
 }
+@%- if config.is_mysql() %@
 
 async fn reader_connect_with(
     pool_option: sqlx::pool::PoolOptions<connection::DbType>,
@@ -1939,6 +2012,17 @@ async fn reader_connect_with(
         .connect_with(options)
         .await?)
 }
+@%- else %@
+
+async fn reader_connect_with(
+    pool_option: sqlx::pool::PoolOptions<connection::DbType>,
+    options: DbConnectOptions,
+) -> Result<DbPool> {
+    Ok(pool_option
+        .connect_with(options)
+        .await?)
+}
+@%- endif %@
 
 #[allow(dead_code)]
 pub fn _is_retryable_error<T>(result: Result<T>, table: &str) -> bool {
