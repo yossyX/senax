@@ -1,5 +1,5 @@
 use nom::branch::alt;
-use nom::bytes::complete::{tag, tag_no_case, take_until};
+use nom::bytes::complete::{tag, tag_no_case};
 use nom::character::complete::{digit1, multispace0, multispace1};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, many1};
@@ -20,7 +20,7 @@ use super::common::{
 use super::create_table_options::table_options;
 use super::keywords::escape;
 use super::order::{OrderType, order_type};
-use crate::common::take_until_unbalanced;
+use crate::common::{string_literal, take_until_unbalanced};
 use crate::create_table_options::TableOption;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -445,16 +445,13 @@ fn default(i: &[u8]) -> IResult<&[u8], Option<ColumnConstraint>> {
         tag_no_case("default"),
         multispace1,
         alt((
-            map(
-                delimited(tag("'"), take_until("'"), tag("'")),
-                |s: &[u8]| Literal::String(String::from_utf8(s.to_vec()).unwrap()),
-            ),
+            map(tag("''"), |_| Literal::String(String::from(""))),
+            string_literal,
             fixed_point,
             map(digit1, |d| {
                 let d_i64 = i64::from_str(str::from_utf8(d).unwrap()).unwrap();
                 Literal::Integer(d_i64)
             }),
-            map(tag("''"), |_| Literal::String(String::from(""))),
             map(tag_no_case("null"), |_| Literal::Null),
             map(
                 tag_no_case("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
