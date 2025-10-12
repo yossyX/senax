@@ -57,10 +57,10 @@ where
             time.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64 / self.tick - self.divisor;
         let mut count = 0;
         for (t, map) in counter.iter() {
-            if *t > time {
-                if let Some(c) = map.get(key.borrow()) {
-                    count += c;
-                }
+            if *t > time
+                && let Some(c) = map.get(key.borrow())
+            {
+                count += c;
             }
         }
         count

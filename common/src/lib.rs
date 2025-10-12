@@ -10,6 +10,8 @@ pub mod types {
     pub mod geo_point;
     pub mod point;
 }
+pub mod db;
+pub use db::convert_mysql_placeholders_to_postgresql;
 pub mod update_operator;
 
 pub type ShardId = u16;
@@ -23,12 +25,4 @@ macro_rules! if_then_else {
 
 pub trait SqlColumns {
     fn _sql_cols() -> &'static str;
-}
-
-// This may be deprecated.
-pub fn hash64(v: &str) -> String {
-    use sha2::Digest;
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(v);
-    hex::encode(&*hasher.finalize())
 }

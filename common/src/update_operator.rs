@@ -115,17 +115,16 @@ pub fn apply_operator(mut obj: Value, op: &Value, now: DateTime<Utc>) -> Result<
                             .as_array()
                             .context("Cannot apply _addToSet to a non-array value")?
                             .clone();
-                        if let Some(obj) = val.as_object() {
-                            if let Some(each) = obj.get("_each") {
-                                if let Some(list) = each.as_array() {
-                                    for val in list {
-                                        if !org_list.iter().any(|o| o == val) {
-                                            org_list.push(val.clone());
-                                        }
-                                    }
-                                    return Ok(Some(Value::from(org_list)));
+                        if let Some(obj) = val.as_object()
+                            && let Some(each) = obj.get("_each")
+                            && let Some(list) = each.as_array()
+                        {
+                            for val in list {
+                                if !org_list.iter().any(|o| o == val) {
+                                    org_list.push(val.clone());
                                 }
                             }
+                            return Ok(Some(Value::from(org_list)));
                         }
                         if !org_list.iter().any(|o| o == val) {
                             org_list.push(val.clone());
@@ -162,30 +161,29 @@ pub fn apply_operator(mut obj: Value, op: &Value, now: DateTime<Utc>) -> Result<
                             .as_array()
                             .context("Cannot apply _push to a non-array value")?
                             .clone();
-                        if let Some(obj) = val.as_object() {
-                            if let Some(each) = obj.get("_each") {
-                                if let Some(list) = each.as_array() {
-                                    if let Some(pos) = obj.get("_position") {
-                                        let pos = pos.as_u64().context(
-                                            "The value for _position must be an integer value.",
-                                        )?;
-                                        for val in list {
-                                            org_list.insert(pos as usize, val.clone())
-                                        }
-                                    } else {
-                                        for val in list {
-                                            org_list.push(val.clone())
-                                        }
-                                    }
-                                    // _sort is not supported
-                                    if let Some(slice) = obj.get("_slice") {
-                                        if let Some(slice) = slice.as_u64() {
-                                            org_list.truncate(slice as usize);
-                                        }
-                                    }
-                                    return Ok(Some(Value::from(org_list)));
+                        if let Some(obj) = val.as_object()
+                            && let Some(each) = obj.get("_each")
+                            && let Some(list) = each.as_array()
+                        {
+                            if let Some(pos) = obj.get("_position") {
+                                let pos = pos
+                                    .as_u64()
+                                    .context("The value for _position must be an integer value.")?;
+                                for val in list {
+                                    org_list.insert(pos as usize, val.clone())
+                                }
+                            } else {
+                                for val in list {
+                                    org_list.push(val.clone())
                                 }
                             }
+                            // _sort is not supported
+                            if let Some(slice) = obj.get("_slice")
+                                && let Some(slice) = slice.as_u64()
+                            {
+                                org_list.truncate(slice as usize);
+                            }
+                            return Ok(Some(Value::from(org_list)));
                         }
                         org_list.push(val.clone());
                         Ok(Some(Value::from(org_list)))

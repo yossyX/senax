@@ -90,28 +90,28 @@ impl FastCache {
             if candidate != 0 && (candidate & !TIME_MASK) == ((hash as u64) & !TIME_MASK) {
                 let guard = &epoch::pin();
                 let ptr = self.data[pos].load_consume(guard);
-                if let Some(data) = unsafe { ptr.as_ref() } {
-                    if data.hash == hash {
-                        if data.is_timeout(msec, self.ttl) {
-                            let old = self.data[pos].swap(Shared::null(), Ordering::SeqCst, guard);
-                            if !old.is_null() {
-                                unsafe { guard.defer_destroy(old) };
-                                guard.flush();
-                            }
-                            self.index[pos].store(0, Ordering::Release);
-                            return None;
+                if let Some(data) = unsafe { ptr.as_ref() }
+                    && data.hash == hash
+                {
+                    if data.is_timeout(msec, self.ttl) {
+                        let old = self.data[pos].swap(Shared::null(), Ordering::SeqCst, guard);
+                        if !old.is_null() {
+                            unsafe { guard.defer_destroy(old) };
+                            guard.flush();
                         }
-                        let hash_time = ((hash as u64) & !TIME_MASK) | (now & TIME_MASK);
-                        if candidate != hash_time {
-                            let _ = self.index[pos].compare_exchange_weak(
-                                candidate,
-                                hash_time,
-                                Ordering::Relaxed,
-                                Ordering::Relaxed,
-                            );
-                        }
-                        return Some(Arc::clone(&data.value));
+                        self.index[pos].store(0, Ordering::Release);
+                        return None;
                     }
+                    let hash_time = ((hash as u64) & !TIME_MASK) | (now & TIME_MASK);
+                    if candidate != hash_time {
+                        let _ = self.index[pos].compare_exchange_weak(
+                            candidate,
+                            hash_time,
+                            Ordering::Relaxed,
+                            Ordering::Relaxed,
+                        );
+                    }
+                    return Some(Arc::clone(&data.value));
                 }
             }
         }
@@ -127,15 +127,15 @@ impl FastCache {
             if candidate != 0 && (candidate & !TIME_MASK) == ((hash as u64) & !TIME_MASK) {
                 let guard = &epoch::pin();
                 let ptr = self.data[pos].load_consume(guard);
-                if let Some(data) = unsafe { ptr.as_ref() } {
-                    if data.hash == hash {
-                        let old = self.data[pos].swap(Shared::null(), Ordering::SeqCst, guard);
-                        if !old.is_null() {
-                            unsafe { guard.defer_destroy(old) };
-                            guard.flush();
-                        }
-                        self.index[pos].store(0, Ordering::Release);
+                if let Some(data) = unsafe { ptr.as_ref() }
+                    && data.hash == hash
+                {
+                    let old = self.data[pos].swap(Shared::null(), Ordering::SeqCst, guard);
+                    if !old.is_null() {
+                        unsafe { guard.defer_destroy(old) };
+                        guard.flush();
                     }
+                    self.index[pos].store(0, Ordering::Release);
                 }
                 return;
             }
@@ -146,14 +146,14 @@ impl FastCache {
         let guard = &epoch::pin();
         for i in 0..self.data.len() {
             let ptr = self.data[i].load_consume(guard);
-            if let Some(data) = unsafe { ptr.as_ref() } {
-                if data.value._type_id() == type_id {
-                    let old = self.data[i].swap(Shared::null(), Ordering::SeqCst, guard);
-                    if !old.is_null() {
-                        unsafe { guard.defer_destroy(old) };
-                    }
-                    self.index[i].store(0, Ordering::Release);
+            if let Some(data) = unsafe { ptr.as_ref() }
+                && data.value._type_id() == type_id
+            {
+                let old = self.data[i].swap(Shared::null(), Ordering::SeqCst, guard);
+                if !old.is_null() {
+                    unsafe { guard.defer_destroy(old) };
                 }
+                self.index[i].store(0, Ordering::Release);
             }
         }
         guard.flush();

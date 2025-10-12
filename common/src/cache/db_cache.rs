@@ -129,12 +129,11 @@ fn get_long_cache(
             if cause == RemovalCause::Size {
                 long_cache_evicted.fetch_add(1, Ordering::Relaxed);
             }
-            if cause.was_evicted() {
-                if let Some(ref storage_cache) = storage_cache {
-                    if let Ok(buf) = v._encode() {
-                        storage_cache.write(*k, v._type_id(), &buf, v._time());
-                    }
-                }
+            if cause.was_evicted()
+                && let Some(ref storage_cache) = storage_cache
+                && let Ok(buf) = v._encode()
+            {
+                storage_cache.write(*k, v._type_id(), &buf, v._time());
             }
         })
         .build_with_hasher(FxBuildHasher::default())
@@ -278,14 +277,12 @@ impl DbCache {
         use_fast_cache: bool,
     ) {
         let hash = id.hash_val(value._shard_id());
-        if use_fast_cache {
-            if let Some(ref fast_cache) = self.fast_cache {
-                let old = fast_cache.insert(hash, value);
-                if let Some(old) = old {
-                    self.long_cache.insert(old.0, old.1).await;
-                }
-                return;
+        if use_fast_cache && let Some(ref fast_cache) = self.fast_cache {
+            let old = fast_cache.insert(hash, value);
+            if let Some(old) = old {
+                self.long_cache.insert(old.0, old.1).await;
             }
+            return;
         }
         self.long_cache.insert(hash, value).await;
     }
@@ -303,17 +300,15 @@ impl DbCache {
         let (now, msec) = get_cache_time();
         self.cache_request_count.fetch_add(1, Ordering::Relaxed);
 
-        if use_fast_cache {
-            if let Some(ref fast_cache) = self.fast_cache {
-                let val = fast_cache
-                    .get(hash, now, msec)
-                    .filter(|v| v._shard_id() == shard_id)
-                    .map(|v| v.downcast_arc::<T>().ok())
-                    .unwrap_or(None);
-                if val.is_some() {
-                    self.fast_cache_hit.fetch_add(1, Ordering::Relaxed);
-                    return val;
-                }
+        if use_fast_cache && let Some(ref fast_cache) = self.fast_cache {
+            let val = fast_cache
+                .get(hash, now, msec)
+                .filter(|v| v._shard_id() == shard_id)
+                .map(|v| v.downcast_arc::<T>().ok())
+                .unwrap_or(None);
+            if val.is_some() {
+                self.fast_cache_hit.fetch_add(1, Ordering::Relaxed);
+                return val;
             }
         }
 
@@ -328,10 +323,8 @@ impl DbCache {
             if val._time().less_than_ttl(msec, self.ttl) {
                 return None;
             }
-            if use_fast_cache {
-                if let Some(ref fast_cache) = self.fast_cache {
-                    fast_cache.insert(hash, val.clone());
-                }
+            if use_fast_cache && let Some(ref fast_cache) = self.fast_cache {
+                fast_cache.insert(hash, val.clone());
             }
             self.long_cache_hit.fetch_add(1, Ordering::Relaxed);
             return Some(val);
@@ -354,22 +347,21 @@ impl DbCache {
             return None;
         }
 
-        if let Some(ref storage_cache) = self.storage_cache {
-            if let Some(buf) = storage_cache
+        if let Some(ref storage_cache) = self.storage_cache
+            && let Some(buf) = storage_cache
                 .read(hash, T::__type_id(), T::_estimate())
                 .await
-            {
-                match T::_decode(&buf) {
-                    Ok(v) => {
-                        if v._shard_id() == shard_id {
-                            let val = Arc::new(v);
-                            self.storage_cache_hit.fetch_add(1, Ordering::Relaxed);
-                            self.long_cache.insert(hash, val.clone()).await;
-                            return Some(val);
-                        }
+        {
+            match T::_decode(&buf) {
+                Ok(v) => {
+                    if v._shard_id() == shard_id {
+                        let val = Arc::new(v);
+                        self.storage_cache_hit.fetch_add(1, Ordering::Relaxed);
+                        self.long_cache.insert(hash, val.clone()).await;
+                        return Some(val);
                     }
-                    Err(e) => error!("{}", e),
                 }
+                Err(e) => error!("{}", e),
             }
         }
         None
