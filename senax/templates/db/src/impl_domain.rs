@@ -15,7 +15,7 @@ macro_rules! get_repo {
 }
 
 // Do not modify below this line. (ModStart)
-// Do not modify up to this line. (ModEnd)
+// Do not modify above this line. (ModEnd)
 
 #[derive(derive_new::new)]
 pub struct @{ db|pascal }@RepositoryImpl {
@@ -49,7 +49,7 @@ impl @{ db|pascal }@Repository for @{ db|pascal }@RepositoryImpl {
         self._conn.lock().await.reset_tx()
     }
     // Do not modify below this line. (RepoStart)
-    // Do not modify up to this line. (RepoEnd)
+    // Do not modify above this line. (RepoEnd)
 }
 #[rustfmt::skip]
 #[async_trait]
@@ -67,6 +67,6 @@ impl @{ db|pascal }@QueryService for @{ db|pascal }@RepositoryImpl {
         self._conn.lock().await.reset_tx()
     }
     // Do not modify below this line. (QueryServiceStart)
-    // Do not modify up to this line. (QueryServiceEnd)
+    // Do not modify above this line. (QueryServiceEnd)
 }
 @{-"\n"}@

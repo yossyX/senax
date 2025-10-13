@@ -2,18 +2,19 @@ use anyhow::{Context as _, Result};
 use chrono::Utc;
 use derive_more::Display;
 use indexmap::IndexMap;
-use senax_mysql_parser::column;
-use senax_mysql_parser::common::{Literal, ReferenceOption, SqlType, TableKey};
 use std::collections::{BTreeMap, HashSet};
 use std::env;
 use std::fmt::Write;
 use std::path::Path;
 use std::str::FromStr;
 
-use crate::common::ToCase as _;
 use crate::common::fs_write;
+use crate::common::{ToCase as _, column_escape};
+use crate::ddl::sql_type::{IndexColumn, Literal, ReferenceOption, SqlType, TableKey};
 use crate::ddl::table::{Column, Constraint, Table};
-use crate::schema::{self, AutoGeneration, CONFIG, GROUPS, SoftDelete, SortDirection};
+use crate::schema::{
+    self, AutoGeneration, CONFIG, GROUPS, SoftDelete, SortDirection, is_mysql_mode,
+};
 use crate::{DB_PATH, ddl};
 
 pub const UTF8_BYTE_LEN: u32 = 4;
@@ -47,7 +48,7 @@ pub async fn generate(
     let db_url = env::var(&url_name)
         .with_context(|| format!("{} is required in the .env file.", url_name))?;
     let old_tables = ddl::table::parse(&db_url).await?;
-    let mut ddl = make_ddl(new_tables, old_tables)?;
+    let (mut ddl, mut ddl_list) = make_ddl(new_tables, old_tables)?;
     if skip_empty && ddl.is_empty() {
         return Ok(());
     }
@@ -55,6 +56,7 @@ pub async fn generate(
         if ddl.is_empty() {
             ddl.push_str("-- TODO: Fix this file.\n");
         }
+        ddl_list.insert(0, ddl);
         let description: String = description
             .chars()
             .map(|c| {
@@ -68,11 +70,27 @@ pub async fn generate(
         let base_path = Path::new(DB_PATH).join(db);
         let ddl_path = base_path.join("migrations");
         let dt = Utc::now();
-        let file_prefix = dt.format("%Y%m%d%H%M%S").to_string();
-        let file_path = ddl_path.join(format!("{}_{}.sql", file_prefix, description));
-        fs_write(file_path, &ddl)?;
+        let mut file_prefix: u64 = dt.format("%Y%m%d%H%M%S").to_string().parse().unwrap();
+        ddl_list.reverse();
+        loop {
+            let file_path = ddl_path.join(format!("{}_*.sql", file_prefix));
+            if glob::glob(file_path.to_str().unwrap())?.count() > 0 {
+                file_prefix += 1;
+                continue;
+            }
+            let ddl = if let Some(ddl) = ddl_list.pop() {
+                ddl
+            } else {
+                break;
+            };
+            let file_path = ddl_path.join(format!("{}_{}.sql", file_prefix, description));
+            fs_write(file_path, &ddl)?;
+        }
     } else {
         println!("{}", &ddl);
+        for line in ddl_list {
+            println!("{}", &line);
+        }
     }
     Ok(())
 }
@@ -116,11 +134,11 @@ pub fn make_table_def(
             // character_set: col.character_set.clone()
             default_collation: default_collation.clone(),
             collation: col.collation.clone(),
-            default_value: Default::default(),
+            // default_value: Default::default(),
             auto_increment: col.auto == Some(AutoGeneration::AutoIncrement),
             // primary_key: col.primary
-            primary_key: Default::default(),
-            unique: Default::default(),
+            // primary_key: Default::default(),
+            // unique: Default::default(),
             srid: col.srid,
             query: col
                 .query
@@ -145,7 +163,8 @@ pub fn make_table_def(
             schema::DataType::Varchar => {
                 SqlType::Varchar(col.length.unwrap_or(schema::DEFAULT_VARCHAR_LENGTH))
             }
-            schema::DataType::Boolean => SqlType::Tinyint,
+            schema::DataType::Boolean if is_mysql_mode() => SqlType::Tinyint,
+            schema::DataType::Boolean => SqlType::Bool,
             schema::DataType::Text if col.length.unwrap_or(65536) * UTF8_BYTE_LEN < 256 => {
                 SqlType::Tinytext
             }
@@ -153,7 +172,8 @@ pub fn make_table_def(
                 SqlType::Text
             }
             schema::DataType::Text => SqlType::Longtext,
-            schema::DataType::Uuid => SqlType::Char(schema::UUID_LENGTH),
+            schema::DataType::Uuid if is_mysql_mode() => SqlType::Char(schema::UUID_LENGTH),
+            schema::DataType::Uuid => SqlType::Uuid,
             schema::DataType::BinaryUuid => SqlType::Binary(schema::BINARY_UUID_LENGTH),
             schema::DataType::Binary => SqlType::Binary(
                 col.length
@@ -168,8 +188,11 @@ pub fn make_table_def(
             schema::DataType::Blob if col.length.unwrap_or(65536) < 256 => SqlType::Tinyblob,
             schema::DataType::Blob if col.length.unwrap_or(65536) < 65536 => SqlType::Blob,
             schema::DataType::Blob => SqlType::Longblob,
-            schema::DataType::Timestamp => SqlType::Timestamp(col.precision.unwrap_or(0)),
-            schema::DataType::DateTime => SqlType::DateTime(col.precision.unwrap_or(0)),
+            schema::DataType::NaiveDateTime => SqlType::DateTime(col.precision.unwrap_or(0)),
+            schema::DataType::UtcDateTime => SqlType::DateTime(col.precision.unwrap_or(0)),
+            schema::DataType::TimestampWithTimeZone => {
+                SqlType::Timestamp(col.precision.unwrap_or(0))
+            }
             schema::DataType::Date => SqlType::Date,
             schema::DataType::Time => SqlType::Time,
             schema::DataType::Decimal => SqlType::Decimal(
@@ -209,7 +232,10 @@ pub fn make_table_def(
         } else {
             sql_type.clone()
         };
-        if col.data_type == schema::DataType::Uuid && constraint.collation.is_none() {
+        if col.data_type == schema::DataType::Uuid
+            && constraint.collation.is_none()
+            && is_mysql_mode()
+        {
             constraint.collation = Some("ascii_general_ci".to_string());
         }
         let mut sql_comment = col.sql_comment.clone();
@@ -233,10 +259,10 @@ pub fn make_table_def(
             },
         );
     }
-    let cols: Vec<column::Column> = def
+    let cols: Vec<IndexColumn> = def
         .primaries()
         .iter()
-        .map(|(n, c)| column::Column {
+        .map(|(n, c)| IndexColumn {
             name: c.get_col_name(n).to_string(),
             query: None,
             len: None,
@@ -244,7 +270,7 @@ pub fn make_table_def(
         })
         .collect();
     if !cols.is_empty() {
-        table.primary = Some(TableKey::PrimaryKey(cols));
+        table.primary = Some((String::new(), TableKey::PrimaryKey(cols)));
     }
     let mut idx_check = HashSet::new();
     let mut idx_map = IndexMap::new();
@@ -256,7 +282,7 @@ pub fn make_table_def(
             fields.insert(org_index_name.clone(), None);
             fields
         };
-        let cols: Vec<column::Column> = fields
+        let cols: Vec<IndexColumn> = fields
             .iter()
             .map(|(n, c)| {
                 let col = def
@@ -285,7 +311,7 @@ pub fn make_table_def(
                     .as_ref()
                     .map(|c| c.direction == Some(SortDirection::Desc))
                     .unwrap_or_default();
-                column::Column {
+                IndexColumn {
                     name,
                     query,
                     len,
@@ -298,7 +324,11 @@ pub fn make_table_def(
             .filter_map(|v| v.query.clone())
             .collect::<Vec<_>>()
             .join(",");
-        let mut index_name = org_index_name.clone();
+        let mut index_name = if is_mysql_mode() {
+            org_index_name.clone()
+        } else {
+            format!("{}_{}", &table_name, org_index_name)
+        };
         if !query.is_empty() {
             index_name.push('_');
             index_name.push_str(&crate::common::hex_digest(&query));
@@ -352,7 +382,7 @@ pub fn make_table_def(
                 } else {
                     local_id.clone()
                 };
-                column::Column {
+                IndexColumn {
                     name: local_col_name,
                     query: None,
                     len: None,
@@ -364,7 +394,7 @@ pub fn make_table_def(
         let foreign_primaries = foreign
             .primaries()
             .iter()
-            .map(|(n, c)| column::Column {
+            .map(|(n, c)| IndexColumn {
                 name: c.get_col_name(n).to_string(),
                 query: None,
                 len: None,
@@ -373,15 +403,15 @@ pub fn make_table_def(
             .collect();
         let index_name = format!("IDX_FK_{}", &name);
         let mut cols = local_cols.clone();
-        if config.add_soft_delete_column_to_relation_index {
-            if let Some(col) = def.soft_delete_col() {
-                cols.push(column::Column {
-                    name: col.to_string(),
-                    query: None,
-                    len: None,
-                    desc: false,
-                });
-            }
+        if config.add_soft_delete_column_to_relation_index
+            && let Some(col) = def.soft_delete_col()
+        {
+            cols.push(IndexColumn {
+                name: col.to_string(),
+                query: None,
+                len: None,
+                desc: false,
+            });
         }
         let check = cols.iter().fold(String::new(), |mut output, v| {
             let _ = write!(output, "{},", v.name);
@@ -422,7 +452,7 @@ pub fn make_table_def(
                 } else {
                     local_id.clone()
                 };
-                column::Column {
+                IndexColumn {
                     name: local_col_name,
                     query: None,
                     len: None,
@@ -432,15 +462,15 @@ pub fn make_table_def(
             .collect();
         let index_name = format!("IDX_FK_{}", &name);
         let mut cols = local_cols.clone();
-        if config.add_soft_delete_column_to_relation_index {
-            if let Some(col) = def.soft_delete_col() {
-                cols.push(column::Column {
-                    name: col.to_string(),
-                    query: None,
-                    len: None,
-                    desc: false,
-                });
-            }
+        if config.add_soft_delete_column_to_relation_index
+            && let Some(col) = def.soft_delete_col()
+        {
+            cols.push(IndexColumn {
+                name: col.to_string(),
+                query: None,
+                len: None,
+                desc: false,
+            });
         }
         let check = cols.iter().fold(String::new(), |mut output, v| {
             let _ = write!(output, "{},", v.name);
@@ -472,10 +502,6 @@ fn ref_op(r: &Option<schema::ReferenceOption>) -> Option<ReferenceOption> {
     }
 }
 
-fn escape(s: &String) -> String {
-    format!("`{}`", s)
-}
-
 #[derive(Display, Eq, PartialOrd, Ord, PartialEq)]
 enum Type {
     AddTable,
@@ -498,8 +524,9 @@ enum Type {
 fn make_ddl(
     mut new_tables: IndexMap<String, Table>,
     mut old_tables: IndexMap<String, Table>,
-) -> Result<String> {
-    let mut result = String::new();
+) -> Result<(String, Vec<String>)> {
+    let mut result1 = String::new();
+    let mut result2 = Vec::new();
     let mut history: BTreeMap<Type, IndexMap<String, Vec<String>>> = BTreeMap::new();
     while {
         let mut found = false;
@@ -507,28 +534,36 @@ fn make_ddl(
             if new_table.skip_ddl {
                 continue;
             }
-            if let Some(old_name) = &new_table.old_name {
-                if table_name != old_name
-                    && old_tables.contains_key(old_name)
-                    && !old_tables.contains_key(table_name)
-                {
-                    history
-                        .entry(Type::RenameTable)
-                        .or_default()
-                        .entry(table_name.clone())
-                        .or_default()
-                        .push(old_name.clone());
+            if let Some(old_name) = &new_table.old_name
+                && table_name != old_name
+                && old_tables.contains_key(old_name)
+                && !old_tables.contains_key(table_name)
+            {
+                history
+                    .entry(Type::RenameTable)
+                    .or_default()
+                    .entry(table_name.clone())
+                    .or_default()
+                    .push(old_name.clone());
+                if is_mysql_mode() {
                     writeln!(
-                        &mut result,
+                        &mut result1,
                         "RENAME TABLE {} TO {};",
-                        &escape(old_name),
-                        &escape(table_name)
+                        &column_escape(old_name),
+                        &column_escape(table_name)
                     )?;
-                    let table = old_tables.swap_remove(old_name).unwrap();
-                    old_tables.insert(table_name.clone(), table);
-                    new_table.old_name = None;
-                    found = true;
+                } else {
+                    writeln!(
+                        &mut result1,
+                        "ALTER TABLE {} RENAME TO {};",
+                        &column_escape(old_name),
+                        &column_escape(table_name)
+                    )?;
                 }
+                let table = old_tables.swap_remove(old_name).unwrap();
+                old_tables.insert(table_name.clone(), table);
+                new_table.old_name = None;
+                found = true;
             }
         }
         found
@@ -537,10 +572,10 @@ fn make_ddl(
         if new_table.skip_ddl {
             continue;
         }
-        if let Some(old_name) = &new_table.old_name {
-            if table_name != old_name {
-                anyhow::bail!("Illegal rename of {} table detected.", table_name);
-            }
+        if let Some(old_name) = &new_table.old_name
+            && table_name != old_name
+        {
+            anyhow::bail!("Illegal rename of {} table detected.", table_name);
         }
     }
     for (table_name, new_table) in new_tables.iter_mut() {
@@ -555,51 +590,50 @@ fn make_ddl(
                     match *typ {
                         SoftDelete::Time => {
                             writeln!(
-                                &mut result,
+                                &mut result1,
                                 "DELETE FROM {} WHERE {} IS NOT NULL;",
-                                &escape(table_name),
-                                &escape(name),
+                                &column_escape(table_name),
+                                &column_escape(name),
                             )?;
                         }
                         SoftDelete::Flag | SoftDelete::UnixTime => {
                             writeln!(
-                                &mut result,
+                                &mut result1,
                                 "DELETE FROM {} WHERE {} <> 0;",
-                                &escape(table_name),
-                                &escape(name),
+                                &column_escape(table_name),
+                                &column_escape(name),
                             )?;
                         }
                         SoftDelete::None => {}
                     }
                 }
                 for (name, new_field) in new_table.columns.iter_mut() {
-                    if let Some(old_name) = &new_field.old_name {
-                        if name != old_name
-                            && old_table.columns.contains_key(old_name)
-                            && !old_table.columns.contains_key(name)
+                    if let Some(old_name) = &new_field.old_name
+                        && name != old_name
+                        && old_table.columns.contains_key(old_name)
+                        && !old_table.columns.contains_key(name)
+                    {
+                        if !new_field.has_query()
+                            && !old_table.columns.get(old_name).unwrap().has_query()
                         {
-                            if !new_field.has_query()
-                                && !old_table.columns.get(old_name).unwrap().has_query()
-                            {
-                                history
-                                    .entry(Type::RenameColumn)
-                                    .or_default()
-                                    .entry(table_name.clone())
-                                    .or_default()
-                                    .push(name.clone());
-                                writeln!(
-                                    &mut result,
-                                    "ALTER TABLE {} RENAME COLUMN {} TO {};",
-                                    &escape(table_name),
-                                    &escape(old_name),
-                                    &escape(name),
-                                )?;
-                                let column = old_table.columns.swap_remove(old_name).unwrap();
-                                old_table.columns.insert(name.clone(), column);
-                            }
-                            new_field.old_name = None;
-                            found = true;
+                            history
+                                .entry(Type::RenameColumn)
+                                .or_default()
+                                .entry(table_name.clone())
+                                .or_default()
+                                .push(name.clone());
+                            writeln!(
+                                &mut result1,
+                                "ALTER TABLE {} RENAME COLUMN {} TO {};",
+                                &column_escape(table_name),
+                                &column_escape(old_name),
+                                &column_escape(name),
+                            )?;
+                            let column = old_table.columns.swap_remove(old_name).unwrap();
+                            old_table.columns.insert(name.clone(), column);
                         }
+                        new_field.old_name = None;
+                        found = true;
                     }
                 }
             }
@@ -607,13 +641,13 @@ fn make_ddl(
         } {}
         if old_tables.contains_key(table_name) {
             for (name, new_field) in &new_table.columns {
-                if let Some(old_name) = &new_field.old_name {
-                    if name != old_name {
-                        anyhow::bail!(
-                            "A illegal rename of columns in the {} table was detected.",
-                            table_name
-                        );
-                    }
+                if let Some(old_name) = &new_field.old_name
+                    && name != old_name
+                {
+                    anyhow::bail!(
+                        "A illegal rename of columns in the {} table was detected.",
+                        table_name
+                    );
                 }
             }
         }
@@ -624,28 +658,33 @@ fn make_ddl(
                 continue;
             }
             for (name, constraint) in &new_table.constraints {
-                if let Some(old_constraint) = old_table.constraints.get(name) {
-                    if old_constraint != constraint {
-                        // fix foreign key constraints
-                        writeln!(
-                            &mut result,
-                            "ALTER TABLE {} DROP FOREIGN KEY {};",
-                            &escape(table_name),
-                            &escape(name)
-                        )?;
-                    }
+                if let Some(old_constraint) = old_table.constraints.get(name)
+                    && old_constraint != constraint
+                {
+                    // fix foreign key constraints
+                    writeln!(
+                        &mut result1,
+                        "ALTER TABLE {} DROP FOREIGN KEY {};",
+                        &column_escape(table_name),
+                        &column_escape(name)
+                    )?;
                 }
             }
             for (name, index) in &new_table.indexes {
-                if let Some(old_index) = old_table.indexes.get(name) {
-                    if old_index != index && !matches!(index, TableKey::Key(_, x) if x.is_empty()) {
-                        // fix indexes
+                if let Some(old_index) = old_table.indexes.get(name)
+                    && old_index != index
+                    && !matches!(index, TableKey::Key(_, x) if x.is_empty())
+                {
+                    // fix indexes
+                    if is_mysql_mode() {
                         writeln!(
-                            &mut result,
+                            &mut result1,
                             "ALTER TABLE {} DROP INDEX {};",
-                            &escape(table_name),
-                            &escape(name)
+                            &column_escape(table_name),
+                            &column_escape(name)
                         )?;
+                    } else {
+                        writeln!(&mut result1, "DROP INDEX {};", &column_escape(name))?;
                     }
                 }
             }
@@ -666,10 +705,10 @@ fn make_ddl(
                         .or_default()
                         .push(name.clone());
                     writeln!(
-                        &mut result,
+                        &mut result1,
                         "ALTER TABLE {} DROP FOREIGN KEY {};",
-                        &escape(table_name),
-                        &escape(name)
+                        &column_escape(table_name),
+                        &column_escape(name)
                     )?;
                 }
             }
@@ -684,12 +723,16 @@ fn make_ddl(
                             .or_default()
                             .push(name.clone());
                     }
-                    writeln!(
-                        &mut result,
-                        "ALTER TABLE {} DROP INDEX {};",
-                        &escape(table_name),
-                        &escape(name)
-                    )?;
+                    if is_mysql_mode() {
+                        writeln!(
+                            &mut result1,
+                            "ALTER TABLE {} DROP INDEX {};",
+                            &column_escape(table_name),
+                            &column_escape(name)
+                        )?;
+                    } else {
+                        writeln!(&mut result1, "DROP INDEX {};", &column_escape(name))?;
+                    }
                 }
             }
         }
@@ -701,12 +744,15 @@ fn make_ddl(
                 // To prevent deletion of _sqlx_migrations
                 continue;
             }
+            if table_name.eq("spatial_ref_sys") {
+                continue;
+            }
             history
                 .entry(Type::DropTable)
                 .or_default()
                 .entry(table_name.clone())
                 .or_default();
-            writeln!(&mut result, "DROP TABLE {};", &escape(table_name))?;
+            writeln!(&mut result1, "DROP TABLE {};", &column_escape(table_name))?;
         }
     }
     for (table_name, new_table) in &new_tables {
@@ -715,24 +761,14 @@ fn make_ddl(
         }
         if let Some(old_table) = old_tables.get(table_name) {
             let mut alter_columns = Vec::new();
-            if let Some(collation) = &new_table.collation {
-                if old_table
-                    .collation
-                    .as_ref()
-                    .map(|v| !v.eq_ignore_ascii_case(collation))
-                    .unwrap_or(true)
-                {
-                    alter_columns.push(format!("COLLATE='{}'", collation));
-                }
-            }
-            if let Some(engine) = &new_table.engine {
-                if old_table
-                    .engine
-                    .as_ref()
-                    .map(|v| !v.eq_ignore_ascii_case(engine))
-                    .unwrap_or(true)
-                {
-                    alter_columns.push(format!("ENGINE={}", engine));
+            let mut after_alter_table = Vec::new();
+            if new_table.primary.as_ref().map(|v| &v.1) != old_table.primary.as_ref().map(|v| &v.1)
+            {
+                // Fix primary keys
+                if is_mysql_mode() {
+                    alter_columns.push("DROP PRIMARY KEY".to_string());
+                } else if let Some(old_primary_key) = old_table.primary.as_ref().map(|v| &v.0) {
+                    alter_columns.push(format!("DROP CONSTRAINT {}", old_primary_key));
                 }
             }
             for (name, _old_field) in &old_table.columns {
@@ -744,7 +780,7 @@ fn make_ddl(
                         .entry(table_name.clone())
                         .or_default()
                         .push(name.clone());
-                    alter_columns.push(format!("DROP COLUMN {}", &escape(name)));
+                    alter_columns.push(format!("DROP COLUMN {}", &column_escape(name)));
                 }
             }
             let mut pos = " FIRST".to_string();
@@ -755,6 +791,7 @@ fn make_ddl(
                     .as_ref()
                     .unwrap()
                     .preserve_column_order
+                    || !is_mysql_mode()
                 {
                     pos = String::new();
                 }
@@ -767,13 +804,63 @@ fn make_ddl(
                             .entry(table_name.clone())
                             .or_default()
                             .push(name.clone());
-                        alter_columns.push(format!(
-                            "CHANGE COLUMN {} {} {}{}",
-                            &escape(name),
-                            &escape(name),
-                            new_field,
-                            &pos
-                        ));
+                        if is_mysql_mode() {
+                            alter_columns.push(format!(
+                                "CHANGE COLUMN {} {} {}{}",
+                                &column_escape(name),
+                                &column_escape(name),
+                                new_field,
+                                &pos
+                            ));
+                        } else {
+                            if !new_field.is_same_type(old_field) {
+                                alter_columns.push(format!(
+                                    "ALTER COLUMN {} TYPE {:.0}",
+                                    &column_escape(name),
+                                    new_field,
+                                ));
+                            }
+                            if old_field.constraint.not_null && !new_field.constraint.not_null {
+                                alter_columns.push(format!(
+                                    "ALTER COLUMN {} DROP NOT NULL",
+                                    &column_escape(name),
+                                ));
+                            }
+                            if !old_field.constraint.not_null && new_field.constraint.not_null {
+                                alter_columns.push(format!(
+                                    "ALTER COLUMN {} SET NOT NULL",
+                                    &column_escape(name),
+                                ));
+                            }
+                            if old_field.default.is_some() && new_field.default.is_none() {
+                                alter_columns.push(format!(
+                                    "ALTER COLUMN {} DROP DEFAULT",
+                                    &column_escape(name),
+                                ));
+                            } else if old_field.default != new_field.default {
+                                alter_columns.push(format!(
+                                    "ALTER COLUMN {} SET DEFAULT {}",
+                                    &column_escape(name),
+                                    &new_field
+                                        .default
+                                        .as_ref()
+                                        .map(|v| v.to_string())
+                                        .unwrap_or_default()
+                                ));
+                            }
+                            if old_field.comment != new_field.comment {
+                                after_alter_table.push(format!(
+                                    "COMMENT ON COLUMN {}.{} IS '{}';",
+                                    &column_escape(table_name),
+                                    &column_escape(name),
+                                    &new_field
+                                        .comment
+                                        .as_ref()
+                                        .map(|v| v.to_string().replace("'", "''"))
+                                        .unwrap_or_default()
+                                ));
+                            }
+                        }
                     }
                 } else {
                     // add columns
@@ -785,14 +872,27 @@ fn make_ddl(
                         .push(name.clone());
                     alter_columns.push(format!(
                         "ADD COLUMN {} {}{}",
-                        &escape(name),
+                        &column_escape(name),
                         new_field,
                         &pos
                     ));
+                    if !is_mysql_mode() && new_field.comment.is_some() {
+                        after_alter_table.push(format!(
+                            "COMMENT ON COLUMN {}.{} IS '{}';",
+                            &column_escape(table_name),
+                            &column_escape(name),
+                            &new_field
+                                .comment
+                                .as_ref()
+                                .map(|v| v.to_string().replace("'", "''"))
+                                .unwrap_or_default()
+                        ));
+                    }
                 }
-                pos = format!(" AFTER {}", &escape(name));
+                pos = format!(" AFTER {}", &column_escape(name));
             }
-            if new_table.primary != old_table.primary {
+            if new_table.primary.as_ref().map(|v| &v.1) != old_table.primary.as_ref().map(|v| &v.1)
+            {
                 // Fix primary keys
                 if let Some(ref primary) = new_table.primary {
                     history
@@ -800,23 +900,45 @@ fn make_ddl(
                         .or_default()
                         .entry(table_name.clone())
                         .or_default();
-                    alter_columns.push(format!("DROP PRIMARY KEY, ADD {}", primary));
+                    alter_columns.push(format!("ADD {}", primary.1));
                 } else {
                     history
                         .entry(Type::DropPrimary)
                         .or_default()
                         .entry(table_name.clone())
                         .or_default();
-                    alter_columns.push("DROP PRIMARY KEY".to_string());
                 }
+            }
+            if let Some(collation) = &new_table.collation
+                && old_table
+                    .collation
+                    .as_ref()
+                    .map(|v| !v.eq_ignore_ascii_case(collation))
+                    .unwrap_or(true)
+                && is_mysql_mode()
+            {
+                alter_columns.push(format!("COLLATE='{}'", collation));
+            }
+            if let Some(engine) = &new_table.engine
+                && old_table
+                    .engine
+                    .as_ref()
+                    .map(|v| !v.eq_ignore_ascii_case(engine))
+                    .unwrap_or(true)
+                && is_mysql_mode()
+            {
+                alter_columns.push(format!("ENGINE={}", engine));
             }
             if !alter_columns.is_empty() {
                 writeln!(
-                    &mut result,
+                    &mut result1,
                     "ALTER TABLE {} {};",
-                    &escape(table_name),
+                    &column_escape(table_name),
                     &alter_columns.join(", ")
                 )?;
+            }
+            for line in after_alter_table {
+                result1.push_str(&line);
             }
         } else {
             // add tables
@@ -829,7 +951,48 @@ fn make_ddl(
                 .or_default()
                 .entry(table_name.clone())
                 .or_default();
-            writeln!(&mut result, "{}", &new_table)?;
+            writeln!(&mut result1, "{}", &new_table)?;
+            if !is_mysql_mode() {
+                for (name, new_field) in &new_table.columns {
+                    if let Some(comment) = &new_field.comment {
+                        writeln!(
+                            &mut result1,
+                            "COMMENT ON COLUMN {}.{} IS '{}';",
+                            &column_escape(table_name),
+                            &column_escape(name),
+                            &comment.to_string().replace("'", "''")
+                        )?;
+                    }
+                }
+                for (_name, index) in &new_table.indexes {
+                    if let TableKey::Key(index_name, cols) = index
+                        && !cols.is_empty()
+                    {
+                        writeln!(
+                            &mut result1,
+                            "CREATE INDEX {} ON {} ({});",
+                            &column_escape(index_name),
+                            &column_escape(table_name),
+                            cols.iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        )?;
+                    }
+                    if let TableKey::UniqueKey(index_name, cols) = index {
+                        writeln!(
+                            &mut result1,
+                            "CREATE UNIQUE INDEX {} ON {} ({});",
+                            &column_escape(index_name),
+                            &column_escape(table_name),
+                            cols.iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        )?;
+                    }
+                }
+            }
         }
     }
     for (table_name, old_table) in &old_tables {
@@ -838,6 +1001,40 @@ fn make_ddl(
                 continue;
             }
             for (name, index) in &new_table.indexes {
+                let mut add_index = || {
+                    if is_mysql_mode() {
+                        writeln!(
+                            &mut result1,
+                            "ALTER TABLE {} ADD {};",
+                            &column_escape(table_name),
+                            index
+                        )?;
+                    } else {
+                        if let TableKey::Key(index_name, cols) = index {
+                            result2.push(format!(
+                                "CREATE INDEX CONCURRENTLY {} ON {} ({});",
+                                &column_escape(index_name),
+                                &column_escape(table_name),
+                                cols.iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ));
+                        }
+                        if let TableKey::UniqueKey(index_name, cols) = index {
+                            result2.push(format!(
+                                "CREATE UNIQUE INDEX CONCURRENTLY {} ON {} ({});",
+                                &column_escape(index_name),
+                                &column_escape(table_name),
+                                cols.iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ));
+                        }
+                    }
+                    Ok::<_, anyhow::Error>(())
+                };
                 if let Some(old_index) = old_table.indexes.get(name) {
                     if old_index != index && !matches!(index, TableKey::Key(_, x) if x.is_empty()) {
                         // fix indexes
@@ -849,12 +1046,7 @@ fn make_ddl(
                                 .or_default()
                                 .push(name.clone());
                         }
-                        writeln!(
-                            &mut result,
-                            "ALTER TABLE {} ADD {};",
-                            &escape(table_name),
-                            index
-                        )?;
+                        add_index()?;
                     }
                 } else if !matches!(index, TableKey::Key(_, x) if x.is_empty()) {
                     // add indexes
@@ -866,12 +1058,7 @@ fn make_ddl(
                             .or_default()
                             .push(name.clone());
                     }
-                    writeln!(
-                        &mut result,
-                        "ALTER TABLE {} ADD {};",
-                        &escape(table_name),
-                        index
-                    )?;
+                    add_index()?;
                 }
             }
             for (name, constraint) in &new_table.constraints {
@@ -885,9 +1072,9 @@ fn make_ddl(
                             .or_default()
                             .push(name.clone());
                         writeln!(
-                            &mut result,
+                            &mut result1,
                             "ALTER TABLE {} ADD {};",
-                            &escape(table_name),
+                            &column_escape(table_name),
                             constraint
                         )?;
                     }
@@ -900,9 +1087,9 @@ fn make_ddl(
                         .or_default()
                         .push(name.clone());
                     writeln!(
-                        &mut result,
+                        &mut result1,
                         "ALTER TABLE {} ADD {};",
-                        &escape(table_name),
+                        &column_escape(table_name),
                         constraint
                     )?;
                 }
@@ -917,25 +1104,42 @@ fn make_ddl(
             // Add foreign key constraints when adding table
             for constraint in new_table.constraints.values() {
                 writeln!(
-                    &mut result,
+                    &mut result1,
                     "ALTER TABLE {} ADD {};",
-                    &escape(table_name),
+                    &column_escape(table_name),
                     constraint
                 )?;
             }
         }
     }
     let mut buf = String::new();
+    if !is_mysql_mode()
+        && result1.is_empty()
+        && let Some(first) = result2.pop()
+    {
+        buf.push_str("-- no-transaction\n");
+        result1.push_str(&first);
+    }
+    for ddl in result2.iter_mut() {
+        ddl.insert_str(0, "-- no-transaction\n");
+    }
     for (typ, tables) in history {
         for (table, columns) in tables {
             let columns = columns.join(", ");
             writeln!(&mut buf, "-- [{typ}:{table}:{columns}]")?;
         }
     }
-    if !result.is_empty() {
-        buf.push_str("SET foreign_key_checks = 0;\n");
-        buf.push_str(&result);
-        buf.push_str("SET foreign_key_checks = 1;\n");
+    if !result1.is_empty() {
+        if is_mysql_mode() {
+            buf.push_str("SET foreign_key_checks = 0;\n");
+            buf.push_str(&result1);
+            buf.push_str("SET foreign_key_checks = 1;\n");
+        } else {
+            if result1.contains("geography(") {
+                buf.push_str("CREATE EXTENSION IF NOT EXISTS postgis;\n");
+            }
+            buf.push_str(&result1);
+        }
     }
-    Ok(buf)
+    Ok((buf, result2))
 }

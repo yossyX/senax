@@ -205,11 +205,15 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     #[derive(Template)]
     #[template(path = "db/src/seeder.rs", escape = "none")]
     struct SeederTemplate<'a> {
+        pub config: &'a ConfigDef,
         pub groups: &'a GroupsDef,
     }
 
     let file_path = model_src_dir.join("seeder.rs");
-    let tpl = SeederTemplate { groups };
+    let tpl = SeederTemplate {
+        config: &config,
+        groups,
+    };
     fs_write(file_path, tpl.render()?)?;
 
     let path = model_dir.join("migrations");
@@ -386,9 +390,9 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 for (index_name, index_def) in &def.merged_indexes {
                     for (force_index_name, force_index_def) in &index_def.force_index_on {
                         let force_index_def = force_index_def.clone().unwrap_or_default();
-                        let includes = force_index_def
-                            .includes
-                            .unwrap_or_else(|| StringOrArray::One(format!("`{}`", force_index_name)));
+                        let includes = force_index_def.includes.unwrap_or_else(|| {
+                            StringOrArray::One(format!("`{}`", force_index_name))
+                        });
                         let mut cond: Vec<_> = includes
                             .to_vec()
                             .iter()

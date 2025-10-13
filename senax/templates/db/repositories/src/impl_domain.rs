@@ -12,7 +12,7 @@ macro_rules! get_repo {
 }
 
 // Do not modify below this line. (ModStart)
-// Do not modify up to this line. (ModEnd)
+// Do not modify above this line. (ModEnd)
 
 #[derive(derive_new::new)]
 pub struct RepositoryImpl_ {
@@ -21,7 +21,7 @@ pub struct RepositoryImpl_ {
 #[rustfmt::skip]
 impl Repository_ for RepositoryImpl_ {
     // Do not modify below this line. (RepoStart)
-    // Do not modify up to this line. (RepoEnd)
+    // Do not modify above this line. (RepoEnd)
 }
 
 #[derive(derive_new::new)]
@@ -31,6 +31,6 @@ pub struct QueryServiceImpl_ {
 #[rustfmt::skip]
 impl QueryService_ for QueryServiceImpl_ {
     // Do not modify below this line. (QueryServiceStart)
-    // Do not modify up to this line. (QueryServiceEnd)
+    // Do not modify above this line. (QueryServiceEnd)
 }
 @{-"\n"}@

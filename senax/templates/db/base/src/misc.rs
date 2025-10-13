@@ -212,14 +212,17 @@ impl Size for JsonBlob {
 }
 impl std::fmt::Debug for JsonBlob {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self._into_json())
+        write!(f, "{}", &self._into_json_str())
     }
 }
 impl JsonBlob {
-    pub fn _into_json(&self) -> String {
+    pub fn _into_json_str(&self) -> String {
         let s: String = self.into();
         assert!(s.len() <= @{ config.max_db_str_len() }@, "Incorrect JSON length.");
         s
+    }
+    pub fn _into_json(&self) -> Option<serde_json::Value> {
+        self._to_value()
     }
     pub fn _to_value<T: serde::de::DeserializeOwned>(&self) -> Option<T> {
         if self.0.is_empty() {

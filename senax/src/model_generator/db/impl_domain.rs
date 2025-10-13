@@ -31,7 +31,7 @@ pub fn write_impl_domain_rs(
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
 
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -45,7 +45,7 @@ pub fn write_impl_domain_rs(
 @%- for (name, (_, defs)) in groups %@
 pub use _base::impl_domain::@{ name|snake|to_var_name }@;
 @%- endfor %@
-// Do not modify up to this line. (ModEnd)"###,
+// Do not modify above this line. (ModEnd)"###,
         ext = "txt",
         escape = "none"
     )]
@@ -57,7 +57,7 @@ pub use _base::impl_domain::@{ name|snake|to_var_name }@;
     let tpl = tpl.trim_start();
     let content = re.replace(&content, tpl);
 
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify up to this line. \(RepoEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify above this line. \(RepoEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -71,7 +71,7 @@ pub use _base::impl_domain::@{ name|snake|to_var_name }@;
     @%- for (name, (_, defs)) in groups %@
     get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@Repository, _repo_@{ name|snake }@::impl_domain::@{ name|snake|to_var_name }@::@{ name|pascal }@RepositoryImpl);
     @%- endfor %@
-    // Do not modify up to this line. (RepoEnd)"###,
+    // Do not modify above this line. (RepoEnd)"###,
         ext = "txt",
         escape = "none"
     )]
@@ -83,7 +83,7 @@ pub use _base::impl_domain::@{ name|snake|to_var_name }@;
     let tpl = tpl.trim_start();
     let content = re.replace(&content, tpl);
 
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceStart\).+// Do not modify up to this line. \(QueryServiceEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceStart\).+// Do not modify above this line. \(QueryServiceEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -97,7 +97,7 @@ pub use _base::impl_domain::@{ name|snake|to_var_name }@;
     @%- for (name, (_, defs)) in groups %@
     get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, _repo_@{ name|snake }@::impl_domain::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryServiceImpl);
     @%- endfor %@
-    // Do not modify up to this line. (QueryServiceEnd)"###,
+    // Do not modify above this line. (QueryServiceEnd)"###,
         ext = "txt",
         escape = "none"
     )]

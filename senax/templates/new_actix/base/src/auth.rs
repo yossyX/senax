@@ -42,11 +42,11 @@ pub static SECRET: OnceCell<String> = OnceCell::new();
 #[allow(non_camel_case_types)]
 pub enum Role {
     // Do not modify below this line. (RoleStart)
-    // Do not modify up to this line. (RoleEnd)
+    // Do not modify above this line. (RoleEnd)
 }
 impl Role {
     // Do not modify below this line. (ImplRoleStart)
-    // Do not modify up to this line. (ImplRoleEnd)
+    // Do not modify above this line. (ImplRoleEnd)
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

@@ -63,7 +63,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     fn {var}(&self) -> {domain_outer} {
         __Getter__::_{raw_var}(self)
     }", "") }@
-@{- parent.cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         __Getter__::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -78,7 +78,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     fn {var}(&self) -> {domain_outer} {
         __Cache__::_{raw_var}(self)
     }", "") }@
-@{- parent.cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         __Cache__::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -93,7 +93,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     fn {var}(&self) -> {domain_outer} {
         self._data.{var}
     }", "") }@
-@{- parent.cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
@@ -133,7 +133,7 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
     }", "") }@}
 @%- endif %@
 impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@ for _@{ pascal_name }@ {
-@{- parent.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         __Getter__::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -155,11 +155,11 @@ impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_nam
 }
 #[allow(clippy::useless_conversion)]
 impl domain::models::@{ db|snake|to_var_name }@::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater for _@{ pascal_name }@Updater {
-@{- parent.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
-@{- parent.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
+@{- parent.non_primaries_except_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         __Updater__::mut_{raw_var}(self).set(v{convert_domain_inner_type})
     }", "") }@
@@ -219,7 +219,7 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@ {
     fn {var}(&self) -> {domain_outer} {
         __Getter__::_{raw_var}(self)
     }", "") }@
-@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         __Getter__::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -235,7 +235,7 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@Cache {
     fn {var}(&self) -> {domain_outer} {
         __Cache__::_{raw_var}(self)
     }", "") }@
-@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         __Cache__::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -251,7 +251,7 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@Updater {
     fn {var}(&self) -> {domain_outer} {
         self._data.{var}
     }", "") }@
-@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
@@ -294,7 +294,7 @@ impl @{ pascal_name }@Cache for _@{ pascal_name }@Cache {
 @%- endif %@
 
 impl @{ pascal_name }@ for _@{ pascal_name }@ {
-@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         __Getter__::_{raw_var}(self){convert_impl_domain_outer}
     }", "") }@
@@ -317,11 +317,11 @@ impl @{ pascal_name }@ for _@{ pascal_name }@ {
 
 #[allow(clippy::useless_conversion)]
 impl @{ pascal_name }@Updater for _@{ pascal_name }@Updater {
-@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
-@{- def.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
+@{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         __Updater__::mut_{raw_var}(self).set(v{convert_domain_inner_type})
     }", "") }@

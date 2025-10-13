@@ -2,8 +2,6 @@ use anyhow::{Context as _, Result, ensure};
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use senax_mysql_parser::column::Column;
-use senax_mysql_parser::common::{ReferenceOption, SqlType, TableKey};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -12,6 +10,7 @@ use std::path::Path;
 use crate::SCHEMA_PATH;
 use crate::common::ToCase as _;
 use crate::common::{fs_write, simplify_yml, to_plural, to_singular};
+use crate::ddl::sql_type::{IndexColumn, ReferenceOption, SqlType, TableKey};
 use crate::ddl::table::parse;
 use crate::schema::{
     self, BelongsToDef, CONFIG, ConfigDef, DataType, EnumValue, FieldDef, FieldDefOrSubsetType,
@@ -70,7 +69,7 @@ pub async fn generate(
             model.collation = table.collation.clone();
         }
         model._before_rename_name = Some(model.table_name());
-        if let Some(primary) = &table.primary {
+        if let Some((_, primary)) = &table.primary {
             match primary {
                 TableKey::PrimaryKey(cols) => {
                     pk = cols.iter().map(|c| c.name.clone()).collect();
@@ -207,13 +206,13 @@ pub async fn generate(
                     field.data_type = DataType::Time;
                 }
                 SqlType::DateTime(precision) => {
-                    field.data_type = DataType::DateTime;
+                    field.data_type = DataType::UtcDateTime;
                     if precision > 0 {
                         field.precision = Some(precision)
                     }
                 }
                 SqlType::Timestamp(precision) => {
-                    field.data_type = DataType::Timestamp;
+                    field.data_type = DataType::TimestampWithTimeZone;
                     if precision > 0 {
                         field.precision = Some(precision)
                     }
@@ -282,12 +281,17 @@ pub async fn generate(
                     field.data_type = DataType::Geometry;
                     field.srid = column.constraint.srid;
                 }
+                SqlType::UnSupported => unimplemented!(),
+                SqlType::Uuid => {
+                    field.data_type = DataType::Uuid;
+                }
             };
             // field.character_set = column.constraint.character_set.clone();
             if config.collation != column.constraint.collation {
                 field.collation = column.constraint.collation.clone();
             }
-            field.primary = column.constraint.primary_key || pk.contains(name);
+            // field.primary = column.constraint.primary_key || pk.contains(name);
+            field.primary = pk.contains(name);
             if column.constraint.auto_increment {
                 field.auto = Some(schema::AutoGeneration::AutoIncrement);
             }
@@ -554,10 +558,12 @@ pub async fn generate(
                         force_index_on: Default::default(),
                     };
                     let name = name.trim_start_matches("UQ_").to_string();
-                    if let Some(first) = def.fields.first() {
-                        if def.fields.len() == 1 && *first.0 == name && first.1.is_none() {
-                            def.fields.clear();
-                        }
+                    if let Some(first) = def.fields.first()
+                        && def.fields.len() == 1
+                        && *first.0 == name
+                        && first.1.is_none()
+                    {
+                        def.fields.clear();
                     }
                     indexes.insert(name, Some(def));
                 }
@@ -583,10 +589,12 @@ pub async fn generate(
                         force_index_on: Default::default(),
                     };
                     let name = name.trim_start_matches("FT_").to_string();
-                    if let Some(first) = def.fields.first() {
-                        if def.fields.len() == 1 && *first.0 == name && first.1.is_none() {
-                            def.fields.clear();
-                        }
+                    if let Some(first) = def.fields.first()
+                        && def.fields.len() == 1
+                        && *first.0 == name
+                        && first.1.is_none()
+                    {
+                        def.fields.clear();
                     }
                     indexes.insert(name, Some(def));
                 }
@@ -620,10 +628,12 @@ pub async fn generate(
                         force_index_on: Default::default(),
                     };
                     let name = name.trim_start_matches("IDX_").to_string();
-                    if let Some(first) = def.fields.first() {
-                        if def.fields.len() == 1 && *first.0 == name && first.1.is_none() {
-                            def.fields.clear();
-                        }
+                    if let Some(first) = def.fields.first()
+                        && def.fields.len() == 1
+                        && *first.0 == name
+                        && first.1.is_none()
+                    {
+                        def.fields.clear();
                     }
                     if def == IndexDef::default() {
                         indexes.insert(name, None);
@@ -653,10 +663,12 @@ pub async fn generate(
                         force_index_on: Default::default(),
                     };
                     let name = name.trim_start_matches("SP_").to_string();
-                    if let Some(first) = def.fields.first() {
-                        if def.fields.len() == 1 && *first.0 == name && first.1.is_none() {
-                            def.fields.clear();
-                        }
+                    if let Some(first) = def.fields.first()
+                        && def.fields.len() == 1
+                        && *first.0 == name
+                        && first.1.is_none()
+                    {
+                        def.fields.clear();
                     }
                     indexes.insert(name, Some(def));
                 }
@@ -740,7 +752,7 @@ pub async fn generate(
     Ok(())
 }
 
-fn make_name(col: &Column) -> String {
+fn make_name(col: &IndexColumn) -> String {
     if !col.name.is_empty() {
         col.name.clone()
     } else if let Some(ref query) = col.query {

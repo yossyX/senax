@@ -379,14 +379,14 @@ fn gen_er(
                 } else {
                     vec![format!("{}_id", rel_name)]
                 };
-                if let Some(local_id) = local.get(foreign.main_primary_nth()) {
-                    if let Some(col) = model.merged_fields.get(local_id) {
-                        relations.insert(
-                            format!("{model_name}:{local_id}"),
-                            to_rel(&foreign_name, col, model),
-                        );
-                        columns.insert(local_id.clone(), to_column(local_id, col));
-                    }
+                if let Some(local_id) = local.get(foreign.main_primary_nth())
+                    && let Some(col) = model.merged_fields.get(local_id)
+                {
+                    relations.insert(
+                        format!("{model_name}:{local_id}"),
+                        to_rel(&foreign_name, col, model),
+                    );
+                    columns.insert(local_id.clone(), to_column(local_id, col));
                 }
                 // for local_id in &local {
                 //     if let Some(col) = model.merged_columns.get(local_id) {

@@ -134,13 +134,13 @@ pub fn write_json_schema(file_path: &std::path::Path, schema: String) -> anyhow:
     ensure!(file_path.exists(), "File not found: {:?}", file_path);
     let contents = std::fs::read_to_string(file_path)
         .with_context(|| format!("File cannot be read: {}", file_path.display()))?;
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(JsonSchemaStart\).+// Do not modify up to this line. \(JsonSchemaEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(JsonSchemaStart\).+// Do not modify above this line. \(JsonSchemaEnd\)").unwrap();
     ensure!(
         re.is_match(&contents),
         "File contents are invalid.: {:?}",
         file_path
     );
-    let tpl = format!("// Do not modify below this line. (JsonSchemaStart)\nexport const JsonSchema = {};\n// Do not modify up to this line. (JsonSchemaEnd)", schema);
+    let tpl = format!("// Do not modify below this line. (JsonSchemaStart)\nexport const JsonSchema = {};\n// Do not modify above this line. (JsonSchemaEnd)", schema);
     println!("{}", file_path.display());
     std::fs::write(file_path, &*re.replace(&contents, tpl))?;
     Ok(())

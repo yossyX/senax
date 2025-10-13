@@ -388,15 +388,15 @@ impl<Store: SessionStore + 'static> Session<Store> {
         };
         let mut status = SessionStatus::Unchanged;
         let ttl = configuration.session.state_ttl.whole_seconds();
-        if let Some(session_key) = &session_key {
-            if (ttl - data.ttl()) > (ttl >> 6) {
-                data.set_ttl(configuration.session.state_ttl);
-                let _ = storage.update_ttl(session_key, &data).await.map_err(|e| {
-                    log::warn!("{}", e);
-                });
-                if configuration.cookie.max_age.is_some() {
-                    status = SessionStatus::Changed;
-                }
+        if let Some(session_key) = &session_key
+            && (ttl - data.ttl()) > (ttl >> 6)
+        {
+            data.set_ttl(configuration.session.state_ttl);
+            let _ = storage.update_ttl(session_key, &data).await.map_err(|e| {
+                log::warn!("{}", e);
+            });
+            if configuration.cookie.max_age.is_some() {
+                status = SessionStatus::Changed;
             }
         }
         let mut list: Vec<HashMap<String, Vec<u8>>> = if data.is_empty_data() {

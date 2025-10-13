@@ -29,7 +29,7 @@ use _server::{
 };
 
 // Do not modify below this line. (GqlModelStart)
-// Do not modify up to this line. (GqlModelEnd)
+// Do not modify above this line. (GqlModelEnd)
 
 async fn find(
     gql_ctx: &async_graphql::Context<'_>,
@@ -155,7 +155,7 @@ impl GqlQuery@{ graphql_name }@ {
         let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, repo.@{ db|snake }@_query(), auth, &primary), repo, auth, gql_ctx)
+        crate::gql_find!(find(gql_ctx, repo.@{ db|snake }@_query(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -168,7 +168,7 @@ impl GqlQuery@{ graphql_name }@ {
         let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        crate::gql_@{ db_route|snake }@_find!(find(gql_ctx, repo.@{ db|snake }@_query(), auth, &primary), repo, auth, gql_ctx)
+        crate::gql_find!(find(gql_ctx, repo.@{ db|snake }@_query(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
@@ -184,11 +184,11 @@ impl GqlQuery@{ graphql_name }@ {
         @{ api_selector_def.limit_validator() }@first: Option<i32>,
         @{ api_selector_def.limit_validator() }@last: Option<i32>,
         @%- if selector_def.filter_is_required() %@
-        filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        filter: _repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
         @%- else %@
-        filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        filter: Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
         @%- endif %@
-        order: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Order>,
+        order: Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Order>,
         offset: Option<usize>,
     ) -> async_graphql::Result<graphql_conn::Connection<String, ResObj>> {
         use graphql_conn::Edge;
@@ -213,11 +213,11 @@ impl GqlQuery@{ graphql_name }@ {
             first: Option<usize>,
             last: Option<usize>,
             @%- if selector_def.filter_is_required() %@
-            filter: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+            filter: &_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
             @%- else %@
-            filter: &Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+            filter: &Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
             @%- endif %@
-            order: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order,
+            order: _repository_::@{ pascal_name }@Query@{ selector|pascal }@Order,
             offset: Option<usize>,
         ) -> anyhow::Result<(Vec<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>, bool, Option<usize>)> {
             use domain::models::Cursor;
@@ -247,20 +247,20 @@ impl GqlQuery@{ graphql_name }@ {
                 previous = after.is_some();
                 match order {
                     @%- for (order, order_def) in selector_def.orders %@
-                    _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
+                    _repository_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
                         if let Some(after) = after {
-                            let c = _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
+                            let c = _repository_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
                                 after,
                             )?;
                             query = query.cursor(
-                                _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
+                                _repository_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
                                     Cursor::After(c),
                                 ),
                             );
                         }
                     }
                     @%- endfor %@
-                    _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
+                    _repository_::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
                 }
                 if first.is_some() {
                     limit = first@{ api_selector_def.check_limit() }@;
@@ -270,13 +270,13 @@ impl GqlQuery@{ graphql_name }@ {
                 previous = before.is_some();
                 match order {
                     @%- for (order, order_def) in selector_def.orders %@
-                    _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
+                    _repository_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
                         if let Some(before) = before {
-                            let c = _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
+                            let c = _repository_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
                                 before,
                             )?;
                             query = query.cursor(
-                                _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
+                                _repository_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
                                     Cursor::Before(c),
                                 ),
                             )
@@ -284,7 +284,7 @@ impl GqlQuery@{ graphql_name }@ {
                         }
                     }
                     @%- endfor %@
-                    _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
+                    _repository_::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
                 }
                 if last.is_some() {
                     limit = last@{ api_selector_def.check_limit() }@;
@@ -311,7 +311,7 @@ impl GqlQuery@{ graphql_name }@ {
                 let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
                 let auth: &AuthInfo = gql_ctx.data()?;
                 let order = order.unwrap_or_default();
-                let (mut list, previous, limit) = crate::gql_@{ db_route|snake }@_selector!(
+                let (mut list, previous, limit) = crate::gql_selector!(
                     _fetch(
                         gql_ctx, &repo, auth, &after, &before, first, last, &filter, order, offset,
                     ),
@@ -348,9 +348,9 @@ impl GqlQuery@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         @%- if selector_def.filter_is_required() %@
-        filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        filter: _repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
         @%- else %@
-        filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        filter: Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
         @%- endif %@
     ) -> async_graphql::Result<i64> {
         @%- if selector_def.filter_is_required() %@
@@ -369,9 +369,9 @@ impl GqlQuery@{ graphql_name }@ {
             repo: &RepositoryImpl,
             auth: &AuthInfo,
             @%- if selector_def.filter_is_required() %@
-            filter: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+            filter: &_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
             @%- else %@
-            filter: &Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+            filter: &Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
             @%- endif %@
         ) -> anyhow::Result<i64> {
             let @{ db|snake }@_query = repo.@{ db|snake }@_query();
@@ -391,7 +391,7 @@ impl GqlQuery@{ graphql_name }@ {
             Ok(count)
         }
 
-        crate::gql_@{ db_route|snake }@_count!(_count(&repo, auth, &filter), repo, gql_ctx)
+        crate::gql_count!(_count(&repo, auth, &filter), repo, gql_ctx)
     }
     @%- endfor %@
     @%- endfor %@
@@ -419,7 +419,7 @@ impl GqlMutation@{ graphql_name }@ {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, &primary), repo, auth, gql_ctx)
+        crate::gql_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -432,7 +432,7 @@ impl GqlMutation@{ graphql_name }@ {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, &primary), repo, auth, gql_ctx)
+        crate::gql_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -556,9 +556,9 @@ impl GqlMutation@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         @%- if selector_def.filter_is_required() %@
-        filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        filter: _repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
         @%- else %@
-        filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        filter: Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
         @%- endif %@
         value: serde_json::Value,
         #[graphql(default = false)] create_if_empty: bool,
@@ -649,9 +649,9 @@ impl GqlMutation@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         @%- if selector_def.filter_is_required() %@
-        filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        filter: _repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
         @%- else %@
-        filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        filter: Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
         @%- endif %@
         operator: serde_json::Value,
     ) -> async_graphql::Result<Vec<ResObj>> {
@@ -705,9 +705,9 @@ impl GqlMutation@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         @%- if selector_def.filter_is_required() %@
-        filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        filter: _repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
         @%- else %@
-        filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        filter: Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
         @%- endif %@
     ) -> async_graphql::Result<Vec<async_graphql::ID>> {
         @%- if selector_def.filter_is_required() %@
@@ -809,13 +809,13 @@ pub fn _route_config(_cfg: &mut utoipa_actix_web::service_config::ServiceConfig)
 #[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct @{ selector|pascal }@Request {
     @%- if selector_def.filter_is_required() %@
-    filter: _domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+    filter: _repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
     @%- else %@
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    filter: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+    filter: Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
     @%- endif %@
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    order: Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Order>,
+    order: Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Order>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     limit: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -870,18 +870,18 @@ async fn @{ selector }@_handler(
         if let Some(_after) = &data.after {
             match order {
                 @%- for (order, order_def) in selector_def.orders %@
-                _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
-                    let c = _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
+                _repository_::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
+                    let c = _repository_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order }@_from_str(
                         _after,
                     )?;
                     query = query.cursor(
-                        _domain_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
+                        _repository_::@{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ order|pascal }@(
                             domain::models::Cursor::After(c),
                         ),
                     );
                 }
                 @%- endfor %@
-                _domain_::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
+                _repository_::@{ pascal_name }@Query@{ selector|pascal }@Order::_None => {}
             }
         }
         query = query.order_by(order);
@@ -906,7 +906,7 @@ async fn @{ selector }@_handler(
         }
         @%- endif %@
         let repo = RepositoryImpl::new_with_ctx(&ctx);
-        let stream = crate::api_@{ db_route|snake }@_selector!(_fetch(&repo, &auth, &data), repo);
+        let stream = crate::api_selector!(_fetch(&repo, &auth, &data), repo);
         let order = data.order.unwrap_or_default();
         let stream = stream.map(move |obj| {
             obj.and_then(|obj| ResObj::try_from_(&*obj, &auth, order.to_cursor(&obj)))
@@ -927,9 +927,9 @@ async fn @{ selector }@_handler(
 #[post("/count_@{ selector }@")]
 async fn count_@{ selector }@_handler(
     @%- if selector_def.filter_is_required() %@
-    filter: actix_web::web::Json<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+    filter: actix_web::web::Json<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
     @%- else %@
-    filter: actix_web::web::Json<Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>>,
+    filter: actix_web::web::Json<Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>>,
     @%- endif %@
     http_req: actix_web::HttpRequest,
 ) -> impl actix_web::Responder {
@@ -939,9 +939,9 @@ async fn count_@{ selector }@_handler(
         repo: &RepositoryImpl,
         auth: &AuthInfo,
         @%- if selector_def.filter_is_required() %@
-        filter: &_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
+        filter: &_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter,
         @%- else %@
-        filter: &Option<_domain_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
+        filter: &Option<_repository_::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
         @%- endif %@
     ) -> anyhow::Result<i64> {
         let @{ db|snake }@_query = repo.@{ db|snake }@_query();
@@ -976,7 +976,7 @@ async fn count_@{ selector }@_handler(
         }
         @%- endif %@
         let repo = RepositoryImpl::new_with_ctx(&ctx);
-        Ok(crate::api_@{ db_route|snake }@_selector!(_count(&repo, &auth, &filter), repo))
+        Ok(crate::api_selector!(_count(&repo, &auth, &filter), repo))
     }
     .await;
     crate::response::json_response(result, &ctx)

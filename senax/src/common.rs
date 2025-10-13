@@ -69,7 +69,7 @@ pub fn rel_hash(key: String) -> u64 {
 }
 
 pub fn check_struct_name(name: &str) {
-    if ["box", "vec", "option"].iter().any(|&x| x == name) {
+    if ["box", "vec", "option"].contains(&name) {
         error_exit!("{} is an incorrect name.", name)
     }
 }
@@ -77,7 +77,7 @@ pub fn check_struct_name(name: &str) {
 pub fn check_name(name: &str) {
     static RE: Lazy<Regex> =
         Lazy::new(|| Regex::new(r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$").unwrap());
-    if !RE.is_match(name).unwrap() || BAD_KEYWORDS.iter().any(|&x| x == name) {
+    if !RE.is_match(name).unwrap() || BAD_KEYWORDS.contains(&name) {
         error_exit!("{} is an incorrect name.", name)
     }
 }
@@ -92,7 +92,7 @@ pub fn check_column_name(name: &str) {
 
 pub fn check_ascii_name(name: &str) {
     static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[A-Za-z][_0-9A-Za-z]*(?<!_)$").unwrap());
-    if !RE.is_match(name).unwrap() || BAD_KEYWORDS.iter().any(|&x| x == name) {
+    if !RE.is_match(name).unwrap() || BAD_KEYWORDS.contains(&name) {
         error_exit!("{} is an incorrect name.", name)
     }
 }
@@ -113,10 +113,11 @@ pub fn fs_write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> Result<
             true
         };
         if update {
-            if let Some(parent) = path.parent() {
-                if !parent.eq(Path::new("")) && !parent.exists() {
-                    fs::create_dir_all(parent)?;
-                }
+            if let Some(parent) = path.parent()
+                && !parent.eq(Path::new(""))
+                && !parent.exists()
+            {
+                fs::create_dir_all(parent)?;
             }
             let mut last_path = LAST_PATH.lock().unwrap();
             let path_str = path.display().to_string();
@@ -344,22 +345,17 @@ pub fn write_group_yml(
     crate::common::check_ascii_name(db);
     crate::common::check_ascii_name(group);
     let path = Path::new(SCHEMA_PATH).join(db).join(format!("{group}.yml"));
-    if let Some(bk) = BACKUP.get() {
-        if path.exists() {
-            let content = fs::read_to_string(&path)?;
-            let dir = bk.join(format!("group-{db}-{group}-{}.yml", Local::now()));
-            fs::write(dir, content)?;
-        }
+    if let Some(bk) = BACKUP.get()
+        && path.exists()
+    {
+        let content = fs::read_to_string(&path)?;
+        let bk_path = bk.join(format!("group-{db}-{group}-{}.yml", Local::now()));
+        fs::write(bk_path, content)?;
     }
     let mut buf =
         "# yaml-language-server: $schema=../../senax-schema.json#properties/model\n\n".to_string();
     buf.push_str(&simplify_yml(serde_yaml::to_string(&data)?)?);
-    if let Some(parent) = path.parent() {
-        if !parent.eq(Path::new("")) && !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
-    }
-    fs::write(path, &buf)?;
+    fs_write(path, &buf)?;
     Ok(())
 }
 
@@ -379,18 +375,18 @@ pub fn write_simple_vo_yml(data: &IndexMap<String, FieldDef>) -> anyhow::Result<
         return Ok(());
     }
     let path = Path::new(SCHEMA_PATH).join(SIMPLE_VALUE_OBJECTS_FILE);
-    if let Some(bk) = BACKUP.get() {
-        if path.exists() {
-            let content = fs::read_to_string(&path)?;
-            let dir = bk.join(format!("vo-{}.yml", Local::now()));
-            fs::write(dir, content)?;
-        }
+    if let Some(bk) = BACKUP.get()
+        && path.exists()
+    {
+        let content = fs::read_to_string(&path)?;
+        let dir = bk.join(format!("vo-{}.yml", Local::now()));
+        fs::write(dir, content)?;
     }
     let mut buf =
         "# yaml-language-server: $schema=../senax-schema.json#properties/simple_value_object\n\n"
             .to_string();
     buf.push_str(&simplify_yml(serde_yaml::to_string(&data)?)?);
-    fs::write(path, &buf)?;
+    fs_write(path, &buf)?;
     Ok(())
 }
 
@@ -442,12 +438,12 @@ pub fn write_api_yml(
     let path = Path::new(&server).join(API_SCHEMA_PATH).join(db);
     fs::create_dir_all(&path)?;
     let path = path.join(format!("{}.yml", group));
-    if let Some(bk) = BACKUP.get() {
-        if path.exists() {
-            let content = fs::read_to_string(&path)?;
-            let dir = bk.join(format!("api-{server}-{db}-{group}-{}.yml", Local::now()));
-            fs::write(dir, content)?;
-        }
+    if let Some(bk) = BACKUP.get()
+        && path.exists()
+    {
+        let content = fs::read_to_string(&path)?;
+        let bk_path = bk.join(format!("api-{server}-{db}-{group}-{}.yml", Local::now()));
+        fs::write(bk_path, content)?;
     }
     let mut buf =
         "# yaml-language-server: $schema=../../../senax-schema.json#properties/api_model\n\n"
@@ -606,5 +602,13 @@ where
             Boundary::UPPER_DIGIT,
         ])
         .to_case(Case::Title)
+    }
+}
+
+pub fn column_escape(s: &String) -> String {
+    if schema::is_mysql_mode() {
+        format!("`{}`", s)
+    } else {
+        format!(r#""{}""#, s)
     }
 }

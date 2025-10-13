@@ -139,7 +139,7 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
             writer.as_mut(),
         )
         .await?;
-        let result = sqlx::query("SELECT version FROM _seeds WHERE version=?")
+        let result = sqlx::query("SELECT version FROM _seeds WHERE version=@{ config.db_type_switch("?", "$1") }@")
             .bind(version)
             .fetch_optional(writer.as_mut())
             .await?;
@@ -147,7 +147,7 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
             continue;
         }
         SeedSchema::seed(&data).await?;
-        sqlx::query("INSERT INTO _seeds (version, description) VALUES (?,?)")
+        sqlx::query("INSERT INTO _seeds (version, description) VALUES @{ config.db_type_switch("(?,?)", "($1,$2)") }@")
             .bind(version)
             .bind(description)
             .execute(writer.as_mut())

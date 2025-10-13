@@ -14,9 +14,9 @@ pub enum IndexType {
     Index,
     /// ### ユニーク
     Unique,
-    /// ### フルテキスト
+    /// ### フルテキスト(mysqlのみ)
     Fulltext,
-    /// ### 空間インデックス
+    /// ### 空間インデックス(mysqlのみ)
     Spatial,
 }
 
@@ -37,7 +37,7 @@ pub struct IndexFieldDef {
     /// ### 方向
     #[serde(skip_serializing_if = "Option::is_none")]
     pub direction: Option<SortDirection>,
-    /// ### 長さ
+    /// ### 長さ(mysqlのみ)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub length: Option<u32>,
     /// ### クエリー
@@ -55,7 +55,7 @@ pub struct IndexFieldJson {
     /// ### 方向
     #[serde(skip_serializing_if = "Option::is_none")]
     pub direction: Option<SortDirection>,
-    /// ### 長さ
+    /// ### 長さ(mysqlのみ)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub length: Option<u32>,
     /// ### クエリー

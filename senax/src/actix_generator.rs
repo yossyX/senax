@@ -491,7 +491,7 @@ fn fix_build_sh(content: &str, name: &str) -> Result<String> {
         let content = content.replace(
             "# Do not modify this line. (Api)",
             &format!(
-                "senax actix api {} -c ${}_client\n# Do not modify this line. (Api)",
+                "senax actix api {} -c -f ${}_client\n# Do not modify this line. (Api)",
                 name, name
             ),
         );

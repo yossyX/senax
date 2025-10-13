@@ -2,17 +2,17 @@ use anyhow::{Result, bail};
 use indexmap::IndexMap;
 use senax_mysql_parser::NomErr;
 use senax_mysql_parser::column::ColumnConstraint;
-use senax_mysql_parser::common::{Literal, SqlType, TableKey};
 use senax_mysql_parser::create::{CreateTableStatement, creation};
 use senax_mysql_parser::create_table_options::TableOption;
-use senax_mysql_parser::keywords::escape;
 use serde::{Deserialize, Serialize};
 use sqlx::migrate::MigrateDatabase;
-use sqlx::{MySql, MySqlPool, Row};
-use std::fmt;
+use sqlx::pool::PoolConnection;
+use sqlx::{MySql, MySqlPool, Postgres, Row};
+use std::fmt::{self, Debug};
 
-use crate::common::yaml_value_to_str;
-use crate::schema::SoftDelete;
+use crate::common::{column_escape, yaml_value_to_str};
+use crate::ddl::sql_type::{Literal, SqlType, TableKey};
+use crate::schema::{SoftDelete, is_mysql_mode, set_mysql_mode};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Table {
@@ -20,7 +20,7 @@ pub struct Table {
     pub old_name: Option<String>,
     pub old_soft_delete: Option<(String, SoftDelete)>,
     pub columns: IndexMap<String, Column>,
-    pub primary: Option<TableKey>,
+    pub primary: Option<(String, TableKey)>,
     pub indexes: IndexMap<String, TableKey>,
     pub constraints: IndexMap<String, TableKey>,
     pub comment: Option<String>,
@@ -32,47 +32,51 @@ pub struct Table {
 
 impl fmt::Display for Table {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CREATE TABLE {} (\n    ", escape(&self.name))?;
+        write!(f, "CREATE TABLE {} (\n    ", column_escape(&self.name))?;
         write!(
             f,
             "{}",
             self.columns
                 .iter()
-                .map(|(name, column)| format!("{} {}", escape(name), column))
+                .map(|(name, column)| format!("{} {}", column_escape(name), column))
                 .collect::<Vec<_>>()
                 .join(",\n    ")
         )?;
         if let Some(ref primary) = self.primary {
-            write!(f, ",\n    {}", primary)?;
+            write!(f, ",\n    {}", primary.1)?;
         }
-        write!(
-            f,
-            "{}",
-            self.indexes
-                .values()
-                .filter(|index| !matches!(index, TableKey::Key(_, x) if x.is_empty()))
-                .map(|index| format!(",\n    {}", index))
-                .collect::<Vec<_>>()
-                .join("")
-        )?;
-        // write!(
-        //     f,
-        //     "{}",
-        //     self.constraints
-        //         .iter()
-        //         .map(|(name, constraint)| format!(",\n    {}", constraint))
-        //         .collect::<Vec<_>>()
-        //         .join("")
-        // )?;
+        if is_mysql_mode() {
+            write!(
+                f,
+                "{}",
+                self.indexes
+                    .values()
+                    .filter(|index| !matches!(index, TableKey::Key(_, x) if x.is_empty()))
+                    .map(|index| format!(",\n    {}", index))
+                    .collect::<Vec<_>>()
+                    .join("")
+            )?;
+            // write!(
+            //     f,
+            //     "{}",
+            //     self.constraints
+            //         .iter()
+            //         .map(|(name, constraint)| format!(",\n    {}", constraint))
+            //         .collect::<Vec<_>>()
+            //         .join("")
+            // )?;
+        }
         write!(f, "\n)")?;
-        if let Some(ref engine) = self.engine {
-            write!(f, " ENGINE={engine}")?;
-        }
-        // if let Some(ref character_set) = self.character_set {
-        //     write!(f, " CHARACTER SET='{character_set}'")?;
-        // }
-        if let Some(ref collation) = self.collation {
-            write!(f, " COLLATE='{collation}'")?;
+        if is_mysql_mode() {
+            if let Some(ref engine) = self.engine {
+                write!(f, " ENGINE={engine}")?;
+            }
+            // if let Some(ref character_set) = self.character_set {
+            //     write!(f, " CHARACTER SET='{character_set}'")?;
+            // }
+            if let Some(ref collation) = self.collation {
+                write!(f, " COLLATE='{collation}'")?;
+            }
         }
         write!(f, ";")
     }
@@ -90,9 +94,7 @@ pub struct Column {
 
 impl PartialEq for Column {
     fn eq(&self, other: &Self) -> bool {
-        (self.sql_type == other.sql_type
-            || self.alt_type == other.sql_type
-            || self.sql_type == other.alt_type)
+        self.is_same_type(other)
             && self.constraint == other.constraint
             && comp_literal(&self.default, &other.default)
             && self.comment == other.comment
@@ -100,25 +102,30 @@ impl PartialEq for Column {
 }
 
 impl Column {
+    pub fn is_same_type(&self, other: &Self) -> bool {
+        self.sql_type == other.sql_type
+            || self.alt_type == other.sql_type
+            || self.sql_type == other.alt_type
+    }
     pub fn has_query(&self) -> bool {
         self.constraint.query.is_some()
     }
 }
 
 fn comp_literal(value: &Option<Literal>, other: &Option<Literal>) -> bool {
-    if let Some(value) = value {
-        if let Some(other) = other {
-            return value.to_raw_string() == other.to_raw_string();
-        }
+    if let Some(value) = value
+        && let Some(other) = other
+    {
+        return value.to_raw_string() == other.to_raw_string();
     }
     value.is_some() == other.is_some()
 }
 
-fn mysql_escape(v: &str) -> String {
+pub fn mysql_escape(v: &str) -> String {
     v.replace('\\', "\\\\")
         .replace(0 as char, "\\0")
         .replace('\'', "\\'")
-        .replace('"', "\\\"")
+        // .replace('"', "\\\"")
         .replace(8 as char, "\\b")
         .replace('\r', "\\r")
         .replace('\n', "\\n")
@@ -128,12 +135,20 @@ fn mysql_escape(v: &str) -> String {
 
 impl fmt::Display for Column {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.sql_type)?;
-        write!(f, "{}", self.constraint)?;
-        if let Some(ref default) = self.default {
-            write!(f, " DEFAULT {}", default.to_string())?;
+        let mode = f.precision();
+        if mode.is_none_or(|v| v == 0) {
+            self.sql_type.write(f, &self.constraint)?;
         }
-        if let Some(ref comment) = self.comment {
+        if mode.is_none() {
+            write!(f, "{}", self.constraint)?;
+            if let Some(ref default) = self.default {
+                write!(f, " DEFAULT {}", default.to_string())?;
+            }
+        }
+        if is_mysql_mode()
+            && mode.is_none()
+            && let Some(ref comment) = self.comment
+        {
             write!(f, " COMMENT '{}'", mysql_escape(comment))?;
         }
         Ok(())
@@ -146,10 +161,10 @@ pub struct Constraint {
     // pub character_set: Option<String>,
     pub default_collation: Option<String>,
     pub collation: Option<String>,
-    pub default_value: Option<Literal>,
+    // pub default_value: Option<Literal>,
     pub auto_increment: bool,
-    pub primary_key: bool,
-    pub unique: bool,
+    // pub primary_key: bool,
+    // pub unique: bool,
     pub srid: Option<u32>,
     pub query: Option<(String, bool)>,
 }
@@ -160,10 +175,10 @@ impl PartialEq for Constraint {
             && (self.collation == other.collation
                 || (self.default_collation == other.collation && self.collation.is_none())
                 || (self.collation == other.default_collation && other.collation.is_none()))
-            && self.default_value == other.default_value
+            // && self.default_value == other.default_value
             && self.auto_increment == other.auto_increment
-            && self.primary_key == other.primary_key
-            && self.unique == other.unique
+            // && self.primary_key == other.primary_key
+            // && self.unique == other.unique
             && self.srid == other.srid
             && self.query.is_none() == other.query.is_none()
             && self.query.clone().unwrap_or_default().1 == other.query.clone().unwrap_or_default().1
@@ -175,27 +190,12 @@ impl fmt::Display for Constraint {
         if self.not_null {
             write!(f, " NOT NULL")?;
         }
-        // if let Some(ref c) = self.character_set {
-        //     write!(f, " CHARACTER SET {}", c)?;
+        // if let Some(ref v) = self.default_value {
+        //     write!(f, " DEFAULT {}", v.to_string())?;
         // }
-        if let Some(ref c) = self.collation {
-            write!(f, " COLLATE {}", c)?;
-        }
-        if let Some(ref v) = self.default_value {
-            write!(f, " DEFAULT {}", v.to_string())?;
-        }
-        if self.auto_increment {
-            write!(f, " AUTO_INCREMENT")?;
-        }
-        if self.primary_key {
-            write!(f, " PRIMARY KEY")?;
-        }
-        if self.unique {
-            write!(f, " UNIQUE")?;
-        }
-        if let Some(srid) = self.srid {
-            write!(f, " /*!80003 SRID {} */", srid)?;
-        }
+        // if is_mysql_mode() && self.auto_increment {
+        //     write!(f, " AUTO_INCREMENT")?;
+        // }
         if let Some((query, stored)) = &self.query {
             write!(
                 f,
@@ -223,17 +223,17 @@ impl From<Vec<ColumnConstraint>> for Constraint {
                     constraint.default_collation = Some(v.clone());
                     constraint.collation = Some(v);
                 }
-                ColumnConstraint::DefaultValue(v) => {
-                    constraint.default_value = Some(v);
+                ColumnConstraint::DefaultValue(_) => {
+                    // constraint.default_value = Some(v.into());
                 }
                 ColumnConstraint::AutoIncrement => {
                     constraint.auto_increment = true;
                 }
                 ColumnConstraint::PrimaryKey => {
-                    constraint.primary_key = true;
+                    // constraint.primary_key = true;
                 }
                 ColumnConstraint::Unique => {
-                    constraint.unique = true;
+                    // constraint.unique = true;
                 }
                 ColumnConstraint::Srid(v) => {
                     constraint.srid = Some(v);
@@ -247,9 +247,10 @@ impl From<Vec<ColumnConstraint>> for Constraint {
     }
 }
 
-fn conv(def: CreateTableStatement) -> Table {
+fn mysql_conv(def: CreateTableStatement) -> Table {
     let mut table = Table::default();
     table.name = def.table;
+    use senax_mysql_parser::column::ColumnConstraint as MysqlColumnConstraint;
     table.columns = def
         .fields
         .into_iter()
@@ -258,7 +259,7 @@ fn conv(def: CreateTableStatement) -> Table {
                 .constraints
                 .iter()
                 .map(|v| match v {
-                    ColumnConstraint::DefaultValue(x) => Some(x.clone()),
+                    MysqlColumnConstraint::DefaultValue(x) => Some(x.clone()),
                     _ => None,
                 })
                 .find(|v| v.is_some())
@@ -266,41 +267,42 @@ fn conv(def: CreateTableStatement) -> Table {
             let constraints: Vec<_> = spec
                 .constraints
                 .into_iter()
-                .filter(|v| !matches!(v, ColumnConstraint::DefaultValue(_)))
+                .filter(|v| !matches!(v, MysqlColumnConstraint::DefaultValue(_)))
                 .collect();
             map.insert(
                 spec.column.name,
                 Column {
                     old_name: None,
-                    sql_type: spec.sql_type.clone(),
-                    alt_type: spec.sql_type,
+                    sql_type: spec.sql_type.clone().into(),
+                    alt_type: spec.sql_type.into(),
                     constraint: constraints.into(),
-                    default,
+                    default: default.map(|v| v.into()),
                     comment: spec.comment.map(|v| v.to_raw_string()),
                 },
             );
             map
         });
+    use senax_mysql_parser::common::TableKey as MysqlTableKey;
     if let Some(keys) = def.keys {
         for key in keys {
             match &key {
-                TableKey::PrimaryKey(_) => {
-                    table.primary = Some(key);
+                MysqlTableKey::PrimaryKey(_) => {
+                    table.primary = Some((String::new(), key.into()));
                 }
-                TableKey::UniqueKey(n, _) => {
-                    table.indexes.insert(n.to_string(), key);
+                MysqlTableKey::UniqueKey(n, _) => {
+                    table.indexes.insert(n.to_string(), key.into());
                 }
-                TableKey::FulltextKey(n, _, _) => {
-                    table.indexes.insert(n.to_string(), key);
+                MysqlTableKey::FulltextKey(n, _, _) => {
+                    table.indexes.insert(n.to_string(), key.into());
                 }
-                TableKey::Key(n, _) => {
-                    table.indexes.insert(n.to_string(), key);
+                MysqlTableKey::Key(n, _) => {
+                    table.indexes.insert(n.to_string(), key.into());
                 }
-                TableKey::SpatialKey(n, _) => {
-                    table.indexes.insert(n.to_string(), key);
+                MysqlTableKey::SpatialKey(n, _) => {
+                    table.indexes.insert(n.to_string(), key.into());
                 }
-                TableKey::Constraint(n, _, _, _, _, _) => {
-                    table.constraints.insert(n.to_string(), key);
+                MysqlTableKey::Constraint(n, _, _, _, _, _) => {
+                    table.constraints.insert(n.to_string(), key.into());
                 }
             }
         }
@@ -319,47 +321,70 @@ fn conv(def: CreateTableStatement) -> Table {
     table
 }
 
-pub async fn parse(database_url: &str) -> Result<IndexMap<String, Table>> {
-    if !MySql::database_exists(database_url).await? {
-        return Ok(Default::default());
-    }
-    let pool = MySqlPool::connect(database_url).await?;
-    let mut conn = pool.acquire().await?;
+async fn get_mysql_table_list(conn: &mut PoolConnection<MySql>) -> Result<Vec<String>> {
+    let tables_query = "show full tables where Table_Type != 'VIEW'";
+    let rows = sqlx::query(tables_query).fetch_all(conn.as_mut()).await?;
+    Ok(rows.iter().map(|v| v.get(0)).collect())
+}
 
-    let rows = sqlx::query("show full tables where Table_Type != 'VIEW'")
-        .fetch_all(conn.as_mut())
+async fn get_mysql_table_def(conn: &mut PoolConnection<MySql>, table: &str) -> Result<Table> {
+    let row = sqlx::query(&format!("show create table `{}`;", table))
+        .fetch_one(conn.as_mut())
         .await?;
-    let tables: Vec<String> = rows.iter().map(|v| v.get(0)).collect();
+    let def: String = row.get(1);
+    let def = match creation(def.as_bytes()) {
+        Ok((_, o)) => o,
+        Err(e) => match e {
+            NomErr::Incomplete(_e) => {
+                bail!(format!("failed to incomplete query:\n{}", def));
+            }
+            NomErr::Error(e) => {
+                bail!(format!(
+                    "failed to parse query:\n{}",
+                    String::from_utf8(e.input.to_vec()).unwrap()
+                ));
+            }
+            NomErr::Failure(e) => {
+                bail!(format!(
+                    "failed to parse query:\n{}",
+                    String::from_utf8(e.input.to_vec()).unwrap()
+                ));
+            }
+        },
+    };
+    Ok(mysql_conv(def))
+}
+
+pub async fn get_mysql_table_def_map(
+    conn: &mut PoolConnection<MySql>,
+) -> Result<IndexMap<String, Table>> {
+    let tables: Vec<String> = get_mysql_table_list(conn).await?;
     let mut result = IndexMap::new();
     for table in tables {
-        let row = sqlx::query(&format!("show create table `{}`;", &table))
-            .fetch_one(conn.as_mut())
-            .await?;
-        let def: String = row.get(1);
-        let def = match creation(def.as_bytes()) {
-            Ok((_, o)) => o,
-            Err(e) => match e {
-                NomErr::Incomplete(_e) => {
-                    bail!(format!("failed to incomplete query:\n{}", def));
-                }
-                NomErr::Error(e) => {
-                    bail!(format!(
-                        "failed to parse query:\n{}",
-                        String::from_utf8(e.input.to_vec()).unwrap()
-                    ));
-                }
-                NomErr::Failure(e) => {
-                    bail!(format!(
-                        "failed to parse query:\n{}",
-                        String::from_utf8(e.input.to_vec()).unwrap()
-                    ));
-                }
-            },
-        };
-        let def = conv(def);
+        let def = get_mysql_table_def(conn, &table).await?;
         result.insert(table, def);
     }
     Ok(result)
+}
+
+pub async fn parse(database_url: &str) -> Result<IndexMap<String, Table>> {
+    if database_url.starts_with("mysql:") {
+        set_mysql_mode(true);
+        if !MySql::database_exists(database_url).await? {
+            return Ok(Default::default());
+        }
+        let pool = MySqlPool::connect(database_url).await?;
+        let mut conn = pool.acquire().await?;
+        get_mysql_table_def_map(&mut conn).await
+    } else if database_url.starts_with("postgres:") {
+        set_mysql_mode(false);
+        if !Postgres::database_exists(database_url).await? {
+            return Ok(Default::default());
+        }
+        super::pgsql::get_pgsql_table_def_map(database_url).await
+    } else {
+        bail!("unsupported database type");
+    }
 }
 
 pub fn parse_default_value(value: &serde_yaml::Value, sql_type: &SqlType) -> Result<Literal> {
@@ -367,9 +392,17 @@ pub fn parse_default_value(value: &serde_yaml::Value, sql_type: &SqlType) -> Res
     match sql_type {
         SqlType::Bool => {
             if value.eq_ignore_ascii_case("true") || value.eq("1") {
-                Ok(Literal::Integer(1))
+                if is_mysql_mode() {
+                    Ok(Literal::Integer(1))
+                } else {
+                    Ok(Literal::Boolean(true))
+                }
             } else if value.eq_ignore_ascii_case("false") || value.eq("0") {
-                Ok(Literal::Integer(0))
+                if is_mysql_mode() {
+                    Ok(Literal::Integer(0))
+                } else {
+                    Ok(Literal::Boolean(false))
+                }
             } else {
                 anyhow::bail!("{:?} is not bool", value);
             }
@@ -413,8 +446,20 @@ pub fn parse_default_value(value: &serde_yaml::Value, sql_type: &SqlType) -> Res
         SqlType::Mediumtext => Ok(Literal::String(value)),
         SqlType::Longtext => Ok(Literal::String(value)),
         SqlType::Text => Ok(Literal::String(value)),
-        SqlType::Date => Ok(Literal::Null),
-        SqlType::Time => Ok(Literal::Null),
+        SqlType::Date => {
+            if "CURRENT_DATE".eq_ignore_ascii_case(&value) {
+                Ok(Literal::CurrentDate)
+            } else {
+                Ok(Literal::Null)
+            }
+        }
+        SqlType::Time => {
+            if "CURRENT_TIME".eq_ignore_ascii_case(&value) {
+                Ok(Literal::CurrentTime)
+            } else {
+                Ok(Literal::Null)
+            }
+        }
         SqlType::DateTime(_) => {
             if "CURRENT_TIMESTAMP".eq_ignore_ascii_case(&value) {
                 Ok(Literal::CurrentTimestamp)
@@ -437,6 +482,8 @@ pub fn parse_default_value(value: &serde_yaml::Value, sql_type: &SqlType) -> Res
         SqlType::Json => Ok(Literal::Null),
         SqlType::Point => Ok(Literal::Null),
         SqlType::Geometry => Ok(Literal::Null),
+        SqlType::UnSupported => Ok(Literal::Null),
+        SqlType::Uuid => Ok(Literal::Null),
     }
 }
 

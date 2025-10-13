@@ -1160,26 +1160,26 @@ impl ApiFieldDef {
         }
     }
     pub fn default(name: &str) -> Option<serde_yaml::Value> {
-        if let Some(c) = API_COLUMNS.lock().unwrap().last() {
-            if let Some(Some(c)) = c.get(name) {
-                return c.default.clone();
-            }
+        if let Some(c) = API_COLUMNS.lock().unwrap().last()
+            && let Some(Some(c)) = c.get(name)
+        {
+            return c.default.clone();
         }
         None
     }
     pub fn on_insert_formula(name: &str) -> Option<String> {
-        if let Some(c) = API_COLUMNS.lock().unwrap().last() {
-            if let Some(Some(c)) = c.get(name) {
-                return c.on_insert_formula.clone();
-            }
+        if let Some(c) = API_COLUMNS.lock().unwrap().last()
+            && let Some(Some(c)) = c.get(name)
+        {
+            return c.on_insert_formula.clone();
         }
         None
     }
     pub fn on_update_formula(name: &str) -> Option<String> {
-        if let Some(c) = API_COLUMNS.lock().unwrap().last() {
-            if let Some(Some(c)) = c.get(name) {
-                return c.on_update_formula.clone();
-            }
+        if let Some(c) = API_COLUMNS.lock().unwrap().last()
+            && let Some(Some(c)) = c.get(name)
+        {
+            return c.on_update_formula.clone();
         }
         None
     }

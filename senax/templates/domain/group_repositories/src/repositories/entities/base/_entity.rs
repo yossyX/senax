@@ -430,7 +430,7 @@ impl Col_ {
         match self {
             @{- def.primaries()|fmt_join("
             Col_::{var} => {filter_check_null},", "") }@
-            @{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
+            @{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
             Col_::{var} => {filter_check_null},", "") }@
             _ => unimplemented!(),
         }
@@ -440,7 +440,7 @@ impl Col_ {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColOne_ {
-@{ def.all_fields_without_json()|fmt_join("    {var}({filter_type}),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("    {var}({filter_type}),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@),
 @%- endfor %@
@@ -450,7 +450,7 @@ pub enum ColOne_ {
 impl ColOne_ {
     fn _name(&self) -> &'static str {
         match self {
-            @{- def.all_fields_without_json()|fmt_join("
+            @{- def.all_fields_except_json()|fmt_join("
             ColOne_::{var}(_) => \"`{col}`\",", "") }@
             @%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "`{name}`", ", ") }@>",
@@ -460,7 +460,7 @@ impl ColOne_ {
     }
     pub fn check_eq<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
         match self {
-            @{- def.equivalence_cache_fields_without_json()|fmt_join("
+            @{- def.equivalence_cache_fields_except_json()|fmt_join("
             ColOne_::{var}(c) => _obj.{var}(){filter_check_eq},", "") }@
             @%- for (index_name, index) in def.multi_index(true) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{var}(){filter_check_eq})", " && ") }@,
@@ -470,7 +470,7 @@ impl ColOne_ {
     }
     pub fn check_cmp<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T, order: std::cmp::Ordering, eq: bool) -> Result<bool, bool> {
         let o = match self {
-            @{- def.comparable_cache_fields_without_json()|fmt_join("
+            @{- def.comparable_cache_fields_except_json()|fmt_join("
             ColOne_::{var}(c) => _obj.{var}(){filter_check_cmp},", "") }@
             @%- for (index_name, index) in def.multi_index(true) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{var}(){filter_check_cmp})", ".then") }@,
@@ -511,7 +511,7 @@ impl ColKey_ {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColMany_ {
-@{ def.all_fields_without_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(Vec<@{ pascal_name }@Index_@{ index_name }@>),
 @%- endfor %@
@@ -521,7 +521,7 @@ pub enum ColMany_ {
 impl ColMany_ {
     fn _name(&self) -> &'static str {
         match self {
-            @{- def.all_fields_without_json()|fmt_join("
+            @{- def.all_fields_except_json()|fmt_join("
             ColMany_::{var}(_) => \"`{col}`\",", "") }@
             @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "`{name}`", ", ") }@>",
@@ -532,7 +532,7 @@ impl ColMany_ {
     #[allow(bindings_with_variant_name)]
     pub fn check_in<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
         match self {
-            @{- def.equivalence_cache_fields_without_json()|fmt_join("
+            @{- def.equivalence_cache_fields_except_json()|fmt_join("
             ColMany_::{var}(list) => list.iter().any(|c| _obj.{var}(){filter_check_eq}),", "") }@
             @%- for (index_name, index) in def.multi_index(true) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(list) => list.iter().any(|@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)| @{ index.join_fields(def, "(_obj.{var}(){filter_check_eq})", " && ") }@),
@@ -582,7 +582,7 @@ impl ColJsonArray_ {
 #[derive(Clone, Debug)]
 pub enum ColGeo_ {
 @{- def.all_fields_only_geo()|fmt_join("
-    {var}(::serde_json::Value, u32),", "") }@
+    {var}(::serde_json::Value, i32),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -600,7 +600,7 @@ impl ColGeo_ {
 #[derive(Clone, Debug)]
 pub enum ColGeoDistance_ {
 @{- def.all_fields_only_geo()|fmt_join("
-    {var}(::serde_json::Value, f64, u32),", "") }@
+    {var}(::serde_json::Value, f64, i32),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -790,6 +790,7 @@ impl Default for Filter_ {
     }
 }
 impl std::fmt::Display for Filter_ {
+    #[allow(bindings_with_variant_name)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Filter_::WithTrashed => write!(f, "WithTrashed"),
@@ -984,7 +985,7 @@ pub use @{ filter_macro_name }@_text as filter_text;
 
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_one {
-@%- for (col_name, column_def) in def.all_fields_without_json() %@
+@%- for (col_name, column_def) in def.all_fields_except_json() %@
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColOne_::@{ col_name|to_var_name }@($e.clone().try_into()?));
 @%- endfor %@
 }
@@ -992,7 +993,7 @@ pub use @{ filter_macro_name }@_one as filter_one;
 
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_many {
-@%- for (col_name, column_def) in def.all_fields_without_json() %@
+@%- for (col_name, column_def) in def.all_fields_except_json() %@
     (@{ col_name }@ [$($e:expr),*]) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@(vec![ $( $e.clone().try_into()? ),* ]));
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@($e.into_iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
 @%- endfor %@

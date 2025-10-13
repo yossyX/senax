@@ -12,8 +12,9 @@ use crate::{
     api_generator::schema::ApiFieldDef,
     common::{if_then_else, yaml_value_to_str},
     migration_generator::UTF8_BYTE_LEN,
+    schema::is_mysql_mode,
 };
-use crate::{common::ToCase as _, schema::to_id_name_wo_pascal};
+use crate::{common::ToCase as _, schema::to_id_name_wo_changing_case};
 
 use super::{_to_var_name, CONFIG, TimeZone, domain_mode};
 
@@ -43,9 +44,12 @@ pub enum DataType {
     Decimal,
     Date,
     Time,
-    DateTime,
-    /// 非推奨
-    Timestamp,
+    #[serde(rename = "naive_datetime")]
+    NaiveDateTime,
+    #[serde(rename = "utc_datetime")]
+    UtcDateTime,
+    #[serde(rename = "timestamp_with_timezone")]
+    TimestampWithTimeZone,
     Boolean,
     Binary,
     Varbinary,
@@ -94,7 +98,12 @@ pub enum DataSubsetType {
     Binary,
     Varbinary,
     Blob,
-    Datetime,
+    #[serde(rename = "naive_datetime")]
+    NaiveDateTime,
+    #[serde(rename = "utc_datetime")]
+    UtcDateTime,
+    #[serde(rename = "timestamp_with_timezone")]
+    TimestampWithTimeZone,
     Date,
     Time,
     Decimal,
@@ -122,7 +131,12 @@ pub enum DataSubsetType {
     BinaryNotNull,
     VarbinaryNotNull,
     BlobNotNull,
-    DatetimeNotNull,
+    #[serde(rename = "naive_datetime_not_null")]
+    NaiveDateTimeNotNull,
+    #[serde(rename = "utc_datetime_not_null")]
+    UtcDateTimeNotNull,
+    #[serde(rename = "timestamp_with_timezone_not_null")]
+    TimestampWithTimeZoneNotNull,
     DateNotNull,
     TimeNotNull,
     DecimalNotNull,
@@ -155,7 +169,9 @@ impl From<&DataSubsetType> for DataType {
             DataSubsetType::Binary => DataType::Binary,
             DataSubsetType::Varbinary => DataType::Varbinary,
             DataSubsetType::Blob => DataType::Blob,
-            DataSubsetType::Datetime => DataType::DateTime,
+            DataSubsetType::NaiveDateTime => DataType::NaiveDateTime,
+            DataSubsetType::UtcDateTime => DataType::UtcDateTime,
+            DataSubsetType::TimestampWithTimeZone => DataType::TimestampWithTimeZone,
             DataSubsetType::Date => DataType::Date,
             DataSubsetType::Time => DataType::Time,
             DataSubsetType::Decimal => DataType::Decimal,
@@ -182,7 +198,9 @@ impl From<&DataSubsetType> for DataType {
             DataSubsetType::BinaryNotNull => DataType::Binary,
             DataSubsetType::VarbinaryNotNull => DataType::Varbinary,
             DataSubsetType::BlobNotNull => DataType::Blob,
-            DataSubsetType::DatetimeNotNull => DataType::DateTime,
+            DataSubsetType::NaiveDateTimeNotNull => DataType::NaiveDateTime,
+            DataSubsetType::UtcDateTimeNotNull => DataType::UtcDateTime,
+            DataSubsetType::TimestampWithTimeZoneNotNull => DataType::TimestampWithTimeZone,
             DataSubsetType::DateNotNull => DataType::Date,
             DataSubsetType::TimeNotNull => DataType::Time,
             DataSubsetType::DecimalNotNull => DataType::Decimal,
@@ -215,7 +233,9 @@ impl DataSubsetType {
             DataSubsetType::Binary => false,
             DataSubsetType::Varbinary => false,
             DataSubsetType::Blob => false,
-            DataSubsetType::Datetime => false,
+            DataSubsetType::NaiveDateTime => false,
+            DataSubsetType::UtcDateTime => false,
+            DataSubsetType::TimestampWithTimeZone => false,
             DataSubsetType::Date => false,
             DataSubsetType::Time => false,
             DataSubsetType::Decimal => false,
@@ -242,7 +262,9 @@ impl DataSubsetType {
             DataSubsetType::BinaryNotNull => true,
             DataSubsetType::VarbinaryNotNull => true,
             DataSubsetType::BlobNotNull => true,
-            DataSubsetType::DatetimeNotNull => true,
+            DataSubsetType::NaiveDateTimeNotNull => true,
+            DataSubsetType::UtcDateTimeNotNull => true,
+            DataSubsetType::TimestampWithTimeZoneNotNull => true,
             DataSubsetType::DateNotNull => true,
             DataSubsetType::TimeNotNull => true,
             DataSubsetType::DecimalNotNull => true,
@@ -380,7 +402,7 @@ impl std::fmt::Display for IdClass {
                 &self.name
             )
         } else {
-            write!(f, "{}", to_id_name_wo_pascal(&self.name))
+            write!(f, "{}", to_id_name_wo_changing_case(&self.name))
         }
     }
 }
@@ -504,7 +526,7 @@ pub struct FieldDef {
     pub scale: Option<u16>,
     /// ### タイムゾーン
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_zone: Option<TimeZone>,
+    pub output_time_zone: Option<TimeZone>,
     /// ### 列挙型の値
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enum_values: Option<Vec<EnumValue>>,
@@ -627,7 +649,7 @@ pub struct FieldJson {
     pub scale: Option<u16>,
     /// ### タイムゾーン
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_zone: Option<TimeZone>,
+    pub output_time_zone: Option<TimeZone>,
     /// ### 列挙型の値
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub enum_values: Vec<EnumValue>,
@@ -713,7 +735,7 @@ pub struct ValueObjectJson {
     pub scale: Option<u16>,
     /// ### タイムゾーン
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_zone: Option<TimeZone>,
+    pub output_time_zone: Option<TimeZone>,
     /// ### 列挙型の値
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub enum_values: Vec<EnumValue>,
@@ -774,7 +796,7 @@ impl From<FieldDef> for FieldJson {
             collation: value.collation,
             precision: value.precision,
             scale: value.scale,
-            time_zone: value.time_zone,
+            output_time_zone: value.output_time_zone,
             enum_values: value.enum_values.unwrap_or_default(),
             json_class: value.json_class,
             exclude_from_cache: value.exclude_from_cache,
@@ -818,7 +840,7 @@ impl From<FieldJson> for FieldDef {
             collation: value.collation,
             precision: value.precision,
             scale: value.scale,
-            time_zone: value.time_zone,
+            output_time_zone: value.output_time_zone,
             enum_values: if value.enum_values.is_empty() {
                 None
             } else {
@@ -853,7 +875,7 @@ impl From<FieldDef> for ValueObjectJson {
             collation: value.collation,
             precision: value.precision,
             scale: value.scale,
-            time_zone: value.time_zone,
+            output_time_zone: value.output_time_zone,
             enum_values: value.enum_values.unwrap_or_default(),
             json_class: value.json_class,
             exclude_from_cache: value.exclude_from_cache.unwrap_or_default(),
@@ -897,7 +919,7 @@ impl From<ValueObjectJson> for FieldDef {
             collation: value.collation,
             precision: value.precision,
             scale: value.scale,
-            time_zone: value.time_zone,
+            output_time_zone: value.output_time_zone,
             enum_values: if value.enum_values.is_empty() {
                 None
             } else {
@@ -972,10 +994,10 @@ impl FieldDef {
             self.secret = Some(secret);
         }
     }
-    pub fn is_utc(&self) -> bool {
-        let tz = self
-            .time_zone
-            .or(CONFIG.read().unwrap().as_ref().unwrap().time_zone);
+    pub fn is_utc_output(&self) -> bool {
+        let tz =
+            self.output_time_zone
+                .or(CONFIG.read().unwrap().as_ref().unwrap().output_time_zone);
         tz == Some(TimeZone::Utc)
     }
     pub fn is_integer(&self) -> bool {
@@ -1028,9 +1050,9 @@ impl FieldDef {
                 DataType::Boolean => {
                     let v = yaml_value_to_str(value).unwrap();
                     if v.eq_ignore_ascii_case("true") || v.eq("1") {
-                        "1".to_string()
+                        "true".to_string()
                     } else {
-                        "0".to_string()
+                        "false".to_string()
                     }
                 }
                 DataType::Binary | DataType::Varbinary | DataType::Blob => {
@@ -1115,81 +1137,94 @@ impl FieldDef {
     }
 
     pub fn get_column_query(&self, name: &str) -> String {
-        match self.data_type {
-            DataType::Uuid => {
-                format!(
-                    "    #[sql(query = {:?})]\n",
-                    &format!("UUID_TO_BIN(\"{}\")", self.get_col_name(name))
-                )
-            }
-            DataType::Point => {
-                format!(
-                    "    #[sql(query = {:?})]\n",
-                    &format!("ST_AsBinary(\"{}\")", self.get_col_name(name))
-                )
-            }
-            DataType::GeoPoint => {
-                format!(
-                    "    #[sql(query = {:?})]\n",
-                    &format!(
-                        "ST_AsBinary(\"{}\", 'axis-order=lat-long')",
-                        self.get_col_name(name)
-                    )
-                )
-            }
-            DataType::Geometry => {
-                format!(
-                    "    #[sql(query = {:?})]\n",
-                    &format!("ST_AsGeoJSON(\"{}\")", self.get_col_name(name))
-                )
-            }
-            _ => {
-                if self
-                    .collation
-                    .as_deref()
-                    .is_some_and(|v| v.ends_with("_bin"))
-                {
+        if is_mysql_mode() {
+            match self.data_type {
+                DataType::Uuid => {
                     format!(
                         "    #[sql(query = {:?})]\n",
-                        &format!("CONVERT(\"{}\" USING utf8mb4)", self.get_col_name(name))
+                        &format!("UUID_TO_BIN(\"{}\")", self.get_col_name(name))
                     )
-                } else if self.column_name.is_some() || self.query.is_some() {
+                }
+                DataType::Point => {
                     format!(
                         "    #[sql(query = {:?})]\n",
-                        &format!("\"{}\"", self.get_col_name(name))
+                        &format!("ST_AsBinary(\"{}\")", self.get_col_name(name))
                     )
-                } else {
-                    "".to_owned()
+                }
+                DataType::GeoPoint => {
+                    format!(
+                        "    #[sql(query = {:?})]\n",
+                        &format!(
+                            "ST_AsBinary(\"{}\", 'axis-order=lat-long')",
+                            self.get_col_name(name)
+                        )
+                    )
+                }
+                DataType::Geometry => {
+                    format!(
+                        "    #[sql(query = {:?})]\n",
+                        &format!("ST_AsGeoJSON(\"{}\")", self.get_col_name(name))
+                    )
+                }
+                _ => {
+                    if self
+                        .collation
+                        .as_deref()
+                        .is_some_and(|v| v.ends_with("_bin"))
+                    {
+                        format!(
+                            "    #[sql(query = {:?})]\n",
+                            &format!("CONVERT(\"{}\" USING utf8mb4)", self.get_col_name(name))
+                        )
+                    } else if self.column_name.is_some() || self.query.is_some() {
+                        format!(
+                            "    #[sql(query = {:?})]\n",
+                            &format!("\"{}\"", self.get_col_name(name))
+                        )
+                    } else {
+                        "".to_owned()
+                    }
                 }
             }
+        } else if self.column_name.is_some() || self.query.is_some() {
+            format!(
+                "    #[sql(query = {:?})]\n",
+                &format!("\"{}\"", self.get_col_name(name))
+            )
+        } else {
+            "".to_owned()
         }
     }
 
     pub fn get_col_query(&self, name: &str) -> String {
-        match self.data_type {
-            DataType::Uuid => {
-                format!("UUID_TO_BIN(\"{}\")", name)
-            }
-            DataType::Point => {
-                format!("ST_AsBinary(\"{}\")", name)
-            }
-            DataType::GeoPoint => {
-                format!("ST_AsBinary(\"{}\", 'axis-order=lat-long')", name)
-            }
-            DataType::Geometry => {
-                format!("ST_AsGeoJSON(\"{}\")", name)
-            }
-            _ => {
-                if self
-                    .collation
-                    .as_deref()
-                    .is_some_and(|v| v.ends_with("_bin"))
-                {
-                    format!("CONVERT(\"{}\" USING utf8mb4)", name)
-                } else {
-                    format!("\"{}\"", name)
+        if is_mysql_mode() {
+            match self.data_type {
+                DataType::Uuid => {
+                    format!("UUID_TO_BIN(\"{}\")", name)
+                }
+                DataType::Point => {
+                    format!("ST_AsBinary(\"{}\")", name)
+                }
+                DataType::GeoPoint => {
+                    format!("ST_AsBinary(\"{}\", 'axis-order=lat-long')", name)
+                }
+                DataType::Geometry => {
+                    format!("ST_AsGeoJSON(\"{}\")", name)
+                }
+                _ => {
+                    if self
+                        .collation
+                        .as_deref()
+                        .is_some_and(|v| v.ends_with("_bin"))
+                    {
+                        format!("CONVERT(\"{}\" USING utf8mb4)", name)
+                    } else {
+                        format!("\"{}\"", name)
+                    }
                 }
             }
+        } else {
+            format!("\"{}\"", name)
         }
     }
 
@@ -1454,14 +1489,14 @@ impl FieldDef {
     }
 
     pub fn get_inner_type(&self, raw: bool, without_option: bool) -> String {
-        if let Some(enum_class) = &self.enum_class {
-            if !raw {
-                let typ = enum_class.to_string();
-                if without_option || self.not_null {
-                    return typ;
-                } else {
-                    return format!("Option<{}>", &typ);
-                }
+        if let Some(enum_class) = &self.enum_class
+            && !raw
+        {
+            let typ = enum_class.to_string();
+            if without_option || self.not_null {
+                return typ;
+            } else {
+                return format!("Option<{}>", &typ);
             }
         }
         let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
@@ -1480,15 +1515,20 @@ impl FieldDef {
             DataType::Char | DataType::Varchar => "std::sync::Arc<String>",
             DataType::Uuid => "uuid::Uuid",
             DataType::BinaryUuid => "uuid::Uuid",
-            DataType::Boolean => "i8",
+            DataType::Boolean => "bool",
             DataType::Text if raw => "String",
             DataType::Text => "std::sync::Arc<String>",
             DataType::Binary | DataType::Varbinary | DataType::Blob if raw => "Vec<u8>",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "std::sync::Arc<Vec<u8>>",
-            DataType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
-            DataType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::NaiveDateTime => "chrono::NaiveDateTime",
+            DataType::UtcDateTime if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::UtcDateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::TimestampWithTimeZone if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::TimestampWithTimeZone => "chrono::DateTime<chrono::offset::Local>",
             DataType::Date => "chrono::NaiveDate",
             DataType::Time => "chrono::NaiveTime",
             DataType::Decimal => "rust_decimal::Decimal",
@@ -1546,13 +1586,18 @@ impl FieldDef {
             DataType::Char | DataType::Varchar => "str",
             DataType::Uuid => "uuid::Uuid",
             DataType::BinaryUuid => "uuid::Uuid",
-            DataType::Boolean => "i8",
+            DataType::Boolean => "bool",
             DataType::Text => "str",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "Vec<u8>",
-            DataType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
-            DataType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::NaiveDateTime => "chrono::NaiveDateTime",
+            DataType::UtcDateTime if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::UtcDateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::TimestampWithTimeZone if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::TimestampWithTimeZone => "chrono::DateTime<chrono::offset::Local>",
             DataType::Date => "chrono::NaiveDate",
             DataType::Time => "chrono::NaiveTime",
             DataType::Decimal => "rust_decimal::Decimal",
@@ -1624,14 +1669,15 @@ impl FieldDef {
                 return format!("rel_{}::{}", mod_name, name);
             }
         }
+        let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
         let type_str = match self.data_type {
-            DataType::TinyInt if self.signed => "i8",
+            DataType::TinyInt if self.signed || signed_only => "i8",
             DataType::TinyInt => "u8",
-            DataType::SmallInt if self.signed => "i16",
+            DataType::SmallInt if self.signed || signed_only => "i16",
             DataType::SmallInt => "u16",
-            DataType::Int if self.signed => "i32",
+            DataType::Int if self.signed || signed_only => "i32",
             DataType::Int => "u32",
-            DataType::BigInt if self.signed => "i64",
+            DataType::BigInt if self.signed || signed_only => "i64",
             DataType::BigInt => "u64",
             DataType::Float => "f32",
             DataType::Double => "f64",
@@ -1641,10 +1687,15 @@ impl FieldDef {
             DataType::Boolean => "bool",
             DataType::Text => "String",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "Vec<u8>",
-            DataType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
-            DataType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::NaiveDateTime => "chrono::NaiveDateTime",
+            DataType::UtcDateTime if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::UtcDateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::TimestampWithTimeZone if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::TimestampWithTimeZone => "chrono::DateTime<chrono::offset::Local>",
             DataType::Date => "chrono::NaiveDate",
             DataType::Time => "chrono::NaiveTime",
             DataType::Decimal => "rust_decimal::Decimal",
@@ -1732,14 +1783,15 @@ impl FieldDef {
     }
 
     pub fn get_factory_type(&self) -> String {
+        let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
         let mut typ = match self.data_type {
-            DataType::TinyInt if self.signed => "i8",
+            DataType::TinyInt if self.signed || signed_only => "i8",
             DataType::TinyInt => "u8",
-            DataType::SmallInt if self.signed => "i16",
+            DataType::SmallInt if self.signed || signed_only => "i16",
             DataType::SmallInt => "u16",
-            DataType::Int if self.signed => "i32",
+            DataType::Int if self.signed || signed_only => "i32",
             DataType::Int => "u32",
-            DataType::BigInt if self.signed => "i64",
+            DataType::BigInt if self.signed || signed_only => "i64",
             DataType::BigInt => "u64",
             DataType::Float => "f32",
             DataType::Double => "f64",
@@ -1751,10 +1803,15 @@ impl FieldDef {
             DataType::Binary | DataType::Varbinary | DataType::Blob => {
                 "senax_common::types::blob::Blob"
             }
-            DataType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
-            DataType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::NaiveDateTime => "chrono::NaiveDateTime",
+            DataType::UtcDateTime if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::UtcDateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::TimestampWithTimeZone if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::TimestampWithTimeZone => "chrono::DateTime<chrono::offset::Local>",
             DataType::Date => "chrono::NaiveDate",
             DataType::Time => "chrono::NaiveTime",
             DataType::Decimal => "rust_decimal::Decimal",
@@ -1853,16 +1910,18 @@ impl FieldDef {
             DataType::Float => "",
             DataType::Double => "",
             DataType::Char | DataType::Varchar => ".into()",
-            DataType::Boolean => " as i8",
+            DataType::Boolean => "",
             DataType::Text => ".into()",
             DataType::Uuid => "",
             DataType::BinaryUuid => "",
             DataType::Binary | DataType::Varbinary | DataType::Blob if !id_str.is_empty() => "",
             DataType::Binary | DataType::Varbinary | DataType::Blob => ".0.into()",
-            DataType::Timestamp if self.not_null => ".into()",
-            DataType::Timestamp => "",
-            DataType::DateTime if self.not_null => ".into()",
-            DataType::DateTime => "",
+            DataType::NaiveDateTime if self.not_null => ".into()",
+            DataType::NaiveDateTime => "",
+            DataType::UtcDateTime if self.not_null => ".into()",
+            DataType::UtcDateTime => "",
+            DataType::TimestampWithTimeZone if self.not_null => ".into()",
+            DataType::TimestampWithTimeZone => "",
             DataType::Date if self.not_null => ".into()",
             DataType::Date => "",
             DataType::Time if self.not_null => ".into()",
@@ -1911,14 +1970,15 @@ impl FieldDef {
             DataType::Float => "",
             DataType::Double => "",
             DataType::Char | DataType::Varchar => "",
-            DataType::Boolean => " as i8",
+            DataType::Boolean => "",
             DataType::Text => "",
             DataType::Uuid => "",
             DataType::BinaryUuid => "",
             DataType::Binary | DataType::Varbinary | DataType::Blob if !id_str.is_empty() => "",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "",
-            DataType::Timestamp => "",
-            DataType::DateTime => "",
+            DataType::NaiveDateTime => "",
+            DataType::UtcDateTime => "",
+            DataType::TimestampWithTimeZone => "",
             DataType::Date => "",
             DataType::Time => "",
             DataType::Decimal => "",
@@ -1946,14 +2006,15 @@ impl FieldDef {
     }
 
     pub fn get_api_type(&self, option: bool, req: bool) -> String {
+        let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
         let typ = match self.data_type {
-            DataType::TinyInt if self.signed => "i8",
+            DataType::TinyInt if self.signed || signed_only => "i8",
             DataType::TinyInt => "u8",
-            DataType::SmallInt if self.signed => "i16",
+            DataType::SmallInt if self.signed || signed_only => "i16",
             DataType::SmallInt => "u16",
-            DataType::Int if self.signed => "i32",
+            DataType::Int if self.signed || signed_only => "i32",
             DataType::Int => "u32",
-            DataType::BigInt if self.signed => "i64",
+            DataType::BigInt if self.signed || signed_only => "i64",
             DataType::BigInt => "u64",
             DataType::Float if !req => "f64",
             DataType::Float => "f32",
@@ -1966,10 +2027,15 @@ impl FieldDef {
             DataType::Uuid => "uuid::Uuid",
             DataType::BinaryUuid => "uuid::Uuid",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "String",
-            DataType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
-            DataType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::NaiveDateTime => "chrono::NaiveDateTime",
+            DataType::UtcDateTime if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::UtcDateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::TimestampWithTimeZone if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::TimestampWithTimeZone => "chrono::DateTime<chrono::offset::Local>",
             DataType::Date => "chrono::NaiveDate",
             DataType::Time => "chrono::NaiveTime",
             DataType::Decimal => "rust_decimal::Decimal",
@@ -2019,8 +2085,9 @@ impl FieldDef {
             DataType::Uuid => "UUID",
             DataType::BinaryUuid => "UUID",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "String",
-            DataType::Timestamp => "DateTime",
-            DataType::DateTime => "DateTime",
+            DataType::NaiveDateTime => "NaiveDateTime",
+            DataType::UtcDateTime => "DateTime",
+            DataType::TimestampWithTimeZone => "DateTime",
             DataType::Date => "NaiveDate",
             DataType::Time => "NaiveTime",
             DataType::Decimal => "Decimal",
@@ -2037,14 +2104,13 @@ impl FieldDef {
             DataType::UnSupported => unimplemented!(),
         }
         .to_string();
-        if let Some(ref name) = self.value_object {
-            if self.data_type != DataType::Char
-                && self.data_type != DataType::Varchar
-                && self.data_type != DataType::Text
-            {
-                let name = name.to_pascal();
-                typ = format!("Vo{}", name);
-            }
+        if let Some(ref name) = self.value_object
+            && self.data_type != DataType::Char
+            && self.data_type != DataType::Varchar
+            && self.data_type != DataType::Text
+        {
+            let name = name.to_pascal();
+            typ = format!("Vo{}", name);
         }
         if self.not_null {
             format!("{}!", typ)
@@ -2068,8 +2134,9 @@ impl FieldDef {
             DataType::Uuid => "string",
             DataType::BinaryUuid => "string",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "",
-            DataType::Timestamp => "string",
-            DataType::DateTime => "string",
+            DataType::NaiveDateTime => "string",
+            DataType::UtcDateTime => "string",
+            DataType::TimestampWithTimeZone => "string",
             DataType::Date => "string",
             DataType::Time => "string",
             DataType::Decimal => "string",
@@ -2155,8 +2222,9 @@ impl FieldDef {
                 ".map(|v| v.to_str())"
             }
             DataType::Binary | DataType::Varbinary | DataType::Blob => ".to_str()",
-            DataType::Timestamp => "",
-            DataType::DateTime => "",
+            DataType::NaiveDateTime => "",
+            DataType::UtcDateTime => "",
+            DataType::TimestampWithTimeZone => "",
             DataType::Date => "",
             DataType::Time => "",
             DataType::Decimal => "",
@@ -2281,14 +2349,15 @@ impl FieldDef {
                 format!("rel_{}::{}", mod_name, name)
             }
         } else {
+            let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
             let typ = match self.data_type {
-                DataType::TinyInt if self.signed => "i8",
+                DataType::TinyInt if self.signed || signed_only => "i8",
                 DataType::TinyInt => "u8",
-                DataType::SmallInt if self.signed => "i16",
+                DataType::SmallInt if self.signed || signed_only => "i16",
                 DataType::SmallInt => "u16",
-                DataType::Int if self.signed => "i32",
+                DataType::Int if self.signed || signed_only => "i32",
                 DataType::Int => "u32",
-                DataType::BigInt if self.signed => "i64",
+                DataType::BigInt if self.signed || signed_only => "i64",
                 DataType::BigInt => "u64",
                 DataType::Float => "f32",
                 DataType::Double => "f64",
@@ -2300,10 +2369,15 @@ impl FieldDef {
                 DataType::Binary | DataType::Varbinary | DataType::Blob => {
                     "&std::sync::Arc<Vec<u8>>"
                 }
-                DataType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-                DataType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
-                DataType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-                DataType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+                DataType::NaiveDateTime => "chrono::NaiveDateTime",
+                DataType::UtcDateTime if self.is_utc_output() => {
+                    "chrono::DateTime<chrono::offset::Utc>"
+                }
+                DataType::UtcDateTime => "chrono::DateTime<chrono::offset::Local>",
+                DataType::TimestampWithTimeZone if self.is_utc_output() => {
+                    "chrono::DateTime<chrono::offset::Utc>"
+                }
+                DataType::TimestampWithTimeZone => "chrono::DateTime<chrono::offset::Local>",
                 DataType::Date => "chrono::NaiveDate",
                 DataType::Time => "chrono::NaiveTime",
                 DataType::Decimal => "rust_decimal::Decimal",
@@ -2363,14 +2437,15 @@ impl FieldDef {
             }
         }
         let json_class = self.json_class.as_ref().map(|v| format!("&{}", v));
+        let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
         let typ = match self.data_type {
-            DataType::TinyInt if self.signed => "i8",
+            DataType::TinyInt if self.signed || signed_only => "i8",
             DataType::TinyInt => "u8",
-            DataType::SmallInt if self.signed => "i16",
+            DataType::SmallInt if self.signed || signed_only => "i16",
             DataType::SmallInt => "u16",
-            DataType::Int if self.signed => "i32",
+            DataType::Int if self.signed || signed_only => "i32",
             DataType::Int => "u32",
-            DataType::BigInt if self.signed => "i64",
+            DataType::BigInt if self.signed || signed_only => "i64",
             DataType::BigInt => "u64",
             DataType::Float => "f32",
             DataType::Double => "f64",
@@ -2380,10 +2455,15 @@ impl FieldDef {
             DataType::Uuid => "uuid::Uuid",
             DataType::BinaryUuid => "uuid::Uuid",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "&[u8]",
-            DataType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
-            DataType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-            DataType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::NaiveDateTime => "chrono::NaiveDateTime",
+            DataType::UtcDateTime if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::UtcDateTime => "chrono::DateTime<chrono::offset::Local>",
+            DataType::TimestampWithTimeZone if self.is_utc_output() => {
+                "chrono::DateTime<chrono::offset::Utc>"
+            }
+            DataType::TimestampWithTimeZone => "chrono::DateTime<chrono::offset::Local>",
             DataType::Date => "chrono::NaiveDate",
             DataType::Time => "chrono::NaiveTime",
             DataType::Decimal => "rust_decimal::Decimal",
@@ -2436,14 +2516,15 @@ impl FieldDef {
                 format!("rel_{}::{}", mod_name, name)
             }
         } else {
+            let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
             let typ = match self.data_type {
-                DataType::TinyInt if self.signed => "i8",
+                DataType::TinyInt if self.signed || signed_only => "i8",
                 DataType::TinyInt => "u8",
-                DataType::SmallInt if self.signed => "i16",
+                DataType::SmallInt if self.signed || signed_only => "i16",
                 DataType::SmallInt => "u16",
-                DataType::Int if self.signed => "i32",
+                DataType::Int if self.signed || signed_only => "i32",
                 DataType::Int => "u32",
-                DataType::BigInt if self.signed => "i64",
+                DataType::BigInt if self.signed || signed_only => "i64",
                 DataType::BigInt => "u64",
                 DataType::Float => "f32",
                 DataType::Double => "f64",
@@ -2458,10 +2539,15 @@ impl FieldDef {
                 DataType::Binary | DataType::Varbinary | DataType::Blob => {
                     "std::sync::Arc<Vec<u8>>"
                 }
-                DataType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-                DataType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
-                DataType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-                DataType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+                DataType::NaiveDateTime => "chrono::NaiveDateTime",
+                DataType::UtcDateTime if self.is_utc_output() => {
+                    "chrono::DateTime<chrono::offset::Utc>"
+                }
+                DataType::UtcDateTime => "chrono::DateTime<chrono::offset::Local>",
+                DataType::TimestampWithTimeZone if self.is_utc_output() => {
+                    "chrono::DateTime<chrono::offset::Utc>"
+                }
+                DataType::TimestampWithTimeZone => "chrono::DateTime<chrono::offset::Local>",
                 DataType::Date => "chrono::NaiveDate",
                 DataType::Time => "chrono::NaiveTime",
                 DataType::Decimal => "rust_decimal::Decimal",
@@ -2531,8 +2617,7 @@ impl FieldDef {
             DataType::Double => "",
             DataType::Char | DataType::Varchar if !self.not_null => ".as_ref()",
             DataType::Char | DataType::Varchar => "",
-            DataType::Boolean if self.not_null => " == 1",
-            DataType::Boolean => ".map(|v| v == 1)",
+            DataType::Boolean => "",
             DataType::Text if !self.not_null => ".as_ref()",
             DataType::Text => "",
             DataType::Uuid => "",
@@ -2541,8 +2626,9 @@ impl FieldDef {
                 ".as_ref()"
             }
             DataType::Binary | DataType::Varbinary | DataType::Blob => "",
-            DataType::Timestamp => "",
-            DataType::DateTime => "",
+            DataType::NaiveDateTime => "",
+            DataType::UtcDateTime => "",
+            DataType::TimestampWithTimeZone => "",
             DataType::Date => "",
             DataType::Time => "",
             DataType::Decimal => "",
@@ -2642,8 +2728,9 @@ impl FieldDef {
                 ".as_ref()"
             }
             DataType::Binary | DataType::Varbinary | DataType::Blob => "",
-            DataType::Timestamp => "",
-            DataType::DateTime => "",
+            DataType::NaiveDateTime => "",
+            DataType::UtcDateTime => "",
+            DataType::TimestampWithTimeZone => "",
             DataType::Date => "",
             DataType::Time => "",
             DataType::Decimal => "",
@@ -2711,8 +2798,9 @@ impl FieldDef {
             DataType::BinaryUuid => "",
             DataType::Binary | DataType::Varbinary | DataType::Blob if !self.not_null => "",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "",
-            DataType::Timestamp => "",
-            DataType::DateTime => "",
+            DataType::NaiveDateTime => "",
+            DataType::UtcDateTime => "",
+            DataType::TimestampWithTimeZone => "",
             DataType::Date => "",
             DataType::Time => "",
             DataType::Decimal => "",
@@ -2782,8 +2870,7 @@ impl FieldDef {
                 format!("{var}{clone}.as_ref()")
             }
             DataType::Char | DataType::Varchar => format!("&{var}{clone}"),
-            DataType::Boolean if self.not_null => format!("{var}{clone} == 1"),
-            DataType::Boolean => format!("{var}{clone}.map(|v| v == 1)"),
+            DataType::Boolean => var_clone,
             DataType::Text if !self.not_null => format!("{var}{clone}.as_ref()"),
             DataType::Text => format!("&{var}{clone}"),
             DataType::Uuid => var_clone,
@@ -2792,8 +2879,9 @@ impl FieldDef {
                 format!("{var}{clone}.as_ref()")
             }
             DataType::Binary | DataType::Varbinary | DataType::Blob => format!("&{var}{clone}"),
-            DataType::Timestamp => var_clone,
-            DataType::DateTime => var_clone,
+            DataType::NaiveDateTime => var_clone,
+            DataType::UtcDateTime => var_clone,
+            DataType::TimestampWithTimeZone => var_clone,
             DataType::Date => var_clone,
             DataType::Time => var_clone,
             DataType::Decimal => var_clone,
@@ -2838,14 +2926,14 @@ impl FieldDef {
             DataType::Float => "",
             DataType::Double => "",
             DataType::Char | DataType::Varchar => "",
-            DataType::Boolean if self.not_null => " == 1",
-            DataType::Boolean => ".map(|v| v == 1)",
+            DataType::Boolean => "",
             DataType::Text => "",
             DataType::Uuid => "",
             DataType::BinaryUuid => "",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "",
-            DataType::Timestamp => "",
-            DataType::DateTime => "",
+            DataType::NaiveDateTime => "",
+            DataType::UtcDateTime => "",
+            DataType::TimestampWithTimeZone => "",
             DataType::Date => "",
             DataType::Time => "",
             DataType::Decimal => "",
@@ -2863,7 +2951,7 @@ impl FieldDef {
         }
     }
     pub fn get_outer_for_updater_type(&self, arc: bool) -> String {
-        let typ = if let Some(ref class) = self.id_class {
+        if let Some(ref class) = self.id_class {
             class.to_string()
         } else if let Some(ref class) = self.enum_class {
             class.to_string()
@@ -2878,14 +2966,15 @@ impl FieldDef {
             let mod_name = def.get_group_mod_name();
             format!("rel_{}::{}", mod_name, name)
         } else {
+            let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
             match self.data_type {
-                DataType::TinyInt if self.signed => "i8",
+                DataType::TinyInt if self.signed || signed_only => "i8",
                 DataType::TinyInt => "u8",
-                DataType::SmallInt if self.signed => "i16",
+                DataType::SmallInt if self.signed || signed_only => "i16",
                 DataType::SmallInt => "u16",
-                DataType::Int if self.signed => "i32",
+                DataType::Int if self.signed || signed_only => "i32",
                 DataType::Int => "u32",
-                DataType::BigInt if self.signed => "i64",
+                DataType::BigInt if self.signed || signed_only => "i64",
                 DataType::BigInt => "u64",
                 DataType::Float => "f32",
                 DataType::Double => "f64",
@@ -2900,10 +2989,15 @@ impl FieldDef {
                     "std::sync::Arc<Vec<u8>>"
                 }
                 DataType::Binary | DataType::Varbinary | DataType::Blob => "Vec<u8>",
-                DataType::Timestamp if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-                DataType::Timestamp => "chrono::DateTime<chrono::offset::Local>",
-                DataType::DateTime if self.is_utc() => "chrono::DateTime<chrono::offset::Utc>",
-                DataType::DateTime => "chrono::DateTime<chrono::offset::Local>",
+                DataType::NaiveDateTime => "chrono::NaiveDateTime",
+                DataType::UtcDateTime if self.is_utc_output() => {
+                    "chrono::DateTime<chrono::offset::Utc>"
+                }
+                DataType::UtcDateTime => "chrono::DateTime<chrono::offset::Local>",
+                DataType::TimestampWithTimeZone if self.is_utc_output() => {
+                    "chrono::DateTime<chrono::offset::Utc>"
+                }
+                DataType::TimestampWithTimeZone => "chrono::DateTime<chrono::offset::Local>",
                 DataType::Date => "chrono::NaiveDate",
                 DataType::Time => "chrono::NaiveTime",
                 DataType::Decimal => "rust_decimal::Decimal",
@@ -2924,8 +3018,7 @@ impl FieldDef {
                 DataType::UnSupported => unimplemented!(),
             }
             .to_string()
-        };
-        typ
+        }
     }
     pub fn is_addable(&self) -> bool {
         if self.query.is_some() {
@@ -2967,11 +3060,8 @@ impl FieldDef {
         if self.primary {
             if with_type {
                 format!(
-                    "{}Primary{}<{}, {}>",
+                    "{}Primary{sep}<'_, {inner}, {outer}>",
                     if_then_else!(null, "Null", ""),
-                    sep,
-                    inner,
-                    outer
                 )
             } else {
                 format!("{}Primary", if_then_else!(null, "Null", ""))
@@ -2983,11 +3073,8 @@ impl FieldDef {
         {
             if with_type {
                 format!(
-                    "{}Null{}<{}, {}>",
+                    "{}Null{sep}<'_, {inner}, {outer}>",
                     if_then_else!(null, "", "Not"),
-                    sep,
-                    inner,
-                    outer
                 )
             } else {
                 format!("{}Null", if_then_else!(null, "", "Not"))
@@ -2995,10 +3082,8 @@ impl FieldDef {
         } else if is_num {
             if with_type {
                 format!(
-                    "{}NullNum{}<{}>",
+                    "{}NullNum{sep}<'_, {inner}>",
                     if_then_else!(null, "", "Not"),
-                    sep,
-                    inner
                 )
             } else {
                 format!("{}NullNum", if_then_else!(null, "", "Not"))
@@ -3006,23 +3091,25 @@ impl FieldDef {
         } else if is_float {
             if with_type {
                 format!(
-                    "{}NullFloat{}<{}>",
+                    "{}NullFloat{sep}<'_, {inner}>",
                     if_then_else!(null, "", "Not"),
-                    sep,
-                    inner
                 )
             } else {
                 format!("{}NullFloat", if_then_else!(null, "", "Not"))
             }
         } else if self.data_type == DataType::Boolean {
-            format!("{}NullBool", if_then_else!(null, "", "Not"))
+            if with_type {
+                format!("{}NullBool{sep}<'_>", if_then_else!(null, "", "Not"))
+            } else {
+                format!("{}NullBool", if_then_else!(null, "", "Not"))
+            }
         } else if self.data_type == DataType::Char
             || self.data_type == DataType::Varchar
             || self.data_type == DataType::Text
             || self.data_type == DataType::DbSet
         {
             if with_type {
-                format!("{}NullArc{}<String>", if_then_else!(null, "", "Not"), sep)
+                format!("{}NullArc{sep}<'_, String>", if_then_else!(null, "", "Not"),)
             } else {
                 format!("{}NullArc", if_then_else!(null, "", "Not"))
             }
@@ -3030,14 +3117,16 @@ impl FieldDef {
             || self.data_type == DataType::Varbinary
             || self.data_type == DataType::Blob
         {
-            format!("{}NullBlob", if_then_else!(null, "", "Not"))
+            if with_type {
+                format!("{}NullBlob{sep}<'_>", if_then_else!(null, "", "Not"))
+            } else {
+                format!("{}NullBlob", if_then_else!(null, "", "Not"))
+            }
         } else if self.data_type == DataType::Json || self.data_type == DataType::Geometry {
             if with_type {
                 format!(
-                    "{}NullJson{}<{}>",
+                    "{}NullJson{sep}<'_, {outer}>",
                     if_then_else!(null, "", "Not"),
-                    sep,
-                    outer
                 )
             } else {
                 format!("{}NullJson", if_then_else!(null, "", "Not"))
@@ -3045,10 +3134,8 @@ impl FieldDef {
         } else if self.is_arc() {
             if with_type {
                 format!(
-                    "{}NullArc{}<{}>",
+                    "{}NullArc{sep}<'_, {outer}>",
                     if_then_else!(null, "", "Not"),
-                    sep,
-                    outer
                 )
             } else {
                 format!("{}NullArc", if_then_else!(null, "", "Not"))
@@ -3056,21 +3143,16 @@ impl FieldDef {
         } else if is_ord {
             if with_type {
                 format!(
-                    "{}NullOrd{}<{}>",
+                    "{}NullOrd{sep}<'_, {inner}>",
                     if_then_else!(null, "", "Not"),
-                    sep,
-                    inner
                 )
             } else {
                 format!("{}NullOrd", if_then_else!(null, "", "Not"))
             }
         } else if with_type {
             format!(
-                "{}Null{}<{}, {}>",
+                "{}Null{sep}<'_, {inner}, {outer}>",
                 if_then_else!(null, "", "Not"),
-                sep,
-                inner,
-                outer
             )
         } else {
             format!("{}Null", if_then_else!(null, "", "Not"))
@@ -3094,15 +3176,17 @@ impl FieldDef {
             DataType::Float => "",
             DataType::Double => "",
             DataType::Char | DataType::Varchar => ".to_owned()",
-            DataType::Boolean => " as i8",
+            DataType::Boolean => "",
             DataType::Text => ".to_owned()",
             DataType::Uuid => "",
             DataType::BinaryUuid => "",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "",
-            DataType::Timestamp if self.not_null => ".into()",
-            DataType::Timestamp => "",
-            DataType::DateTime if self.not_null => ".into()",
-            DataType::DateTime => "",
+            DataType::NaiveDateTime if self.not_null => ".into()",
+            DataType::NaiveDateTime => "",
+            DataType::UtcDateTime if self.not_null => ".into()",
+            DataType::UtcDateTime => "",
+            DataType::TimestampWithTimeZone if self.not_null => ".into()",
+            DataType::TimestampWithTimeZone => "",
             DataType::Date if self.not_null => ".into()",
             DataType::Date => "",
             DataType::Time if self.not_null => ".into()",
@@ -3161,7 +3245,7 @@ impl FieldDef {
             };
         }
         match self.data_type {
-            DataType::Boolean => " as i8",
+            DataType::Boolean => "",
             _ => "",
         }
     }
@@ -3176,26 +3260,62 @@ impl FieldDef {
                 return ".as_ref().map(|v| v.as_static_str())";
             }
         }
-        match self.data_type {
-            DataType::Char | DataType::Varchar | DataType::Text if self.not_null => ".as_str()",
-            DataType::Char | DataType::Varchar | DataType::Text => ".as_ref().map(|v| v.as_str())",
-            DataType::Binary | DataType::Varbinary | DataType::Blob if self.not_null => {
-                ".as_slice()"
+        if is_mysql_mode() {
+            match self.data_type {
+                DataType::Char | DataType::Varchar | DataType::Text if self.not_null => ".as_str()",
+                DataType::Char | DataType::Varchar | DataType::Text => {
+                    ".as_ref().map(|v| v.as_str())"
+                }
+                DataType::Binary | DataType::Varbinary | DataType::Blob if self.not_null => {
+                    ".as_slice()"
+                }
+                DataType::Binary | DataType::Varbinary | DataType::Blob => {
+                    ".as_ref().map(|v| v.as_slice())"
+                }
+                DataType::GeoPoint | DataType::Point if self.not_null => ".to_wkb()",
+                DataType::GeoPoint | DataType::Point => ".as_ref().map(|v| v.to_wkb())",
+                DataType::ArrayInt
+                | DataType::ArrayString
+                | DataType::Json
+                | DataType::Geometry
+                    if self.not_null =>
+                {
+                    "._into_json_str()"
+                }
+                DataType::ArrayInt
+                | DataType::ArrayString
+                | DataType::Json
+                | DataType::Geometry => ".as_ref().map(|v| v._into_json_str())",
+                _ => "",
             }
-            DataType::Binary | DataType::Varbinary | DataType::Blob => {
-                ".as_ref().map(|v| v.as_slice())"
+        } else {
+            match self.data_type {
+                DataType::Char | DataType::Varchar | DataType::Text if self.not_null => ".as_str()",
+                DataType::Char | DataType::Varchar | DataType::Text => {
+                    ".as_ref().map(|v| v.as_str())"
+                }
+                DataType::Binary | DataType::Varbinary | DataType::Blob if self.not_null => {
+                    ".as_slice()"
+                }
+                DataType::Binary | DataType::Varbinary | DataType::Blob => {
+                    ".as_ref().map(|v| v.as_slice())"
+                }
+                DataType::GeoPoint | DataType::Point if self.not_null => ".to_wkb()",
+                DataType::GeoPoint | DataType::Point => ".as_ref().map(|v| v.to_wkb())",
+                DataType::ArrayInt
+                | DataType::ArrayString
+                | DataType::Json
+                | DataType::Geometry
+                    if self.not_null =>
+                {
+                    "._into_json()"
+                }
+                DataType::ArrayInt
+                | DataType::ArrayString
+                | DataType::Json
+                | DataType::Geometry => ".as_ref().map(|v| v._into_json())",
+                _ => "",
             }
-            DataType::GeoPoint | DataType::Point if self.not_null => ".to_wkb()",
-            DataType::GeoPoint | DataType::Point => ".as_ref().map(|v| v.to_wkb())",
-            DataType::ArrayInt | DataType::ArrayString | DataType::Json | DataType::Geometry
-                if self.not_null =>
-            {
-                "._into_json()"
-            }
-            DataType::ArrayInt | DataType::ArrayString | DataType::Json | DataType::Geometry => {
-                ".as_ref().map(|v| v._into_json())"
-            }
-            _ => "",
         }
     }
 
@@ -3236,6 +3356,9 @@ impl FieldDef {
                 source: Box::new(e),
             }})?", &class.to_string());
             }
+        }
+        if !is_mysql_mode() && self.data_type == DataType::UtcDateTime {
+            return format!("row.try_get_unchecked({index})?",);
         }
         if self.data_type == DataType::Char
             || self.data_type == DataType::Varchar
@@ -3314,8 +3437,9 @@ impl FieldDef {
             DataType::Uuid => true,
             DataType::BinaryUuid => true,
             DataType::Binary | DataType::Varbinary | DataType::Blob => true,
-            DataType::Timestamp => true,
-            DataType::DateTime => true,
+            DataType::NaiveDateTime => true,
+            DataType::UtcDateTime => true,
+            DataType::TimestampWithTimeZone => true,
             DataType::Date => true,
             DataType::Time => true,
             DataType::Decimal => true,
@@ -3351,8 +3475,9 @@ impl FieldDef {
             DataType::BinaryUuid => true,
             DataType::Binary | DataType::Varbinary => true,
             DataType::Blob => false,
-            DataType::Timestamp => true,
-            DataType::DateTime => true,
+            DataType::NaiveDateTime => true,
+            DataType::UtcDateTime => true,
+            DataType::TimestampWithTimeZone => true,
             DataType::Date => true,
             DataType::Time => true,
             DataType::Decimal => true,
@@ -3384,8 +3509,9 @@ impl FieldDef {
             DataType::Uuid => true,
             DataType::BinaryUuid => true,
             DataType::Binary | DataType::Varbinary | DataType::Blob => true,
-            DataType::Timestamp => true,
-            DataType::DateTime => true,
+            DataType::NaiveDateTime => true,
+            DataType::UtcDateTime => true,
+            DataType::TimestampWithTimeZone => true,
             DataType::Date => true,
             DataType::Time => true,
             DataType::Decimal => true,
@@ -3417,8 +3543,9 @@ impl FieldDef {
             DataType::Uuid => true,
             DataType::BinaryUuid => true,
             DataType::Binary | DataType::Varbinary | DataType::Blob => false,
-            DataType::Timestamp => true,
-            DataType::DateTime => true,
+            DataType::NaiveDateTime => true,
+            DataType::UtcDateTime => true,
+            DataType::TimestampWithTimeZone => true,
             DataType::Date => true,
             DataType::Time => true,
             DataType::Decimal => true,
@@ -3450,8 +3577,9 @@ impl FieldDef {
             DataType::Uuid => true,
             DataType::BinaryUuid => true,
             DataType::Binary | DataType::Varbinary | DataType::Blob => false,
-            DataType::Timestamp => true,
-            DataType::DateTime => true,
+            DataType::NaiveDateTime => true,
+            DataType::UtcDateTime => true,
+            DataType::TimestampWithTimeZone => true,
             DataType::Date => true,
             DataType::Time => true,
             DataType::Decimal => true,
@@ -3488,24 +3616,28 @@ impl FieldDef {
     }
 
     pub fn placeholder(&self) -> String {
-        match self.data_type {
-            DataType::Uuid => "BIN_TO_UUID(?)".to_string(),
-            DataType::Point if self.srid.is_some() => {
-                format!("ST_GeomFromWKB(?,{})", self.srid.unwrap())
+        if is_mysql_mode() {
+            match self.data_type {
+                DataType::Uuid => "BIN_TO_UUID(?)".to_string(),
+                DataType::Point if self.srid.is_some() => {
+                    format!("ST_GeomFromWKB(?,{})", self.srid.unwrap())
+                }
+                DataType::Point => "ST_GeomFromWKB(?)".to_string(),
+                DataType::GeoPoint if self.srid.is_some() => {
+                    format!(
+                        "ST_GeomFromWKB(?,{},'axis-order=lat-long')",
+                        self.srid.unwrap()
+                    )
+                }
+                DataType::GeoPoint => "ST_GeomFromWKB(?)".to_string(),
+                DataType::Geometry if self.srid.is_some() => {
+                    format!("ST_GeomFromGeoJSON(?,1,{})", self.srid.unwrap())
+                }
+                DataType::Geometry => "ST_GeomFromGeoJSON(?)".to_string(),
+                _ => "?".to_owned(),
             }
-            DataType::Point => "ST_GeomFromWKB(?)".to_string(),
-            DataType::GeoPoint if self.srid.is_some() => {
-                format!(
-                    "ST_GeomFromWKB(?,{},'axis-order=lat-long')",
-                    self.srid.unwrap()
-                )
-            }
-            DataType::GeoPoint => "ST_GeomFromWKB(?)".to_string(),
-            DataType::Geometry if self.srid.is_some() => {
-                format!("ST_GeomFromGeoJSON(?,1,{})", self.srid.unwrap())
-            }
-            DataType::Geometry => "ST_GeomFromGeoJSON(?)".to_string(),
-            _ => "?".to_owned(),
+        } else {
+            "?".to_owned()
         }
     }
 

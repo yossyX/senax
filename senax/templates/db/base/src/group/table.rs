@@ -185,7 +185,7 @@ pub enum CacheOp {
 impl CacheOp {
     @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
     pub fn update(mut obj: CacheData, update: &Data, op: &OpData) -> CacheData {
-        @{- def.cache_cols_without_primary()|fmt_join("
+        @{- def.cache_cols_except_primary()|fmt_join("
         Accessor{accessor_with_sep_type}::_set(op.{var}, &mut obj.{var}, &update.{var});", "") }@
         obj
     }
@@ -1632,7 +1632,7 @@ impl Updater for _@{ pascal_name }@Updater {
     fn is_updated(&self) -> bool {
         false
         @%- if !def.disable_update() %@
-        @{- def.non_primaries_wo_read_only()|fmt_join("
+        @{- def.non_primaries_except_read_only()|fmt_join("
         || self._op.{var} != Op::None && self._op.{var} != Op::Skip", "") }@
         @%- endif %@
     }
@@ -1667,7 +1667,7 @@ impl _@{ pascal_name }@Updater {
             _phantom: Default::default(),
         }
     }", "") }@
-@{- def.non_primaries_wo_read_only()|fmt_join("
+@{- def.non_primaries_except_read_only()|fmt_join("
 {label}{comment}    pub fn mut_{raw_var}(&mut self) -> Accessor{accessor_with_type} {
         Accessor{accessor} {
             op: &mut self._op.{var},
@@ -1794,7 +1794,7 @@ impl fmt::Display for _@{ pascal_name }@Updater {
             @%- if !def.disable_update() %@
             @{- def.primaries()|fmt_join("
             Accessor{accessor_with_sep_type}::_write_insert(f, \"{comma}\", \"{raw_var}\", &self._data.{var})?;", "") }@
-            @{- def.all_except_secret_without_primary()|fmt_join("
+            @{- def.all_except_secret_and_primary()|fmt_join("
             Accessor{accessor_with_sep_type}::_write_update(f, \"{comma}\", \"{raw_var}\", self._op.{var}, &self._update.{var})?;", "") }@
             @%- endif %@
             write!(f, "}}}}")?;

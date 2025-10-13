@@ -69,4 +69,4 @@ export const DeleteBy@{ selector|pascal }@@{ model_route|pascal }@Query = graphq
 @%- endif %@
 
 // Do not modify below this line. (JsonSchemaStart)
-// Do not modify up to this line. (JsonSchemaEnd)
+// Do not modify above this line. (JsonSchemaEnd)

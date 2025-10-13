@@ -112,7 +112,7 @@ pub fn generate(
     let file_path = base_src_dir.join("auth.rs");
     let content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(RoleStart\).+// Do not modify up to this line. \(RoleEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(RoleStart\).+// Do not modify above this line. \(RoleEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -124,26 +124,26 @@ pub fn generate(
         String::new()
     };
     let roles = config.roles.iter().fold(buf, |mut buf, role| {
-        if let Some(dflt) = &config.default_role {
-            if dflt == role.0 {
-                buf.push_str("    #[default]\n");
-            }
+        if let Some(dflt) = &config.default_role
+            && dflt == role.0
+        {
+            buf.push_str("    #[default]\n");
         }
-        if let Some(def) = role.1 {
-            if let Some(alias) = &def.alias {
-                writeln!(&mut buf, "    #[display({:?})]", alias).unwrap();
-                writeln!(&mut buf, "    #[serde(rename = {:?})]", alias).unwrap();
-            }
+        if let Some(def) = role.1
+            && let Some(alias) = &def.alias
+        {
+            writeln!(&mut buf, "    #[display({:?})]", alias).unwrap();
+            writeln!(&mut buf, "    #[serde(rename = {:?})]", alias).unwrap();
         }
         writeln!(&mut buf, "    {},", _to_var_name(role.0)).unwrap();
         buf
     });
     let tpl = format!(
-        "// Do not modify below this line. (RoleStart)\n{roles}    // Do not modify up to this line. (RoleEnd)"
+        "// Do not modify below this line. (RoleStart)\n{roles}    // Do not modify above this line. (RoleEnd)"
     );
     let content = re.replace(&content, tpl);
 
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(ImplRoleStart\).+// Do not modify up to this line. \(ImplRoleEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(ImplRoleStart\).+// Do not modify above this line. \(ImplRoleEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -160,7 +160,7 @@ pub fn generate(
         buf
     });
     let tpl = format!(
-        "// Do not modify below this line. (ImplRoleStart)\n{roles}    // Do not modify up to this line. (ImplRoleEnd)"
+        "// Do not modify below this line. (ImplRoleStart)\n{roles}    // Do not modify above this line. (ImplRoleEnd)"
     );
     let content = re.replace(&content, tpl);
 
@@ -182,10 +182,10 @@ pub fn generate(
     } else {
         None
     };
-    if let Some(ts_dir) = &ts_dir {
-        if ts_dir.exists() {
-            fs::remove_dir_all(ts_dir)?;
-        }
+    if let Some(ts_dir) = &ts_dir
+        && ts_dir.exists()
+    {
+        fs::remove_dir_all(ts_dir)?;
     }
 
     let group_routes = if let Some(group) = group_route {
@@ -216,18 +216,26 @@ pub fn generate(
     let mut content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
     let name = server.to_snake();
-    let reg = Regex::new(&format!(r"(?m)^_{}_\w+\s*=.+\n", name))?;
-    content = reg.replace_all(&content, "").into_owned();
+    let mut deps = IndexMap::new();
     for group_route in group_routes.iter().rev() {
         let db_route = db_route.to_snake();
         let group_route = group_route.to_snake();
-        content = content.replace(
-            "[dependencies]",
-            &format!(
-                "[dependencies]\n_{}_{}_{} = {{ path = \"auto_api/{}/{}\" }}",
+        deps.insert(
+            format!("_{}_{}_{}", name, db_route, group_route),
+            format!(
+                "_{}_{}_{} = {{ path = \"auto_api/{}/{}\" }}",
                 name, db_route, group_route, db_route, group_route
             ),
         );
+    }
+    let reg = Regex::new(&format!(r"(?m)^(_{}_{}_\w+)\s*=.+\n", name, db_route))?;
+    for (line, [dep]) in reg.captures_iter(&content.clone()).map(|c| c.extract()) {
+        if deps.shift_remove(dep).is_none() {
+            content = content.replace(line, "");
+        }
+    }
+    for (_, dep) in deps {
+        content = content.replace("[dependencies]", &format!("[dependencies]\n{}", dep));
     }
     fs_write(file_path, &*content)?;
 
@@ -280,12 +288,14 @@ pub fn generate(
 
         #[derive(Template)]
         #[template(path = "api/lib.rs", escape = "none")]
-        pub struct LibTemplate;
+        pub struct LibTemplate<'a> {
+            pub db: &'a str,
+        }
 
         let file_path = api_group_dir.join("src/lib.rs");
         remove_files.remove(file_path.as_os_str());
         if force || !file_path.exists() {
-            let content = LibTemplate.render()?;
+            let content = LibTemplate { db: &db }.render()?;
             fs_write(file_path, &*content)?;
         }
 
@@ -404,7 +414,7 @@ pub fn generate(
 fn write_db_file(
     path: &Path,
     server: &str,
-    db: &str,
+    _db: &str,
     db_route: &str,
     group_route_names: &[String],
     force: bool,
@@ -418,11 +428,10 @@ fn write_db_file(
         #[derive(Template)]
         #[template(path = "api/db.rs", escape = "none")]
         pub struct DbTemplate<'a> {
-            pub db: &'a str,
             pub db_route: &'a str,
         }
 
-        DbTemplate { db, db_route }.render()?
+        DbTemplate { db_route }.render()?
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
@@ -723,7 +732,7 @@ fn write_model_file(
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let re = Regex::new(r"(?s)(// Do not modify below this line. \(GqlModelStart\)).+(// Do not modify up to this line. \(GqlModelEnd\))").unwrap();
+    let re = Regex::new(r"(?s)(// Do not modify below this line. \(GqlModelStart\)).+(// Do not modify above this line. \(GqlModelEnd\))").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",

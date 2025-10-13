@@ -233,7 +233,7 @@ pub trait @{ pascal_name }@Common: std::fmt::Debug@% for parent in def.parent() 
 {label}{comment}    fn {var}(&self) -> {outer};", "") }@
 @{- def.only_version()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {outer};", "") }@
-@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 }
 
@@ -267,7 +267,7 @@ pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common + dyn_clone::DynClone 
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
 pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent in def.parent() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@@% endfor %@ + 'static {
-@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.relations_belonging(true)|fmt_rel_join("
     fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_var}::{class}Primary> {
@@ -287,9 +287,9 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent 
 
 @{ def.label|label0 -}@
 pub trait @{ pascal_name }@Updater: downcast_rs::Downcast + Send + Sync + @{ pascal_name }@Common + crate::models::MarkForDelete@% for parent in def.parent() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater@% endfor %@ + 'static {
-@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
-@{- def.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
+@{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>>;
@@ -308,7 +308,7 @@ downcast_rs::impl_downcast!(@{ pascal_name }@Updater);
 pub struct @{ pascal_name }@Entity {
 @{- def.primaries()|fmt_join("
     pub {var}: {domain_outer_owned},", "") }@
-@{- def.non_primaries_wo_invisibles(false)|fmt_join("
+@{- def.non_primaries_except_invisibles(false)|fmt_join("
     pub {var}: {domain_outer_owned},", "") }@
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
     pub {rel_name}: Option<Box<_model_::{class_mod_var}::{class}Entity>>,", "") }@
@@ -333,7 +333,7 @@ impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_na
     fn {var}(&self) -> {outer} {
         1
     }", "") }@
-@{- parent.cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
@@ -356,7 +356,7 @@ impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_na
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
 impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@ for @{ pascal_name }@Entity {
-@{- parent.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
@@ -372,11 +372,11 @@ impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_na
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
 impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater for @{ pascal_name }@Entity {
-@{- parent.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
-@{- parent.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
+@{- parent.non_primaries_except_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         self.{var} = v{convert_domain_factory}
     }", "") }@
@@ -431,7 +431,7 @@ impl @{ pascal_name }@Common for @{ pascal_name }@Entity {
     fn {var}(&self) -> {outer} {
         1
     }", "") }@
-@{- def.cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
@@ -472,7 +472,7 @@ impl @{ pascal_name }@Cache for @{ pascal_name }@Entity {
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
 impl @{ pascal_name }@ for @{ pascal_name }@Entity {
-@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
@@ -493,11 +493,11 @@ impl @{ pascal_name }@ for @{ pascal_name }@Entity {
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
 impl @{ pascal_name }@Updater for @{ pascal_name }@Entity {
-@{- def.non_cache_cols_wo_primaries_and_invisibles()|fmt_join("
+@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
-@{- def.non_primaries_wo_invisible_and_read_only(true)|fmt_join("
+@{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_var}(&mut self, v: {domain_factory}) {
         self.{var} = v{convert_domain_factory}
     }", "") }@

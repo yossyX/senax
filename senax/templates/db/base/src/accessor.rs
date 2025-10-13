@@ -363,13 +363,13 @@ where
 
 pub struct AccessorNotNullBool<'a> {
     pub(crate) op: &'a mut Op,
-    pub(crate) val: &'a mut i8,
-    pub(crate) update: &'a mut i8,
-    pub(crate) _phantom: PhantomData<i8>,
+    pub(crate) val: &'a mut bool,
+    pub(crate) update: &'a mut bool,
+    pub(crate) _phantom: PhantomData<bool>,
 }
 impl AccessorNotNullBool<'_> {
     pub fn get(&self) -> bool {
-        (*self.val) == 1
+        *self.val
     }
     pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
@@ -383,8 +383,8 @@ impl AccessorNotNullBool<'_> {
         *self.update = val.into();
     }
 }
-impl AccessorForDb<i8> for AccessorNotNullBool<'_> {
-    fn _set(op: Op, prop: &mut i8, update: &i8) {
+impl AccessorForDb<bool> for AccessorNotNullBool<'_> {
+    fn _set(op: Op, prop: &mut bool, update: &bool) {
         if op == Op::Set {
             *prop = *update;
         }
@@ -394,7 +394,7 @@ impl AccessorForDb<i8> for AccessorNotNullBool<'_> {
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
-        value: &i8,
+        value: &bool,
     ) -> fmt::Result {
         write!(f, "{comma}{col}: {:?}", value)
     }
@@ -404,7 +404,7 @@ impl AccessorForDb<i8> for AccessorNotNullBool<'_> {
         comma: &str,
         col: &str,
         op: Op,
-        value: &i8,
+        value: &bool,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
             write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
@@ -415,13 +415,13 @@ impl AccessorForDb<i8> for AccessorNotNullBool<'_> {
 
 pub struct AccessorNullBool<'a> {
     pub(crate) op: &'a mut Op,
-    pub(crate) val: &'a mut Option<i8>,
-    pub(crate) update: &'a mut Option<i8>,
-    pub(crate) _phantom: PhantomData<i8>,
+    pub(crate) val: &'a mut Option<bool>,
+    pub(crate) update: &'a mut Option<bool>,
+    pub(crate) _phantom: PhantomData<bool>,
 }
 impl AccessorNullBool<'_> {
     pub fn get(&self) -> Option<bool> {
-        self.val.map(|v| v == 1)
+        *self.val
     }
     pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
@@ -441,8 +441,8 @@ impl AccessorNullBool<'_> {
         *self.update = None;
     }
 }
-impl AccessorForDb<Option<i8>> for AccessorNullBool<'_> {
-    fn _set(op: Op, prop: &mut Option<i8>, update: &Option<i8>) {
+impl AccessorForDb<Option<bool>> for AccessorNullBool<'_> {
+    fn _set(op: Op, prop: &mut Option<bool>, update: &Option<bool>) {
         if op == Op::Set {
             *prop = *update;
         }
@@ -452,7 +452,7 @@ impl AccessorForDb<Option<i8>> for AccessorNullBool<'_> {
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
-        value: &Option<i8>,
+        value: &Option<bool>,
     ) -> fmt::Result {
         if let Some(value) = value {
             write!(f, "{comma}{col}: {:?}", value)
@@ -466,7 +466,7 @@ impl AccessorForDb<Option<i8>> for AccessorNullBool<'_> {
         comma: &str,
         col: &str,
         op: Op,
-        value: &Option<i8>,
+        value: &Option<bool>,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
             if let Some(value) = value {

@@ -17,6 +17,7 @@ fi
 
 cargo run -- migrate -t -c
 senax gen-migrate auto --skip-empty --use-test-db
+cargo run -- migrate -t
 cargo run -- migrate --ignore-missing
 senax reflect-migration-changes
 cargo run -- open-api > open-api.json

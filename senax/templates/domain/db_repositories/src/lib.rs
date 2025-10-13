@@ -5,7 +5,7 @@ use ::async_trait::async_trait;
 use ::std::{sync::{atomic::{AtomicIsize, Ordering}, Arc, Mutex}, any::{TypeId, Any}, collections::HashMap};
 
 // Do not modify below this line. (ModStart)
-// Do not modify up to this line. (ModEnd)
+// Do not modify above this line. (ModEnd)
 
 #[cfg_attr(any(feature = "mock", test), mockall::automock)]
 #[async_trait]
@@ -19,7 +19,7 @@ pub trait @{ db|pascal }@Repository: Send + Sync {
     fn should_retry(&self, err: &anyhow::Error) -> bool;
     async fn reset_tx(&self);
     // Do not modify below this line. (RepoStart)
-    // Do not modify up to this line. (RepoEnd)
+    // Do not modify above this line. (RepoEnd)
 }
 
 #[cfg_attr(any(feature = "mock", test), mockall::automock)]
@@ -30,7 +30,7 @@ pub trait @{ db|pascal }@QueryService: Send + Sync {
     fn should_retry(&self, err: &anyhow::Error) -> bool;
     async fn reset_tx(&self);
     // Do not modify below this line. (QueryServiceStart)
-    // Do not modify up to this line. (QueryServiceEnd)
+    // Do not modify above this line. (QueryServiceEnd)
 }
 
 #[cfg(any(feature = "mock", test))]
@@ -133,7 +133,7 @@ impl @{ db|pascal }@Repository for Emu@{ db|pascal }@Repository {
     }
     async fn reset_tx(&self) {}
     // Do not modify below this line. (EmuRepoStart)
-    // Do not modify up to this line. (EmuRepoEnd)
+    // Do not modify above this line. (EmuRepoEnd)
 }
 #[rustfmt::skip]
 #[cfg(any(feature = "mock", test))]
@@ -152,6 +152,6 @@ impl @{ db|pascal }@QueryService for Emu@{ db|pascal }@Repository {
     }
     async fn reset_tx(&self) {}
     // Do not modify below this line. (EmuQueryServiceStart)
-    // Do not modify up to this line. (EmuQueryServiceEnd)
+    // Do not modify above this line. (EmuQueryServiceEnd)
 }
 @{-"\n"}@

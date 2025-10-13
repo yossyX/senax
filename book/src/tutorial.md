@@ -36,7 +36,7 @@ author: author name
 db: mysql
 ignore_foreign_key: true
 timestampable: fixed_time
-time_zone: local
+output_time_zone: utc
 timestamp_time_zone: utc
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read

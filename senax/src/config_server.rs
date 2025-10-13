@@ -240,12 +240,11 @@ fn file_response(
         res_headers.insert(CONTENT_TYPE, mime.essence_str().parse().unwrap());
     }
 
-    if let Some(time) = req_headers.get(&IF_MODIFIED_SINCE) {
-        if let Ok(Ok(t)) = time.to_str().map(HttpDate::from_str) {
-            if t.eq(&TIME) {
-                return (StatusCode::NOT_MODIFIED, res_headers, Vec::new().into());
-            }
-        }
+    if let Some(time) = req_headers.get(&IF_MODIFIED_SINCE)
+        && let Ok(Ok(t)) = time.to_str().map(HttpDate::from_str)
+        && t.eq(&TIME)
+    {
+        return (StatusCode::NOT_MODIFIED, res_headers, Vec::new().into());
     }
 
     res_headers.insert(LAST_MODIFIED, TIME.to_string().parse().unwrap());
@@ -298,8 +297,8 @@ async fn save_db_config(
             let path = Path::new(SCHEMA_PATH).join(format!("{db}.yml"));
             let content = fs::read_to_string(&path)?;
             if let Some(bk) = BACKUP.get() {
-                let dir = bk.join(format!("db_config-{db}-{}.yml", Local::now()));
-                fs_write(dir, &content)?;
+                let bk_path = bk.join(format!("db_config-{db}-{}.yml", Local::now()));
+                fs::write(bk_path, &content)?;
             }
             let old_config: ConfigDef = parse_yml(&content)?;
             let set: HashSet<_> = data.groups.iter().filter_map(|v| v._name.clone()).collect();
@@ -313,16 +312,16 @@ async fn save_db_config(
                 }
             }
             for group in &data.groups {
-                if let Some(old_name) = &group._name {
-                    if old_name != &group.name {
-                        let old_path = Path::new(SCHEMA_PATH)
-                            .join(db)
-                            .join(format!("{old_name}.yml"));
-                        let new_path = Path::new(SCHEMA_PATH)
-                            .join(db)
-                            .join(format!("{}.yml", group.name));
-                        fs::rename(old_path, new_path)?;
-                    }
+                if let Some(old_name) = &group._name
+                    && old_name != &group.name
+                {
+                    let old_path = Path::new(SCHEMA_PATH)
+                        .join(db)
+                        .join(format!("{old_name}.yml"));
+                    let new_path = Path::new(SCHEMA_PATH)
+                        .join(db)
+                        .join(format!("{}.yml", group.name));
+                    fs::rename(old_path, new_path)?;
                 }
             }
 
@@ -670,13 +669,12 @@ async fn save_api_server_config(
             let path = Path::new(server)
             .join(API_SCHEMA_PATH)
             .join("_config.yml");
-            if let Some(bk) = BACKUP.get() {
-                if path.exists() {
+            if let Some(bk) = BACKUP.get()
+                && path.exists() {
                     let content = fs::read_to_string(&path)?;
-                    let dir = bk.join(format!("api_server-{server}-_config-{}.yml", Local::now()));
-                    fs_write(dir, content)?;
+                    let bk_path = bk.join(format!("api_server-{server}-_config-{}.yml", Local::now()));
+                    fs::write(bk_path, content)?;
                 }
-            }
             let config: ApiConfigDef = data.into();
             let mut buf =
                 "# yaml-language-server: $schema=../../senax-schema.json#definitions/ApiConfigDef\n\n"
@@ -743,11 +741,11 @@ async fn save_api_server_db_config(
             if path.exists() {
                 let content = fs::read_to_string(&path)?;
                 if let Some(bk) = BACKUP.get() {
-                    let dir = bk.join(format!(
+                    let bk_path = bk.join(format!(
                         "api_server-{server}-{db_path}-{}.yml",
                         Local::now()
                     ));
-                    fs_write(dir, &content)?;
+                    fs::write(bk_path, &content)?;
                 }
 
                 let old_config: ApiDbDef = parse_yml(&content)?;
@@ -762,12 +760,12 @@ async fn save_api_server_db_config(
                     }
                 }
                 for group in &data.groups {
-                    if let Some(old_name) = &group._name {
-                        if old_name != &group.name {
-                            let old_path = dir.join(format!("{old_name}.yml"));
-                            let new_path = dir.join(format!("{}.yml", group.name));
-                            fs::rename(old_path, new_path)?;
-                        }
+                    if let Some(old_name) = &group._name
+                        && old_name != &group.name
+                    {
+                        let old_path = dir.join(format!("{old_name}.yml"));
+                        let new_path = dir.join(format!("{}.yml", group.name));
+                        fs::rename(old_path, new_path)?;
                     }
                 }
             }
@@ -1091,6 +1089,7 @@ impl std::fmt::Display for NotFound {
 }
 impl std::error::Error for NotFound {}
 
+#[allow(clippy::result_large_err)]
 pub fn json_response<T: Serialize>(
     r: Result<T, anyhow::Error>,
 ) -> Result<Response, (StatusCode, Response)> {
@@ -1119,7 +1118,7 @@ fn error_response(err: anyhow::Error) -> (StatusCode, Response) {
 fn check_ascii_name(name: &str) -> Result<&str> {
     use fancy_regex::Regex;
     static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[A-Za-z][_0-9A-Za-z]*(?<!_)$").unwrap());
-    if !RE.is_match(name).unwrap() || schema::BAD_KEYWORDS.iter().any(|&x| x == name) {
+    if !RE.is_match(name).unwrap() || schema::BAD_KEYWORDS.contains(&name) {
         anyhow::bail!("{} is an incorrect name.", name)
     }
     Ok(name)

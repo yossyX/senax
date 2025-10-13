@@ -37,6 +37,7 @@ static DELETED_AT: RwLock<CompactString> = RwLock::new(CompactString::const_new(
 static DELETED: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
 static AGGREGATION_TYPE: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
 static VERSION: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
+static MYSQL_MODE: AtomicBool = AtomicBool::new(true);
 
 pub type GroupsDef =
     IndexMap<String, (AtomicUsize, IndexMap<String, (AtomicUsize, Arc<ModelDef>)>)>;
@@ -80,12 +81,13 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
         config.use_all_rows_cache = false;
     }
     config.fix_static_vars();
+    set_mysql_mode(config.is_mysql());
 
     for (name, def) in config.groups.iter_mut() {
-        if let Some(def) = def {
-            if def.label.is_none() {
-                def.label = Some(name.to_title());
-            }
+        if let Some(def) = def
+            && def.label.is_none()
+        {
+            def.label = Some(name.to_title());
         }
     }
     CONFIG.write().unwrap().replace(config.clone());
@@ -159,11 +161,14 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 && !def.fields.contains_key(ConfigDef::created_at().as_str())
                 && !def.disable_created_at
             {
-                let mut col: FieldDef = serde_json::from_str(
-                    r#"{"type":"datetime","not_null":true,"skip_factory":true}"#,
-                )?;
+                let mut col: FieldDef = FieldDef {
+                    data_type: DataType::TimestampWithTimeZone,
+                    not_null: true,
+                    skip_factory: Some(true),
+                    ..Default::default()
+                };
                 col.label.clone_from(&config.label_of_created_at);
-                col.time_zone = config.timestamp_time_zone;
+                col.output_time_zone = config.timestamp_time_zone;
                 col.auto_gen = true;
                 col.exclude_from_cache = Some(config.disable_timestamp_cache);
                 col.is_timestamp = true;
@@ -174,11 +179,14 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 && !def.fields.contains_key(ConfigDef::updated_at().as_str())
                 && !def.disable_updated_at
             {
-                let mut col: FieldDef = serde_json::from_str(
-                    r#"{"type":"datetime","not_null":true,"skip_factory":true}"#,
-                )?;
+                let mut col: FieldDef = FieldDef {
+                    data_type: DataType::TimestampWithTimeZone,
+                    not_null: true,
+                    skip_factory: Some(true),
+                    ..Default::default()
+                };
                 col.label.clone_from(&config.label_of_updated_at);
-                col.time_zone = config.timestamp_time_zone;
+                col.output_time_zone = config.timestamp_time_zone;
                 col.auto_gen = true;
                 col.exclude_from_cache = Some(config.disable_timestamp_cache);
                 col.is_timestamp = true;
@@ -190,10 +198,13 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     SoftDelete::None => {}
                     SoftDelete::Time => {
                         if !def.fields.contains_key(ConfigDef::deleted_at().as_str()) {
-                            let mut col: FieldDef =
-                                serde_json::from_str(r#"{"type":"datetime","skip_factory":true}"#)?;
+                            let mut col: FieldDef = FieldDef {
+                                data_type: DataType::TimestampWithTimeZone,
+                                skip_factory: Some(true),
+                                ..Default::default()
+                            };
                             col.label.clone_from(&config.label_of_deleted_at);
-                            col.time_zone = config.timestamp_time_zone;
+                            col.output_time_zone = config.timestamp_time_zone;
                             col.auto_gen = true;
                             col.hidden = Some(true);
                             def.fields
@@ -202,9 +213,12 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     }
                     SoftDelete::Flag => {
                         if !def.fields.contains_key(ConfigDef::deleted().as_str()) {
-                            let mut col: FieldDef = serde_json::from_str(
-                                r#"{"type":"boolean","not_null":true,"skip_factory":true}"#,
-                            )?;
+                            let mut col: FieldDef = FieldDef {
+                                data_type: DataType::Boolean,
+                                not_null: true,
+                                skip_factory: Some(true),
+                                ..Default::default()
+                            };
                             col.label.clone_from(&config.label_of_deleted);
                             col.auto_gen = true;
                             col.hidden = Some(true);
@@ -214,9 +228,12 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     }
                     SoftDelete::UnixTime => {
                         if !def.fields.contains_key(ConfigDef::deleted().as_str()) {
-                            let mut col: FieldDef = serde_json::from_str(
-                                r#"{"type":"int","not_null":true,"skip_factory":true}"#,
-                            )?;
+                            let mut col: FieldDef = FieldDef {
+                                data_type: DataType::Int,
+                                not_null: true,
+                                skip_factory: Some(true),
+                                ..Default::default()
+                            };
                             col.label.clone_from(&config.label_of_deleted);
                             col.auto_gen = true;
                             col.hidden = Some(true);
@@ -234,9 +251,13 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     );
                 }
                 if !def.fields.contains_key(ConfigDef::version().as_str()) {
-                    let mut col: FieldDef = serde_json::from_str(
-                        r#"{"type":"int","not_null":true,"skip_factory":true,"default":"0"}"#,
-                    )?;
+                    let mut col: FieldDef = FieldDef {
+                        data_type: DataType::Int,
+                        not_null: true,
+                        skip_factory: Some(true),
+                        default: Some(serde_yaml::Value::String("0".to_owned())),
+                        ..Default::default()
+                    };
                     col.label.clone_from(&config.label_of_version);
                     col.auto_gen = true;
                     col.hidden = Some(true);
@@ -244,32 +265,35 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         .insert(ConfigDef::version().to_string(), col.into());
                 }
             }
-            if let Some(ref mut inheritance) = def.inheritance {
-                if inheritance._type == InheritanceType::ColumnAggregation {
-                    if let Some(ref key_field) = inheritance.key_field {
-                        crate::common::check_name(key_field);
-                    } else {
-                        inheritance.key_field = Some(ConfigDef::aggregation_type().to_string());
+            if let Some(ref mut inheritance) = def.inheritance
+                && inheritance._type == InheritanceType::ColumnAggregation
+            {
+                if let Some(ref key_field) = inheritance.key_field {
+                    crate::common::check_name(key_field);
+                } else {
+                    inheritance.key_field = Some(ConfigDef::aggregation_type().to_string());
+                }
+                if inheritance.key_value.is_none() {
+                    inheritance.key_value = Some(Value::from(model_name.clone()));
+                }
+                let key_field = inheritance.key_field.as_ref().unwrap();
+                match def.fields.entry(key_field.to_string()) {
+                    indexmap::map::Entry::Occupied(mut entry) => {
+                        let mut col = entry.get().exact();
+                        col.skip_factory = Some(true);
+                        entry.insert(col.into());
                     }
-                    if inheritance.key_value.is_none() {
-                        inheritance.key_value = Some(Value::from(model_name.clone()));
-                    }
-                    let key_field = inheritance.key_field.as_ref().unwrap();
-                    match def.fields.entry(key_field.to_string()) {
-                        indexmap::map::Entry::Occupied(mut entry) => {
-                            let mut col = entry.get().exact();
-                            col.skip_factory = Some(true);
-                            entry.insert(col.into());
-                        }
-                        indexmap::map::Entry::Vacant(entry) => {
-                            let mut col: FieldDef = serde_json::from_str(
-                                r#"{"type":"varchar","not_null":true, "skip_factory": true}"#,
-                            )?;
-                            col.label.clone_from(&config.label_of_aggregation_type);
-                            col.auto_gen = true;
-                            col.hidden = Some(true);
-                            entry.insert(col.into());
-                        }
+                    indexmap::map::Entry::Vacant(entry) => {
+                        let mut col: FieldDef = FieldDef {
+                            data_type: DataType::Varchar,
+                            not_null: true,
+                            skip_factory: Some(true),
+                            ..Default::default()
+                        };
+                        col.label.clone_from(&config.label_of_aggregation_type);
+                        col.auto_gen = true;
+                        col.hidden = Some(true);
+                        entry.insert(col.into());
                     }
                 }
             }
@@ -314,6 +338,12 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     column_def = v;
                     column_def.value_object = Some(vo_name);
                     column_def.overwrite(org, &postfix);
+                }
+                if is_mysql_mode()
+                    && config.force_datetime_on_mysql
+                    && column_def.data_type == DataType::TimestampWithTimeZone
+                {
+                    column_def.data_type = DataType::UtcDateTime;
                 }
                 if column_def.enum_values.is_some() {
                     column_def.enum_class = Some(EnumClass {
@@ -840,10 +870,9 @@ pub fn get_model<'a>(
         return model;
     }
     let singular_name = to_singular(&stem_name);
-    let model = group
+    group
         .get(&singular_name)
-        .unwrap_or_else(|| error_exit!("{} {} model is not defined", group_name, stem_name));
-    model
+        .unwrap_or_else(|| error_exit!("{} {} model is not defined", group_name, stem_name))
 }
 
 pub fn set_domain_mode(mode: bool) -> bool {
@@ -855,9 +884,9 @@ pub fn domain_mode() -> bool {
 }
 
 pub fn to_id_name(name: &str) -> String {
-    to_id_name_wo_pascal(&name.to_pascal())
+    to_id_name_wo_changing_case(&name.to_pascal())
 }
-pub fn to_id_name_wo_pascal(name: &str) -> String {
+pub fn to_id_name_wo_changing_case(name: &str) -> String {
     if domain_mode() {
         format!("{}Id", name)
     } else {
@@ -866,9 +895,9 @@ pub fn to_id_name_wo_pascal(name: &str) -> String {
 }
 pub fn _to_var_name(s: &str) -> String {
     let name = s;
-    if BAD_KEYWORDS.iter().any(|&x| x == name) {
+    if BAD_KEYWORDS.contains(&name) {
         format!("_{}", name)
-    } else if KEYWORDS.iter().any(|&x| x == name) {
+    } else if KEYWORDS.contains(&name) {
         format!("r#{}", name)
     } else {
         name.to_owned()
@@ -876,7 +905,7 @@ pub fn _to_var_name(s: &str) -> String {
 }
 pub fn _to_raw_var_name(s: &str) -> String {
     let name = s;
-    if BAD_KEYWORDS.iter().any(|&x| x == name) {
+    if BAD_KEYWORDS.contains(&name) {
         format!("_{}", name)
     } else {
         name.to_owned()
@@ -890,3 +919,11 @@ static KEYWORDS: &[&str] = &[
     "override", "priv", "typeof", "unsized", "virtual", "yield", "try", "gen",
 ];
 pub static BAD_KEYWORDS: &[&str] = &["super", "self", "Self", "extern", "crate"];
+
+pub fn set_mysql_mode(is_mysql: bool) {
+    MYSQL_MODE.store(is_mysql, std::sync::atomic::Ordering::SeqCst);
+}
+
+pub fn is_mysql_mode() -> bool {
+    MYSQL_MODE.load(std::sync::atomic::Ordering::Relaxed)
+}

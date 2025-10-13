@@ -104,6 +104,7 @@ where
 #[macro_export]
 macro_rules! filter {
     ( $t:ty ) => {
+        #[allow(bindings_with_variant_name)]
         fn write(&self, buf: &mut String, idx: usize, trash_mode: &mut TrashMode, shard_id: ShardId, is_outer: bool) {
             match self {
                 Filter_::WithTrashed => {
@@ -510,17 +511,21 @@ macro_rules! order {
 pub use order;
 
 pub trait IntoJson<T> {
-    fn _into_json(&self) -> String;
+    fn _into_json_str(&self) -> String;
+    fn _into_json(&self) -> Option<serde_json::Value>;
 }
 
 impl<T> IntoJson<T> for T
 where
     T: serde::Serialize,
 {
-    fn _into_json(&self) -> String {
+    fn _into_json_str(&self) -> String {
         let s = serde_json::to_string(self).unwrap();
         assert!(s.len() <= @{ config.max_db_str_len() }@, "Incorrect JSON length.");
         s
+    }
+    fn _into_json(&self) -> Option<serde_json::Value> {
+        Some(serde_json::to_value(self).unwrap())
     }
 }
 @{-"\n"}@

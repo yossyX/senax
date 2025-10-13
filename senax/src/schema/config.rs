@@ -43,7 +43,7 @@ pub struct ConfigDef {
     pub timestampable: Option<Timestampable>,
     /// ### 日時型のデフォルトのタイムゾーン設定
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_zone: Option<TimeZone>,
+    pub output_time_zone: Option<TimeZone>,
     /// ### タイムスタンプタイムゾーン
     /// created_at, updated_at, deleted_atに使用されるタイムゾーン
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -118,6 +118,9 @@ pub struct ConfigDef {
     /// ### 論理名をカラムのSQLコメントとして使用
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_label_as_sql_comment: bool,
+    /// ### MySQLの場合に強制的にdatetimeを使用する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub force_datetime_on_mysql: bool,
     /// ### created_atに別名を使用
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rename_created_at: Option<String>,
@@ -198,7 +201,7 @@ pub struct ConfigJson {
     pub timestampable: Option<Timestampable>,
     /// ### 日時型のデフォルトのタイムゾーン設定
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_zone: Option<TimeZone>,
+    pub output_time_zone: Option<TimeZone>,
     /// ### タイムスタンプタイムゾーン
     /// created_at, updated_at, deleted_atに使用されるタイムゾーン
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -273,6 +276,9 @@ pub struct ConfigJson {
     /// ### 論理名をカラムのSQLコメントとして使用
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_label_as_sql_comment: bool,
+    /// ### MySQLの場合に強制的にdatetimeを使用する
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub force_datetime_on_mysql: bool,
     /// ### created_atに別名を使用
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rename_created_at: Option<String>,
@@ -329,7 +335,7 @@ impl From<ConfigDef> for ConfigJson {
             disable_relation_index: value.disable_relation_index,
             plural_table_name: value.plural_table_name,
             timestampable: value.timestampable,
-            time_zone: value.time_zone,
+            output_time_zone: value.output_time_zone,
             timestamp_time_zone: value.timestamp_time_zone,
             disable_timestamp_cache: value.disable_timestamp_cache,
             soft_delete: value.soft_delete,
@@ -357,6 +363,7 @@ impl From<ConfigDef> for ConfigJson {
             preserve_column_order: value.preserve_column_order,
             exclude_from_domain: value.exclude_from_domain,
             use_label_as_sql_comment: value.use_label_as_sql_comment,
+            force_datetime_on_mysql: value.force_datetime_on_mysql,
             rename_created_at: value.rename_created_at,
             label_of_created_at: value.label_of_created_at,
             rename_updated_at: value.rename_updated_at,
@@ -395,7 +402,7 @@ impl From<ConfigJson> for ConfigDef {
             disable_relation_index: value.disable_relation_index,
             plural_table_name: value.plural_table_name,
             timestampable: value.timestampable,
-            time_zone: value.time_zone,
+            output_time_zone: value.output_time_zone,
             timestamp_time_zone: value.timestamp_time_zone,
             disable_timestamp_cache: value.disable_timestamp_cache,
             soft_delete: value.soft_delete,
@@ -423,6 +430,7 @@ impl From<ConfigJson> for ConfigDef {
             preserve_column_order: value.preserve_column_order,
             exclude_from_domain: value.exclude_from_domain,
             use_label_as_sql_comment: value.use_label_as_sql_comment,
+            force_datetime_on_mysql: value.force_datetime_on_mysql,
             rename_created_at: value.rename_created_at,
             label_of_created_at: value.label_of_created_at,
             rename_updated_at: value.rename_updated_at,
@@ -551,7 +559,7 @@ impl ConfigDef {
     pub fn max_db_str_len(&self) -> u64 {
         match self.db {
             DbType::Mysql => 4 * 1024 * 1024 * 1024 - 1,
-            DbType::Postgres => 1 * 1024 * 1024 * 1024 - 1,
+            DbType::Postgres => 1024 * 1024 * 1024 - 1,
         }
     }
     pub fn outer_db(&self) -> BTreeSet<String> {
@@ -627,7 +635,19 @@ impl From<GroupJson> for GroupDef {
     }
 }
 
-#[derive(Debug, derive_more::Display, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, Default, JsonSchema, ValueEnum)]
+#[derive(
+    Debug,
+    derive_more::Display,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Copy,
+    Clone,
+    Default,
+    JsonSchema,
+    ValueEnum,
+)]
 #[serde(rename_all = "lowercase")]
 /// ### データベースタイプ
 pub enum DbType {

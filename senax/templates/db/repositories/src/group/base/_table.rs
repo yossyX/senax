@@ -1175,7 +1175,7 @@ async fn _handle_delayed_msg_save(shard_id: ShardId) {
 @%- if def.has_delayed_update() %@
 
 fn aggregate_update(x: &_@{ pascal_name }@Updater, old: &mut _@{ pascal_name }@Updater) {
-    @{- def.non_primaries_wo_read_only()|fmt_join("
+    @{- def.non_primaries_except_read_only()|fmt_join("
     Accessor{accessor_with_sep_type}::_set(x._op.{var}, &mut old._update.{var}, &x._update.{var});", "") }@
 }
 @%- endif %@
@@ -2589,7 +2589,7 @@ impl ColTr for Col_ {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColOne_ {
-@{ def.all_fields_without_json()|fmt_join("    {var}({filter_type}),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("    {var}({filter_type}),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(_@{ pascal_name }@Index_@{ index_name }@),
 @%- endfor %@
@@ -2599,7 +2599,7 @@ pub enum ColOne_ {
 impl ColOne_ {
     fn _name(&self) -> &'static str {
         match self {
-            @{- def.all_fields_without_json()|fmt_join("
+            @{- def.all_fields_except_json()|fmt_join("
             ColOne_::{var}(_) => \"{col}\",", "") }@
             @%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "{name}", ", ") }@>",
@@ -2615,7 +2615,7 @@ pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_nam
 impl BindTr for ColOne_ {
     fn name(&self) -> &'static str {
         match self {
-@{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(_) => r#\"{col_esc}\"#,", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColOne_::{var}(_) => r#\"{col_esc}\"#,", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => r#"(@{ index.join_fields(def, "{col_esc}", ", ") }@)"#,
 @%- endfor %@
@@ -2624,7 +2624,7 @@ impl BindTr for ColOne_ {
     }
     fn placeholder(&self) -> &'static str {
         match self {
-@{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(_) => \"{placeholder}\",", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColOne_::{var}(_) => \"{placeholder}\",", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "(@{ index.join_fields(def, "{placeholder}", ", ") }@)",
 @%- endfor %@
@@ -2637,7 +2637,7 @@ impl BindTr for ColOne_ {
     ) -> Query<'_, DbType, DbArguments> {
         debug!("bind: {:?}", &self);
         match self {
-@{ def.all_fields_without_json()|fmt_join("            ColOne_::{var}(v) => query.bind(v{bind_as_for_filter}),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColOne_::{var}(v) => query.bind(v{bind_as_for_filter}),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(v) => query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@,
 @%- endfor %@
@@ -2711,7 +2711,7 @@ impl HashVal for VecColKey {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColMany_ {
-@{ def.all_fields_without_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(Vec<_@{ pascal_name }@Index_@{ index_name }@>),
 @%- endfor %@
@@ -2721,7 +2721,7 @@ pub enum ColMany_ {
 impl ColMany_ {
     fn _name(&self) -> &'static str {
         match self {
-            @{- def.all_fields_without_json()|fmt_join("
+            @{- def.all_fields_except_json()|fmt_join("
             ColMany_::{var}(_) => \"{col}\",", "") }@
             @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "{name}", ", ") }@>",
@@ -2737,7 +2737,7 @@ pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_nam
 impl BindTr for ColMany_ {
     fn name(&self) -> &'static str {
         match self {
-@{ def.all_fields_without_json()|fmt_join("            ColMany_::{var}(_) => r#\"{col_esc}\"#,", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColMany_::{var}(_) => r#\"{col_esc}\"#,", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_v) => r#"(@{ index.join_fields(def, "{col_esc}", ", ") }@)"#,
 @%- endfor %@
@@ -2746,7 +2746,7 @@ impl BindTr for ColMany_ {
     }
     fn placeholder(&self) -> &'static str {
         match self {
-@{ def.all_fields_without_json()|fmt_join("            ColMany_::{var}(_) => \"{placeholder}\",", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColMany_::{var}(_) => \"{placeholder}\",", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_v) => "(@{ index.join_fields(def, "{placeholder}", ", ") }@)",
 @%- endfor %@
@@ -2755,7 +2755,7 @@ impl BindTr for ColMany_ {
     }
     fn len(&self) -> usize {
         match self {
-@{ def.all_fields_without_json()|fmt_join("            ColMany_::{var}(v) => v.len(),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColMany_::{var}(v) => v.len(),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(v) => v.len(),
 @%- endfor %@
@@ -2768,7 +2768,7 @@ impl BindTr for ColMany_ {
     ) -> Query<'_, DbType, DbArguments> {
         debug!("bind: {:?}", &self);
         match self {
-@{ def.all_fields_without_json()|fmt_join("            ColMany_::{var}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColMany_::{var}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(v) => {for v in v { query = query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@; } query},
 @%- endfor %@
@@ -2881,7 +2881,7 @@ impl BindArrayTr for ColJsonArray_ {
 #[derive(Clone, Debug)]
 pub enum ColGeo_ {
 @{- def.all_fields_only_geo()|fmt_join("
-    {var}(Value, u32),", "") }@
+    {var}(Value, i32),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -2924,7 +2924,7 @@ impl BindTr for ColGeo_ {
 #[derive(Clone, Debug)]
 pub enum ColGeoDistance_ {
 @{- def.all_fields_only_geo()|fmt_join("
-    {var}(Value, f64, u32),", "") }@
+    {var}(Value, f64, i32),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -3194,6 +3194,7 @@ impl Default for Filter_ {
     }
 }
 impl std::fmt::Display for Filter_ {
+    #[allow(bindings_with_variant_name)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Filter_::WithTrashed => write!(f, "WithTrashed"),
@@ -3321,7 +3322,7 @@ pub use @{ filter_macro_name }@_text as filter_text;
 
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_one {
-@%- for (col_name, column_def) in def.all_fields_without_json() %@
+@%- for (col_name, column_def) in def.all_fields_except_json() %@
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColOne_::@{ col_name|to_var_name }@($e.clone().try_into()?));
 @%- endfor %@
 }
@@ -3329,7 +3330,7 @@ pub use @{ filter_macro_name }@_one as filter_one;
 
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_many {
-@%- for (col_name, column_def) in def.all_fields_without_json() %@
+@%- for (col_name, column_def) in def.all_fields_except_json() %@
     (@{ col_name }@ [$($e:expr),*]) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@(vec![ $( $e.clone().try_into()? ),* ]));
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@($e.into_iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
 @%- endfor %@
@@ -3665,6 +3666,9 @@ impl QueryBuilder {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let sql = self._sql(sql_cols, false, conn.shard_id(), &filter_digest);
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         query = self._bind(query);
@@ -3730,6 +3734,9 @@ impl QueryBuilder {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = ctx_no; "filter digest:{}", filter_digest);
         let sql = self._sql(sql_cols, false, conn.shard_id(), &filter_digest);
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let (tx, rx) = mpsc::channel(1000);
         let mut executor = conn.acquire_reader().await?;
         tokio::spawn(async move {
@@ -3778,6 +3785,9 @@ impl QueryBuilder {
         if let Some(offset) = self.offset {
             write!(sql, " offset {}", offset)?;
         }
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let joiner = self.joiner.take();
@@ -3806,6 +3816,9 @@ impl QueryBuilder {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let sql = self._sql(Data::_sql_cols(), !conn.wo_tx(), conn.shard_id(), &filter_digest);
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let joiner = self.joiner.take();
@@ -3938,7 +3951,7 @@ impl QueryBuilder {
         }
         @%- endif %@
         let mut vec: Vec<String> = Vec::new();
-        @{- def.non_primaries_wo_read_only()|fmt_join_cache_or_not("
+        @{- def.non_primaries_except_read_only()|fmt_join_cache_or_not("
         crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "
         crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         let mut sql = format!(
@@ -3963,9 +3976,12 @@ impl QueryBuilder {
         if let Some(limit) = self.limit {
             write!(sql, " limit {}", limit)?;
         }
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        @{- def.non_primaries_wo_read_only()|fmt_join("
+        @{- def.non_primaries_except_read_only()|fmt_join("
         for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{var}{bind_as});
         }","") }@
@@ -4038,6 +4054,9 @@ impl QueryBuilder {
         if let Some(limit) = self.limit {
             write!(sql, " limit {}", limit)?;
         }
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "delete_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "");
@@ -4086,6 +4105,9 @@ impl QueryBuilder {
         } else {
             write!(sql, " FOR UPDATE").unwrap();
         }
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         query = self._bind(query);
@@ -4145,6 +4167,9 @@ async fn _union(
                 })
                 .collect::<Vec<_>>()
                 .join(" UNION ALL ");
+            @%- if !config.is_mysql() %@
+            let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+            @%- endif %@
             let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for builder in chunk {
@@ -4169,6 +4194,9 @@ async fn _union(
         if let Some(offset) = offset {
             write!(sql, " offset {}", offset)?;
         }
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for builder in list {
@@ -4508,6 +4536,9 @@ impl _@{ pascal_name }@_ {
         if let Some(limit) = limit {
             write!(sql, " limit {}", limit)?;
         }
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter {
@@ -4562,6 +4593,9 @@ impl _@{ pascal_name }@_ {
             ),
             Order_::write_order(&order, &None)
         );
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let result = crate::misc::fetch!(conn, query, fetch_all);
@@ -4989,9 +5023,12 @@ impl _@{ pascal_name }@_ {
         obj.__validate()?;
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__set_default_value(conn).await?;
-        let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) 
-            VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#;
-        let query = bind_to_query(sqlx::query(sql), &obj._data);
+        let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
+            VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#;
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(sql);
+        @%- endif %@
+        let query = bind_to_query(sqlx::query(&sql), &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
         if rows_affected == 0 {
@@ -5221,6 +5258,9 @@ impl _@{ pascal_name }@_ {
                     r#"UPDATE @{ table_name|db_esc }@ SET @{ def.soft_delete_tpl2("","deleted_at=?","deleted=1","deleted=?")}@@% if def.updated_at_conf().is_some() %@, updated_at=?@%- endif %@ WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({});"#,
                     &q[0..q.len() - 1]
                 );
+                @%- if !config.is_mysql() %@
+                let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+                @%- endif %@
                 let mut query = sqlx::query(&sql);
                 let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     @{- def.soft_delete_tpl2("","
@@ -5302,6 +5342,9 @@ impl _@{ pascal_name }@_ {
                     r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({});"#,
                     &q[0..q.len() - 1]
                 );
+                @%- if !config.is_mysql() %@
+                let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+                @%- endif %@
                 let mut query = sqlx::query(&sql);
                 let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
                 for id in ids {
@@ -5417,7 +5460,11 @@ impl _@{ pascal_name }@_ {
 @%- for on_delete_str in def.on_delete_list %@
         crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, &[id.clone()], false).await?;
 @%- endfor %@
-        let mut query = sqlx::query(r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#);
+        let sql = r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#;
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(sql);
+        @%- endif %@
+        let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
@@ -5552,6 +5599,9 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
             &q[0..q.len() - 1]
         );
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
@@ -5583,6 +5633,9 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
             r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
             &q[0..q.len() - 1]
         );
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
@@ -5619,6 +5672,9 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
             r#"SELECT count(*) as c FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
             &q[0..q.len() - 1]
         );
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
@@ -5655,6 +5711,9 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
             r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
             &q[0..q.len() - 1]
         );
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
@@ -5683,6 +5742,9 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
             r#"UPDATE @{ table_name|db_esc }@ SET @{ local|db_esc }@ = @{ val }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
             &q[0..q.len() - 1]
         );
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
@@ -5753,6 +5815,9 @@ async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], t
         sql_cols,
         &q[0..q.len() - 1]
     );
+    @%- if !config.is_mysql() %@
+    let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+    @%- endif %@
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     if let Some(c) = filter {
@@ -5950,6 +6015,9 @@ async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, tr
         filter_str.push_str(" AND ");
     }
     let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#, sql_cols);
+    @%- if !config.is_mysql() %@
+    let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+    @%- endif %@
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     if let Some(c) = filter {
@@ -5982,6 +6050,9 @@ async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: Tra
         filter_str.push_str(" AND ");
     }
     let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ FOR UPDATE"#, Data::_sql_cols());
+    @%- if !config.is_mysql() %@
+    let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+    @%- endif %@
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     if let Some(c) = filter {
@@ -6017,6 +6088,9 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
             Data::_sql_cols(),
             &q[0..q.len() - 1],
         );
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         if let Some(c) = filter.clone() {
@@ -6129,11 +6203,14 @@ pub(crate) fn ___save(
 #[allow(clippy::unnecessary_cast)]
 async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, replace: bool) -> Result<(_@{ pascal_name }@, CacheOp)> {
     let sql = if replace {
-        r#"REPLACE INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#
+        r#"REPLACE INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#
     } else {
-        r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#
+        r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#
     };
-    let query = bind_to_query(sqlx::query(sql), &obj._data);
+    @%- if !config.is_mysql() %@
+    let sql = senax_common::convert_mysql_placeholders_to_postgresql(sql);
+    @%- endif %@
+    let query = bind_to_query(sqlx::query(&sql), &obj._data);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     let (_, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
 @{- def.auto_inc()|fmt_join("
@@ -6180,7 +6257,7 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     let mut update_cache = false; // To distinguish from updates that do not require cache updates
     if obj.is_updated() {
         let mut vec: Vec<String> = Vec::new();
-        @{- def.non_primaries_wo_invisible_and_read_only(false)|fmt_join_cache_or_not("
+        @{- def.non_primaries_except_invisible_and_read_only(false)|fmt_join_cache_or_not("
         crate::misc::assign_sql!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, update_cache, \"{placeholder}\");", "
         crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         @%- if config.is_mysql() %@
@@ -6200,9 +6277,12 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @%- else %@
         let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
         @%- endif %@
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        @{- def.non_primaries_wo_invisible_and_read_only(false)|fmt_join("
+        @{- def.non_primaries_except_invisible_and_read_only(false)|fmt_join("
         for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{var}{bind_as});
         }","") }@
@@ -6257,14 +6337,14 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
 fn assign_non_primaries(obj: &_@{ pascal_name }@Updater) -> (Vec<String>, bool) {
     let mut update_cache = false;
     let mut vec: Vec<String> = Vec::new();
-    @{- def.non_primaries_wo_read_only()|fmt_join_cache_or_not("
+    @{- def.non_primaries_except_read_only()|fmt_join_cache_or_not("
     crate::misc::assign_sql!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, update_cache, \"{placeholder}\");", "
     crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
     (vec, update_cache)
 }
 
 fn bind_non_primaries<'a>(obj: &'a _@{ pascal_name }@Updater, mut query: Query<'a, DbType, DbArguments>, _sql: &'a str) -> Query<'a, DbType, DbArguments> {
-    @{- def.non_primaries_wo_read_only()|fmt_join("
+    @{- def.non_primaries_except_read_only()|fmt_join("
     for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
         query = query.bind(obj._update.{var}{bind_as});
     }","") }@
@@ -6288,8 +6368,11 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     @%- endif %@
     @%- endif %@
     let sql = format!(r#"INSERT INTO @{ table_name|db_esc }@ 
-        (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) 
-        VALUES (@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
+        (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
+        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
+    @%- if !config.is_mysql() %@
+    let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+    @%- endif %@
     let query = bind_to_query(sqlx::query(&sql), &obj._data);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     let query = bind_non_primaries(&obj, query, &sql);
@@ -6424,6 +6507,9 @@ async fn ___update_many(conn: &mut DbConn, ids: &[InnerPrimary], obj: &__Updater
     let (mut vec, _) = assign_non_primaries(obj);
     let q = "@{ def.primaries()|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
     let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({})"#, &vec.join(","), &q[0..q.len() - 1]);
+    @%- if !config.is_mysql() %@
+    let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+    @%- endif %@
     let query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     let mut query = bind_non_primaries(&obj, query, &sql);
@@ -6515,13 +6601,13 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         const SQL_IGNORE: &str = r#"INSERT IGNORE "#; 
         const SQL_REPLACE: &str = r#"REPLACE "#; 
         @%- if config.is_mysql() %@
-        const SQL1: &str = r#"INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES "#;
-        const SQL2: &str = r#"(@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
-        const SQL3: &str = r#" AS new ON DUPLICATE KEY UPDATE @{ def.non_primaries_without_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@"#;
+        const SQL1: &str = r#"INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES "#;
+        const SQL2: &str = r#"(@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)"#;
+        const SQL3: &str = r#" AS new ON DUPLICATE KEY UPDATE @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@"#;
         @%- else %@
-        const SQL1: &str = r#"INTO @{ table_name|db_esc }@ AS new (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES "#;
-        const SQL2: &str = r#"(@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
-        const SQL3: &str = r#" ON CONFLICT DO UPDATE @{ def.non_primaries_without_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@"#;
+        const SQL1: &str = r#"INTO @{ table_name|db_esc }@ AS new (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES "#;
+        const SQL2: &str = r#"(@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)"#;
+        const SQL3: &str = r#" ON CONFLICT DO UPDATE @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@"#;
         @%- endif %@
         let mut sql = String::with_capacity(SQL_IGNORE.len() + SQL1.len() + (SQL2.len() + 1) * list.len() + SQL3.len()@% if !config.is_mysql() && def.is_auto_inc() %@ + 30@% endif %@);
         if ignore {
@@ -6543,6 +6629,9 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
     @%- if !config.is_mysql() && def.is_auto_inc() %@
         sql.push_str(r#" RETURNING @{ def.auto_inc()|fmt_join("{col_esc}", "") }@"#);
     @%- endif %@
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for data in list {
@@ -6662,8 +6751,8 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     if list.is_empty() {
         return Ok(());
     }
-    const SQL1: &str = r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_wo_read_only()|fmt_join("{col_esc}", ",") }@) VALUES "#;
-    const SQL2: &str = r#"(@{ def.all_fields_wo_read_only()|fmt_join("{placeholder}", ",") }@)"#;
+    const SQL1: &str = r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES "#;
+    const SQL2: &str = r#"(@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)"#;
     let mut sql = String::with_capacity(SQL1.len() + (SQL2.len() + 1) * list.len() + 100);
     sql.push_str(SQL1);
     sql.push_str(SQL2);
@@ -6676,6 +6765,9 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     vec.push(r#"\"@{ version_col }@\" = IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0)"#.to_string());
     @%- endif %@
     write!(sql, " @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE") }@ {}", &vec.join(","))?;
+    @%- if !config.is_mysql() %@
+    let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+    @%- endif %@
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     for data in list {
@@ -6753,7 +6845,7 @@ fn make_force_indexes(filter_digest: &str) -> Vec<&'static str> {
 
 #[allow(clippy::needless_borrow)]
 fn bind_to_query<'a>(mut query: Query<'a, DbType, DbArguments>, data: &'a Data) -> Query<'a, DbType, DbArguments> {
-    @{- def.all_fields_wo_read_only()|fmt_join("
+    @{- def.all_fields_except_read_only_and_auto_inc()|fmt_join("
     query = query.bind(data.{var}{bind_as});", "") }@
     query
 }

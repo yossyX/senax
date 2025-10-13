@@ -1,6 +1,6 @@
 [package]
 name = "senax"
-version = "0.3.30"
+version = "0.4.0-alpha.1"
 edition = "2024"
 authors = ["yossyX"]
 license = "MIT OR Apache-2.0"
@@ -10,6 +10,7 @@ homepage = "https://yossyx.github.io/senax/"
 keywords = ["senax", "database", "orm", "sqlx", "async"]
 categories = ["database"]
 readme = "../README.md"
+rust-version = "1.90"
 
 [features]
 default = ["config"]
@@ -44,7 +45,8 @@ rquickjs = { version = "0.9", features = ["rust-alloc"], default-features = fals
 schemars = { version = "0.8.22", features = ["indexmap2", "preserve_order"] }
 semver = "1.0.22"
 senax-inflector = "0.1.1"
-senax-mysql-parser = { path = "../mysql-parser", version = "=0.1.8" }
+senax-mysql-parser = { path = "../mysql-parser", version = "=0.1.9" }
+senax-pgsql-parser = { path = "../../parse-pgsql", version = "=0.1.0" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde_yaml = "0.9"

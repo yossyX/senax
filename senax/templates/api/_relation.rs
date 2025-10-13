@@ -284,7 +284,7 @@ pub fn update_updater(
     repo: &dyn _Repository,
     auth: &AuthInfo,
 ) -> anyhow::Result<()> {
-@{- def.for_api_request_except_without_primary(rel_id)|fmt_join("
+@{- def.for_api_request_except_primary_and(rel_id)|fmt_join("
     updater.set_{raw_var}({from_api_type_for_update});", "") }@
 @{- def.relations_one_for_api_request_with_replace_type(true)|fmt_rel_join("
     if let Some(input) = input.{rel_name} {

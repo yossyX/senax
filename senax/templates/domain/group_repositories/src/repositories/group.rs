@@ -13,7 +13,7 @@ use ::std::{
 #[allow(clippy::map_identity)]
 #[allow(clippy::collapsible_if)]
 // Do not modify below this line. (ModStart)
-// Do not modify up to this line. (ModEnd)
+// Do not modify above this line. (ModEnd)
 pub use crate::repositories as _super;
 
 #[rustfmt::skip]
@@ -22,7 +22,7 @@ pub use crate::repositories as _super;
 pub trait @{ group_name|pascal }@Repository: Send + Sync {
     fn _super(&self) -> Box<dyn super::Repository_>;
     // Do not modify below this line. (RepoStart)
-    // Do not modify up to this line. (RepoEnd)
+    // Do not modify above this line. (RepoEnd)
 }
 
 impl From<&dyn @{ group_name|pascal }@Repository> for Box<dyn super::Repository_> {
@@ -37,7 +37,7 @@ impl From<&dyn @{ group_name|pascal }@Repository> for Box<dyn super::Repository_
 pub trait @{ group_name|pascal }@QueryService: Send + Sync {
     fn _super(&self) -> Box<dyn super::QueryService_>;
     // Do not modify below this line. (QueryServiceStart)
-    // Do not modify up to this line. (QueryServiceEnd)
+    // Do not modify above this line. (QueryServiceEnd)
 }
 
 impl From<&dyn @{ group_name|pascal }@QueryService> for Box<dyn super::QueryService_> {
@@ -57,7 +57,7 @@ pub struct Emu@{ group_name|pascal }@Repository {
 impl @{ group_name|pascal }@Repository for Emu@{ group_name|pascal }@Repository {
     get_emu_repo!(_super, dyn super::Repository_, super::EmuRepository_);
     // Do not modify below this line. (EmuRepoStart)
-    // Do not modify up to this line. (EmuRepoEnd)
+    // Do not modify above this line. (EmuRepoEnd)
 }
 
 #[cfg(any(feature = "mock", test))]
@@ -71,6 +71,6 @@ pub struct Emu@{ group_name|pascal }@QueryService {
 impl @{ group_name|pascal }@QueryService for Emu@{ group_name|pascal }@QueryService {
     get_emu_repo!(_super, dyn super::QueryService_, super::EmuQueryService_);
     // Do not modify below this line. (EmuQueryServiceStart)
-    // Do not modify up to this line. (EmuQueryServiceEnd)
+    // Do not modify above this line. (EmuQueryServiceEnd)
 }
 @{-"\n"}@

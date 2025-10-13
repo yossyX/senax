@@ -137,7 +137,7 @@ function Config() {
                 {...formData}
               />
               <AutoField name="timestampable" {...formData} />
-              <AutoField name="time_zone" {...formData} />
+              <AutoField name="output_time_zone" {...formData} />
               <AutoField name="timestamp_time_zone" {...formData} />
               <AutoField name="disable_timestamp_cache" {...formData} />
               <AutoField name="use_cache" {...formData} />
@@ -162,6 +162,7 @@ function Config() {
               <AutoField name="preserve_column_order" {...formData} />
               <AutoField name="exclude_from_domain" {...formData} />
               <AutoField name="use_label_as_sql_comment" {...formData} />
+              <AutoField name="force_datetime_on_mysql" {...formData} />
               <AutoField
                 name="rename_created_at"
                 {...formData}

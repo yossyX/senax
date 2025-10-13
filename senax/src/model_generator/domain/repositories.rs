@@ -105,7 +105,7 @@ pub mod @{ name|snake|to_var_name }@;
 @%- for name in ref_groups %@
 pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|to_var_name }@;
 @%- endfor %@
-// Do not modify up to this line. (ModEnd)"###,
+// Do not modify above this line. (ModEnd)"###,
             ext = "txt",
             escape = "none"
         )]
@@ -115,7 +115,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             pub ref_groups: &'a [String],
         }
 
-        let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
+        let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();
         ensure!(
             re.is_match(&content),
             "File contents are invalid.: {:?}",
@@ -137,7 +137,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     @%- for (name, (_, defs)) in groups %@
     fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository>;
     @%- endfor %@
-    // Do not modify up to this line. (RepoEnd)"###,
+    // Do not modify above this line. (RepoEnd)"###,
             ext = "txt",
             escape = "none"
         )]
@@ -145,7 +145,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             pub groups: &'a GroupsDef,
         }
 
-        let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify up to this line. \(RepoEnd\)").unwrap();
+        let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify above this line. \(RepoEnd\)").unwrap();
         ensure!(
             re.is_match(&content),
             "File contents are invalid.: {:?}",
@@ -162,7 +162,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     @%- for (name, (_, defs)) in groups %@
     fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService>;
     @%- endfor %@
-    // Do not modify up to this line. (QueryServiceEnd)"###,
+    // Do not modify above this line. (QueryServiceEnd)"###,
             ext = "txt",
             escape = "none"
         )]
@@ -170,7 +170,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             pub groups: &'a GroupsDef,
         }
 
-        let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceStart\).+// Do not modify up to this line. \(QueryServiceEnd\)").unwrap();
+        let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceStart\).+// Do not modify above this line. \(QueryServiceEnd\)").unwrap();
         ensure!(
             re.is_match(&content),
             "File contents are invalid.: {:?}",
@@ -187,7 +187,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     @%- for (name, (_, defs)) in groups %@
     get_emu_repo!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@Repository);
     @%- endfor %@
-    // Do not modify up to this line. (EmuRepoEnd)"###,
+    // Do not modify above this line. (EmuRepoEnd)"###,
             ext = "txt",
             escape = "none"
         )]
@@ -195,7 +195,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             pub groups: &'a GroupsDef,
         }
 
-        let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuRepoStart\).+// Do not modify up to this line. \(EmuRepoEnd\)").unwrap();
+        let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuRepoStart\).+// Do not modify above this line. \(EmuRepoEnd\)").unwrap();
         ensure!(
             re.is_match(&content),
             "File contents are invalid.: {:?}",
@@ -212,7 +212,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     @%- for (name, (_, defs)) in groups %@
     get_emu_repo!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@QueryService);
     @%- endfor %@
-    // Do not modify up to this line. (EmuQueryServiceEnd)"###,
+    // Do not modify above this line. (EmuQueryServiceEnd)"###,
             ext = "txt",
             escape = "none"
         )]
@@ -220,7 +220,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             pub groups: &'a GroupsDef,
         }
 
-        let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuQueryServiceStart\).+// Do not modify up to this line. \(EmuQueryServiceEnd\)").unwrap();
+        let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuQueryServiceStart\).+// Do not modify above this line. \(EmuQueryServiceEnd\)").unwrap();
         ensure!(
             re.is_match(&content),
             "File contents are invalid.: {:?}",
@@ -264,7 +264,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             fs::read_to_string(&file_path)?.replace("\r\n", "\n")
         };
         {
-            let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
+            let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();
             ensure!(
                 re.is_match(&content),
                 "File contents are invalid.: {:?}",
@@ -287,7 +287,7 @@ pub mod _base;
 @%- for mod_name in mod_names %@
 pub mod @{ mod_name|to_var_name }@;
 @%- endfor %@
-// Do not modify up to this line. (ModEnd)"###,
+// Do not modify above this line. (ModEnd)"###,
                 ext = "txt",
                 escape = "none"
             )]
@@ -299,7 +299,7 @@ pub mod @{ mod_name|to_var_name }@;
             let tpl = tpl.trim_start();
             let content = re.replace(&content, tpl);
 
-            let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify up to this line. \(RepoEnd\)").unwrap();
+            let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify above this line. \(RepoEnd\)").unwrap();
             ensure!(
                 re.is_match(&content),
                 "File contents are invalid.: {:?}",
@@ -313,7 +313,7 @@ pub mod @{ mod_name|to_var_name }@;
     @%- for (mod_name, model_name) in mod_names %@
     fn @{ mod_name|to_var_name }@(&self) -> Box<dyn @{ mod_name|to_var_name }@::@{ model_name|pascal }@Repository>;
     @%- endfor %@
-    // Do not modify up to this line. (RepoEnd)"###,
+    // Do not modify above this line. (RepoEnd)"###,
                 ext = "txt",
                 escape = "none"
             )]
@@ -328,7 +328,7 @@ pub mod @{ mod_name|to_var_name }@;
             let tpl = tpl.trim_start();
             let content = re.replace(&content, tpl);
 
-            let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceStart\).+// Do not modify up to this line. \(QueryServiceEnd\)").unwrap();
+            let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceStart\).+// Do not modify above this line. \(QueryServiceEnd\)").unwrap();
             ensure!(
                 re.is_match(&content),
                 "File contents are invalid.: {:?}",
@@ -342,7 +342,7 @@ pub mod @{ mod_name|to_var_name }@;
     @%- for (mod_name, model_name) in mod_names %@
     fn @{ mod_name|to_var_name }@(&self) -> Box<dyn @{ mod_name|to_var_name }@::@{ model_name|pascal }@QueryService>;
     @%- endfor %@
-    // Do not modify up to this line. (QueryServiceEnd)"###,
+    // Do not modify above this line. (QueryServiceEnd)"###,
                 ext = "txt",
                 escape = "none"
             )]
@@ -357,7 +357,7 @@ pub mod @{ mod_name|to_var_name }@;
             let tpl = tpl.trim_start();
             let content = re.replace(&content, tpl);
 
-            let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuRepoStart\).+// Do not modify up to this line. \(EmuRepoEnd\)").unwrap();
+            let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuRepoStart\).+// Do not modify above this line. \(EmuRepoEnd\)").unwrap();
             ensure!(
                 re.is_match(&content),
                 "File contents are invalid.: {:?}",
@@ -371,7 +371,7 @@ pub mod @{ mod_name|to_var_name }@;
     @%- for (mod_name, model_name) in mod_names %@
     get_emu_table!(@{ mod_name|to_var_name }@, dyn @{ mod_name|to_var_name }@::@{ model_name|pascal }@Repository, @{ mod_name|to_var_name }@::Emu@{ model_name|pascal }@Repository);
     @%- endfor %@
-    // Do not modify up to this line. (EmuRepoEnd)"###,
+    // Do not modify above this line. (EmuRepoEnd)"###,
                 ext = "txt",
                 escape = "none"
             )]
@@ -386,7 +386,7 @@ pub mod @{ mod_name|to_var_name }@;
             let tpl = tpl.trim_start();
             let content = re.replace(&content, tpl);
 
-            let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuQueryServiceStart\).+// Do not modify up to this line. \(EmuQueryServiceEnd\)").unwrap();
+            let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuQueryServiceStart\).+// Do not modify above this line. \(EmuQueryServiceEnd\)").unwrap();
             ensure!(
                 re.is_match(&content),
                 "File contents are invalid.: {:?}",
@@ -400,7 +400,7 @@ pub mod @{ mod_name|to_var_name }@;
     @%- for (mod_name, model_name) in mod_names %@
     get_emu_table!(@{ mod_name|to_var_name }@, dyn @{ mod_name|to_var_name }@::@{ model_name|pascal }@QueryService, @{ mod_name|to_var_name }@::Emu@{ model_name|pascal }@Repository);
     @%- endfor %@
-    // Do not modify up to this line. (EmuQueryServiceEnd)"###,
+    // Do not modify above this line. (EmuQueryServiceEnd)"###,
                 ext = "txt",
                 escape = "none"
             )]
@@ -467,7 +467,7 @@ pub fn write_lib_rs(
 @%- for (name, (_, defs)) in groups %@
 pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|to_var_name }@ as @{ name|snake|to_var_name }@;
 @%- endfor %@
-// Do not modify up to this line. (ModEnd)"###,
+// Do not modify above this line. (ModEnd)"###,
         ext = "txt",
         escape = "none"
     )]
@@ -476,7 +476,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
         pub groups: &'a GroupsDef,
     }
 
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -486,7 +486,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     let tpl = tpl.trim_start();
     let content = re.replace(&content, tpl);
 
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify up to this line. \(RepoEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(RepoStart\).+// Do not modify above this line. \(RepoEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -500,7 +500,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     @%- for (name, (_, defs)) in groups %@
     fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository>;
     @%- endfor %@
-    // Do not modify up to this line. (RepoEnd)"###,
+    // Do not modify above this line. (RepoEnd)"###,
         ext = "txt",
         escape = "none"
     )]
@@ -512,7 +512,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     let tpl = tpl.trim_start();
     let content = re.replace(&content, tpl);
 
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceStart\).+// Do not modify up to this line. \(QueryServiceEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceStart\).+// Do not modify above this line. \(QueryServiceEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -526,7 +526,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     @%- for (name, (_, defs)) in groups %@
     fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService>;
     @%- endfor %@
-    // Do not modify up to this line. (QueryServiceEnd)"###,
+    // Do not modify above this line. (QueryServiceEnd)"###,
         ext = "txt",
         escape = "none"
     )]
@@ -538,7 +538,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     let tpl = tpl.trim_start();
     let content = re.replace(&content, tpl);
 
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuRepoStart\).+// Do not modify up to this line. \(EmuRepoEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuRepoStart\).+// Do not modify above this line. \(EmuRepoEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -552,7 +552,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     @%- for (name, (_, defs)) in groups %@
     get_emu_group!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@Repository);
     @%- endfor %@
-    // Do not modify up to this line. (EmuRepoEnd)"###,
+    // Do not modify above this line. (EmuRepoEnd)"###,
         ext = "txt",
         escape = "none"
     )]
@@ -564,7 +564,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     let tpl = tpl.trim_start();
     let content = re.replace(&content, tpl);
 
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuQueryServiceStart\).+// Do not modify up to this line. \(EmuQueryServiceEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(EmuQueryServiceStart\).+// Do not modify above this line. \(EmuQueryServiceEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -578,7 +578,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
     @%- for (name, (_, defs)) in groups %@
     get_emu_group!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@QueryService);
     @%- endfor %@
-    // Do not modify up to this line. (EmuQueryServiceEnd)"###,
+    // Do not modify above this line. (EmuQueryServiceEnd)"###,
         ext = "txt",
         escape = "none"
     )]
@@ -660,6 +660,89 @@ pub fn write_entity(
         escape = "none"
     )]
     pub struct DomainEntityTemplate<'a> {
+        pub group_name: &'a str,
+        pub mod_name: &'a str,
+        pub pascal_name: &'a str,
+        pub def: &'a Arc<ModelDef>,
+    }
+
+    let content = if force || !file_path.exists() {
+        DomainEntityTemplate {
+            group_name,
+            mod_name,
+            pascal_name,
+            def,
+        }
+        .render()?
+    } else {
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
+    };
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
+// Do not modify below this line. (ModStart)
+use async_trait::async_trait;
+#[allow(unused_imports)]
+use base_domain as domain;
+#[allow(unused_imports)]
+use base_domain::models::@{ db|snake|to_var_name }@ as _model_;
+@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+#[allow(unused_imports)]
+pub use base_domain::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
+@%- endfor %@
+@%- for (enum_name, column_def) in def.num_enums(true) %@
+#[rustfmt::skip]
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ enum_name|pascal }@;
+@%- endfor %@
+@%- for (enum_name, column_def) in def.str_enums(true) %@
+#[rustfmt::skip]
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ enum_name|pascal }@;
+@%- endfor %@
+#[rustfmt::skip]
+pub use super::_base::_@{ mod_name }@::{join, Joiner_};
+#[rustfmt::skip]
+pub use super::_base::_@{ mod_name }@::{filter, order, Filter_};
+pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Factory;
+use super::_base::_@{ mod_name }@::{_@{ pascal_name }@QueryService, _@{ pascal_name }@Repository};
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::consts;
+#[rustfmt::skip]
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{
+    @{ pascal_name }@, @{ pascal_name }@Cache, @{ pascal_name }@Common, @{ pascal_name }@Updater,
+};
+@%- for id in def.id() %@
+#[rustfmt::skip]
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ id_name }@;
+@%- endfor %@
+#[rustfmt::skip]
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Primary;
+#[rustfmt::skip]
+pub use super::_base::_@{ mod_name }@::{_@{ pascal_name }@QueryFindBuilder, _@{ pascal_name }@RepositoryFindBuilder};
+#[cfg(any(feature = "mock", test))]
+pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Entity;
+@%- for (selector, selector_def) in def.selectors %@
+#[rustfmt::skip]
+pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Repository@{ selector|pascal }@Builder;
+@%- endfor %@
+@%- for (selector, selector_def) in def.selectors %@
+#[rustfmt::skip]
+pub use super::_base::_@{ mod_name }@::{@{ pascal_name }@Query@{ selector|pascal }@Builder, @{ pascal_name }@Query@{ selector|pascal }@Cursor, @{ pascal_name }@Query@{ selector|pascal }@Filter, @{ pascal_name }@Query@{ selector|pascal }@Order};
+@%- endfor %@
+#[cfg(any(feature = "mock", test))]
+pub use self::{MockQueryService_ as Mock@{ pascal_name }@QueryService, MockRepository_ as Mock@{ pascal_name }@Repository};
+#[cfg(any(feature = "mock", test))]
+pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
+@{- def.relations()|fmt_rel_join("
+pub use base_domain::models::--1--::{class_mod_var} as _{raw_rel_name}_model_;
+pub use crate::repositories::{class_mod_var} as _{raw_rel_name}_repository_;", "")|replace1(db|snake|to_var_name) }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+pub use base_domain::models::{db_mod_var}::{class_mod_var} as _{raw_rel_name}_model_;
+pub use repository_{db_snake}_{group_snake}::repositories::{class_mod_var} as _{raw_rel_name}_repository_;", "") }@
+// Do not modify above this line. (ModEnd)"###,
+        ext = "txt",
+        escape = "none"
+    )]
+    pub struct ModTemplate<'a> {
         pub db: &'a str,
         pub group_name: &'a str,
         pub mod_name: &'a str,
@@ -668,17 +751,108 @@ pub fn write_entity(
         pub def: &'a Arc<ModelDef>,
     }
 
-    if force || !file_path.exists() {
-        let tpl = DomainEntityTemplate {
-            db,
-            group_name,
-            mod_name,
-            pascal_name,
-            id_name,
-            def,
-        };
-        fs_write(file_path, tpl.render()?)?;
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();
+    ensure!(
+        re.is_match(&content),
+        "File contents are invalid.: {:?}",
+        &file_path
+    );
+    let tpl = ModTemplate {
+        db,
+        group_name,
+        mod_name,
+        pascal_name,
+        id_name,
+        def,
     }
+    .render()?;
+    let tpl = tpl.trim_start();
+    let content = re.replace(&content, tpl);
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
+    // Do not modify below this line. (RepositoryMockStart)
+    #[async_trait]
+    impl _@{ pascal_name }@Repository for Repository_ {
+        @%- if !def.disable_update() %@
+        fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn _@{ pascal_name }@RepositoryFindBuilder>;
+        @%- endif %@
+        fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn @{ pascal_name }@Updater>;
+        async fn save(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>>;
+        @%- if !def.disable_update() %@
+        async fn import(&self, list: Vec<Box<dyn @{ pascal_name }@Updater>>, option: Option<domain::models::ImportOption>) -> anyhow::Result<()>;
+        @%- endif %@
+        @%- if def.use_insert_delayed() %@
+        async fn insert_delayed(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()>;
+        @%- endif %@
+        @%- if !def.disable_delete() %@
+        async fn delete(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()>;
+        @%- if def.primaries().len() == 1 %@
+        async fn delete_by_ids(&self, ids: &[@{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@]) -> anyhow::Result<u64>;
+        @%- endif %@
+        async fn delete_all(&self) -> anyhow::Result<()>;
+        @%- endif %@
+        @%- if def.act_as_job_queue() %@
+        async fn fetch(&self, limit: usize) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>>;
+        @%- endif %@
+        @%- for (selector, selector_def) in def.selectors %@
+        fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder>;
+        @%- endfor %@
+    }
+    // Do not modify above this line. (RepositoryMockEnd)"###,
+        ext = "txt",
+        escape = "none"
+    )]
+    pub struct RepositoryMockTemplate<'a> {
+        pub pascal_name: &'a str,
+        pub def: &'a Arc<ModelDef>,
+    }
+
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(RepositoryMockStart\).+// Do not modify above this line. \(RepositoryMockEnd\)").unwrap();
+    ensure!(
+        re.is_match(&content),
+        "File contents are invalid.: {:?}",
+        &file_path
+    );
+    let tpl = RepositoryMockTemplate { pascal_name, def }.render()?;
+    let tpl = tpl.trim_start();
+    let content = re.replace(&content, tpl);
+
+    #[derive(Template)]
+    #[template(
+        source = r###"
+    // Do not modify below this line. (QueryServiceMockStart)
+    #[async_trait]
+    impl _@{ pascal_name }@QueryService for QueryService_ {
+        @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
+        async fn all(&self) -> anyhow::Result<Box<dyn base_domain::models::EntityIterator<dyn @{ pascal_name }@Cache>>>;
+        @%- endif %@
+        @%- for (selector, selector_def) in def.selectors %@
+        fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder>;
+        @%- endfor %@
+        fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn _@{ pascal_name }@QueryFindBuilder>;
+    }
+    // Do not modify above this line. (QueryServiceMockEnd)"###,
+        ext = "txt",
+        escape = "none"
+    )]
+    pub struct QueryServiceMockTemplate<'a> {
+        pub pascal_name: &'a str,
+        pub def: &'a Arc<ModelDef>,
+    }
+
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(QueryServiceMockStart\).+// Do not modify above this line. \(QueryServiceMockEnd\)").unwrap();
+    ensure!(
+        re.is_match(&content),
+        "File contents are invalid.: {:?}",
+        &file_path
+    );
+    let tpl = QueryServiceMockTemplate { pascal_name, def }.render()?;
+    let tpl = tpl.trim_start();
+    let content = re.replace(&content, tpl);
+
+    fs_write(file_path, &*content)?;
 
     #[derive(Template)]
     #[template(

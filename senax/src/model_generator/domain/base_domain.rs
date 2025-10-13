@@ -52,7 +52,7 @@ mod @{ mod_name|to_var_name }@;
 @%- for (mod_name, name) in mod_names %@
 pub use @{ mod_name|to_var_name }@::@{ name }@;
 @%- endfor %@
-// Do not modify up to this line. (ModEnd)"###,
+// Do not modify above this line. (ModEnd)"###,
         ext = "txt",
         escape = "none"
     )]
@@ -63,7 +63,7 @@ pub use @{ mod_name|to_var_name }@::@{ name }@;
     let tpl = tpl.trim_start();
     if file_path.exists() {
         let content = fs::read_to_string(&file_path)?.replace("\r\n", "\n");
-        let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
+        let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();
         ensure!(
             re.is_match(&content),
             "File contents are invalid.: {:?}",
@@ -193,7 +193,7 @@ pub fn write_models_db_rs(
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
 
-    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify up to this line. \(ModEnd\)").unwrap();
+    let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
         "File contents are invalid.: {:?}",
@@ -207,7 +207,7 @@ pub fn write_models_db_rs(
 @%- for (name, (_, defs)) in groups %@
 pub mod @{ name|snake|to_var_name }@;
 @%- endfor %@
-// Do not modify up to this line. (ModEnd)"###,
+// Do not modify above this line. (ModEnd)"###,
         ext = "txt",
         escape = "none"
     )]

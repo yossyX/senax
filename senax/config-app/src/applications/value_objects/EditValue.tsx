@@ -180,7 +180,7 @@ function EditValue() {
                 hidden={type !== "decimal"}
               />
               <AutoField
-                name="time_zone"
+                name="output_time_zone"
                 {...formData}
                 hidden={!["datetime", "timestamp"].includes(type)}
               />

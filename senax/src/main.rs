@@ -31,6 +31,8 @@ mod api_document;
 pub(crate) mod common;
 mod db_document;
 pub(crate) mod ddl {
+    mod pgsql;
+    pub mod sql_type;
     pub mod table;
 }
 mod actix_generator;

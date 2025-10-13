@@ -56,18 +56,18 @@ impl LogWriter {
                     .unwrap();
                     while let Some(log) = writer_rx.recv().await {
                         let now = rotation.round_date(&OffsetDateTime::now_utc().to_offset(offset));
-                        if let Some(next) = next_date {
-                            if now.unix_timestamp() >= next.unix_timestamp() {
-                                (next_date, file) = Self::rotate(
-                                    &rotation,
-                                    &log_directory,
-                                    &log_filename_prefix,
-                                    &now,
-                                    compress,
-                                )
-                                .await
-                                .unwrap();
-                            }
+                        if let Some(next) = next_date
+                            && now.unix_timestamp() >= next.unix_timestamp()
+                        {
+                            (next_date, file) = Self::rotate(
+                                &rotation,
+                                &log_directory,
+                                &log_filename_prefix,
+                                &now,
+                                compress,
+                            )
+                            .await
+                            .unwrap();
                         }
                         if compress {
                             let mut sleep = std::time::Duration::from_millis(1000);

@@ -283,10 +283,10 @@ fn link_port() -> Result<SocketAddr> {
         return Ok(env::var("OUTER_PORT").unwrap().parse()?);
     }
     let hostname = hostname::get()?;
-    if let Ok(mut port) = format!("{}:{port}", hostname.to_str().unwrap()).to_socket_addrs() {
-        if let Some(port) = port.next() {
-            return Ok(port);
-        }
+    if let Ok(mut port) = format!("{}:{port}", hostname.to_str().unwrap()).to_socket_addrs()
+        && let Some(port) = port.next()
+    {
+        return Ok(port);
     }
     for iface in if_addrs::get_if_addrs()? {
         if !iface.is_loopback() {

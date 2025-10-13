@@ -32,18 +32,18 @@ macro_rules! get_emu_table {
 }
 
 // Do not modify below this line. (ModStart)
-// Do not modify up to this line. (ModEnd)
+// Do not modify above this line. (ModEnd)
 
 #[cfg_attr(any(feature = "mock", test), mockall::automock)]
 pub trait Repository_: Send + Sync {
     // Do not modify below this line. (RepoStart)
-    // Do not modify up to this line. (RepoEnd)
+    // Do not modify above this line. (RepoEnd)
 }
 
 #[cfg_attr(any(feature = "mock", test), mockall::automock)]
 pub trait QueryService_: Send + Sync {
     // Do not modify below this line. (QueryServiceStart)
-    // Do not modify up to this line. (QueryServiceEnd)
+    // Do not modify above this line. (QueryServiceEnd)
 }
 
 #[cfg(any(feature = "mock", test))]
@@ -56,7 +56,7 @@ pub struct EmuRepository_ {
 #[cfg(any(feature = "mock", test))]
 impl Repository_ for EmuRepository_ {
     // Do not modify below this line. (EmuRepoStart)
-    // Do not modify up to this line. (EmuRepoEnd)
+    // Do not modify above this line. (EmuRepoEnd)
 }
 
 #[cfg(any(feature = "mock", test))]
@@ -69,6 +69,6 @@ pub struct EmuQueryService_ {
 #[cfg(any(feature = "mock", test))]
 impl QueryService_ for EmuQueryService_ {
     // Do not modify below this line. (EmuQueryServiceStart)
-    // Do not modify up to this line. (EmuQueryServiceEnd)
+    // Do not modify above this line. (EmuQueryServiceEnd)
 }
 @{-"\n"}@

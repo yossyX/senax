@@ -31,7 +31,7 @@ pub fn db_list(dir_type_only: bool) -> Result<Vec<String>> {
     Ok(dbs)
 }
 
-pub fn generate(db_type: DbType,db: &str, exclude_from_domain: bool) -> Result<()> {
+pub fn generate(db_type: DbType, db: &str, exclude_from_domain: bool) -> Result<()> {
     anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
     let schema_path = Path::new(SCHEMA_PATH);
 

@@ -614,12 +614,12 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 };
                 @%- if def.is_soft_delete() %@
                 let obj = if self.with_trashed {
-                    _@{ pascal_name }@_::find_optional_from_cache_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, joiner).await?
+                    _@{ pascal_name }@_::find_optional_from_cache_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, joiner).await?
                 } else {
-                    _@{ pascal_name }@_::find_optional_from_cache(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, joiner).await?
+                    _@{ pascal_name }@_::find_optional_from_cache(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, joiner).await?
                 };
                 @%- else %@
-                let obj = _@{ pascal_name }@_::find_optional_from_cache(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, joiner).await?;
+                let obj = _@{ pascal_name }@_::find_optional_from_cache(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, joiner).await?;
                 @%- endif %@
                 if let Some(obj) = obj {
                     if let Some(filter) = self.filter {
@@ -627,18 +627,18 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                         match filter.check(&obj as &dyn @{ pascal_name }@Cache) {
                             Ok(true) => Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@Cache>)),
                             Ok(false) => {
-                                log::warn!(ctx = conn.ctx_no(); "Forbidden: {:?}", @{ def.primaries()|fmt_join_with_paren2("self.id", "self.id.{index}", ", ") }@);
+                                log::warn!(ctx = conn.ctx_no(); "Forbidden: {:?}", @{ def.primaries()|fmt_join_with_paren2("self.id.clone()", "self.id.{index}.clone()", ", ") }@);
                                 Ok(None)
                             }
                             Err(_) => {
                                 @%- if def.is_soft_delete() %@
                                 let exists = if self.with_trashed {
-                                    _@{ pascal_name }@_::exists_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, Some(filter)).await?
+                                    _@{ pascal_name }@_::exists_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, Some(filter)).await?
                                 } else {
-                                    _@{ pascal_name }@_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, Some(filter)).await?
+                                    _@{ pascal_name }@_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, Some(filter)).await?
                                 };
                                 @%- else %@
-                                let exists = _@{ pascal_name }@_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, Some(filter)).await?;
+                                let exists = _@{ pascal_name }@_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, Some(filter)).await?;
                                 @%- endif %@
                                 if exists {
                                     Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@Cache>))

@@ -537,7 +537,11 @@ pub async fn reset_database(is_test: bool, clean: bool) -> Result<()> {
         }
         let url = url.as_str();
         if clean {
+@%- if config.is_mysql() %@
             DbType::drop_database(url).await?;
+@%- else %@
+            DbType::force_drop_database(url).await?;
+@%- endif %@
             DbType::create_database(url).await?;
         } else if !DbType::database_exists(url).await? {
             DbType::create_database(url).await?;
@@ -980,12 +984,14 @@ impl DbConn {
             cb().await;
         }
     }
+@%- if config.is_mysql() %@
 
     pub async fn rows_affected(&mut self) -> Result<i64> {
         let query = sqlx::query("select row_count()");
         let row = query.fetch_one(self.get_tx().await?.as_mut()).await?;
         Ok(row.try_get(0)?)
     }
+@%- endif %@
 
     pub async fn commit(&mut self) -> Result<()> {
         ensure!(self.has_tx(), "No transaction is active.");
@@ -1180,7 +1186,7 @@ impl DbConn {
         if seq + num > ceiling {
             let base = SEQUENCE_FETCH_NUM.load(Ordering::Relaxed) as u64;
             let fetch_num = (num / base + 1) * base;
-            let sql = "@{ config.db_type_switch("UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;", "UPDATE _sequence SET seq = seq + ? where id = ? RETURNING seq;") }@";
+            let sql = "@{ config.db_type_switch("UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;", "UPDATE _sequence SET seq = seq + $1 where id = $2 RETURNING seq;") }@";
             let query = sqlx::query(sql).bind(fetch_num).bind(ID_OF_SEQUENCE);
             let result = query.@{ config.db_type_switch("execute", "fetch_one") }@(self.acquire_writer().await?.as_mut()).await?;
             let ceiling = result.@{ config.db_type_switch("last_insert_id()", "get::<i64, usize>(0) as u64") }@;
@@ -1230,14 +1236,14 @@ impl DbConn {
             query.fetch_all(self.get_tx().await?.as_mut()).await?
         };
         let rows_affected = result.len() as u64;
-        let last_insert_id = result.first().map(|v| v.get::<i64, usize>(0) as u64).unwrap_or_default();
+        let last_insert_id = result.first().map(|v| v.get_unchecked::<i64, usize>(0) as u64).unwrap_or_default();
         Ok((rows_affected, last_insert_id))
     }
     @%- endif %@
     @%- if !config.force_disable_cache %@
 
     async fn ___inc_cache_sync(mut pool: PoolConnection<DbType>) -> Result<u64> {
-        let sql = "@{ config.db_type_switch("UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;", "UPDATE _sequence SET seq = seq + ? where id = ? RETURNING seq;") }@";
+        let sql = "@{ config.db_type_switch("UPDATE _sequence SET seq = LAST_INSERT_ID(seq + ?) where id = ?;", "UPDATE _sequence SET seq = seq + $1 where id = $2 RETURNING seq;") }@";
         let query = sqlx::query(sql).bind(1).bind(ID_OF_CACHE_SYNC);
         let result = query.@{ config.db_type_switch("execute", "fetch_one") }@(pool.as_mut()).await?;
         Ok(result.@{ config.db_type_switch("last_insert_id()", "get::<i64, usize>(0) as u64") }@)
