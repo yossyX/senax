@@ -1,7 +1,7 @@
 use nom::IResult;
 use nom::branch::alt;
 use nom::character::complete::{digit1, line_ending, multispace0, multispace1};
-use nom::combinator::{map, not, peek};
+use nom::combinator::{map, not, peek, recognize};
 use nom::{AsChar, Parser};
 use serde::Deserialize;
 use serde::Serialize;
@@ -681,7 +681,7 @@ pub fn column_identifier_no_alias(i: &[u8]) -> IResult<&[u8], Column> {
     Ok((
         remaining_input,
         Column {
-            name: str::from_utf8(column).unwrap().to_string(),
+            name: str::from_utf8(column).unwrap().replace("``", "`"),
             query: None,
             len: len.map(|l| u32::from_str(str::from_utf8(l).unwrap()).unwrap()),
             desc: false,
@@ -706,7 +706,11 @@ pub fn column_identifier_query(i: &[u8]) -> IResult<&[u8], Column> {
 pub fn sql_identifier(i: &[u8]) -> IResult<&[u8], &[u8]> {
     alt((
         preceded(not(peek(sql_keyword)), take_while1(is_sql_identifier)),
-        delimited(tag("`"), take_while1(is_quoted_sql_identifier), tag("`")),
+        delimited(
+            tag("`"),
+            recognize(many0(alt((tag("``"), take_while1(|c| c != b'`'))))),
+            tag("`"),
+        ),
         delimited(tag("["), take_while1(is_quoted_sql_identifier), tag("]")),
     ))
     .parse(i)
@@ -897,7 +901,7 @@ pub fn value_list(i: &[u8]) -> IResult<&[u8], Vec<Literal>> {
 // Parse a reference to a named schema.table, with an optional alias
 pub fn schema_table_reference(i: &[u8]) -> IResult<&[u8], String> {
     map(sql_identifier, |tup| {
-        String::from(str::from_utf8(tup).unwrap())
+        str::from_utf8(tup).unwrap().replace("``", "`")
     })
     .parse(i)
 }

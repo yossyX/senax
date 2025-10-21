@@ -122,7 +122,7 @@ fn full_text_key(i: &[u8]) -> IResult<&[u8], TableKey> {
     )
         .parse(i)?;
 
-    let name = String::from_utf8(name.to_vec()).unwrap();
+    let name = String::from_utf8(name.to_vec()).unwrap().replace("``", "`");
     let parser = parser.map(|v| String::from_utf8(v.to_vec()).unwrap());
     Ok((
         remaining_input,
@@ -172,7 +172,7 @@ fn unique(i: &[u8]) -> IResult<&[u8], TableKey> {
     )
         .parse(i)?;
 
-    let n = String::from_utf8(name.to_vec()).unwrap();
+    let n = String::from_utf8(name.to_vec()).unwrap().replace("``", "`");
     Ok((remaining_input, TableKey::UniqueKey(n, columns)))
 }
 
@@ -192,7 +192,7 @@ fn key_or_index(i: &[u8]) -> IResult<&[u8], TableKey> {
     )
         .parse(i)?;
 
-    let n = String::from_utf8(name.to_vec()).unwrap();
+    let n = String::from_utf8(name.to_vec()).unwrap().replace("``", "`");
     Ok((remaining_input, TableKey::Key(n, columns)))
 }
 
@@ -214,7 +214,7 @@ fn spatial(i: &[u8]) -> IResult<&[u8], TableKey> {
     )
         .parse(i)?;
 
-    let n = String::from_utf8(name.to_vec()).unwrap();
+    let n = String::from_utf8(name.to_vec()).unwrap().replace("``", "`");
     Ok((remaining_input, TableKey::SpatialKey(n, columns)))
 }
 
@@ -282,8 +282,10 @@ fn constraint(i: &[u8]) -> IResult<&[u8], TableKey> {
     )
         .parse(i)?;
 
-    let name = String::from_utf8(name.to_vec()).unwrap();
-    let table = String::from_utf8(table.to_vec()).unwrap();
+    let name = String::from_utf8(name.to_vec()).unwrap().replace("``", "`");
+    let table = String::from_utf8(table.to_vec())
+        .unwrap()
+        .replace("``", "`");
     let on_delete = if let Some(on_delete) = on_delete {
         let (_, _, _, on_delete) = on_delete;
         Some(on_delete)
