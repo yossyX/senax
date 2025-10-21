@@ -450,7 +450,7 @@ function Field({ formData, definitions }: any) {
           <AutoField
             name="output_time_zone"
             {...formData}
-            hidden={!["datetime", "timestamp"].includes(type)}
+            hidden={!["utc_datetime", "timestamp_with_timezone"].includes(type)}
           />
           <AutoField
             name="enum_values"
@@ -480,7 +480,7 @@ function Field({ formData, definitions }: any) {
           />
           <AutoField name="default" {...formData} hidden={primary} />
           <AutoField name="query" {...formData} hidden={primary} />
-          <AutoField name="stored" {...formData} hidden={!query}/>
+          <AutoField name="stored" {...formData} hidden={!query} />
           <AutoField name="sql_comment" {...formData} />
           <AutoField name="hidden" {...formData} />
           <AutoField name="secret" {...formData} />
@@ -901,8 +901,9 @@ function Filter({ formData, definitions }: any) {
         "decimal",
         "date",
         "time",
-        "datetime",
-        "timestamp",
+        "utc_datetime",
+        "naive_datetime",
+        "timestamp_with_timezone",
       ];
     } else if (type === "identity") {
       types = [
@@ -1036,13 +1037,13 @@ function getFields(additionalData: any, types?: string[]) {
     if (!additionalData.modelData?.disable_created_at) {
       fields.push({
         name: additionalData.db_data?.rename_created_at || "created_at",
-        type: "datetime",
+        type: "timestamp_with_timezone",
       });
     }
     if (!additionalData.modelData?.disable_updated_at) {
       fields.push({
         name: additionalData.db_data?.rename_updated_at || "updated_at",
-        type: "datetime",
+        type: "timestamp_with_timezone",
       });
     }
   }
@@ -1052,7 +1053,7 @@ function getFields(additionalData: any, types?: string[]) {
   if (soft_delete == "time") {
     fields.push({
       name: additionalData.db_data?.rename_deleted_at || "deleted_at",
-      type: "datetime",
+      type: "timestamp_with_timezone",
     });
   } else if (soft_delete == "flag") {
     fields.push({

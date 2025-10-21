@@ -9,7 +9,7 @@ use senax_mysql_parser::common::ReferenceOption as MysqlReferenceOption;
 use senax_mysql_parser::common::SqlType as MysqlSqlType;
 use senax_mysql_parser::common::TableKey as MysqlTableKey;
 
-use crate::common::column_escape;
+use crate::common::escape_db_identifier;
 use crate::ddl::table::mysql_escape;
 use crate::schema::is_mysql_mode;
 
@@ -397,7 +397,7 @@ impl fmt::Display for TableKey {
                 )
             }
             TableKey::UniqueKey(ref name, ref columns) => {
-                write!(f, "UNIQUE KEY {} ", column_escape(name))?;
+                write!(f, "UNIQUE KEY {} ", escape_db_identifier(name))?;
                 write!(
                     f,
                     "({})",
@@ -409,7 +409,7 @@ impl fmt::Display for TableKey {
                 )
             }
             TableKey::FulltextKey(ref name, ref columns, ref parser) => {
-                write!(f, "FULLTEXT KEY {} ", column_escape(name))?;
+                write!(f, "FULLTEXT KEY {} ", escape_db_identifier(name))?;
                 write!(
                     f,
                     "({})",
@@ -425,7 +425,7 @@ impl fmt::Display for TableKey {
                 Ok(())
             }
             TableKey::Key(ref name, ref columns) => {
-                write!(f, "KEY {} ", column_escape(name))?;
+                write!(f, "KEY {} ", escape_db_identifier(name))?;
                 write!(
                     f,
                     "({})",
@@ -437,7 +437,7 @@ impl fmt::Display for TableKey {
                 )
             }
             TableKey::SpatialKey(ref name, ref columns) => {
-                write!(f, "SPATIAL KEY {} ", column_escape(name))?;
+                write!(f, "SPATIAL KEY {} ", escape_db_identifier(name))?;
                 write!(
                     f,
                     "({})",
@@ -456,7 +456,7 @@ impl fmt::Display for TableKey {
                 ref on_delete,
                 ref on_update,
             ) => {
-                write!(f, "CONSTRAINT {} FOREIGN KEY ", column_escape(name))?;
+                write!(f, "CONSTRAINT {} FOREIGN KEY ", escape_db_identifier(name))?;
                 write!(
                     f,
                     "({})",
@@ -466,7 +466,7 @@ impl fmt::Display for TableKey {
                         .collect::<Vec<_>>()
                         .join(", ")
                 )?;
-                write!(f, " REFERENCES {} ", column_escape(table))?;
+                write!(f, " REFERENCES {} ", escape_db_identifier(table))?;
                 write!(
                     f,
                     "({})",
@@ -523,7 +523,7 @@ impl fmt::Display for IndexColumn {
         if let Some(ref query) = self.query {
             write!(f, "({})", query)?;
         } else {
-            write!(f, "{}", column_escape(&self.name))?;
+            write!(f, "{}", escape_db_identifier(&self.name))?;
             if is_mysql_mode()
                 && let Some(ref len) = self.len
             {

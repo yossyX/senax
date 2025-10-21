@@ -56,11 +56,11 @@ pub fn stop() {
 }
 
 #[rustfmt::skip]
-pub async fn migrate(db: Option<&str>, use_test: bool, clean: bool, ignore_missing: bool) -> Result<()> {
+pub async fn migrate(db: Option<&str>, use_test: bool, clean: bool, ignore_missing: bool, remove_missing: bool) -> Result<()> {
     let mut join_set = tokio::task::JoinSet::new();
     @%- if session %@
     if db.is_none() || db == Some("session") {
-        join_set.spawn_local(db_session::migrate(use_test, clean, ignore_missing));
+        join_set.spawn_local(db_session::migrate(use_test, clean, ignore_missing, remove_missing));
     }
     @%- endif %@
     // Do not modify this line. (migrate)

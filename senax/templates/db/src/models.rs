@@ -59,7 +59,11 @@ where
     Ok(())
 }
 
-pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Result<()> {
+pub(crate) async fn exec_migrate(
+    shard_id: ShardId,
+    ignore_missing: bool,
+    remove_missing: bool,
+) -> Result<()> {
     static MIGRATE_LOCK: Mutex<BTreeMap<String, Arc<Semaphore>>> =
         Mutex::const_new(BTreeMap::new());
     let _lock = {
@@ -124,10 +128,29 @@ pub(crate) async fn exec_migrate(shard_id: ShardId, ignore_missing: bool) -> Res
     .await?;
     @%- endif %@
     @%- endif %@
-    sqlx::migrate!()
-        .set_ignore_missing(ignore_missing)
-        .run(writer.as_mut())
-        .await?;
+    loop {
+        match sqlx::migrate!()
+            .set_ignore_missing(ignore_missing)
+            .run(writer.as_mut())
+            .await
+        {
+            Ok(_) => break,
+            Err(sqlx::migrate::MigrateError::VersionMissing(v)) => {
+                if remove_missing {
+                    exec_ddl(
+                        &format!("delete from _sqlx_migrations where version = {};", v),
+                        writer.as_mut(),
+                    )
+                    .await?;
+                } else {
+                    return Err(sqlx::migrate::MigrateError::VersionMissing(v).into());
+                }
+            }
+            Err(e) => {
+                return Err(e.into());
+            }
+        }
+    }
     Ok(())
 }
 @{-"\n"}@

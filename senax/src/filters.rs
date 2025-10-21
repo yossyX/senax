@@ -10,7 +10,7 @@ pub static SHOW_COMMNET: AtomicBool = AtomicBool::new(true);
 
 pub fn _to_db_col(s: &str, esc: bool) -> String {
     if esc {
-        format!("\"{}\"", s)
+        format!("\"{}\"", s.replace('"', r#""""#))
     } else {
         s.to_owned()
     }

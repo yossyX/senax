@@ -9,7 +9,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use crate::common::fs_write;
-use crate::common::{ToCase as _, column_escape};
+use crate::common::{ToCase as _, escape_db_identifier};
 use crate::ddl::sql_type::{IndexColumn, Literal, ReferenceOption, SqlType, TableKey};
 use crate::ddl::table::{Column, Constraint, Table};
 use crate::schema::{
@@ -48,7 +48,8 @@ pub async fn generate(
     let db_url = env::var(&url_name)
         .with_context(|| format!("{} is required in the .env file.", url_name))?;
     let old_tables = ddl::table::parse(&db_url).await?;
-    let (mut ddl, mut ddl_list) = make_ddl(new_tables, old_tables)?;
+    let cli_mode = description.is_none();
+    let (mut ddl, mut ddl_list) = make_ddl(new_tables, old_tables, cli_mode)?;
     if skip_empty && ddl.is_empty() {
         return Ok(());
     }
@@ -86,7 +87,8 @@ pub async fn generate(
             let file_path = ddl_path.join(format!("{}_{}.sql", file_prefix, description));
             fs_write(file_path, &ddl)?;
         }
-    } else {
+    } else if !ddl.is_empty() || !ddl_list.is_empty() {
+        println!("-- {}", &db);
         println!("{}", &ddl);
         for line in ddl_list {
             println!("{}", &line);
@@ -524,6 +526,7 @@ enum Type {
 fn make_ddl(
     mut new_tables: IndexMap<String, Table>,
     mut old_tables: IndexMap<String, Table>,
+    cli_mode: bool,
 ) -> Result<(String, Vec<String>)> {
     let mut result1 = String::new();
     let mut result2 = Vec::new();
@@ -549,15 +552,15 @@ fn make_ddl(
                     writeln!(
                         &mut result1,
                         "RENAME TABLE {} TO {};",
-                        &column_escape(old_name),
-                        &column_escape(table_name)
+                        &escape_db_identifier(old_name),
+                        &escape_db_identifier(table_name)
                     )?;
                 } else {
                     writeln!(
                         &mut result1,
                         "ALTER TABLE {} RENAME TO {};",
-                        &column_escape(old_name),
-                        &column_escape(table_name)
+                        &escape_db_identifier(old_name),
+                        &escape_db_identifier(table_name)
                     )?;
                 }
                 let table = old_tables.swap_remove(old_name).unwrap();
@@ -592,16 +595,16 @@ fn make_ddl(
                             writeln!(
                                 &mut result1,
                                 "DELETE FROM {} WHERE {} IS NOT NULL;",
-                                &column_escape(table_name),
-                                &column_escape(name),
+                                &escape_db_identifier(table_name),
+                                &escape_db_identifier(name),
                             )?;
                         }
                         SoftDelete::Flag | SoftDelete::UnixTime => {
                             writeln!(
                                 &mut result1,
                                 "DELETE FROM {} WHERE {} <> 0;",
-                                &column_escape(table_name),
-                                &column_escape(name),
+                                &escape_db_identifier(table_name),
+                                &escape_db_identifier(name),
                             )?;
                         }
                         SoftDelete::None => {}
@@ -625,9 +628,9 @@ fn make_ddl(
                             writeln!(
                                 &mut result1,
                                 "ALTER TABLE {} RENAME COLUMN {} TO {};",
-                                &column_escape(table_name),
-                                &column_escape(old_name),
-                                &column_escape(name),
+                                &escape_db_identifier(table_name),
+                                &escape_db_identifier(old_name),
+                                &escape_db_identifier(name),
                             )?;
                             let column = old_table.columns.swap_remove(old_name).unwrap();
                             old_table.columns.insert(name.clone(), column);
@@ -662,12 +665,21 @@ fn make_ddl(
                     && old_constraint != constraint
                 {
                     // fix foreign key constraints
-                    writeln!(
-                        &mut result1,
-                        "ALTER TABLE {} DROP FOREIGN KEY {};",
-                        &column_escape(table_name),
-                        &column_escape(name)
-                    )?;
+                    if is_mysql_mode() {
+                        writeln!(
+                            &mut result1,
+                            "ALTER TABLE {} DROP FOREIGN KEY {};",
+                            &escape_db_identifier(table_name),
+                            &escape_db_identifier(name)
+                        )?;
+                    } else {
+                        writeln!(
+                            &mut result1,
+                            "ALTER TABLE {} DROP CONSTRAINT {};",
+                            &escape_db_identifier(table_name),
+                            &escape_db_identifier(name)
+                        )?;
+                    }
                 }
             }
             for (name, index) in &new_table.indexes {
@@ -680,11 +692,11 @@ fn make_ddl(
                         writeln!(
                             &mut result1,
                             "ALTER TABLE {} DROP INDEX {};",
-                            &column_escape(table_name),
-                            &column_escape(name)
+                            &escape_db_identifier(table_name),
+                            &escape_db_identifier(name)
                         )?;
                     } else {
-                        writeln!(&mut result1, "DROP INDEX {};", &column_escape(name))?;
+                        writeln!(&mut result1, "DROP INDEX {};", &escape_db_identifier(name))?;
                     }
                 }
             }
@@ -704,12 +716,21 @@ fn make_ddl(
                         .entry(table_name.clone())
                         .or_default()
                         .push(name.clone());
-                    writeln!(
-                        &mut result1,
-                        "ALTER TABLE {} DROP FOREIGN KEY {};",
-                        &column_escape(table_name),
-                        &column_escape(name)
-                    )?;
+                    if is_mysql_mode() {
+                        writeln!(
+                            &mut result1,
+                            "ALTER TABLE {} DROP FOREIGN KEY {};",
+                            &escape_db_identifier(table_name),
+                            &escape_db_identifier(name)
+                        )?;
+                    } else {
+                        writeln!(
+                            &mut result1,
+                            "ALTER TABLE {} DROP CONSTRAINT {};",
+                            &escape_db_identifier(table_name),
+                            &escape_db_identifier(name)
+                        )?;
+                    }
                 }
             }
             for name in old_table.indexes.keys() {
@@ -727,11 +748,11 @@ fn make_ddl(
                         writeln!(
                             &mut result1,
                             "ALTER TABLE {} DROP INDEX {};",
-                            &column_escape(table_name),
-                            &column_escape(name)
+                            &escape_db_identifier(table_name),
+                            &escape_db_identifier(name)
                         )?;
                     } else {
-                        writeln!(&mut result1, "DROP INDEX {};", &column_escape(name))?;
+                        writeln!(&mut result1, "DROP INDEX {};", &escape_db_identifier(name))?;
                     }
                 }
             }
@@ -752,7 +773,11 @@ fn make_ddl(
                 .or_default()
                 .entry(table_name.clone())
                 .or_default();
-            writeln!(&mut result1, "DROP TABLE {};", &column_escape(table_name))?;
+            writeln!(
+                &mut result1,
+                "DROP TABLE {};",
+                &escape_db_identifier(table_name)
+            )?;
         }
     }
     for (table_name, new_table) in &new_tables {
@@ -780,7 +805,7 @@ fn make_ddl(
                         .entry(table_name.clone())
                         .or_default()
                         .push(name.clone());
-                    alter_columns.push(format!("DROP COLUMN {}", &column_escape(name)));
+                    alter_columns.push(format!("DROP COLUMN {}", &escape_db_identifier(name)));
                 }
             }
             let mut pos = " FIRST".to_string();
@@ -807,8 +832,8 @@ fn make_ddl(
                         if is_mysql_mode() {
                             alter_columns.push(format!(
                                 "CHANGE COLUMN {} {} {}{}",
-                                &column_escape(name),
-                                &column_escape(name),
+                                &escape_db_identifier(name),
+                                &escape_db_identifier(name),
                                 new_field,
                                 &pos
                             ));
@@ -816,31 +841,31 @@ fn make_ddl(
                             if !new_field.is_same_type(old_field) {
                                 alter_columns.push(format!(
                                     "ALTER COLUMN {} TYPE {:.0}",
-                                    &column_escape(name),
+                                    &escape_db_identifier(name),
                                     new_field,
                                 ));
                             }
                             if old_field.constraint.not_null && !new_field.constraint.not_null {
                                 alter_columns.push(format!(
                                     "ALTER COLUMN {} DROP NOT NULL",
-                                    &column_escape(name),
+                                    &escape_db_identifier(name),
                                 ));
                             }
                             if !old_field.constraint.not_null && new_field.constraint.not_null {
                                 alter_columns.push(format!(
                                     "ALTER COLUMN {} SET NOT NULL",
-                                    &column_escape(name),
+                                    &escape_db_identifier(name),
                                 ));
                             }
                             if old_field.default.is_some() && new_field.default.is_none() {
                                 alter_columns.push(format!(
                                     "ALTER COLUMN {} DROP DEFAULT",
-                                    &column_escape(name),
+                                    &escape_db_identifier(name),
                                 ));
                             } else if old_field.default != new_field.default {
                                 alter_columns.push(format!(
                                     "ALTER COLUMN {} SET DEFAULT {}",
-                                    &column_escape(name),
+                                    &escape_db_identifier(name),
                                     &new_field
                                         .default
                                         .as_ref()
@@ -851,12 +876,12 @@ fn make_ddl(
                             if old_field.comment != new_field.comment {
                                 after_alter_table.push(format!(
                                     "COMMENT ON COLUMN {}.{} IS '{}';",
-                                    &column_escape(table_name),
-                                    &column_escape(name),
+                                    &escape_db_identifier(table_name),
+                                    &escape_db_identifier(name),
                                     &new_field
                                         .comment
                                         .as_ref()
-                                        .map(|v| v.to_string().replace("'", "''"))
+                                        .map(|v| v.replace('\'', "''"))
                                         .unwrap_or_default()
                                 ));
                             }
@@ -872,24 +897,24 @@ fn make_ddl(
                         .push(name.clone());
                     alter_columns.push(format!(
                         "ADD COLUMN {} {}{}",
-                        &column_escape(name),
+                        &escape_db_identifier(name),
                         new_field,
                         &pos
                     ));
                     if !is_mysql_mode() && new_field.comment.is_some() {
                         after_alter_table.push(format!(
                             "COMMENT ON COLUMN {}.{} IS '{}';",
-                            &column_escape(table_name),
-                            &column_escape(name),
+                            &escape_db_identifier(table_name),
+                            &escape_db_identifier(name),
                             &new_field
                                 .comment
                                 .as_ref()
-                                .map(|v| v.to_string().replace("'", "''"))
+                                .map(|v| v.replace('\'', "''"))
                                 .unwrap_or_default()
                         ));
                     }
                 }
-                pos = format!(" AFTER {}", &column_escape(name));
+                pos = format!(" AFTER {}", &escape_db_identifier(name));
             }
             if new_table.primary.as_ref().map(|v| &v.1) != old_table.primary.as_ref().map(|v| &v.1)
             {
@@ -933,7 +958,7 @@ fn make_ddl(
                 writeln!(
                     &mut result1,
                     "ALTER TABLE {} {};",
-                    &column_escape(table_name),
+                    &escape_db_identifier(table_name),
                     &alter_columns.join(", ")
                 )?;
             }
@@ -958,9 +983,9 @@ fn make_ddl(
                         writeln!(
                             &mut result1,
                             "COMMENT ON COLUMN {}.{} IS '{}';",
-                            &column_escape(table_name),
-                            &column_escape(name),
-                            &comment.to_string().replace("'", "''")
+                            &escape_db_identifier(table_name),
+                            &escape_db_identifier(name),
+                            &comment.replace('\'', "''")
                         )?;
                     }
                 }
@@ -971,8 +996,8 @@ fn make_ddl(
                         writeln!(
                             &mut result1,
                             "CREATE INDEX {} ON {} ({});",
-                            &column_escape(index_name),
-                            &column_escape(table_name),
+                            &escape_db_identifier(index_name),
+                            &escape_db_identifier(table_name),
                             cols.iter()
                                 .map(|v| v.to_string())
                                 .collect::<Vec<_>>()
@@ -983,8 +1008,8 @@ fn make_ddl(
                         writeln!(
                             &mut result1,
                             "CREATE UNIQUE INDEX {} ON {} ({});",
-                            &column_escape(index_name),
-                            &column_escape(table_name),
+                            &escape_db_identifier(index_name),
+                            &escape_db_identifier(table_name),
                             cols.iter()
                                 .map(|v| v.to_string())
                                 .collect::<Vec<_>>()
@@ -1006,15 +1031,15 @@ fn make_ddl(
                         writeln!(
                             &mut result1,
                             "ALTER TABLE {} ADD {};",
-                            &column_escape(table_name),
+                            &escape_db_identifier(table_name),
                             index
                         )?;
                     } else {
                         if let TableKey::Key(index_name, cols) = index {
                             result2.push(format!(
                                 "CREATE INDEX CONCURRENTLY {} ON {} ({});",
-                                &column_escape(index_name),
-                                &column_escape(table_name),
+                                &escape_db_identifier(index_name),
+                                &escape_db_identifier(table_name),
                                 cols.iter()
                                     .map(|v| v.to_string())
                                     .collect::<Vec<_>>()
@@ -1024,8 +1049,8 @@ fn make_ddl(
                         if let TableKey::UniqueKey(index_name, cols) = index {
                             result2.push(format!(
                                 "CREATE UNIQUE INDEX CONCURRENTLY {} ON {} ({});",
-                                &column_escape(index_name),
-                                &column_escape(table_name),
+                                &escape_db_identifier(index_name),
+                                &escape_db_identifier(table_name),
                                 cols.iter()
                                     .map(|v| v.to_string())
                                     .collect::<Vec<_>>()
@@ -1074,7 +1099,7 @@ fn make_ddl(
                         writeln!(
                             &mut result1,
                             "ALTER TABLE {} ADD {};",
-                            &column_escape(table_name),
+                            &escape_db_identifier(table_name),
                             constraint
                         )?;
                     }
@@ -1089,7 +1114,7 @@ fn make_ddl(
                     writeln!(
                         &mut result1,
                         "ALTER TABLE {} ADD {};",
-                        &column_escape(table_name),
+                        &escape_db_identifier(table_name),
                         constraint
                     )?;
                 }
@@ -1106,7 +1131,7 @@ fn make_ddl(
                 writeln!(
                     &mut result1,
                     "ALTER TABLE {} ADD {};",
-                    &column_escape(table_name),
+                    &escape_db_identifier(table_name),
                     constraint
                 )?;
             }
@@ -1117,16 +1142,20 @@ fn make_ddl(
         && result1.is_empty()
         && let Some(first) = result2.pop()
     {
-        buf.push_str("-- no-transaction\n");
+        if !cli_mode {
+            buf.push_str("-- no-transaction\n");
+        }
         result1.push_str(&first);
     }
-    for ddl in result2.iter_mut() {
-        ddl.insert_str(0, "-- no-transaction\n");
-    }
-    for (typ, tables) in history {
-        for (table, columns) in tables {
-            let columns = columns.join(", ");
-            writeln!(&mut buf, "-- [{typ}:{table}:{columns}]")?;
+    if !cli_mode {
+        for ddl in result2.iter_mut() {
+            ddl.insert_str(0, "-- no-transaction\n");
+        }
+        for (typ, tables) in history {
+            for (table, columns) in tables {
+                let columns = columns.join(", ");
+                writeln!(&mut buf, "-- [{typ}:{table}:{columns}]")?;
+            }
         }
     }
     if !result1.is_empty() {

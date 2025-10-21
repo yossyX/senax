@@ -695,7 +695,7 @@ pub struct DbRepoImplRollbackTemplate<'a> {
 #[template(
     source = r###"
     if db.is_none() || db == Some("@{ db }@") {
-        join_set.spawn_local(db_@{ db|snake }@::migrate(use_test, clean, ignore_missing));
+        join_set.spawn_local(db_@{ db|snake }@::migrate(use_test, clean, ignore_missing, remove_missing));
     }
     // Do not modify this line. (migrate)"###,
     ext = "txt",

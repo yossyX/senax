@@ -92,6 +92,10 @@ enum Command {
         /// ignore missing migration error
         #[clap(long)]
         ignore_missing: bool,
+        /// Removes entries from _sqlx_migrations for applied migrations missing in the current set.
+        /// Note: Does not revert any applied DDL changes.
+        #[clap(long)]
+        remove_missing: bool,
         /// Use test environment
         #[clap(short, long)]
         test: bool,
@@ -111,6 +115,10 @@ enum Command {
         /// ignore missing migration error
         #[clap(long)]
         ignore_missing: bool,
+        /// Removes entries from _sqlx_migrations for applied migrations missing in the current set.
+        /// Note: Does not revert any applied DDL changes.
+        #[clap(long)]
+        remove_missing: bool,
         /// Use test environment
         #[clap(short, long)]
         test: bool,
@@ -185,6 +193,7 @@ async fn main() -> Result<()> {
                 clean,
                 force_delete_all_db,
                 ignore_missing,
+                remove_missing,
                 test,
             } => {
                 if clean {
@@ -193,7 +202,7 @@ async fn main() -> Result<()> {
                         "clean migrate is debug environment only"
                     );
                 }
-                db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing).await?;
+                db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing, remove_missing).await?;
                 return Ok(());
             }
             Command::GenSeedSchema => {
@@ -205,6 +214,7 @@ async fn main() -> Result<()> {
                 clean,
                 force_delete_all_db,
                 ignore_missing,
+                remove_missing,
                 test,
             } => {
                 if clean {
@@ -212,7 +222,7 @@ async fn main() -> Result<()> {
                         force_delete_all_db || cfg!(debug_assertions),
                         "clean migrate is debug environment only"
                     );
-                    db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing).await?;
+                    db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing, remove_missing).await?;
                 }
                 db::seed(db.as_deref(), test).await?;
                 return Ok(());
@@ -241,7 +251,7 @@ async fn main() -> Result<()> {
     if arg.auto_migrate {
         info!("Starting database migration");
         let now = std::time::Instant::now();
-        if let Err(e) = db::migrate(None, false, false, true).await {
+        if let Err(e) = db::migrate(None, false, false, true, false).await {
             error!("{}", e);
             std::process::exit(1);
         }

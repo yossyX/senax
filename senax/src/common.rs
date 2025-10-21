@@ -605,10 +605,10 @@ where
     }
 }
 
-pub fn column_escape(s: &String) -> String {
+pub fn escape_db_identifier(s: &str) -> String {
     if schema::is_mysql_mode() {
-        format!("`{}`", s)
+        format!("`{}`", s.replace('`', "``"))
     } else {
-        format!(r#""{}""#, s)
+        format!(r#""{}""#, s.replace('"', r#""""#))
     }
 }

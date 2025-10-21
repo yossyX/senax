@@ -10,7 +10,7 @@ use sqlx::pool::PoolConnection;
 use sqlx::{MySql, MySqlPool, Postgres, Row};
 use std::fmt::{self, Debug};
 
-use crate::common::{column_escape, yaml_value_to_str};
+use crate::common::{escape_db_identifier, yaml_value_to_str};
 use crate::ddl::sql_type::{Literal, SqlType, TableKey};
 use crate::schema::{SoftDelete, is_mysql_mode, set_mysql_mode};
 
@@ -32,13 +32,17 @@ pub struct Table {
 
 impl fmt::Display for Table {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CREATE TABLE {} (\n    ", column_escape(&self.name))?;
+        write!(
+            f,
+            "CREATE TABLE {} (\n    ",
+            escape_db_identifier(&self.name)
+        )?;
         write!(
             f,
             "{}",
             self.columns
                 .iter()
-                .map(|(name, column)| format!("{} {}", column_escape(name), column))
+                .map(|(name, column)| format!("{} {}", escape_db_identifier(name), column))
                 .collect::<Vec<_>>()
                 .join(",\n    ")
         )?;

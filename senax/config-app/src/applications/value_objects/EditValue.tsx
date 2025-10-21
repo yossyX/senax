@@ -182,7 +182,7 @@ function EditValue() {
               <AutoField
                 name="output_time_zone"
                 {...formData}
-                hidden={!["datetime", "timestamp"].includes(type)}
+                hidden={!["utc_datetime", "timestamp_with_timezone"].includes(type)}
               />
               <AutoField
                 name="enum_values"

@@ -53,12 +53,17 @@ pub async fn start(
 
 pub async fn start_test() -> Result<MutexGuard<'static, u8>> {
     let guard = _base::_start_test().await?;
-    migrate(true, true, false).await?;
+    migrate(true, true, false, false).await?;
     models::start_test().await?;
     Ok(guard)
 }
 
-pub async fn migrate(use_test: bool, clean: bool, ignore_missing: bool) -> Result<()> {
+pub async fn migrate(
+    use_test: bool,
+    clean: bool,
+    ignore_missing: bool,
+    remove_missing: bool,
+) -> Result<()> {
     connection::reset_database(use_test, clean).await?;
     if use_test {
         connection::init_test().await?;
@@ -70,7 +75,9 @@ pub async fn migrate(use_test: bool, clean: bool, ignore_missing: bool) -> Resul
     }
     let mut join_set = tokio::task::JoinSet::new();
     for shard_id in DbConn::shard_num_range() {
-        join_set.spawn_local(async move { models::exec_migrate(shard_id, ignore_missing).await });
+        join_set.spawn_local(async move {
+            models::exec_migrate(shard_id, ignore_missing, remove_missing).await
+        });
     }
     let mut error = None;
     while let Some(res) = join_set.join_next().await {
