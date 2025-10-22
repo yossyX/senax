@@ -1,9 +1,16 @@
 # yaml-language-server: $schema=../senax-schema.json#definitions/ConfigDef
 
 db_id: @{ db_id }@
-db: mysql
+db: @{ db_type }@
 output_time_zone: utc
 timestamp_time_zone: utc
+@%- if db_type.is_mysql() %@
+id_collation: ascii_bin
+text_collation: utf8mb4_0900_ai_ci
+@%- else %@
+id_collation: C
+text_collation: und-x-icu
+@%- endif %@
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read
 use_cache: true
@@ -23,9 +30,8 @@ groups:
           key:
             primary: true
             main_primary: true
-            type: varchar
+            type: id_varchar
             length: 80
-            collation: ascii_bin
           data: blob_not_null
           eol: int_not_null  # unix_time / 8
 @{-"\n"}@

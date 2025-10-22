@@ -278,15 +278,9 @@ pub struct ModelDef {
     /// ### 継承モード
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inheritance: Option<Inheritance>,
-    /// ### ストレージエンジン
+    /// ### ストレージエンジン(MySQLのみ)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine: Option<String>,
-    // /// ### 文字セット
-    // #[serde(default, skip_serializing_if = "Option::is_none")]
-    // pub character_set: Option<String>,
-    /// ### 文字セット照合順序
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub collation: Option<String>,
     /// ### 機能追加
     #[serde(skip_serializing_if = "Option::is_none")]
     pub act_as: Option<ActAs>,
@@ -430,15 +424,9 @@ pub struct ModelJson {
     /// ### 継承モード
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inheritance: Option<InheritanceJson>,
-    /// ### ストレージエンジン
+    /// ### ストレージエンジン(MySQLのみ)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine: Option<String>,
-    // /// ### 文字セット
-    // #[serde(default, skip_serializing_if = "Option::is_none")]
-    // pub character_set: Option<String>,
-    /// ### 文字セット照合順序
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub collation: Option<String>,
     /// ### 機能追加
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub act_as: Option<ActAsJson>,
@@ -514,8 +502,6 @@ impl From<ModelDef> for ModelJson {
             abstract_mode: value.abstract_mode,
             inheritance: value.inheritance.map(|v| v.into()),
             engine: value.engine,
-            // character_set: value.character_set,
-            collation: value.collation,
             act_as: value.act_as.map(|v| v.into()),
             hide_er_relations: value.hide_er_relations,
             model_id: value.model_id,
@@ -637,8 +623,6 @@ impl TryFrom<ModelJson> for ModelDef {
                 .transpose()?
                 .flatten(),
             engine: value.engine,
-            // character_set: value.character_set,
-            collation: value.collation,
             act_as: value.act_as.map(|v| v.try_into()).transpose()?.flatten(),
             hide_er_relations: value.hide_er_relations,
             model_id: value.model_id,
@@ -1124,7 +1108,8 @@ impl ModelDef {
             .iter()
             .filter(|(_k, v)| {
                 v.data_type == DataType::Char
-                    || v.data_type == DataType::Varchar
+                    || v.data_type == DataType::IdVarchar
+                    || v.data_type == DataType::TextVarchar
                     || v.data_type == DataType::Text
             })
             .collect()
@@ -1437,7 +1422,8 @@ impl ModelDef {
             })
             .filter(|(_k, v)| {
                 v.data_type == DataType::Char
-                    || v.data_type == DataType::Varchar
+                    || v.data_type == DataType::IdVarchar
+                    || v.data_type == DataType::TextVarchar
                     || v.data_type == DataType::Text
             })
             .collect()

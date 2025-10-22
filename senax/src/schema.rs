@@ -285,7 +285,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     }
                     indexmap::map::Entry::Vacant(entry) => {
                         let mut col: FieldDef = FieldDef {
-                            data_type: DataType::Varchar,
+                            data_type: DataType::IdVarchar,
                             not_null: true,
                             skip_factory: Some(true),
                             ..Default::default()

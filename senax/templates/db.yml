@@ -8,6 +8,13 @@ ignore_foreign_key: true
 timestampable: real_time
 output_time_zone: utc
 timestamp_time_zone: utc
+@%- if db_type.is_mysql() %@
+id_collation: ascii_bin
+text_collation: utf8mb4_0900_ai_ci
+@%- else %@
+id_collation: C
+text_collation: und-x-icu
+@%- endif %@
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read
 use_cache: true

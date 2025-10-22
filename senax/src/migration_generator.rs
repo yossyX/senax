@@ -18,6 +18,7 @@ use crate::schema::{
 use crate::{DB_PATH, ddl};
 
 pub const UTF8_BYTE_LEN: u32 = 4;
+pub const MYSQL_UUID_COLLATION: &str = "ascii_general_ci";
 
 pub async fn generate(
     db: &str,
@@ -101,18 +102,12 @@ pub fn make_table_def(
     def: &std::sync::Arc<schema::ModelDef>,
     config: &schema::ConfigDef,
 ) -> Result<(String, Table, IndexMap<String, String>)> {
-    let default_collation = if def.collation.is_some() {
-        def.collation.clone()
-    } else {
-        config.collation.clone()
-    };
+    let default_collation = config.text_collation.clone();
     let table_name = def.table_name();
     let mut table = Table {
         name: table_name.clone(),
         old_name: def._before_rename_name.clone(),
         engine: def.engine.clone().or_else(|| config.engine.clone()),
-        // character_set: def.character_set.clone(),
-        collation: def.collation.clone(),
         skip_ddl: def.skip_ddl.unwrap_or_default(),
         ..Default::default()
     };
@@ -162,7 +157,10 @@ pub fn make_table_def(
                 col.length
                     .with_context(|| format!("length is required: {:?}", col_name))?,
             ),
-            schema::DataType::Varchar => {
+            schema::DataType::IdVarchar => {
+                SqlType::Varchar(col.length.unwrap_or(schema::DEFAULT_VARCHAR_LENGTH))
+            }
+            schema::DataType::TextVarchar => {
                 SqlType::Varchar(col.length.unwrap_or(schema::DEFAULT_VARCHAR_LENGTH))
             }
             schema::DataType::Boolean if is_mysql_mode() => SqlType::Tinyint,
@@ -173,7 +171,8 @@ pub fn make_table_def(
             schema::DataType::Text if col.length.unwrap_or(65536) * UTF8_BYTE_LEN < 65536 => {
                 SqlType::Text
             }
-            schema::DataType::Text => SqlType::Longtext,
+            schema::DataType::Text if is_mysql_mode() => SqlType::Longtext,
+            schema::DataType::Text => SqlType::Text,
             schema::DataType::Uuid if is_mysql_mode() => SqlType::Char(schema::UUID_LENGTH),
             schema::DataType::Uuid => SqlType::Uuid,
             schema::DataType::BinaryUuid => SqlType::Binary(schema::BINARY_UUID_LENGTH),
@@ -234,11 +233,25 @@ pub fn make_table_def(
         } else {
             sql_type.clone()
         };
+        if constraint.collation.is_none() {
+            if col.data_type == schema::DataType::Char
+                || col.data_type == schema::DataType::IdVarchar
+            {
+                constraint.collation = config.id_collation.clone();
+            }
+            if col.data_type == schema::DataType::TextVarchar
+                || col.data_type == schema::DataType::Text
+            {
+                if !is_mysql_mode() {
+                    constraint.collation = config.text_collation.clone();
+                }
+            }
+        }
         if col.data_type == schema::DataType::Uuid
             && constraint.collation.is_none()
             && is_mysql_mode()
         {
-            constraint.collation = Some("ascii_general_ci".to_string());
+            constraint.collation = Some(MYSQL_UUID_COLLATION.to_string());
         }
         let mut sql_comment = col.sql_comment.clone();
         if sql_comment.is_none() && config.use_label_as_sql_comment {
@@ -933,16 +946,6 @@ fn make_ddl(
                         .entry(table_name.clone())
                         .or_default();
                 }
-            }
-            if let Some(collation) = &new_table.collation
-                && old_table
-                    .collation
-                    .as_ref()
-                    .map(|v| !v.eq_ignore_ascii_case(collation))
-                    .unwrap_or(true)
-                && is_mysql_mode()
-            {
-                alter_columns.push(format!("COLLATE='{}'", collation));
             }
             if let Some(engine) = &new_table.engine
                 && old_table

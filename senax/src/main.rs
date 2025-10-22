@@ -227,9 +227,9 @@ enum Server {
         /// DB names
         #[clap(long)]
         db: String,
-        /// Use session
+        /// Session DB type
         #[clap(long)]
-        session: bool,
+        session: Option<schema::DbType>,
         /// Force overwrite
         #[clap(short, long)]
         force: bool,
@@ -320,12 +320,12 @@ async fn exec(cli: Cli) -> Result<()> {
                 session,
                 force,
             } => {
-                if *session {
-                    init_generator::session()?;
+                if let Some(db_type) = session {
+                    init_generator::session(*db_type)?;
                     model_generator::generate("session", false, false, false)?;
                 }
                 let db_list: Vec<_> = db.split(',').map(|v| v.trim()).collect();
-                actix_generator::generate(name, &db_list, *session, *force, true)?;
+                actix_generator::generate(name, &db_list, session.is_some(), *force, true)?;
             }
             Server::UseDb { name, db, api } => {
                 let db_list: Vec<_> = db.split(',').map(|v| v.trim()).collect();

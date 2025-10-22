@@ -25,8 +25,6 @@ pub struct Table {
     pub constraints: IndexMap<String, TableKey>,
     pub comment: Option<String>,
     pub engine: Option<String>,
-    // pub character_set: Option<String>,
-    pub collation: Option<String>,
     pub skip_ddl: bool,
 }
 
@@ -74,12 +72,6 @@ impl fmt::Display for Table {
         if is_mysql_mode() {
             if let Some(ref engine) = self.engine {
                 write!(f, " ENGINE={engine}")?;
-            }
-            // if let Some(ref character_set) = self.character_set {
-            //     write!(f, " CHARACTER SET='{character_set}'")?;
-            // }
-            if let Some(ref collation) = self.collation {
-                write!(f, " COLLATE='{collation}'")?;
             }
         }
         write!(f, ";")
@@ -317,7 +309,7 @@ fn mysql_conv(def: CreateTableStatement) -> Table {
     for option in def.options {
         match option {
             TableOption::Comment(comment) => table.comment = Some(comment.to_raw_string()),
-            TableOption::Collation(collation) => table.collation = Some(collation),
+            TableOption::Collation(_) => {},
             TableOption::Engine(engine) => table.engine = Some(engine),
             TableOption::Another => {}
         }

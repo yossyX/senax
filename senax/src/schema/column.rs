@@ -29,7 +29,10 @@ pub const BINARY_UUID_LENGTH: u16 = 16;
 /// ### データ型
 pub enum DataType {
     Char,
-    Varchar,
+    #[serde(rename = "id_varchar")]
+    IdVarchar,
+    #[serde(rename = "text_varchar")]
+    TextVarchar,
     Text,
     Uuid,
     #[serde(rename = "binary_uuid")]
@@ -90,7 +93,10 @@ pub enum DataSubsetType {
     Float,
     Double,
     Char,
-    Varchar,
+    #[serde(rename = "id_varchar")]
+    IdVarchar,
+    #[serde(rename = "text_varchar")]
+    TextVarchar,
     Uuid,
     BinaryUuid,
     Boolean,
@@ -123,7 +129,10 @@ pub enum DataSubsetType {
     FloatNotNull,
     DoubleNotNull,
     CharNotNull,
-    VarcharNotNull,
+    #[serde(rename = "id_varchar_not_null")]
+    IdVarcharNotNull,
+    #[serde(rename = "text_varchar_not_null")]
+    TextVarcharNotNull,
     UuidNotNull,
     BinaryUuidNotNull,
     BooleanNotNull,
@@ -161,7 +170,8 @@ impl From<&DataSubsetType> for DataType {
             DataSubsetType::Float => DataType::Float,
             DataSubsetType::Double => DataType::Double,
             DataSubsetType::Char => DataType::Char,
-            DataSubsetType::Varchar => DataType::Varchar,
+            DataSubsetType::IdVarchar => DataType::IdVarchar,
+            DataSubsetType::TextVarchar => DataType::TextVarchar,
             DataSubsetType::Uuid => DataType::Uuid,
             DataSubsetType::BinaryUuid => DataType::BinaryUuid,
             DataSubsetType::Boolean => DataType::Boolean,
@@ -190,7 +200,8 @@ impl From<&DataSubsetType> for DataType {
             DataSubsetType::FloatNotNull => DataType::Float,
             DataSubsetType::DoubleNotNull => DataType::Double,
             DataSubsetType::CharNotNull => DataType::Char,
-            DataSubsetType::VarcharNotNull => DataType::Varchar,
+            DataSubsetType::IdVarcharNotNull => DataType::IdVarchar,
+            DataSubsetType::TextVarcharNotNull => DataType::TextVarchar,
             DataSubsetType::UuidNotNull => DataType::Uuid,
             DataSubsetType::BinaryUuidNotNull => DataType::BinaryUuid,
             DataSubsetType::BooleanNotNull => DataType::Boolean,
@@ -225,7 +236,8 @@ impl DataSubsetType {
             DataSubsetType::Float => false,
             DataSubsetType::Double => false,
             DataSubsetType::Char => false,
-            DataSubsetType::Varchar => false,
+            DataSubsetType::IdVarchar => false,
+            DataSubsetType::TextVarchar => false,
             DataSubsetType::Uuid => false,
             DataSubsetType::BinaryUuid => false,
             DataSubsetType::Boolean => false,
@@ -254,7 +266,8 @@ impl DataSubsetType {
             DataSubsetType::FloatNotNull => true,
             DataSubsetType::DoubleNotNull => true,
             DataSubsetType::CharNotNull => true,
-            DataSubsetType::VarcharNotNull => true,
+            DataSubsetType::IdVarcharNotNull => true,
+            DataSubsetType::TextVarcharNotNull => true,
             DataSubsetType::UuidNotNull => true,
             DataSubsetType::BinaryUuidNotNull => true,
             DataSubsetType::BooleanNotNull => true,
@@ -1022,7 +1035,7 @@ impl FieldDef {
     pub fn get_default(&self) -> String {
         if let Some(value) = &self.default {
             let result = match self.data_type {
-                DataType::Char | DataType::Varchar => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
                     format!("{:?}.to_string().into()", yaml_value_to_str(value).unwrap())
                 }
                 DataType::Text => {
@@ -1083,7 +1096,7 @@ impl FieldDef {
     pub fn get_api_default(&self, name: &str) -> String {
         let conv = |value| -> String {
             let result = match self.data_type {
-                DataType::Char | DataType::Varchar => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
                     format!("{:?}.to_string()", yaml_value_to_str(value).unwrap())
                 }
                 DataType::Text => format!("{:?}.to_string()", yaml_value_to_str(value).unwrap()),
@@ -1231,7 +1244,7 @@ impl FieldDef {
     pub fn get_validate(&self, name: &str) -> String {
         let var_name = &_to_var_name(name);
         match self.data_type {
-            DataType::Char | DataType::Varchar if !self.not_null => {
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => {
                 let length = self.length.unwrap_or(DEFAULT_VARCHAR_LENGTH);
                 format!(
                     r#"
@@ -1242,7 +1255,7 @@ impl FieldDef {
         }}"#
                 )
             }
-            DataType::Char | DataType::Varchar => {
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
                 let length = self.length.unwrap_or(DEFAULT_VARCHAR_LENGTH);
                 format!(
                     r#"
@@ -1345,7 +1358,7 @@ impl FieldDef {
         let name = name.to_upper_snake();
         let typ = self.get_inner_type(true, false);
         match self.data_type {
-            DataType::Char | DataType::Varchar => {
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
                 let length = self.length.unwrap_or(DEFAULT_VARCHAR_LENGTH);
                 format!("\n    pub const {}_MAX_LEN: usize = {};", name, length)
             }
@@ -1401,7 +1414,7 @@ impl FieldDef {
             validators.push(format!("custom(function = {:?})", validator));
         }
         match self.data_type {
-            DataType::Char | DataType::Varchar => {
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
                 if !has_custom {
                     validators.push(
                         "custom(function = \"_server::validator::validate_varchar\")".to_string(),
@@ -1481,7 +1494,7 @@ impl FieldDef {
     #[allow(clippy::match_like_matches_macro)]
     pub fn is_arc(&self) -> bool {
         match self.data_type {
-            DataType::Char | DataType::Varchar | DataType::Text => true,
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => true,
             DataType::Binary | DataType::Varbinary | DataType::Blob => true,
             DataType::ArrayInt | DataType::ArrayString => true,
             _ => false,
@@ -1511,8 +1524,8 @@ impl FieldDef {
             DataType::BigInt => "u64",
             DataType::Float => "f32",
             DataType::Double => "f64",
-            DataType::Char | DataType::Varchar if raw => "String",
-            DataType::Char | DataType::Varchar => "std::sync::Arc<String>",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if raw => "String",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "std::sync::Arc<String>",
             DataType::Uuid => "uuid::Uuid",
             DataType::BinaryUuid => "uuid::Uuid",
             DataType::Boolean => "bool",
@@ -1558,14 +1571,14 @@ impl FieldDef {
 
     pub fn get_inner_to_raw(&self) -> &'static str {
         match self.data_type {
-            DataType::Char | DataType::Varchar | DataType::Text => ".to_string()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => ".to_string()",
             _ => "",
         }
     }
 
     pub fn get_raw_to_inner(&self) -> &'static str {
         match self.data_type {
-            DataType::Char | DataType::Varchar | DataType::Text => ".into()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => ".into()",
             _ => "",
         }
     }
@@ -1583,7 +1596,7 @@ impl FieldDef {
             DataType::BigInt => "u64",
             DataType::Float => "f32",
             DataType::Double => "f64",
-            DataType::Char | DataType::Varchar => "str",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "str",
             DataType::Uuid => "uuid::Uuid",
             DataType::BinaryUuid => "uuid::Uuid",
             DataType::Boolean => "bool",
@@ -1681,7 +1694,7 @@ impl FieldDef {
             DataType::BigInt => "u64",
             DataType::Float => "f32",
             DataType::Double => "f64",
-            DataType::Char | DataType::Varchar => "String",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "String",
             DataType::Uuid => "uuid::Uuid",
             DataType::BinaryUuid => "uuid::Uuid",
             DataType::Boolean => "bool",
@@ -1795,7 +1808,7 @@ impl FieldDef {
             DataType::BigInt => "u64",
             DataType::Float => "f32",
             DataType::Double => "f64",
-            DataType::Char | DataType::Varchar => "String",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "String",
             DataType::Uuid => "uuid::Uuid",
             DataType::BinaryUuid => "uuid::Uuid",
             DataType::Boolean => "bool",
@@ -1873,8 +1886,8 @@ impl FieldDef {
             return "";
         }
         match self.data_type {
-            DataType::Char | DataType::Varchar if !self.not_null => ".map(|v| v.into())",
-            DataType::Char | DataType::Varchar => ".into()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => ".map(|v| v.into())",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => ".into()",
             DataType::Text if !self.not_null => ".map(|v| v.into())",
             DataType::Text => ".into()",
             DataType::Binary | DataType::Varbinary | DataType::Blob if !self.not_null => {
@@ -1909,7 +1922,7 @@ impl FieldDef {
             DataType::BigInt => "",
             DataType::Float => "",
             DataType::Double => "",
-            DataType::Char | DataType::Varchar => ".into()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => ".into()",
             DataType::Boolean => "",
             DataType::Text => ".into()",
             DataType::Uuid => "",
@@ -1969,7 +1982,7 @@ impl FieldDef {
             DataType::BigInt => "",
             DataType::Float => "",
             DataType::Double => "",
-            DataType::Char | DataType::Varchar => "",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "",
             DataType::Boolean => "",
             DataType::Text => "",
             DataType::Uuid => "",
@@ -2019,8 +2032,8 @@ impl FieldDef {
             DataType::Float if !req => "f64",
             DataType::Float => "f32",
             DataType::Double => "f64",
-            DataType::Char | DataType::Varchar if req => "String",
-            DataType::Char | DataType::Varchar => "std::sync::Arc<String>",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if req => "String",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "std::sync::Arc<String>",
             DataType::Boolean => "bool",
             DataType::Text if req => "String",
             DataType::Text => "std::sync::Arc<String>",
@@ -2079,7 +2092,7 @@ impl FieldDef {
             DataType::BigInt => "Int",
             DataType::Float => "Float",
             DataType::Double => "Float",
-            DataType::Char | DataType::Varchar => "String",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "String",
             DataType::Boolean => "Boolean",
             DataType::Text => "String",
             DataType::Uuid => "UUID",
@@ -2106,7 +2119,8 @@ impl FieldDef {
         .to_string();
         if let Some(ref name) = self.value_object
             && self.data_type != DataType::Char
-            && self.data_type != DataType::Varchar
+            && self.data_type != DataType::IdVarchar
+            && self.data_type != DataType::TextVarchar
             && self.data_type != DataType::Text
         {
             let name = name.to_pascal();
@@ -2128,7 +2142,7 @@ impl FieldDef {
             DataType::BigInt => "number",
             DataType::Float => "number",
             DataType::Double => "number",
-            DataType::Char | DataType::Varchar => "string",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "string",
             DataType::Boolean => "boolean",
             DataType::Text => "string",
             DataType::Uuid => "string",
@@ -2161,14 +2175,14 @@ impl FieldDef {
         if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
             if !self.not_null {
                 return match self.data_type {
-                    DataType::Char | DataType::Varchar => {
+                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
                         ".map(|v| v.inner().as_ref().to_owned().into())"
                     }
                     _ => ".map(|v| v.into())",
                 };
             } else {
                 return match self.data_type {
-                    DataType::Char | DataType::Varchar => ".inner().as_ref().to_owned().into()",
+                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar => ".inner().as_ref().to_owned().into()",
                     _ => ".into()",
                 };
             }
@@ -2176,7 +2190,7 @@ impl FieldDef {
         if self.value_object.is_some() {
             return if !self.not_null {
                 match self.data_type {
-                    DataType::Char | DataType::Varchar => {
+                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
                         ".map(|v| v.inner().as_ref().to_owned().into())"
                     }
                     DataType::ArrayString => {
@@ -2187,7 +2201,7 @@ impl FieldDef {
                 }
             } else {
                 match self.data_type {
-                    DataType::Char | DataType::Varchar => ".inner().as_ref().to_owned().into()",
+                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar => ".inner().as_ref().to_owned().into()",
                     DataType::ArrayString => ".inner().iter().map(|v| v.into()).collect()",
                     _ if !self.is_copyable() => ".inner().to_owned()",
                     _ => ".inner()",
@@ -2205,12 +2219,12 @@ impl FieldDef {
             DataType::Float if !req => ".to_string().parse()?",
             DataType::Float => "",
             DataType::Double => "",
-            DataType::Char | DataType::Varchar if !self.not_null && req => {
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null && req => {
                 ".map(|v| v.as_ref().to_owned())"
             }
-            DataType::Char | DataType::Varchar if req => ".as_ref().to_owned()",
-            DataType::Char | DataType::Varchar if !self.not_null => ".cloned()",
-            DataType::Char | DataType::Varchar => ".clone()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if req => ".as_ref().to_owned()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => ".cloned()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => ".clone()",
             DataType::Uuid => "",
             DataType::BinaryUuid => "",
             DataType::Boolean => "",
@@ -2284,7 +2298,7 @@ impl FieldDef {
                 DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt => {
                     return "0.into()".to_owned();
                 }
-                DataType::Char | DataType::Varchar | DataType::Text => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
                     return "\"\".to_string().into()".to_owned();
                 }
                 _ => {
@@ -2361,7 +2375,7 @@ impl FieldDef {
                 DataType::BigInt => "u64",
                 DataType::Float => "f32",
                 DataType::Double => "f64",
-                DataType::Char | DataType::Varchar => "&std::sync::Arc<String>",
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "&std::sync::Arc<String>",
                 DataType::Boolean => "bool",
                 DataType::Text => "&std::sync::Arc<String>",
                 DataType::Uuid => "uuid::Uuid",
@@ -2449,7 +2463,7 @@ impl FieldDef {
             DataType::BigInt => "u64",
             DataType::Float => "f32",
             DataType::Double => "f64",
-            DataType::Char | DataType::Varchar => "&str",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "&str",
             DataType::Boolean => "bool",
             DataType::Text => "&str",
             DataType::Uuid => "uuid::Uuid",
@@ -2528,8 +2542,8 @@ impl FieldDef {
                 DataType::BigInt => "u64",
                 DataType::Float => "f32",
                 DataType::Double => "f64",
-                DataType::Char | DataType::Varchar if factory => "String",
-                DataType::Char | DataType::Varchar => "std::sync::Arc<String>",
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar if factory => "String",
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "std::sync::Arc<String>",
                 DataType::Boolean => "bool",
                 DataType::Text if factory => "String",
                 DataType::Text => "std::sync::Arc<String>",
@@ -2589,7 +2603,7 @@ impl FieldDef {
                 ""
             }
             _ if !self.not_null => "",
-            DataType::Char | DataType::Varchar | DataType::Text => "&",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => "&",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "&",
             DataType::ArrayInt => "&",
             DataType::ArrayString => "&",
@@ -2615,8 +2629,8 @@ impl FieldDef {
             DataType::BigInt => "",
             DataType::Float => "",
             DataType::Double => "",
-            DataType::Char | DataType::Varchar if !self.not_null => ".as_ref()",
-            DataType::Char | DataType::Varchar => "",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => ".as_ref()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "",
             DataType::Boolean => "",
             DataType::Text if !self.not_null => ".as_ref()",
             DataType::Text => "",
@@ -2656,7 +2670,7 @@ impl FieldDef {
             _ if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() => "",
             _ if self.value_object.is_some() => "",
             _ if !self.not_null => "",
-            DataType::Char | DataType::Varchar | DataType::Text => "&",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => "&",
             DataType::Binary | DataType::Varbinary | DataType::Blob => "&",
             DataType::ArrayInt => "&",
             DataType::ArrayString => "&",
@@ -2698,10 +2712,10 @@ impl FieldDef {
                 }
             } else {
                 return match self.data_type {
-                    DataType::Char | DataType::Varchar | DataType::Text if !self.not_null => {
+                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text if !self.not_null => {
                         ".map(|v| v.clone().into())"
                     }
-                    DataType::Char | DataType::Varchar | DataType::Text => ".clone().into()",
+                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => ".clone().into()",
                     _ if !self.not_null => ".map(|v| v.into())",
                     _ => ".into()",
                 };
@@ -2714,9 +2728,9 @@ impl FieldDef {
             DataType::BigInt => "",
             DataType::Float => "",
             DataType::Double => "",
-            DataType::Char | DataType::Varchar if is_impl => "",
-            DataType::Char | DataType::Varchar if !self.not_null => ".as_ref()",
-            DataType::Char | DataType::Varchar => "",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if is_impl => "",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => ".as_ref()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "",
             DataType::Boolean => "",
             DataType::Text if is_impl => "",
             DataType::Text if !self.not_null => ".as_ref()",
@@ -2789,8 +2803,8 @@ impl FieldDef {
             DataType::BigInt => "",
             DataType::Float => "",
             DataType::Double => "",
-            DataType::Char | DataType::Varchar if !self.not_null => "",
-            DataType::Char | DataType::Varchar => "",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => "",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "",
             DataType::Boolean => "",
             DataType::Text if !self.not_null => "",
             DataType::Text => "",
@@ -2837,10 +2851,10 @@ impl FieldDef {
         }
         if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
             return match self.data_type {
-                DataType::Char | DataType::Varchar | DataType::Text if !self.not_null => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text if !self.not_null => {
                     format!("{var}.as_ref().map(|v| v.clone().into())")
                 }
-                DataType::Char | DataType::Varchar | DataType::Text => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
                     format!("{var}.clone().into()")
                 }
                 _ if !self.not_null => format!("{var}{clone}.map(|v| v.into())"),
@@ -2849,10 +2863,10 @@ impl FieldDef {
         }
         if self.value_object.is_some() {
             return match self.data_type {
-                DataType::Char | DataType::Varchar | DataType::Text if !self.not_null => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text if !self.not_null => {
                     format!("{var}.as_ref().map(|v| v.clone().into())")
                 }
-                DataType::Char | DataType::Varchar | DataType::Text => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
                     format!("{var}.clone().into()")
                 }
                 _ if !self.not_null => format!("{var}{clone}.map(|v| v.into())"),
@@ -2866,10 +2880,10 @@ impl FieldDef {
             DataType::BigInt => var_clone,
             DataType::Float => var_clone,
             DataType::Double => var_clone,
-            DataType::Char | DataType::Varchar if !self.not_null => {
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => {
                 format!("{var}{clone}.as_ref()")
             }
-            DataType::Char | DataType::Varchar => format!("&{var}{clone}"),
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => format!("&{var}{clone}"),
             DataType::Boolean => var_clone,
             DataType::Text if !self.not_null => format!("{var}{clone}.as_ref()"),
             DataType::Text => format!("&{var}{clone}"),
@@ -2925,7 +2939,7 @@ impl FieldDef {
             DataType::BigInt => "",
             DataType::Float => "",
             DataType::Double => "",
-            DataType::Char | DataType::Varchar => "",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "",
             DataType::Boolean => "",
             DataType::Text => "",
             DataType::Uuid => "",
@@ -2978,8 +2992,8 @@ impl FieldDef {
                 DataType::BigInt => "u64",
                 DataType::Float => "f32",
                 DataType::Double => "f64",
-                DataType::Char | DataType::Varchar if arc => "std::sync::Arc<String>",
-                DataType::Char | DataType::Varchar => "String",
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar if arc => "std::sync::Arc<String>",
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "String",
                 DataType::Boolean => "bool",
                 DataType::Text if arc => "std::sync::Arc<String>",
                 DataType::Text => "String",
@@ -3104,7 +3118,8 @@ impl FieldDef {
                 format!("{}NullBool", if_then_else!(null, "", "Not"))
             }
         } else if self.data_type == DataType::Char
-            || self.data_type == DataType::Varchar
+            || self.data_type == DataType::IdVarchar
+            || self.data_type == DataType::TextVarchar
             || self.data_type == DataType::Text
             || self.data_type == DataType::DbSet
         {
@@ -3175,7 +3190,7 @@ impl FieldDef {
             DataType::BigInt => "",
             DataType::Float => "",
             DataType::Double => "",
-            DataType::Char | DataType::Varchar => ".to_owned()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => ".to_owned()",
             DataType::Boolean => "",
             DataType::Text => ".to_owned()",
             DataType::Uuid => "",
@@ -3239,7 +3254,7 @@ impl FieldDef {
                 ".inner().as_ref().to_owned()"
             };
             return match self.data_type {
-                DataType::Char | DataType::Varchar | DataType::Text => s,
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => s,
                 DataType::Binary | DataType::Varbinary | DataType::Blob => s,
                 _ => ".inner()",
             };
@@ -3262,8 +3277,10 @@ impl FieldDef {
         }
         if is_mysql_mode() {
             match self.data_type {
-                DataType::Char | DataType::Varchar | DataType::Text if self.not_null => ".as_str()",
-                DataType::Char | DataType::Varchar | DataType::Text => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text if self.not_null => {
+                    ".as_str()"
+                }
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
                     ".as_ref().map(|v| v.as_str())"
                 }
                 DataType::Binary | DataType::Varbinary | DataType::Blob if self.not_null => {
@@ -3290,8 +3307,10 @@ impl FieldDef {
             }
         } else {
             match self.data_type {
-                DataType::Char | DataType::Varchar | DataType::Text if self.not_null => ".as_str()",
-                DataType::Char | DataType::Varchar | DataType::Text => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text if self.not_null => {
+                    ".as_str()"
+                }
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
                     ".as_ref().map(|v| v.as_str())"
                 }
                 DataType::Binary | DataType::Varbinary | DataType::Blob if self.not_null => {
@@ -3361,7 +3380,8 @@ impl FieldDef {
             return format!("row.try_get_unchecked({index})?",);
         }
         if self.data_type == DataType::Char
-            || self.data_type == DataType::Varchar
+            || self.data_type == DataType::IdVarchar
+            || self.data_type == DataType::TextVarchar
             || self.data_type == DataType::Text
         {
             if self.not_null {
@@ -3431,7 +3451,7 @@ impl FieldDef {
             DataType::BigInt => true,
             DataType::Float => false,
             DataType::Double => false,
-            DataType::Char | DataType::Varchar => true,
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => true,
             DataType::Boolean => true,
             DataType::Text => true,
             DataType::Uuid => true,
@@ -3468,7 +3488,7 @@ impl FieldDef {
             DataType::BigInt => true,
             DataType::Float => true,
             DataType::Double => true,
-            DataType::Char | DataType::Varchar => true,
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => true,
             DataType::Boolean => true,
             DataType::Text => false,
             DataType::Uuid => true,
@@ -3503,7 +3523,7 @@ impl FieldDef {
             DataType::BigInt => true,
             DataType::Float => false,
             DataType::Double => false,
-            DataType::Char | DataType::Varchar => true,
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => true,
             DataType::Boolean => true,
             DataType::Text => true,
             DataType::Uuid => true,
@@ -3537,7 +3557,7 @@ impl FieldDef {
             DataType::BigInt => true,
             DataType::Float => true,
             DataType::Double => true,
-            DataType::Char | DataType::Varchar => false,
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => false,
             DataType::Boolean => true,
             DataType::Text => false,
             DataType::Uuid => true,
@@ -3571,7 +3591,7 @@ impl FieldDef {
             DataType::BigInt => true,
             DataType::Float => true,
             DataType::Double => true,
-            DataType::Char | DataType::Varchar => true,
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => true,
             DataType::Boolean => true,
             DataType::Text => true,
             DataType::Uuid => true,

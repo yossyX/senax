@@ -28,7 +28,6 @@ fn convert_table(org_table: &senax_pgsql_parser::TableInfo) -> Result<Table> {
         constraints: convert_constraints(&org_table.foreign_keys),
         comment: org_table.comment.clone(),
         engine: None,
-        collation: None,
         skip_ddl: false,
     };
     Ok(table)

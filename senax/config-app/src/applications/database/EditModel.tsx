@@ -244,9 +244,7 @@ function EditModel() {
                 hidden={!detail}
                 component={Inheritance}
               />
-              <AutoField name="engine" {...formData} hidden={!detail} />
-              {/* <AutoField name="character_set" {...formData} hidden={!detail} /> */}
-              <AutoField name="collation" {...formData} hidden={!detail} />
+              <AutoField name="engine" {...formData} hidden={!detail || formData.additionalData.db !== "mysql"}/>
               <AutoField
                 name="act_as"
                 {...formData}
@@ -431,7 +429,7 @@ function Field({ formData, definitions }: any) {
             name="length"
             {...formData}
             hidden={
-              !["char", "varchar", "text", "varbinary", "binary", "blob"].includes(type)
+              !["char", "id_varchar", "text_varchar", "text", "varbinary", "binary", "blob"].includes(type)
             }
           />
           <AutoField name="max" {...formData} hidden={!NUMBER.includes(type)} />
@@ -439,7 +437,7 @@ function Field({ formData, definitions }: any) {
           <AutoField
             name="collation"
             {...formData}
-            hidden={!["char", "varchar", "text"].includes(type)}
+            hidden={!["char", "id_varchar", "text_varchar", "text"].includes(type)}
           />
           <AutoField
             name="precision"
@@ -889,7 +887,8 @@ function Filter({ formData, definitions }: any) {
     if (type === "range") {
       types = [
         "char",
-        "varchar",
+        "id_varchar",
+        "text_varchar",
         "uuid",
         "binary_uuid",
         "tinyint",
@@ -908,7 +907,7 @@ function Filter({ formData, definitions }: any) {
     } else if (type === "identity") {
       types = [
         "char",
-        "varchar",
+        "id_varchar",
         "uuid",
         "binary_uuid",
         "tinyint",

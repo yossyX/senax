@@ -7,7 +7,7 @@ import {
   useSubmit,
   useBlocker,
 } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import Form from "@cloudscape-design/components/form";
 import SpaceBetween from "@cloudscape-design/components/space-between";
@@ -75,6 +75,10 @@ function Config() {
     dirtyDialog,
     setDirtyDialog,
   };
+  const db = useWatch({
+    control: formData.form.control,
+    name: "db",
+  });
   return (
     <>
       <Helmet>
@@ -158,11 +162,12 @@ function Config() {
               <AutoField name="read_tx_isolation" {...formData} />
               <AutoField name="engine" {...formData} />
               {/* <AutoField name="character_set" {...formData} /> */}
-              <AutoField name="collation" {...formData} />
-              <AutoField name="preserve_column_order" {...formData} />
+              <AutoField name="id_collation" {...formData} />
+              <AutoField name="text_collation" {...formData} />
+              <AutoField name="preserve_column_order" {...formData} hidden={db !== "mysql"} />
               <AutoField name="exclude_from_domain" {...formData} />
               <AutoField name="use_label_as_sql_comment" {...formData} />
-              <AutoField name="force_datetime_on_mysql" {...formData} />
+              <AutoField name="force_datetime_on_mysql" {...formData} hidden={db !== "mysql"} />
               <AutoField
                 name="rename_created_at"
                 {...formData}
@@ -218,7 +223,7 @@ function Config() {
               <AutoField
                 name="disable_no_semijoin"
                 {...formData}
-                hidden={!detail}
+                hidden={!detail || db !== "mysql"}
               />
               <AutoField
                 name="groups"

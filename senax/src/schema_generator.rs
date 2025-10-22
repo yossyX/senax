@@ -12,9 +12,10 @@ use crate::common::ToCase as _;
 use crate::common::{fs_write, simplify_yml, to_plural, to_singular};
 use crate::ddl::sql_type::{IndexColumn, ReferenceOption, SqlType, TableKey};
 use crate::ddl::table::parse;
+use crate::migration_generator::MYSQL_UUID_COLLATION;
 use crate::schema::{
     self, BelongsToDef, CONFIG, ConfigDef, DataType, EnumValue, FieldDef, FieldDefOrSubsetType,
-    HasManyDef, HasOneDef, IndexDef, ModelDef, SoftDelete, StringOrArray,
+    HasManyDef, HasOneDef, IndexDef, ModelDef, SoftDelete, StringOrArray, is_mysql_mode,
 };
 use crate::schema::{IndexFieldDef, IndexType, Parser};
 
@@ -44,6 +45,9 @@ pub async fn generate(
         if table_name.starts_with('_') {
             continue;
         }
+        if !is_mysql_mode() && table_name.eq("spatial_ref_sys") {
+            continue;
+        }
         let mut model = ModelDef::default();
         let mut pk = Vec::new();
         let mut indexes = IndexMap::new();
@@ -64,9 +68,6 @@ pub async fn generate(
         }
         if table.engine.as_deref() != Some("InnoDB") {
             model.engine = table.engine.clone();
-        }
-        if config.collation != table.collation {
-            model.collation = table.collation.clone();
         }
         model._before_rename_name = Some(model.table_name());
         if let Some((_, primary)) = &table.primary {
@@ -122,27 +123,37 @@ pub async fn generate(
                     if len == schema::UUID_LENGTH {
                         field.data_type = DataType::Uuid;
                     } else {
-                        field.data_type = DataType::Varchar;
+                        if column.constraint.collation == config.id_collation {
+                            field.data_type = DataType::IdVarchar;
+                        } else {
+                            field.data_type = DataType::TextVarchar;
+                        }
                         field.length = Some(len);
                     }
                 }
                 SqlType::Int => {
                     field.data_type = DataType::Int;
-                    field.signed = true;
+                    if is_mysql_mode() {
+                        field.signed = true;
+                    }
                 }
                 SqlType::UnsignedInt => {
                     field.data_type = DataType::Int;
                 }
                 SqlType::Smallint => {
                     field.data_type = DataType::SmallInt;
-                    field.signed = true;
+                    if is_mysql_mode() {
+                        field.signed = true;
+                    }
                 }
                 SqlType::UnsignedSmallint => {
                     field.data_type = DataType::SmallInt;
                 }
                 SqlType::Bigint => {
                     field.data_type = DataType::BigInt;
-                    field.signed = true;
+                    if is_mysql_mode() {
+                        field.signed = true;
+                    }
                 }
                 SqlType::UnsignedBigint => {
                     field.data_type = DataType::BigInt;
@@ -152,7 +163,9 @@ pub async fn generate(
                 }
                 SqlType::Tinyint => {
                     field.data_type = DataType::TinyInt;
-                    field.signed = true;
+                    if is_mysql_mode() {
+                        field.signed = true;
+                    }
                 }
                 SqlType::UnsignedTinyint => {
                     field.data_type = DataType::TinyInt;
@@ -287,8 +300,22 @@ pub async fn generate(
                 }
             };
             // field.character_set = column.constraint.character_set.clone();
-            if config.collation != column.constraint.collation {
-                field.collation = column.constraint.collation.clone();
+            if is_mysql_mode() && field.data_type == DataType::Uuid {
+                if column
+                    .constraint
+                    .collation
+                    .as_ref()
+                    .map(|v| !v.eq(MYSQL_UUID_COLLATION))
+                    .unwrap_or_default()
+                {
+                    field.collation = column.constraint.collation.clone();
+                }
+            }
+
+            if field.data_type == DataType::TextVarchar || field.data_type == DataType::Text {
+                if config.text_collation != column.constraint.collation {
+                    field.collation = column.constraint.collation.clone();
+                }
             }
             // field.primary = column.constraint.primary_key || pk.contains(name);
             field.primary = pk.contains(name);
@@ -297,6 +324,31 @@ pub async fn generate(
             }
             if !field.primary {
                 field.not_null = column.constraint.not_null;
+            }
+            field.default = column.default.as_ref().map(|v| v.to_raw_string().into());
+            if field.data_type == DataType::Boolean
+                && let Some(default) = field.default
+            {
+                let default = default.as_str().unwrap();
+                field.default =
+                    Some((default.eq("1") || default.eq_ignore_ascii_case("true")).into());
+            }
+            if (field.data_type == DataType::TinyInt
+                || field.data_type == DataType::SmallInt
+                || field.data_type == DataType::Int
+                || field.data_type == DataType::BigInt)
+                && let Some(default) = field.default
+            {
+                let default: i64 = default.as_str().unwrap().parse()?;
+                field.default = Some(default.into());
+            }
+            if (field.data_type == DataType::Float
+                || field.data_type == DataType::Double
+                || field.data_type == DataType::Decimal)
+                && let Some(default) = field.default
+            {
+                let default: f64 = default.as_str().unwrap().parse()?;
+                field.default = Some(default.into());
             }
             if use_label_as_sql_comment || config.use_label_as_sql_comment {
                 if let Some(comment) = &column.comment {
@@ -311,6 +363,9 @@ pub async fn generate(
                 field.sql_comment = column.comment.clone();
             }
             field._before_rename_name = Some(field.get_col_name(name).to_string());
+            if field._before_rename_name.as_deref().unwrap().eq(name) {
+                field._before_rename_name = None;
+            }
             model
                 .fields
                 .insert(name.clone(), FieldDefOrSubsetType::Exact(field));
@@ -675,9 +730,19 @@ pub async fn generate(
                 _ => unimplemented!(),
             }
         }
-        model.belongs_to = belongs_to;
-        model.indexes = indexes;
         let (group_name, model_name) = to_group_and_model_name(&config, &singular_name);
+        model.belongs_to = belongs_to;
+        if !is_mysql_mode() {
+            let mut new_indexes = IndexMap::new();
+            let header = format!("{}_", table_name);
+            for (name, def) in &indexes {
+                let name = name.trim_start_matches(&header).to_string();
+                new_indexes.insert(name, def.clone());
+            }
+            indexes.clear();
+            indexes.append(&mut new_indexes);
+        }
+        model.indexes = indexes;
         model.group_name = group_name;
         model.name = model_name;
         defs.insert(singular_name, model);

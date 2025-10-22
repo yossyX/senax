@@ -106,10 +106,13 @@ pub struct ConfigDef {
     // /// ### 文字セット
     // #[serde(default, skip_serializing_if = "Option::is_none")]
     // pub character_set: Option<String>,
-    /// ### 文字セット照合順序
+    /// ### ID用文字セット照合順序
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub collation: Option<String>,
-    /// ### DDL出力時のカラム順序を維持する
+    pub id_collation: Option<String>,
+    /// ### テキスト用文字セット照合順序
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_collation: Option<String>,
+    /// ### DDL出力時のカラム順序を維持する(MySQLのみ)
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub preserve_column_order: bool,
     /// ### ドメイン生成から除外
@@ -118,7 +121,7 @@ pub struct ConfigDef {
     /// ### 論理名をカラムのSQLコメントとして使用
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_label_as_sql_comment: bool,
-    /// ### MySQLの場合に強制的にdatetimeを使用する
+    /// ### 強制的にdatetimeを使用する(MySQLのみ)
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub force_datetime_on_mysql: bool,
     /// ### created_atに別名を使用
@@ -157,7 +160,7 @@ pub struct ConfigDef {
     /// ### versionのラベル
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_of_version: Option<String>,
-    /// ### existsのNO_SEMIJOINを無効化
+    /// ### existsのNO_SEMIJOINを無効化(MySQLのみ)
     /// SEMIJOINはexistsをanyに変換するため、existsとanyの区別ができなくなる。
     /// 明示的にexistsとanyを区別するのではなく、MySQLに任せる場合にdisable_no_semijoinをtureにする。
     #[serde(default, skip_serializing_if = "super::is_false")]
@@ -264,10 +267,13 @@ pub struct ConfigJson {
     // /// ### 文字セット
     // #[serde(default, skip_serializing_if = "Option::is_none")]
     // pub character_set: Option<String>,
-    /// ### 文字セット照合順序
+    /// ### ID用文字セット照合順序
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub collation: Option<String>,
-    /// ### DDL出力時のカラム順序を維持する
+    pub id_collation: Option<String>,
+    /// ### テキスト用文字セット照合順序
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_collation: Option<String>,
+    /// ### DDL出力時のカラム順序を維持する(MySQLのみ)
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub preserve_column_order: bool,
     /// ### ドメイン生成から除外
@@ -276,7 +282,7 @@ pub struct ConfigJson {
     /// ### 論理名をカラムのSQLコメントとして使用
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_label_as_sql_comment: bool,
-    /// ### MySQLの場合に強制的にdatetimeを使用する
+    /// ### 強制的にdatetimeを使用する(MySQLのみ)
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub force_datetime_on_mysql: bool,
     /// ### created_atに別名を使用
@@ -315,7 +321,7 @@ pub struct ConfigJson {
     /// ### versionのラベル
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_of_version: Option<String>,
-    /// ### existsのNO_SEMIJOINを無効化
+    /// ### existsのNO_SEMIJOINを無効化(MySQLのみ)
     /// SEMIJOINはexistsをanyに変換するため、existsとanyの区別ができなくなる。
     /// 明示的にexistsとanyを区別するのではなく、MySQLに任せる場合にdisable_no_semijoinをtureにする。
     #[serde(default, skip_serializing_if = "super::is_false")]
@@ -359,7 +365,8 @@ impl From<ConfigDef> for ConfigJson {
             read_tx_isolation: value.read_tx_isolation,
             engine: value.engine,
             // character_set: value.character_set,
-            collation: value.collation,
+            id_collation: value.id_collation,
+            text_collation: value.text_collation,
             preserve_column_order: value.preserve_column_order,
             exclude_from_domain: value.exclude_from_domain,
             use_label_as_sql_comment: value.use_label_as_sql_comment,
@@ -426,7 +433,8 @@ impl From<ConfigJson> for ConfigDef {
             read_tx_isolation: value.read_tx_isolation,
             engine: value.engine,
             // character_set: value.character_set,
-            collation: value.collation,
+            id_collation: value.id_collation,
+            text_collation: value.text_collation,
             preserve_column_order: value.preserve_column_order,
             exclude_from_domain: value.exclude_from_domain,
             use_label_as_sql_comment: value.use_label_as_sql_comment,
@@ -656,6 +664,12 @@ pub enum DbType {
     Mysql,
     #[display("postgres")]
     Postgres,
+}
+
+impl DbType {
+    pub fn is_mysql(&self) -> bool {
+        *self == DbType::Mysql
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]

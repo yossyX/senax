@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{DOMAIN_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE, common::fs_write};
+use crate::{common::fs_write, schema::DbType, DOMAIN_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE};
 
 pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     let base_path: PathBuf = if let Some(name) = name {
@@ -174,7 +174,7 @@ fn base_domain(path: &Path, non_snake_case: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn session() -> Result<()> {
+pub fn session(db_type: DbType) -> Result<()> {
     anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
     let schema_path = Path::new(SCHEMA_PATH);
 
@@ -182,6 +182,7 @@ pub fn session() -> Result<()> {
     #[template(path = "init/schema/session.yml", escape = "none")]
     struct SessionTemplate {
         pub db_id: u64,
+        pub db_type: DbType,
     }
 
     let file_path = schema_path.join("session.yml");
@@ -191,6 +192,7 @@ pub fn session() -> Result<()> {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_micros() as u64,
+            db_type,
         };
         fs_write(file_path, tpl.render()?)?;
     }

@@ -76,13 +76,6 @@ pub(crate) async fn exec_migrate(
     };
     let conn = DbConn::_new(shard_id);
     let mut writer = conn.acquire_writer().await?;
-    @%- if config.collation.is_some() %@
-    exec_ddl(
-        r#"ALTER DATABASE COLLATE @{ config.collation.as_ref().unwrap() }@;"#,
-        writer.as_mut(),
-    )
-    .await?;
-    @%- endif %@
     @%- if config.is_mysql() %@
     exec_ddl(
         r#"

@@ -152,7 +152,7 @@ function EditValue() {
               <AutoField
                 name="length"
                 {...formData}
-                hidden={!["text", "blob", "varchar"].includes(type)}
+                hidden={!["char", "id_varchar", "text_varchar", "text", "varbinary", "binary", "blob"].includes(type)}
               />
               <AutoField
                 name="max"
@@ -167,7 +167,7 @@ function EditValue() {
               <AutoField
                 name="collation"
                 {...formData}
-                hidden={!["text", "varchar"].includes(type)}
+                hidden={!["char", "id_varchar", "text_varchar", "text"].includes(type)}
               />
               <AutoField
                 name="precision"

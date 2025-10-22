@@ -141,7 +141,7 @@ function AutoField(props: Props) {
       );
     }
   } else if (type == "object") {
-    if (props.hidden && form.getValues(name) === undefined) {
+    if (props.hidden && (form.getValues(name) === undefined || JSON.stringify(form.getValues(name)) === "{}")) {
       return <></>;
     }
     return (
