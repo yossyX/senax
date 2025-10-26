@@ -1286,7 +1286,7 @@ impl ApiSelectorDef {
     }
     pub fn limit_def(&self) -> String {
         self.limit()
-            .map(|l| format!("\n    const LIMIT: usize = {l};"))
+            .map(|l| format!("\n            const LIMIT: usize = {l};"))
             .unwrap_or_default()
     }
     pub fn limit_validator(&self) -> String {

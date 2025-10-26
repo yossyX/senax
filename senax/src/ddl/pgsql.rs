@@ -51,7 +51,6 @@ fn convert_columns(org: &[senax_pgsql_parser::ColumnInfo]) -> Result<IndexMap<St
         });
         let constraint = Constraint {
             not_null: !col.is_nullable,
-            default_collation: None,
             collation: col.collate.clone(),
             // default_value: default.clone(),
             auto_increment: is_auto_increment(&col.data_type),

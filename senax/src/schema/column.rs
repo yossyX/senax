@@ -864,7 +864,31 @@ impl From<FieldJson> for FieldDef {
             skip_factory: value.skip_factory,
             column_name: value.column_name,
             srid: value.srid,
-            default: value.default.map(|v| serde_yaml::from_str(&v).unwrap()),
+            default: value.default.map(|v| {
+                if value.data_type == DataType::Boolean {
+                    if v.eq_ignore_ascii_case("true") {
+                        return serde_yaml::Value::Bool(true);
+                    } else if v.eq_ignore_ascii_case("false") {
+                        return serde_yaml::Value::Bool(false);
+                    }
+                } else if value.data_type == DataType::TinyInt
+                    || value.data_type == DataType::SmallInt
+                    || value.data_type == DataType::Int
+                    || value.data_type == DataType::BigInt
+                {
+                    if let Ok(i) = v.parse::<i64>() {
+                        return serde_yaml::Value::Number(i.into());
+                    }
+                } else if value.data_type == DataType::Float
+                    || value.data_type == DataType::Double
+                    || value.data_type == DataType::Decimal
+                {
+                    if let Ok(i) = v.parse::<f64>() {
+                        return serde_yaml::Value::Number(i.into());
+                    }
+                }
+                serde_yaml::Value::String(v)
+            }),
             query: value.query,
             stored: value.stored,
             sql_comment: value.sql_comment,
@@ -1525,7 +1549,9 @@ impl FieldDef {
             DataType::Float => "f32",
             DataType::Double => "f64",
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar if raw => "String",
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "std::sync::Arc<String>",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
+                "std::sync::Arc<String>"
+            }
             DataType::Uuid => "uuid::Uuid",
             DataType::BinaryUuid => "uuid::Uuid",
             DataType::Boolean => "bool",
@@ -1571,14 +1597,18 @@ impl FieldDef {
 
     pub fn get_inner_to_raw(&self) -> &'static str {
         match self.data_type {
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => ".to_string()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
+                ".to_string()"
+            }
             _ => "",
         }
     }
 
     pub fn get_raw_to_inner(&self) -> &'static str {
         match self.data_type {
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => ".into()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
+                ".into()"
+            }
             _ => "",
         }
     }
@@ -1886,7 +1916,9 @@ impl FieldDef {
             return "";
         }
         match self.data_type {
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => ".map(|v| v.into())",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => {
+                ".map(|v| v.into())"
+            }
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar => ".into()",
             DataType::Text if !self.not_null => ".map(|v| v.into())",
             DataType::Text => ".into()",
@@ -2033,7 +2065,9 @@ impl FieldDef {
             DataType::Float => "f32",
             DataType::Double => "f64",
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar if req => "String",
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "std::sync::Arc<String>",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
+                "std::sync::Arc<String>"
+            }
             DataType::Boolean => "bool",
             DataType::Text if req => "String",
             DataType::Text => "std::sync::Arc<String>",
@@ -2182,7 +2216,9 @@ impl FieldDef {
                 };
             } else {
                 return match self.data_type {
-                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar => ".inner().as_ref().to_owned().into()",
+                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
+                        ".inner().as_ref().to_owned().into()"
+                    }
                     _ => ".into()",
                 };
             }
@@ -2201,7 +2237,9 @@ impl FieldDef {
                 }
             } else {
                 match self.data_type {
-                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar => ".inner().as_ref().to_owned().into()",
+                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
+                        ".inner().as_ref().to_owned().into()"
+                    }
                     DataType::ArrayString => ".inner().iter().map(|v| v.into()).collect()",
                     _ if !self.is_copyable() => ".inner().to_owned()",
                     _ => ".inner()",
@@ -2219,11 +2257,17 @@ impl FieldDef {
             DataType::Float if !req => ".to_string().parse()?",
             DataType::Float => "",
             DataType::Double => "",
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null && req => {
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar
+                if !self.not_null && req =>
+            {
                 ".map(|v| v.as_ref().to_owned())"
             }
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if req => ".as_ref().to_owned()",
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => ".cloned()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if req => {
+                ".as_ref().to_owned()"
+            }
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => {
+                ".cloned()"
+            }
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar => ".clone()",
             DataType::Uuid => "",
             DataType::BinaryUuid => "",
@@ -2375,7 +2419,9 @@ impl FieldDef {
                 DataType::BigInt => "u64",
                 DataType::Float => "f32",
                 DataType::Double => "f64",
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "&std::sync::Arc<String>",
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
+                    "&std::sync::Arc<String>"
+                }
                 DataType::Boolean => "bool",
                 DataType::Text => "&std::sync::Arc<String>",
                 DataType::Uuid => "uuid::Uuid",
@@ -2543,7 +2589,9 @@ impl FieldDef {
                 DataType::Float => "f32",
                 DataType::Double => "f64",
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar if factory => "String",
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "std::sync::Arc<String>",
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
+                    "std::sync::Arc<String>"
+                }
                 DataType::Boolean => "bool",
                 DataType::Text if factory => "String",
                 DataType::Text => "std::sync::Arc<String>",
@@ -2629,7 +2677,9 @@ impl FieldDef {
             DataType::BigInt => "",
             DataType::Float => "",
             DataType::Double => "",
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => ".as_ref()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => {
+                ".as_ref()"
+            }
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "",
             DataType::Boolean => "",
             DataType::Text if !self.not_null => ".as_ref()",
@@ -2712,10 +2762,18 @@ impl FieldDef {
                 }
             } else {
                 return match self.data_type {
-                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text if !self.not_null => {
+                    DataType::Char
+                    | DataType::IdVarchar
+                    | DataType::TextVarchar
+                    | DataType::Text
+                        if !self.not_null =>
+                    {
                         ".map(|v| v.clone().into())"
                     }
-                    DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => ".clone().into()",
+                    DataType::Char
+                    | DataType::IdVarchar
+                    | DataType::TextVarchar
+                    | DataType::Text => ".clone().into()",
                     _ if !self.not_null => ".map(|v| v.into())",
                     _ => ".into()",
                 };
@@ -2729,7 +2787,9 @@ impl FieldDef {
             DataType::Float => "",
             DataType::Double => "",
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar if is_impl => "",
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => ".as_ref()",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => {
+                ".as_ref()"
+            }
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "",
             DataType::Boolean => "",
             DataType::Text if is_impl => "",
@@ -2851,7 +2911,9 @@ impl FieldDef {
         }
         if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
             return match self.data_type {
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text if !self.not_null => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text
+                    if !self.not_null =>
+                {
                     format!("{var}.as_ref().map(|v| v.clone().into())")
                 }
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
@@ -2863,7 +2925,9 @@ impl FieldDef {
         }
         if self.value_object.is_some() {
             return match self.data_type {
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text if !self.not_null => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text
+                    if !self.not_null =>
+                {
                     format!("{var}.as_ref().map(|v| v.clone().into())")
                 }
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
@@ -2883,7 +2947,9 @@ impl FieldDef {
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => {
                 format!("{var}{clone}.as_ref()")
             }
-            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => format!("&{var}{clone}"),
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
+                format!("&{var}{clone}")
+            }
             DataType::Boolean => var_clone,
             DataType::Text if !self.not_null => format!("{var}{clone}.as_ref()"),
             DataType::Text => format!("&{var}{clone}"),
@@ -2992,7 +3058,9 @@ impl FieldDef {
                 DataType::BigInt => "u64",
                 DataType::Float => "f32",
                 DataType::Double => "f64",
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar if arc => "std::sync::Arc<String>",
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar if arc => {
+                    "std::sync::Arc<String>"
+                }
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar => "String",
                 DataType::Boolean => "bool",
                 DataType::Text if arc => "std::sync::Arc<String>",
@@ -3277,7 +3345,9 @@ impl FieldDef {
         }
         if is_mysql_mode() {
             match self.data_type {
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text if self.not_null => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text
+                    if self.not_null =>
+                {
                     ".as_str()"
                 }
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
@@ -3307,7 +3377,9 @@ impl FieldDef {
             }
         } else {
             match self.data_type {
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text if self.not_null => {
+                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text
+                    if self.not_null =>
+                {
                     ".as_str()"
                 }
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {

@@ -295,7 +295,21 @@ function AutoField(props: Props) {
         }}
       />
     );
-  } else if (props.textarea) {
+  } else if (props.codeEditor) {
+    if (props.hidden && !form.getValues(name)) {
+      return <></>;
+    }
+    return (
+      <AutoCodeEditor
+        name={name}
+        path={path}
+        form={form}
+        definition={definition}
+        errors={errors}
+        label={labelWithOptionality}
+      />
+    );
+  } else if (props.textarea || (form.getValues(name) || "").includes("\n")) {
     if (props.hidden && !form.getValues(name)) {
       return <></>;
     }
@@ -329,20 +343,6 @@ function AutoField(props: Props) {
             />
           </FormField>
         )}
-      />
-    );
-  } else if (props.codeEditor) {
-    if (props.hidden && !form.getValues(name)) {
-      return <></>;
-    }
-    return (
-      <AutoCodeEditor
-        name={name}
-        path={path}
-        form={form}
-        definition={definition}
-        errors={errors}
-        label={labelWithOptionality}
       />
     );
   }

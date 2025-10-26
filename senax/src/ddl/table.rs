@@ -154,8 +154,6 @@ impl fmt::Display for Column {
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Constraint {
     pub not_null: bool,
-    // pub character_set: Option<String>,
-    pub default_collation: Option<String>,
     pub collation: Option<String>,
     // pub default_value: Option<Literal>,
     pub auto_increment: bool,
@@ -168,9 +166,7 @@ pub struct Constraint {
 impl PartialEq for Constraint {
     fn eq(&self, other: &Self) -> bool {
         self.not_null == other.not_null
-            && (self.collation == other.collation
-                || (self.default_collation == other.collation && self.collation.is_none())
-                || (self.collation == other.default_collation && other.collation.is_none()))
+            && self.collation == other.collation
             // && self.default_value == other.default_value
             && self.auto_increment == other.auto_increment
             // && self.primary_key == other.primary_key
@@ -216,7 +212,6 @@ impl From<Vec<ColumnConstraint>> for Constraint {
                     // constraint.character_set = Some(v);
                 }
                 ColumnConstraint::Collation(v) => {
-                    constraint.default_collation = Some(v.clone());
                     constraint.collation = Some(v);
                 }
                 ColumnConstraint::DefaultValue(_) => {

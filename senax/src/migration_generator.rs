@@ -102,7 +102,6 @@ pub fn make_table_def(
     def: &std::sync::Arc<schema::ModelDef>,
     config: &schema::ConfigDef,
 ) -> Result<(String, Table, IndexMap<String, String>)> {
-    let default_collation = config.text_collation.clone();
     let table_name = def.table_name();
     let mut table = Table {
         name: table_name.clone(),
@@ -128,8 +127,6 @@ pub fn make_table_def(
     for (col_name, col) in &def.merged_fields {
         let mut constraint = Constraint {
             not_null: col.not_null,
-            // character_set: col.character_set.clone()
-            default_collation: default_collation.clone(),
             collation: col.collation.clone(),
             // default_value: Default::default(),
             auto_increment: col.auto == Some(AutoGeneration::AutoIncrement),
@@ -242,16 +239,11 @@ pub fn make_table_def(
             if col.data_type == schema::DataType::TextVarchar
                 || col.data_type == schema::DataType::Text
             {
-                if !is_mysql_mode() {
-                    constraint.collation = config.text_collation.clone();
-                }
+                constraint.collation = config.text_collation.clone();
             }
-        }
-        if col.data_type == schema::DataType::Uuid
-            && constraint.collation.is_none()
-            && is_mysql_mode()
-        {
-            constraint.collation = Some(MYSQL_UUID_COLLATION.to_string());
+            if col.data_type == schema::DataType::Uuid && is_mysql_mode() {
+                constraint.collation = Some(MYSQL_UUID_COLLATION.to_string());
+            }
         }
         let mut sql_comment = col.sql_comment.clone();
         if sql_comment.is_none() && config.use_label_as_sql_comment {
