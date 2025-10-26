@@ -108,6 +108,7 @@ pub(crate) async fn _clear_cache(shard_id: ShardId, sync: u64, clear_test: bool)
 #[rustfmt::skip]
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[allow(non_snake_case)]
 pub struct @{ group_name|pascal }@ {
 @%- for (name, def) in models %@
     #[serde(default)]

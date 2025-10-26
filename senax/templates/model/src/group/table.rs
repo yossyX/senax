@@ -108,7 +108,7 @@ async fn save_data(
         if let Some(mut updater) = updater_map.remove(&id.into()) {
             let save_data = l.pop().unwrap();
             if save_data.data.version() == updater._@{ ConfigDef::version() }@() {
-                updater.mut_data().set(save_data.data.compressed_data().into());
+                updater.mut_data().set(save_data.data.compressed_data());
                 updater
                     .mut_eol()
                     .set((save_data.data.eol() >> EOL_SHIFT) as u32);
@@ -150,7 +150,7 @@ async fn save_data(
             data: save_data.data.compressed_data().into(),
             eol: (save_data.data.eol() >> EOL_SHIFT) as u32,
         }
-        .create(&conn);
+        .create();
         save_list.push(session);
     }
     if save_list.is_empty() {
@@ -269,7 +269,7 @@ impl SessionStore for _@{ pascal_name }@Store {
         let mut conn = DbConn::_new(calc_shard_id(session_key) as ShardId);
         let s_key: String = session_key.into();
         let id: _@{ pascal_name }@Id = s_key.into();
-        let mut session = id.updater(&conn);
+        let mut session = id.updater();
         session.mut_eol().set((data.eol() >> EOL_SHIFT) as u32);
         session.mut_@{ ConfigDef::updated_at() }@().skip_and_empty();
         _@{ pascal_name }@::update_delayed(&mut conn, session).await
@@ -279,7 +279,7 @@ impl SessionStore for _@{ pascal_name }@Store {
         let mut conn = DbConn::_new(calc_shard_id(session_key) as ShardId);
         let s_key: String = session_key.into();
         let id: _@{ pascal_name }@Id = s_key.into();
-        let mut session = id.updater(&conn);
+        let mut session = id.updater();
         session.mut_eol().set(0);
         _@{ pascal_name }@::update_delayed(&mut conn, session).await
     }

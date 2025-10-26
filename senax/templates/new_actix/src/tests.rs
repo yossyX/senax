@@ -14,7 +14,7 @@ async fn test() {
         App::new()
             .wrap_fn(|req, srv| {
                 req.extensions_mut().insert(Ctx::new());
-                if let Some(claims) = auth::retrieve_claims(req.request()) {
+                if let Some(claims) = auth::AuthInfo::retrieve(req.request()) {
                     req.extensions_mut().insert(claims);
                 }
                 srv.call(req)

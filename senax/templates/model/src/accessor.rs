@@ -15,7 +15,7 @@ use std::ops::{BitAnd, BitOr};
 use std::sync::Arc;
 use std::{fmt, fmt::Display, marker::PhantomData};
 
-use crate::misc::{JsonBlob, ToJsonBlob as _, Updater};
+use crate::misc::{JsonRawValue, ToJsonRawValue as _, Updater};
 
 #[derive(
     Serialize_repr, Deserialize_repr, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash,
@@ -648,13 +648,13 @@ impl<'a, I: Debug> AccessorNullArc<'a, I> {
 
 pub struct AccessorNotNullJson<'a, I: Serialize + DeserializeOwned + Default> {
     pub(crate) op: &'a mut Op,
-    pub(crate) val: &'a mut JsonBlob,
-    pub(crate) update: &'a mut JsonBlob,
+    pub(crate) val: &'a mut JsonRawValue,
+    pub(crate) update: &'a mut JsonRawValue,
     pub(crate) _phantom: PhantomData<I>,
 }
 impl<'a, I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'a, I> {
-    pub fn get(&self) -> I {
-        self.val._to_value().unwrap_or_default()
+    pub fn get(&self) -> Box<serde_json::value::RawValue> {
+        self.val._to_value()
     }
     pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
@@ -664,11 +664,11 @@ impl<'a, I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'a, I> {
     }
     pub fn set<T: Borrow<I>>(&mut self, val: T) {
         *self.op = Op::Set;
-        let v = val.borrow()._to_json_blob().unwrap();
+        let v = val.borrow()._to_json_raw_value().unwrap();
         *self.val = v.clone();
         *self.update = v;
     }
-    pub(crate) fn _set(op: Op, prop: &mut JsonBlob, update: &JsonBlob) {
+    pub(crate) fn _set(op: Op, prop: &mut JsonRawValue, update: &JsonRawValue) {
         if op == Op::Set {
             *prop = update.clone();
         }
@@ -678,7 +678,7 @@ impl<'a, I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'a, I> {
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
-        value: &JsonBlob,
+        value: &JsonRawValue,
     ) -> fmt::Result {
         write!(f, "{comma}{col}: {:?}", value)
     }
@@ -688,7 +688,7 @@ impl<'a, I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'a, I> {
         comma: &str,
         col: &str,
         op: Op,
-        value: &JsonBlob,
+        value: &JsonRawValue,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
             write!(f, "{comma}{col}: {{{op}: {:?}}}", value)?;
@@ -698,13 +698,13 @@ impl<'a, I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'a, I> {
 }
 pub struct AccessorNullJson<'a, I: Serialize + DeserializeOwned> {
     pub(crate) op: &'a mut Op,
-    pub(crate) val: &'a mut Option<JsonBlob>,
-    pub(crate) update: &'a mut Option<JsonBlob>,
+    pub(crate) val: &'a mut Option<JsonRawValue>,
+    pub(crate) update: &'a mut Option<JsonRawValue>,
     pub(crate) _phantom: PhantomData<I>,
 }
 impl<'a, I: Serialize + DeserializeOwned> AccessorNullJson<'a, I> {
-    pub fn get(&self) -> Option<I> {
-        self.val.as_ref().and_then(|v| v._to_value())
+    pub fn get(&self) -> Option<Box<serde_json::value::RawValue>> {
+        self.val.as_ref().and_then(|v| Some(v._to_value()))
     }
     pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;
@@ -714,7 +714,7 @@ impl<'a, I: Serialize + DeserializeOwned> AccessorNullJson<'a, I> {
     }
     pub fn set<T: Borrow<Option<I>>>(&mut self, val: T) {
         *self.op = Op::Set;
-        let v = val.borrow().as_ref().map(|v| v._to_json_blob().unwrap());
+        let v = val.borrow().as_ref().map(|v| v._to_json_raw_value().unwrap());
         self.val.clone_from(&v);
         *self.update = v;
     }
@@ -723,7 +723,7 @@ impl<'a, I: Serialize + DeserializeOwned> AccessorNullJson<'a, I> {
         *self.val = None;
         *self.update = None;
     }
-    pub(crate) fn _set(op: Op, prop: &mut Option<JsonBlob>, update: &Option<JsonBlob>) {
+    pub(crate) fn _set(op: Op, prop: &mut Option<JsonRawValue>, update: &Option<JsonRawValue>) {
         if op == Op::Set {
             prop.clone_from(update);
         }
@@ -733,7 +733,7 @@ impl<'a, I: Serialize + DeserializeOwned> AccessorNullJson<'a, I> {
         f: &mut fmt::Formatter<'_>,
         comma: &str,
         col: &str,
-        value: &Option<JsonBlob>,
+        value: &Option<JsonRawValue>,
     ) -> fmt::Result {
         if let Some(value) = value {
             write!(f, "{comma}{col}: {:?}", value)
@@ -747,7 +747,7 @@ impl<'a, I: Serialize + DeserializeOwned> AccessorNullJson<'a, I> {
         comma: &str,
         col: &str,
         op: Op,
-        value: &Option<JsonBlob>,
+        value: &Option<JsonRawValue>,
     ) -> fmt::Result {
         if op != Op::None && op != Op::Skip {
             if let Some(value) = value {

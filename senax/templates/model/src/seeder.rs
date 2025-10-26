@@ -19,6 +19,7 @@ include!(concat!(env!("OUT_DIR"), "/seeds.rs"));
 
 #[derive(Debug, Serialize, Deserialize, Clone, JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[allow(non_snake_case)]
 pub struct SeedSchema {
 @%- for (name, defs) in groups %@@% if !defs.is_empty() %@
     @{ name|to_var_name }@: Option<crate::models::@{ name|snake|to_var_name }@::@{ name|pascal }@>,

@@ -3,7 +3,7 @@ use actix_web::cookie::Cookie;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use anyhow::{ensure, Context};
 use async_graphql::http::GraphiQLSource;
-use async_graphql::{async_trait, EmptySubscription, Error, ErrorExtensions, Object, Schema};
+use async_graphql::{EmptySubscription, Error, ErrorExtensions, Object, Schema};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
 use domain::models::Repositories;
 use regex::Regex;
@@ -126,11 +126,10 @@ impl ErrorExtensions for GqlError {
 #[allow(dead_code)]
 struct RoleGuard(Role);
 
-#[async_trait::async_trait]
 impl async_graphql::Guard for RoleGuard {
     async fn check(&self, _gql_ctx: &async_graphql::Context<'_>) -> async_graphql::Result<()> {
         let auth: &AuthInfo = _gql_ctx.data()?;
-        let role = claims.role().ok_or_else(|| GqlError::Unauthorized.extend())?;
+        let role = auth.role().ok_or_else(|| GqlError::Unauthorized.extend())?;
         if role == self.0 {
             return Ok(());
         }
@@ -141,7 +140,6 @@ impl async_graphql::Guard for RoleGuard {
 #[allow(dead_code)]
 struct NoGuard;
 
-#[async_trait::async_trait]
 impl async_graphql::Guard for NoGuard {
     async fn check(&self, _gql_ctx: &async_graphql::Context<'_>) -> async_graphql::Result<()> {
         Ok(())
@@ -150,11 +148,13 @@ impl async_graphql::Guard for NoGuard {
 
 pub struct QueryRoot;
 #[Object]
+#[allow(non_snake_case)]
 impl QueryRoot {
 }
 
 pub struct MutationRoot;
 #[Object]
+#[allow(non_snake_case)]
 impl MutationRoot {
     #[cfg(debug_assertions)]
     #[graphql(complexity = LIMIT_COMPLEXITY)]

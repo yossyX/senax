@@ -1,4 +1,6 @@
 #[allow(unused_imports)]
+use domain::models::FromRawValue as _;
+#[allow(unused_imports)]
 use domain::models::@{ db|snake|to_var_name }@::@{ rel_mod }@::{
     self as _domain_, @{ pascal_name }@Updater as _, @{ pascal_name }@UpdaterBase as _
 };
@@ -8,6 +10,7 @@ use domain::value_objects;
 use senax_common::types::blob::{ApiToBlob as _, BlobToApi as _};
 #[allow(unused_imports)]
 use std::collections::HashMap;
+
 @%- if !no_read %@
 
 @{ def.label|label0 -}@
@@ -21,7 +24,7 @@ pub struct ResObj@{ rel_name|pascal }@ {
     pub _id: async_graphql::ID,
 @%- if camel_case %@
 @{- def.for_api_response()|fmt_join("
-{label_wo_hash}    pub {var}: {res_api_type},", "") }@
+{label_wo_hash}{res_api_schema_type}    pub {var}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @{- def.relations_many_for_api_response()|fmt_rel_join("
@@ -33,7 +36,7 @@ pub struct ResObj@{ rel_name|pascal }@ {
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @%- else %@
 @{- def.for_api_response()|fmt_join("
-{label_wo_hash}    #[graphql(name = \"{raw_var}\")]
+{label_wo_hash}{res_api_schema_type}    #[graphql(name = \"{raw_var}\")]
     pub {var}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]

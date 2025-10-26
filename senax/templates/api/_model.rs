@@ -28,6 +28,7 @@ fn delete_guard() -> impl async_graphql::Guard {
 @%- endif %@
 @%- endif %@
 
+#[allow(dead_code)]
 fn api_query_guard(auth: &AuthInfo) -> Option<bool> {
     auth.has_role(&[@{ api_def.readable_roles(config, group)|to_api_guard }@])
 }
@@ -84,7 +85,7 @@ pub struct ResObj {
     pub _id: async_graphql::ID,
 @%- if camel_case %@
 @{- def.for_api_response()|fmt_join("
-{label_wo_hash}    pub {var}: {res_api_type},", "") }@
+{label_wo_hash}{res_api_schema_type}    pub {var}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @{- def.relations_many_for_api_response()|fmt_rel_join("
@@ -96,7 +97,7 @@ pub struct ResObj {
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @%- else %@
 @{- def.for_api_response()|fmt_join("
-{label_wo_hash}    #[graphql(name = \"{raw_var}\")]
+{label_wo_hash}{res_api_schema_type}    #[graphql(name = \"{raw_var}\")]
     pub {var}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]

@@ -7,7 +7,8 @@ use async_graphql::types::connection as graphql_conn;
 use async_graphql::ErrorExtensions as _;
 #[allow(unused_imports)]
 use async_graphql::GuardExt as _;
-use domain::models::Repositories as _;
+#[allow(unused_imports)]
+use domain::models::{FromRawValue as _, Repositories as _};
 #[allow(unused_imports)]
 use domain::value_objects;
 #[allow(unused_imports)]
@@ -66,6 +67,8 @@ async fn find_for_update(
         .await
 }
 #@
+@%- if !api_def.disable_mutation %@
+@%- if !def.disable_update() %@
 
 async fn delete(
     repo: &RepositoriesImpl,
@@ -79,6 +82,8 @@ async fn delete(
     _domain_::delete(repo, obj).await?;
     Ok(())
 }
+@%- endif %@
+@%- endif %@
 
 pub struct GqlQuery@{ graphql_name }@;
 #[async_graphql::Object]

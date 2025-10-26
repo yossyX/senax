@@ -1742,7 +1742,9 @@ async fn reset_writer_pool(
                         tokio::spawn(async move {
                             if let Ok(pool) = new_pool.acquire().await {
                                 let sync = DbConn::___inc_cache_sync(pool).await.unwrap_or(0);
-                                models::common::_clear_cache(idx as ShardId, sync, false).await;
+                                @%- for (name, defs) in groups %@
+                                models::@{ name|snake|to_var_name }@::_clear_cache(idx as ShardId, sync, false).await;
+                                @%- endfor %@
                             }
                         });
                     }

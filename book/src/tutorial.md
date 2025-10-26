@@ -296,7 +296,7 @@ async fn handler(
             date,
             counter: 0,
         }
-        .create(&conn);
+        .create();
         let _ = counter_updater.counter().add(1); // UPDATE加算
         counter_updater._upsert(); // INSERT ... ON DUPLICATE KEY UPDATE の指示
         _Counter::update_delayed(&mut conn, counter_updater).await?;
@@ -367,7 +367,7 @@ async fn handler(
         let note_id = note.id();
         let filter = db_data::filter_note_counter!((note_id=note_id) AND (date=date)); // WHERE句を生成するマクロ
         conn.begin().await?;
-        let mut updater = _Counter::updater(&mut conn); // 更新内容を指定するための空のUpdate用オブジェクト生成
+        let mut updater = _Counter::updater(); // 更新内容を指定するための空のUpdate用オブジェクト生成
         let _ = updater.counter().add(1);
         _Counter::query()
             .filter(filter)

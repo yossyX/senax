@@ -698,59 +698,55 @@ pub mod option_arc_bytes {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Default, PartialEq)]
-pub(crate) struct JsonBlob(std::sync::Arc<Vec<u8>>);
-impl TryFrom<serde_json::Value> for JsonBlob {
+#[derive(serde::Deserialize, serde::Serialize, Clone, Default)]
+pub(crate) struct JsonRawValue(std::sync::Arc<Box<serde_json::value::RawValue>>);
+impl TryFrom<String> for JsonRawValue {
     type Error = Box<dyn std::error::Error + Send + Sync>;
-    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
-        let v = serde_json::to_string(&value)?;
-        Ok(Self(zstd::stream::encode_all(v.as_bytes(), 3)?.into()))
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Ok(Self(serde_json::value::RawValue::from_string(value)?.into()))
     }
 }
-impl From<&JsonBlob> for String {
-    fn from(value: &JsonBlob) -> Self {
-        if value.0.is_empty() {
-            return String::new();
-        }
-        let v = zstd::stream::decode_all(value.0.as_slice()).unwrap();
-        unsafe { String::from_utf8_unchecked(v) }
+impl PartialEq for JsonRawValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.get() == other.0.get()
     }
 }
-impl Size for JsonBlob {
+impl From<&JsonRawValue> for String {
+    fn from(value: &JsonRawValue) -> Self {
+        value.0.get().to_string()
+    }
+}
+impl Size for JsonRawValue {
     fn _size(&self) -> usize {
-        calc_mem_size(self.0.capacity()) + std::mem::size_of::<usize>() * 4
+        calc_mem_size(self.0.get().len()) + std::mem::size_of::<usize>() * 4
     }
 }
-impl std::fmt::Debug for JsonBlob {
+impl std::fmt::Debug for JsonRawValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self._into_json())
     }
 }
-impl JsonBlob {
+impl JsonRawValue {
     pub fn _into_json(&self) -> String {
         let s: String = self.into();
-        assert!(s.len() <= @{ config.max_db_str_len() }@, "Incorrect JSON length.");
+        assert!(s.len() <= 4294967295, "Incorrect JSON length.");
         s
     }
-    pub fn _to_value<T: serde::de::DeserializeOwned>(&self) -> Option<T> {
-        if self.0.is_empty() {
-            return None;
-        }
-        let v = zstd::stream::decode_all(self.0.as_slice()).unwrap();
-        Some(serde_json::from_slice(&v).unwrap())
+    pub fn _to_value(&self) -> Box<serde_json::value::RawValue> {
+        self.0.as_ref().clone()
     }
 }
-pub(crate) trait ToJsonBlob {
-    fn _to_json_blob(&self) -> anyhow::Result<JsonBlob>;
+pub(crate) trait ToJsonRawValue {
+    fn _to_json_raw_value(&self) -> anyhow::Result<JsonRawValue>;
 }
 
-impl<T> ToJsonBlob for T
+impl<T> ToJsonRawValue for T
 where
     T: serde::Serialize,
 {
-    fn _to_json_blob(&self) -> anyhow::Result<JsonBlob> {
+    fn _to_json_raw_value(&self) -> anyhow::Result<JsonRawValue> {
         let v = serde_json::to_string(self)?;
-        Ok(JsonBlob(zstd::stream::encode_all(v.as_bytes(), 3)?.into()))
+        Ok(JsonRawValue(serde_json::value::RawValue::from_string(v)?.into()))
     }
 }
 @{-"\n"}@

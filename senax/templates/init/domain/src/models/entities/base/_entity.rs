@@ -182,6 +182,7 @@ pub enum @{ name|to_pascal_name }@ {
 @% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@@{ row.value_str() }@,
 @% endfor -%@
 }
+#[allow(non_snake_case)]
 impl @{ name|to_pascal_name }@ {
     pub fn inner(&self) -> @{ column_def.get_inner_type(true, true) }@ {
         *self as @{ column_def.get_inner_type(true, true) }@
@@ -220,6 +221,7 @@ pub enum @{ name|to_pascal_name }@ {
 @% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@,
 @% endfor -%@
 }
+#[allow(non_snake_case)]
 impl @{ name|to_pascal_name }@ {
     pub fn as_static_str(&self) -> &'static str {
         Into::<&'static str>::into(self)
@@ -323,6 +325,10 @@ impl @{ pascal_name }@Factory {
         repo.convert_factory(self)
     }
 }
+
+#[cfg(any(feature = "mock", test))]
+#[allow(unused_imports)]
+use crate::models::ToRawValue as _;
 
 #[cfg(any(feature = "mock", test))]
 #[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
@@ -1324,6 +1330,7 @@ impl Default for Filter_ {
     }
 }
 impl std::fmt::Display for Filter_ {
+    #[allow(bindings_with_variant_name)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Filter_::WithTrashed => write!(f, "WithTrashed"),

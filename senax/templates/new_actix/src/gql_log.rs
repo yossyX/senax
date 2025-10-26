@@ -94,7 +94,10 @@ impl Extension for LoggerExtension {
                 }
             }
         } else {
-            info!(target:"response", ctx = _ctx.ctx_no(), response = resp.data.to_string(); "");
+            if log_enabled!(target: "response", log::Level::Info) {
+                let r = serde_json::to_string(&resp.data).unwrap();
+                info!(target:"response", ctx = _ctx.ctx_no(), response = r; "");
+            }
         }
         resp
     }

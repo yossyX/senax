@@ -77,6 +77,7 @@ pub struct ConnectionTemplate<'a> {
     pub config: &'a ConfigDef,
     pub tx_isolation: Option<&'a str>,
     pub read_tx_isolation: Option<&'a str>,
+    pub groups: &'a IndexMap<String, IndexMap<String, Arc<ModelDef>>>,
 }
 
 #[allow(dead_code)]
@@ -139,19 +140,6 @@ pub struct GroupBaseAbstractTemplate<'a> {
     pub def: &'a Arc<ModelDef>,
     pub config: &'a ConfigDef,
     pub visibility: &'a str,
-}
-
-#[derive(Template)]
-#[template(
-    source = r###"
-db_@{ db|snake }@ = { path = "../2_db/@{ db|snake }@" }
-# Do not modify this line. (Dep:@{ all }@)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct ImplDomainstructureCargoDepTemplate<'a> {
-    pub all: String,
-    pub db: &'a str,
 }
 
 #[derive(Template)]
@@ -516,26 +504,6 @@ pub struct ImplDomainGroupRepoTemplate<'a> {
 )]
 pub struct ImplDomainGroupQueriesTemplate<'a> {
     pub mod_names: &'a BTreeSet<(String, &'a String)>,
-}
-
-#[derive(Template)]
-#[template(
-    source = r###"
-// Do not modify below this line. (ModStart)
-pub mod _base {
-@%- for name in mod_names %@
-    pub mod _@{ name }@;
-@%- endfor %@
-}
-@%- for name in mod_names %@
-pub mod @{ name|to_var_name }@;
-@%- endfor %@
-// Do not modify up to this line. (ModEnd)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct ModNamesTemplate<'a> {
-    pub mod_names: &'a BTreeSet<&'a str>,
 }
 
 #[derive(Template)]

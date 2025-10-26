@@ -1694,7 +1694,7 @@ impl ModelDef {
     ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_belongs_to() || v.1.is_type_of_has_one())
             .map(|v| (self, v.0, v.1))
             .collect()
@@ -1702,7 +1702,7 @@ impl ModelDef {
     pub fn relations_belonging(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| ApiRelationDef::has(v.0))
             .filter(|v| v.1.is_type_of_belongs_to())
             .map(|v| (self, v.0, v.1))
@@ -1711,7 +1711,7 @@ impl ModelDef {
     pub fn relations_belonging_cache(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_belongs_to() && v.1.get_foreign_model().use_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
@@ -1722,7 +1722,7 @@ impl ModelDef {
     ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_belongs_to() && !v.1.get_foreign_model().use_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
@@ -1742,7 +1742,7 @@ impl ModelDef {
         self.merged_relations
             .iter()
             // .filter(|v| ApiRelationDef::has(v.0))
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_belongs_to_outer_db())
             .map(|v| (self, v.0, v.1))
             .collect()
@@ -1750,7 +1750,7 @@ impl ModelDef {
     pub fn relations_one_and_many(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_has_one() || v.1.is_type_of_has_many())
             .map(|v| (self, v.0, v.1))
             .collect()
@@ -1758,7 +1758,7 @@ impl ModelDef {
     pub fn relations_one(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| ApiRelationDef::has(v.0))
             .filter(|v| v.1.is_type_of_has_one())
             .map(|v| (self, v.0, v.1))
@@ -1767,7 +1767,7 @@ impl ModelDef {
     pub fn relations_one_cache(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_has_one() && v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
@@ -1775,7 +1775,7 @@ impl ModelDef {
     pub fn relations_one_uncached(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_has_one() && !v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
@@ -1791,7 +1791,7 @@ impl ModelDef {
     pub fn relations_many(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| ApiRelationDef::has(v.0))
             .filter(|v| v.1.is_type_of_has_many())
             .map(|v| (self, v.0, v.1))
@@ -1814,7 +1814,7 @@ impl ModelDef {
     pub fn relations_many_cache(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
@@ -1836,7 +1836,7 @@ impl ModelDef {
     pub fn relations_many_uncached(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| (!self_only || !v.1.in_abstract))
+            .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()

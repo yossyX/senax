@@ -53,12 +53,14 @@ use crate::auto_api::{Role, RoleGuard};
 
 pub struct GqlQuery@{ db_route|pascal }@;
 #[Object]
+#[allow(non_snake_case)]
 impl GqlQuery@{ db_route|pascal }@ {
     // Do not modify this line. (GqlQuery)
 }
 
 pub struct GqlMutation@{ db_route|pascal }@;
 #[Object]
+#[allow(non_snake_case)]
 impl GqlMutation@{ db_route|pascal }@ {
     // Do not modify this line. (GqlMutation)
 }
@@ -243,12 +245,14 @@ use utoipa_actix_web::scope;
 
 pub struct GqlQuery@{ db|pascal }@@{ group|pascal }@;
 #[Object]
+#[allow(non_snake_case)]
 impl GqlQuery@{ db|pascal }@@{ group|pascal }@ {
     // Do not modify this line. (GqlQuery)
 }
 
 pub struct GqlMutation@{ db|pascal }@@{ group|pascal }@;
 #[Object]
+#[allow(non_snake_case)]
 impl GqlMutation@{ db|pascal }@@{ group|pascal }@ {
     // Do not modify this line. (GqlMutation)
 }

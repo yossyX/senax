@@ -91,7 +91,7 @@ impl Ctx {
 }
 
 impl log::kv::ToValue for Ctx {
-    fn to_value(&self) -> log::kv::Value {
+    fn to_value(&self) -> log::kv::Value<'_> {
         self.ctx_no.into()
     }
 }

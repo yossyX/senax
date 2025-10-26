@@ -167,6 +167,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         config: &config,
         tx_isolation: config.tx_isolation.map(|v| v.as_str()),
         read_tx_isolation: config.read_tx_isolation.map(|v| v.as_str()),
+        groups: &groups,
     };
     fs_write(file_path, tpl.render()?)?;
 
