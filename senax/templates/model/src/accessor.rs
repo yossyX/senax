@@ -653,7 +653,7 @@ pub struct AccessorNotNullJson<'a, I: Serialize + DeserializeOwned + Default> {
     pub(crate) _phantom: PhantomData<I>,
 }
 impl<'a, I: Serialize + DeserializeOwned + Default> AccessorNotNullJson<'a, I> {
-    pub fn get(&self) -> Box<serde_json::value::RawValue> {
+    pub fn get(&self) -> std::sync::Arc<Box<serde_json::value::RawValue>> {
         self.val._to_value()
     }
     pub fn mark_for_skip(&mut self) {
@@ -703,7 +703,7 @@ pub struct AccessorNullJson<'a, I: Serialize + DeserializeOwned> {
     pub(crate) _phantom: PhantomData<I>,
 }
 impl<'a, I: Serialize + DeserializeOwned> AccessorNullJson<'a, I> {
-    pub fn get(&self) -> Option<Box<serde_json::value::RawValue>> {
+    pub fn get(&self) -> Option<std::sync::Arc<Box<serde_json::value::RawValue>>> {
         self.val.as_ref().and_then(|v| Some(v._to_value()))
     }
     pub fn mark_for_skip(&mut self) {

@@ -2091,14 +2091,14 @@ impl FieldDef {
             DataType::ArrayInt => "std::sync::Arc<Vec<u64>>",
             DataType::ArrayString if req => "Vec<String>",
             DataType::ArrayString => "std::sync::Arc<Vec<String>>",
-            DataType::Json if !req => "async_graphql::Json<Box<serde_json::value::RawValue>>",
+            DataType::Json if !req => "async_graphql::Json<std::sync::Arc<Box<serde_json::value::RawValue>>>",
             DataType::Json if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
             DataType::Json => "serde_json::Value",
             DataType::DbEnum => "",
             DataType::DbSet => "String",
             DataType::Point => "domain::models::Point",
             DataType::GeoPoint => "domain::models::GeoPoint",
-            DataType::Geometry if !req => "async_graphql::Json<Box<serde_json::value::RawValue>>",
+            DataType::Geometry if !req => "async_graphql::Json<std::sync::Arc<Box<serde_json::value::RawValue>>>",
             DataType::Geometry if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
             DataType::Geometry => "serde_json::Value",
             DataType::ValueObject => unimplemented!(),
@@ -2432,7 +2432,7 @@ impl FieldDef {
                 DataType::ArrayInt => "&std::sync::Arc<Vec<u64>>",
                 DataType::ArrayString => "&std::sync::Arc<Vec<String>>",
                 // DataType::Json if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
-                DataType::Json => "Box<serde_json::value::RawValue>",
+                DataType::Json => "std::sync::Arc<Box<serde_json::value::RawValue>>",
                 DataType::DbEnum => "",
                 DataType::DbSet => "&str",
                 DataType::Point if is_domain => "domain::models::Point",
@@ -2442,7 +2442,7 @@ impl FieldDef {
                 // DataType::Geometry if self.json_class.is_some() => {
                 //     self.json_class.as_ref().unwrap()
                 // }
-                DataType::Geometry => "Box<serde_json::value::RawValue>",
+                DataType::Geometry => "std::sync::Arc<Box<serde_json::value::RawValue>>",
                 DataType::ValueObject => unimplemented!(),
                 DataType::AutoFk => unimplemented!(),
                 DataType::UnSupported => unimplemented!(),
@@ -2591,7 +2591,7 @@ impl FieldDef {
                 DataType::ArrayInt => "std::sync::Arc<Vec<u64>>",
                 DataType::ArrayString if factory => "Vec<String>",
                 DataType::ArrayString => "std::sync::Arc<Vec<String>>",
-                DataType::Json if !factory => "Box<serde_json::value::RawValue>",
+                DataType::Json if !factory => "std::sync::Arc<Box<serde_json::value::RawValue>>",
                 DataType::Json if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
                 DataType::Json => "serde_json::Value",
                 DataType::DbEnum => "String",
@@ -2600,7 +2600,7 @@ impl FieldDef {
                 DataType::Point => "senax_common::types::point::Point",
                 DataType::GeoPoint if is_domain => "domain::models::GeoPoint",
                 DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
-                DataType::Geometry if !factory => "Box<serde_json::value::RawValue>",
+                DataType::Geometry if !factory => "std::sync::Arc<Box<serde_json::value::RawValue>>",
                 DataType::Geometry if self.json_class.is_some() => {
                     self.json_class.as_ref().unwrap()
                 }

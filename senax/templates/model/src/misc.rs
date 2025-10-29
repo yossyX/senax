@@ -732,8 +732,8 @@ impl JsonRawValue {
         assert!(s.len() <= 4294967295, "Incorrect JSON length.");
         s
     }
-    pub fn _to_value(&self) -> Box<serde_json::value::RawValue> {
-        self.0.as_ref().clone()
+    pub fn _to_value(&self) -> std::sync::Arc<Box<serde_json::value::RawValue>> {
+        std::sync::Arc::clone(&self.0)
     }
 }
 pub(crate) trait ToJsonRawValue {

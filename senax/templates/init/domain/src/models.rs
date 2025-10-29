@@ -381,15 +381,15 @@ where
 }
 
 pub trait ToRawValue {
-    fn to_raw_value(&self) -> serde_json::Result<Box<serde_json::value::RawValue>>;
+    fn to_raw_value(&self) -> serde_json::Result<std::sync::Arc<Box<serde_json::value::RawValue>>>;
 }
 
 impl<T> ToRawValue for T
 where
     T: serde::Serialize,
 {
-    fn to_raw_value(&self) -> serde_json::Result<Box<serde_json::value::RawValue>> {
-        serde_json::value::to_raw_value(self)
+    fn to_raw_value(&self) -> serde_json::Result<std::sync::Arc<Box<serde_json::value::RawValue>>> {
+        serde_json::value::to_raw_value(self).map(|v| v.into())
     }
 }
 @{-"\n"}@
