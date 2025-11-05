@@ -9,6 +9,8 @@ use async_graphql::ErrorExtensions as _;
 use async_graphql::GuardExt as _;
 use domain::repository::Repository as _;
 #[allow(unused_imports)]
+use domain::models::FromRawValue as _;
+#[allow(unused_imports)]
 use domain::value_objects;
 #[allow(unused_imports)]
 use senax_common::types::blob::{ApiToBlob as _, BlobToApi as _};
@@ -48,6 +50,7 @@ async fn find(
     repo.release_read_tx().await?;
     result
 }
+@%- if !api_def.disable_mutation %@
 @%- if !def.disable_update() %@
 
 async fn find_for_update(
@@ -79,6 +82,7 @@ async fn delete(
     _repository_::delete(repo.as_ref().into(), obj).await?;
     Ok(())
 }
+@%- endif %@
 @%- endif %@
 
 pub struct GqlQuery@{ graphql_name }@;

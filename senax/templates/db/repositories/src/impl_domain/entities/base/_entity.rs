@@ -1,6 +1,8 @@
-#[allow(unused_imports)]
-use db::misc::{Updater as _, ToJsonBlob as _};
 use async_trait::async_trait;
+#[allow(unused_imports)]
+use db::misc::{Updater as _, ToJsonRawValue as _};
+#[allow(unused_imports)]
+use domain::models::ToRawValue as _;
 #[allow(unused_imports)]
 use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::{self, *};
 use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;

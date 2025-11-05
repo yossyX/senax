@@ -44,6 +44,7 @@ pub enum Role {
     // Do not modify below this line. (RoleStart)
     // Do not modify above this line. (RoleEnd)
 }
+#[allow(non_snake_case)]
 impl Role {
     // Do not modify below this line. (ImplRoleStart)
     // Do not modify above this line. (ImplRoleEnd)

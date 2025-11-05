@@ -32,7 +32,7 @@ use zstd::{decode_all, encode_all};
 use crate::cache::Cache;
 @% endif %@
 use crate::connection::{DbArguments, DbConn, DbRow, DbType};
-use crate::misc::ToJsonBlob as _;
+use crate::misc::ToJsonRawValue as _;
 use crate::misc::{BindValue, Updater, Size, TrashMode};
 use crate::models::USE_FAST_CACHE;
 use crate::{self as db, accessor::*, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
@@ -447,6 +447,7 @@ pub enum _@{ name|pascal }@ {
 @% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@@{ row.value_str() }@,
 @% endfor -%@
 }
+#[allow(non_snake_case)]
 impl _@{ name|pascal }@ {
     pub fn inner(&self) -> @{ column_def.get_inner_type(true, true) }@ {
         *self as @{ column_def.get_inner_type(true, true) }@
@@ -515,6 +516,7 @@ pub enum _@{ name|pascal }@ {
 @% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@,
 @% endfor -%@
 }
+#[allow(non_snake_case)]
 impl _@{ name|pascal }@ {
     pub fn as_static_str(&self) -> &'static str {
         Into::<&'static str>::into(self)
@@ -1677,14 +1679,14 @@ impl _@{ pascal_name }@Updater {
         }
     }", "") }@
 @{- def.relations_one(false)|fmt_rel_join("
-{label}{comment}    pub fn mut_{raw_rel_name}(&mut self) -> AccessorHasOne<rel_{class_mod}::{class}Updater> {
+{label}{comment}    pub fn mut_{raw_rel_name}(&mut self) -> AccessorHasOne<'_, rel_{class_mod}::{class}Updater> {
         AccessorHasOne {
             name: \"{raw_rel_name}\",
             val: &mut self.{rel_name},
         }
     }", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
-{label}{comment}    pub fn mut_{raw_rel_name}(&mut self) -> AccessorHasMany<rel_{class_mod}::{class}Updater> {
+{label}{comment}    pub fn mut_{raw_rel_name}(&mut self) -> AccessorHasMany<'_, rel_{class_mod}::{class}Updater> {
         AccessorHasMany {
             name: \"{raw_rel_name}\",
             val: &mut self.{rel_name},

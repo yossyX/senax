@@ -27,11 +27,13 @@ pub const LIMIT_COMPLEXITY: usize = 1000;
 
 pub struct QueryRoot;
 #[Object]
+#[allow(non_snake_case)]
 impl QueryRoot {
 }
 
 pub struct MutationRoot;
 #[Object]
+#[allow(non_snake_case)]
 impl MutationRoot {
     #[cfg(debug_assertions)]
     #[graphql(complexity = LIMIT_COMPLEXITY)]

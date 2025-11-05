@@ -8,6 +8,7 @@ use crate::_base::auto_api::{Role, RoleGuard};
 
 pub struct GqlQuery@{ db_route|pascal }@;
 #[Object]
+#[allow(non_snake_case)]
 impl GqlQuery@{ db_route|pascal }@ {
     // This function can be removed.
     async fn _dummy(&self) -> bool {
@@ -18,6 +19,7 @@ impl GqlQuery@{ db_route|pascal }@ {
 
 pub struct GqlMutation@{ db_route|pascal }@;
 #[Object]
+#[allow(non_snake_case)]
 impl GqlMutation@{ db_route|pascal }@ {
     // This function can be removed.
     async fn _dummy(&self) -> bool {

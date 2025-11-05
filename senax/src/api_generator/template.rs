@@ -51,12 +51,14 @@ use utoipa_actix_web::scope;
 
 pub struct GqlQuery@{ db|pascal }@@{ group|pascal }@;
 #[Object]
+#[allow(non_snake_case)]
 impl GqlQuery@{ db|pascal }@@{ group|pascal }@ {
     // Do not modify this line. (GqlQuery)
 }
 
 pub struct GqlMutation@{ db|pascal }@@{ group|pascal }@;
 #[Object]
+#[allow(non_snake_case)]
 impl GqlMutation@{ db|pascal }@@{ group|pascal }@ {
     // Do not modify this line. (GqlMutation)
 }

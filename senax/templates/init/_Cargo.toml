@@ -8,7 +8,7 @@ strip = true
 [workspace.dependencies]
 ahash = "0.8"
 anyhow = "1.0"
-async-graphql = { version = "7.0", features = ["apollo_persisted_queries", "chrono", "uuid", "decimal", "log"] }
+async-graphql = { version = "7.0", features = ["apollo_persisted_queries", "chrono", "uuid", "decimal", "log", "raw_value"] }
 async-graphql-actix-web = "7.0"
 async-stream = "0.3"
 async-trait = "0.1"
@@ -28,10 +28,10 @@ rust_decimal = "1.19"
 rust_decimal_macros = "1.19"
 schemars = { version = "0.8.22", features = ["chrono", "uuid1", "rust_decimal", "indexmap2", "preserve_order"] }
 senax-common = "=0.4.2"
-senax-encoder = { version = "0.2.0", features = ["indexmap", "chrono", "rust_decimal", "uuid", "ulid", "serde_json", "fxhash"] }
+senax-encoder = { version = "0.2.1", features = ["indexmap", "chrono", "rust_decimal", "uuid", "ulid", "serde_json", "fxhash", "raw_value"] }
 senax-macros = "=0.2.1"
 serde = { version = "1.0", features = ["derive", "rc"] }
-serde_json = { version = "1.0", features = ["preserve_order"] }
+serde_json = { version = "1.0", features = ["preserve_order", "raw_value"] }
 serde_repr = "0.1"
 serde_yaml = "0.9"
 sqlx = { version = "0.8.5", features = ["runtime-tokio", "tls-rustls", "chrono", "rust_decimal", "json", "uuid"] }

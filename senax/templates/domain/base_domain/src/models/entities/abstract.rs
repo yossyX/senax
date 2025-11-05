@@ -22,6 +22,7 @@ pub enum @{ name|to_pascal_name }@ {
 @% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@@{ row.value_str() }@,
 @% endfor -%@
 }
+#[allow(non_snake_case)]
 impl @{ name|to_pascal_name }@ {
     pub fn inner(&self) -> @{ column_def.get_inner_type(true, true) }@ {
         *self as @{ column_def.get_inner_type(true, true) }@
@@ -60,6 +61,7 @@ pub enum @{ name|to_pascal_name }@ {
 @% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@,
 @% endfor -%@
 }
+#[allow(non_snake_case)]
 impl @{ name|to_pascal_name }@ {
     pub fn as_static_str(&self) -> &'static str {
         Into::<&'static str>::into(self)

@@ -300,4 +300,30 @@ where
         Ok(())
     }
 }
+
+pub trait FromRawValue<T> {
+    fn from_raw_value(&self) -> serde_json::Result<T>;
+}
+
+impl<T> FromRawValue<T> for Box<serde_json::value::RawValue>
+where
+    T: serde::de::DeserializeOwned,
+{
+    fn from_raw_value(&self) -> serde_json::Result<T> {
+        serde_json::from_str(self.get())
+    }
+}
+
+pub trait ToRawValue {
+    fn to_raw_value(&self) -> serde_json::Result<std::sync::Arc<Box<serde_json::value::RawValue>>>;
+}
+
+impl<T> ToRawValue for T
+where
+    T: serde::Serialize,
+{
+    fn to_raw_value(&self) -> serde_json::Result<std::sync::Arc<Box<serde_json::value::RawValue>>> {
+        serde_json::value::to_raw_value(self).map(|v| v.into())
+    }
+}
 @{-"\n"}@

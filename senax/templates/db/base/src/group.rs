@@ -39,6 +39,7 @@ pub enum CacheOp {
 #[cfg(feature = "seeder")]
 #[derive(::schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
+#[allow(non_snake_case)]
 pub struct @{ group_name|pascal }@ {
 @%- for (name, (_, def)) in models %@
     #[serde(default)]
