@@ -91,28 +91,17 @@ impl From<&[u8]> for GeoPoint {
         } else {
             f64::from_be_bytes(bytes.try_into().unwrap())
         };
-        GeoPoint { lat: x, lng: y }
-    }
-}
-
-impl From<GeoPoint> for Vec<u8> {
-    fn from(point: GeoPoint) -> Self {
-        let mut buf = BytesMut::with_capacity(21);
-        buf.put_u8(1);
-        buf.put_u32_le(1);
-        buf.put_f64_le(point.lat);
-        buf.put_f64_le(point.lng);
-        buf.to_vec()
+        GeoPoint { lat: y, lng: x }
     }
 }
 
 impl GeoPoint {
-    pub fn to_wkb(&self) -> Vec<u8> {
+    pub fn to_lng_lat_wkb(&self) -> Vec<u8> {
         let mut buf = BytesMut::with_capacity(21);
         buf.put_u8(1);
         buf.put_u32_le(1);
-        buf.put_f64_le(self.lat);
         buf.put_f64_le(self.lng);
+        buf.put_f64_le(self.lat);
         buf.to_vec()
     }
 }

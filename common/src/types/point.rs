@@ -107,7 +107,7 @@ impl From<Point> for Vec<u8> {
 }
 
 impl Point {
-    pub fn to_wkb(&self) -> Vec<u8> {
+    pub fn to_lng_lat_wkb(&self) -> Vec<u8> {
         let mut buf = BytesMut::with_capacity(21);
         buf.put_u8(1);
         buf.put_u32_le(1);

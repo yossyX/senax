@@ -21,15 +21,15 @@ use super::msec::{MSEC_SHR, MSec, get_cache_time};
 
 const MOKA_BASE_MEMORY: u32 = 400;
 const DEFAULT_FAST_CACHE_INDEX_SIZE: &str = "1MiB";
-const DEFAULT_SHORT_CACHE_CAPACITY: &str = "1MiB";
+const DEFAULT_SHORT_CACHE_CAPACITY: &str = "8MiB";
 const DEFAULT_SHORT_CACHE_TIME: &str = "60";
-const DEFAULT_LONG_CACHE_CAPACITY: &str = "10MiB";
-const DEFAULT_LONG_CACHE_TIME: &str = "3600";
-const DEFAULT_LONG_CACHE_IDLE_TIME: &str = "600";
+const DEFAULT_LONG_CACHE_CAPACITY: &str = "32MiB";
+const DEFAULT_LONG_CACHE_TIME: &str = "86400";
+const DEFAULT_LONG_CACHE_IDLE_TIME: &str = "86400";
 const DEFAULT_DISK_CACHE_INDEX_SIZE: &str = "8MiB";
 const DEFAULT_DISK_CACHE_FILE_NUM: &str = "1";
 const DEFAULT_DISK_CACHE_FILE_SIZE: &str = "100MiB";
-const DEFAULT_CACHE_TTL: &str = "3600";
+const DEFAULT_CACHE_TTL: &str = "86400";
 const DISK_CACHE_FILE_NAME: &str = "cache-%Y%m%d%H%M%S";
 
 pub trait CacheVal: DowncastSync + std::fmt::Debug {
