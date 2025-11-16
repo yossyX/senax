@@ -47,11 +47,11 @@ pub enum SqlType {
     Set(Vec<Literal>),
     Decimal(u16, u16),
     Json,
+    Jsonb, // PostgreSQL Only
     Point,
     Geometry,
+    Uuid, // PostgreSQL Only
     UnSupported,
-    // PostgreSQL
-    Uuid,
 }
 
 impl SqlType {
@@ -135,10 +135,11 @@ impl SqlType {
                 ),
                 SqlType::Decimal(m, d) => write!(f, "DECIMAL({}, {})", m, d),
                 SqlType::Json => write!(f, "JSON"),
+                SqlType::Jsonb => write!(f, "JSON"),
                 SqlType::Point => write!(f, "POINT{srid}"),
                 SqlType::Geometry => write!(f, "GEOMETRY{srid}"),
-                SqlType::UnSupported => unimplemented!("SqlType::UnSupported"),
                 SqlType::Uuid => unimplemented!("SqlType::Uuid"),
+                SqlType::UnSupported => unimplemented!("SqlType::UnSupported"),
             }
         } else {
             let collation = if let Some(ref c) = constraint.collation {
@@ -146,11 +147,7 @@ impl SqlType {
             } else {
                 "".to_owned()
             };
-            let srid = if let Some(srid) = constraint.srid {
-                format!(", {}", srid)
-            } else {
-                "".to_owned()
-            };
+            let srid = constraint.srid.unwrap_or_default();
             match *self {
                 SqlType::Bool => write!(f, "boolean"),
                 SqlType::Char(0) => write!(f, "char{collation}"),
@@ -191,11 +188,14 @@ impl SqlType {
                 SqlType::Enum(ref _v) => unimplemented!("SqlType::Enum"),
                 SqlType::Set(ref _v) => unimplemented!("SqlType::Set"),
                 SqlType::Decimal(m, d) => write!(f, "numeric({}, {})", m, d),
-                SqlType::Json => write!(f, "jsonb"),
-                SqlType::Point => write!(f, "geography(POINT{srid})"),
-                SqlType::Geometry => write!(f, "geography(GEOMETRYCOLLECTION{srid})"),
-                SqlType::UnSupported => unimplemented!("SqlType::UnSupported"),
+                SqlType::Json => write!(f, "json"),
+                SqlType::Jsonb => write!(f, "jsonb"),
+                SqlType::Point if srid == 4326 => write!(f, "geography(POINT)"),
+                SqlType::Point => write!(f, "geometry(POINT, {srid})"),
+                SqlType::Geometry if srid == 4326 => write!(f, "geography"),
+                SqlType::Geometry => write!(f, "geometry(Geometry, {srid})"),
                 SqlType::Uuid => write!(f, "uuid"),
+                SqlType::UnSupported => unimplemented!("SqlType::UnSupported"),
             }
         }
     }
@@ -316,7 +316,7 @@ pub enum TableKey {
     UniqueKey(String, Vec<IndexColumn>),
     FulltextKey(String, Vec<IndexColumn>, Option<String>),
     Key(String, Vec<IndexColumn>),
-    SpatialKey(String, Vec<IndexColumn>),
+    GeometryKey(String, Vec<IndexColumn>),
     Constraint(
         String,
         Vec<IndexColumn>,
@@ -341,7 +341,7 @@ impl From<MysqlTableKey> for TableKey {
             }
             MysqlTableKey::Key(v, c) => TableKey::Key(v, c.into_iter().map(|v| v.into()).collect()),
             MysqlTableKey::SpatialKey(v, c) => {
-                TableKey::SpatialKey(v, c.into_iter().map(|v| v.into()).collect())
+                TableKey::GeometryKey(v, c.into_iter().map(|v| v.into()).collect())
             }
             MysqlTableKey::Constraint(v1, c1, v2, c2, r1, r2) => TableKey::Constraint(
                 v1,
@@ -436,7 +436,7 @@ impl fmt::Display for TableKey {
                         .join(", ")
                 )
             }
-            TableKey::SpatialKey(ref name, ref columns) => {
+            TableKey::GeometryKey(ref name, ref columns) => {
                 write!(f, "SPATIAL KEY {} ", escape_db_identifier(name))?;
                 write!(
                     f,

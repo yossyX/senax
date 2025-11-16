@@ -226,13 +226,13 @@ impl FilterDef {
             ),
             FilterType::EqAny => "bool".to_string(),
             FilterType::FullText => "String".to_string(),
-            FilterType::ArrayInt => "models::ArrayIntFilter".to_string(),
-            FilterType::ArrayString => "models::ArrayStringFilter".to_string(),
+            FilterType::ArrayInt => "domain::models::ArrayIntFilter".to_string(),
+            FilterType::ArrayString => "domain::models::ArrayStringFilter".to_string(),
             FilterType::Json if self.json_path.is_none() => {
-                "models::JsonValueWithPathFilter".to_string()
+                "domain::models::JsonValueWithPathFilter".to_string()
             }
-            FilterType::Json => "models::JsonValueFilter".to_string(),
-            FilterType::Geometry => "Vec<models::GeometryFilter>".to_string(),
+            FilterType::Json => "domain::models::JsonValueFilter".to_string(),
+            FilterType::Geometry => "Vec<domain::models::GeometryFilter>".to_string(),
             FilterType::RawQuery if self.query_param_num() == 0 => "bool".to_string(),
             FilterType::RawQuery if self.query_param_num() == 1 => "String".to_string(),
             FilterType::RawQuery => "Vec<String>".to_string(),
@@ -606,29 +606,35 @@ impl FilterDef {
     {prefix}
         for p in f {{
             match &p.r#type {{
-                models::GeometryFilterType::Within => {{
+                domain::models::GeometryFilterType::Equals => {{
+                    fltr = fltr.and(filter!({field} GEO_EQUALS p.area.clone()));
+                }}
+                domain::models::GeometryFilterType::Within => {{
                     fltr = fltr.and(filter!({field} WITHIN p.area.clone()));
                 }}
-                models::GeometryFilterType::Intersects => {{
+                domain::models::GeometryFilterType::Intersects => {{
                     fltr = fltr.and(filter!({field} INTERSECTS p.area.clone()));
                 }}
-                models::GeometryFilterType::Crosses => {{
+                domain::models::GeometryFilterType::Crosses => {{
                     fltr = fltr.and(filter!({field} CROSSES p.area.clone()));
                 }}
-                models::GeometryFilterType::DWithin => {{
+                domain::models::GeometryFilterType::DWithin => {{
                     let distance = p.distance.context(\"distance is required.\")?;
                     fltr = fltr.and(filter!({field} D_WITHIN p.area.clone(), distance));
                 }}
-                models::GeometryFilterType::NotWithin => {{
+                domain::models::GeometryFilterType::NotEquals => {{
+                    fltr = fltr.and(filter!(NOT ({field} GEO_EQUALS p.area.clone())));
+                }}
+                domain::models::GeometryFilterType::NotWithin => {{
                     fltr = fltr.and(filter!(NOT ({field} WITHIN p.area.clone())));
                 }}
-                models::GeometryFilterType::NotIntersects => {{
+                domain::models::GeometryFilterType::NotIntersects => {{
                     fltr = fltr.and(filter!(NOT ({field} INTERSECTS p.area.clone())));
                 }}
-                models::GeometryFilterType::NotCrosses => {{
+                domain::models::GeometryFilterType::NotCrosses => {{
                     fltr = fltr.and(filter!(NOT ({field} CROSSES p.area.clone())));
                 }}
-                models::GeometryFilterType::NotDWithin => {{
+                domain::models::GeometryFilterType::NotDWithin => {{
                     let distance = p.distance.context(\"distance is required.\")?;
                     fltr = fltr.and(filter!(NOT ({field} D_WITHIN p.area.clone(), distance)));
                 }}
@@ -671,8 +677,17 @@ impl FilterDef {
         if let Some(p) = &f.eq {{
             fltr = fltr.and(filter!({field} -> (json_path) = p));
         }}
+        if f.is_null.unwrap_or_default() {{
+            fltr = fltr.and(filter!({field} -> (json_path) IS NULL));
+        }}
+        if f.is_not_null.unwrap_or_default() {{
+            fltr = fltr.and(filter!({field} -> (json_path) IS NOT NULL));
+        }}
         if let Some(p) = &f.r#in {{
-            fltr = fltr.and(filter!({field} -> (json_path) OVERLAPS p));
+            fltr = fltr.and(filter!({field} -> (json_path) IN p));
+        }}
+        if let Some(p) = &f.contains {{
+            fltr = fltr.and(filter!({field} -> (json_path) CONTAINS p));
         }}
         if let Some(p) = &f.lt {{
             fltr = fltr.and(filter!({field} -> (json_path) < p));

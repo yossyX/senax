@@ -244,7 +244,7 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
         .replace("{factory_default}", col.get_factory_default())
         .replace("{convert_factory}", &col.convert_factory_type())
         .replace("{convert_from_entity}", &col.convert_from_entity())
-        .replace("{res_api_schema_type}", &col.get_api_schema_type())
+        .replace("{res_api_schema_type}", col.get_api_schema_type())
         .replace("{res_api_type}", &col.get_api_type(false, false))
         .replace("{req_api_option_type}", &col.get_api_type(true, true))
         .replace("{req_api_type}", &col.get_api_type(false, true))

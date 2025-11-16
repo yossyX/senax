@@ -479,15 +479,15 @@ impl GqlMutation@{ graphql_name }@ {
         if !errors.is_empty() {
             return Err(GqlError::ValidationErrorList(errors).extend());
         }
-        @%- if def.has_auto_primary() %@
         let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
+        @%- if def.has_auto_primary() %@
         for (idx, data) in list.into_iter().enumerate() {
             if let Some(_id) = data._id.clone() {
                 let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
                 let query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().find(id.into());
                 match query.join(updater_joiner()).query_for_update().await {
                     Ok(obj) => {
-                        _domain_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
+                        _repository_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
                             .await
                             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
                     }
@@ -502,7 +502,7 @@ impl GqlMutation@{ graphql_name }@ {
                     }
                 }
             } else {
-                _domain_::create(@{ group|snake }@_repo.as_ref().into(), create_entity(data, @{ group|snake }@_repo.as_ref(), auth)).await
+                _repository_::create(@{ group|snake }@_repo.as_ref().into(), create_entity(data, @{ group|snake }@_repo.as_ref(), auth)).await
                     .map_err(|e| GqlError::server_error(gql_ctx, e))?;
             }
         }
@@ -510,7 +510,7 @@ impl GqlMutation@{ graphql_name }@ {
             return Err(GqlError::ValidationErrorList(errors).extend());
         }
         @%- else %@
-        _domain_::import(@{ group|snake }@_repo.as_ref().into(), create_list(list, @{ group|snake }@_repo.as_ref(), auth), option)
+        _repository_::import(@{ group|snake }@_repo.as_ref().into(), create_list(list, @{ group|snake }@_repo.as_ref(), auth), option)
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         @%- endif %@
@@ -617,7 +617,7 @@ impl GqlMutation@{ graphql_name }@ {
                 if let Some(data) = data {
                     data.validate()
                         .map_err(|e| GqlError::ValidationError(e).extend())?;
-                    let obj = _domain_::create(@{ group|snake }@_repo.as_ref().into(), create_entity(data, @{ group|snake }@_repo.as_ref(), auth))
+                    let obj = _repository_::create(@{ group|snake }@_repo.as_ref().into(), create_entity(data, @{ group|snake }@_repo.as_ref(), auth))
                         .await
                         .map_err(|e| GqlError::server_error(gql_ctx, e))?;
                     result.push(ResObj::try_from_(&*obj, auth, None)?);
@@ -633,7 +633,7 @@ impl GqlMutation@{ graphql_name }@ {
                     data.validate()
                         .map_err(|e| GqlError::ValidationError(e).extend())?;
                     if let Some(obj) = updater_map.remove(data._id.as_ref()?) {
-                        let obj = _domain_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| {
+                        let obj = _repository_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| {
                                 update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth)
                             })
                             .await
@@ -694,7 +694,7 @@ impl GqlMutation@{ graphql_name }@ {
             data.validate()
                 .map_err(|e| GqlError::ValidationError(e).extend())?;
             let obj =
-                _domain_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
+                _repository_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
                     .await
                     .map_err(|e| GqlError::server_error(gql_ctx, e))?;
             result.push(ResObj::try_from_(&*obj, auth, None)?);
@@ -742,7 +742,7 @@ impl GqlMutation@{ graphql_name }@ {
             .map_err(|e| GqlError::server_error(gql_ctx, e))?
         {
             result.push((&*obj).into());
-            _domain_::delete(repo, obj)
+            _repository_::delete(repo, obj)
                 .await
                 .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         }

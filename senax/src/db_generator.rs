@@ -6,9 +6,9 @@ use std::{fs, path::Path};
 
 use crate::common::ToCase as _;
 use crate::common::fs_write;
-use crate::filters;
 use crate::schema::DbType;
 use crate::{DOMAIN_PATH, SCHEMA_PATH};
+use crate::{DOMAIN_REPOSITORIES_PATH, filters};
 
 pub fn db_list(dir_type_only: bool) -> Result<Vec<String>> {
     let schema_path = Path::new(SCHEMA_PATH);
@@ -96,7 +96,7 @@ pub fn generate(db_type: DbType, db: &str, exclude_from_domain: bool) -> Result<
             fs_write(file_path, &*content)?;
         }
 
-        repositories(&domain_path.join("repositories").join(db), db)?;
+        repositories(&domain_path.join(DOMAIN_REPOSITORIES_PATH).join(db), db)?;
     }
     Ok(())
 }

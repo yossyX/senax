@@ -29,6 +29,7 @@ pub struct Table {
 }
 
 impl fmt::Display for Table {
+    #[allow(clippy::collapsible_if)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -99,9 +100,11 @@ impl PartialEq for Column {
 
 impl Column {
     pub fn is_same_type(&self, other: &Self) -> bool {
-        self.sql_type == other.sql_type
+        (self.sql_type == other.sql_type
             || self.alt_type == other.sql_type
-            || self.sql_type == other.alt_type
+            || self.sql_type == other.alt_type)
+            && self.constraint.srid.unwrap_or_default() == other.constraint.srid.unwrap_or_default()
+            && self.constraint.collation == other.constraint.collation
     }
     pub fn has_query(&self) -> bool {
         self.constraint.query.is_some()
@@ -171,7 +174,7 @@ impl PartialEq for Constraint {
             && self.auto_increment == other.auto_increment
             // && self.primary_key == other.primary_key
             // && self.unique == other.unique
-            && self.srid == other.srid
+            && self.srid.unwrap_or_default() == other.srid.unwrap_or_default()
             && self.query.is_none() == other.query.is_none()
             && self.query.clone().unwrap_or_default().1 == other.query.clone().unwrap_or_default().1
     }
@@ -304,7 +307,7 @@ fn mysql_conv(def: CreateTableStatement) -> Table {
     for option in def.options {
         match option {
             TableOption::Comment(comment) => table.comment = Some(comment.to_raw_string()),
-            TableOption::Collation(_) => {},
+            TableOption::Collation(_) => {}
             TableOption::Engine(engine) => table.engine = Some(engine),
             TableOption::Another => {}
         }
@@ -471,10 +474,11 @@ pub fn parse_default_value(value: &serde_yaml::Value, sql_type: &SqlType) -> Res
         SqlType::Set(_) => Ok(Literal::String(value)),
         SqlType::Decimal(_, _) => Ok(Literal::Integer(value.parse()?)),
         SqlType::Json => Ok(Literal::Null),
+        SqlType::Jsonb => Ok(Literal::Null),
         SqlType::Point => Ok(Literal::Null),
         SqlType::Geometry => Ok(Literal::Null),
-        SqlType::UnSupported => Ok(Literal::Null),
         SqlType::Uuid => Ok(Literal::Null),
+        SqlType::UnSupported => Ok(Literal::Null),
     }
 }
 

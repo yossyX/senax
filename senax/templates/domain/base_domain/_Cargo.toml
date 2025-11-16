@@ -8,6 +8,7 @@ publish = false
 mock = ["mockall"]
 
 [dependencies]
+user_defined_types = { path = "../user_defined_types" }
 anyhow.workspace = true
 async-graphql.workspace = true
 base64.workspace = true

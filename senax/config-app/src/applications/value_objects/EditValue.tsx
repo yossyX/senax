@@ -198,7 +198,7 @@ function EditValue() {
                 )}
               />
               <AutoField
-                name="json_class"
+                name="user_defined_json_type"
                 {...formData}
                 hidden={!["json"].includes(type)}
               />

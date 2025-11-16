@@ -44,7 +44,7 @@ use ::db::cache::Cache;
 @%- else %@
 @% endif %@
 use ::db::connection::{DbArguments, DbConn, DbRow, DbType};
-use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, IntoJson as _, OrderTr};
+use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, ToBindableJson as _, OrderTr};
 use crate::repositories::{CacheOpTr, IdFetcher, IdFetcherWithCache};
 use ::db::misc::{BindValue, Count, Updater, Size, TrashMode, UpdaterForInner as _};
 use ::db::models::USE_FAST_CACHE;
@@ -257,6 +257,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
     }
     @%- endif %@
 
+    #[allow(unused_parens)]
     #[allow(clippy::redundant_clone)]
     fn handle_cache_msg(self, sync_map: Arc<FxHashMap<ShardId, u64>>) -> BoxFuture<'static, ()> {
         async move {
@@ -1895,6 +1896,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
         Ok(())
     }", "") }@
 @{- def.relations_many_without_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.{rel_name}.is_some() {
             return Ok(());
@@ -1964,6 +1966,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
         Ok(())
     }", "") }@
 @{- def.relations_many_without_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.{rel_name}.is_some() {
             return Ok(());
@@ -2014,6 +2017,7 @@ impl CacheWrapperTr for CacheWrapper {
         Ok(())
     }", "") }@
 @{- def.relations_many_cache_without_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         let mut l: Vec<_> = repo_{class_mod}::{class}_::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).collect();
@@ -2121,6 +2125,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         Ok(())
     }", "") }@
 @{- def.relations_many_uncached_without_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.{rel_name}.is_some() {
             return Ok(());
@@ -2196,6 +2201,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         Ok(())
     }", "") }@
 @{- def.relations_many_without_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
@@ -2216,6 +2222,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         Ok(())
     }", "") }@
 @{- def.relations_many_with_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let queries: Result<Vec<_>> = self.iter().map(|v| {
@@ -2273,6 +2280,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         Ok(())
     }", "") }@
 @{- def.relations_one(false)|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
@@ -2293,6 +2301,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         Ok(())
     }", "") }@
 @{- def.relations_many_without_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
@@ -2313,6 +2322,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         Ok(())
     }", "") }@
 @{- def.relations_many_with_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let queries: Result<Vec<_>> = self.iter().map(|v| {
@@ -2370,6 +2380,7 @@ impl CacheWrapperVecTr for CacheWrapper {
         Ok(())
     }", "") }@
 @{- def.relations_many_cache_without_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
@@ -2390,6 +2401,7 @@ impl CacheWrapperVecTr for CacheWrapper {
         Ok(())
     }", "") }@
 @{- def.relations_many_cache_with_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
         let queries: Vec<_> = vec.iter().map(|v| {
@@ -2466,6 +2478,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         Ok(())
     }", "") }@
 @{- def.relations_many_uncached_without_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
@@ -2486,6 +2499,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         Ok(())
     }", "") }@
 @{- def.relations_many_uncached_with_limit()|fmt_rel_join("
+    #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let queries: Result<Vec<_>> = self.iter().map(|v| {
@@ -2955,8 +2969,13 @@ impl BindTr for ColGeoDistance_ {
     ) -> Query<'_, DbType, DbArguments> {
         debug!("bind: {:?}", &self);
         match self {
+@%- if !config.is_mysql() %@
 @{- def.all_fields_only_geo()|fmt_join("
             ColGeoDistance_::{var}(v, d, srid) => query.bind(v.clone(){bind_as_for_filter}).bind(srid).bind(d).bind(v{bind_as_for_filter}).bind(srid).bind(d),", "") }@
+@%- else %@
+@{- def.all_fields_only_geo()|fmt_join("
+            ColGeoDistance_::{var}(v, d, srid) => query.bind(v.clone(){bind_as_for_filter}).bind(srid).bind(d),", "") }@
+@%- endif %@
             _ => unreachable!(),
         }
     }
@@ -3163,16 +3182,17 @@ pub enum Filter_ {
     AnyBits(ColOne_),
     In(ColMany_),
     NotIn(ColMany_),
-    MemberOf(ColJson_, Option<String>),
     Contains(ColJsonArray_, Option<String>),
-    Overlaps(ColJsonArray_, Option<String>),
     JsonIn(ColJsonArray_, String),
     JsonContainsPath(ColJson_, String),
     JsonEq(ColJson_, String),
+    JsonIsNull(ColJson_, String),
+    JsonIsNotNull(ColJson_, String),
     JsonLt(ColJson_, String),
     JsonLte(ColJson_, String),
     JsonGt(ColJson_, String),
     JsonGte(ColJson_, String),
+    GeoEquals(ColGeo_),
     Within(ColGeo_),
     Intersects(ColGeo_),
     Crosses(ColGeo_),
@@ -3216,16 +3236,17 @@ impl std::fmt::Display for Filter_ {
             Filter_::AnyBits(col) => write!(f, "AnyBits:{}", col._name()),
             Filter_::In(col) => write!(f, "In:{}", col._name()),
             Filter_::NotIn(col) => write!(f, "NotIn:{}", col._name()),
-            Filter_::MemberOf(col, _) => write!(f, "MemberOf:{}", col._name()),
             Filter_::Contains(col, _) => write!(f, "Contains:{}", col._name()),
-            Filter_::Overlaps(col, _) => write!(f, "Overlaps:{}", col._name()),
             Filter_::JsonIn(col, _) => write!(f, "JsonIn:{}", col._name()),
             Filter_::JsonContainsPath(col, _) => write!(f, "JsonContainsPath:{}", col._name()),
             Filter_::JsonEq(col, _) => write!(f, "JsonEq:{}", col._name()),
+            Filter_::JsonIsNull(col, _) => write!(f, "JsonIsNull:{}", col._name()),
+            Filter_::JsonIsNotNull(col, _) => write!(f, "JsonIsNotNull:{}", col._name()),
             Filter_::JsonLt(col, _) => write!(f, "JsonLt:{}", col._name()),
             Filter_::JsonLte(col, _) => write!(f, "JsonLte:{}", col._name()),
             Filter_::JsonGt(col, _) => write!(f, "JsonGt:{}", col._name()),
             Filter_::JsonGte(col, _) => write!(f, "JsonGte:{}", col._name()),
+            Filter_::GeoEquals(col) => write!(f, "GeoEquals:{}", col._name()),
             Filter_::Within(col) => write!(f, "Within:{}", col._name()),
             Filter_::Intersects(col) => write!(f, "Intersects:{}", col._name()),
             Filter_::Crosses(col) => write!(f, "Crosses:{}", col._name()),
@@ -3358,7 +3379,6 @@ pub use @{ filter_macro_name }@_json_array as filter_json_array;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_geo {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
-    (@{ col_name }@ $e:expr, $s:expr) => (@{ model_path }@::ColGeo_::@{ col_name|to_var_name }@($e.clone().try_into()?, $s));
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColGeo_::@{ col_name|to_var_name }@($e.clone().try_into()?, @{ column_def.srid() }@));
 @%- endfor %@
     () => ();
@@ -3368,7 +3388,6 @@ pub use @{ filter_macro_name }@_geo as filter_geo;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_geo_distance {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
-    (@{ col_name }@ $e:expr, $d:expr, $s:expr) => (@{ model_path }@::ColGeoDistance_::@{ col_name|to_var_name }@($e.clone().try_into()?, $d, $s));
     (@{ col_name }@ $e:expr, $d:expr) => (@{ model_path }@::ColGeoDistance_::@{ col_name|to_var_name }@($e.clone().try_into()?, $d, @{ column_def.srid() }@));
 @%- endfor %@
     () => ();
@@ -3440,31 +3459,24 @@ macro_rules! @{ filter_macro_name }@ {
     ($i:ident IN $e:expr) => (@{ model_path }@::Filter_::In(@{ model_path }@::filter_many!($i $e)));
     ($i:ident NOT IN ( $($e:expr),* )) => (@{ model_path }@::Filter_::NotIn(@{ model_path }@::filter_many!($i [ $( $e ),* ])));
     ($i:ident NOT IN $e:expr) => (@{ model_path }@::Filter_::NotIn(@{ model_path }@::filter_many!($i $e)));
-    ($i:ident HAS $e:expr) => (@{ model_path }@::Filter_::MemberOf(@{ model_path }@::filter_json!($i $e), None));
-    ($i:ident -> ($p:expr) HAS $e:expr) => (@{ model_path }@::Filter_::MemberOf(@{ model_path }@::filter_json!($i $e), Some($p.to_string())));
     ($i:ident CONTAINS [ $($e:expr),* ]) => (@{ model_path }@::Filter_::Contains(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), None));
     ($i:ident CONTAINS $e:expr) => (@{ model_path }@::Filter_::Contains(@{ model_path }@::filter_json_array!($i $e), None));
     ($i:ident -> ($p:expr) CONTAINS [ $($e:expr),* ]) => (@{ model_path }@::Filter_::Contains(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), Some($p.to_string())));
     ($i:ident -> ($p:expr) CONTAINS $e:expr) => (@{ model_path }@::Filter_::Contains(@{ model_path }@::filter_json_array!($i $e), Some($p.to_string())));
-    ($i:ident OVERLAPS [ $($e:expr),* ]) => (@{ model_path }@::Filter_::Overlaps(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), None));
-    ($i:ident OVERLAPS $e:expr) => (@{ model_path }@::Filter_::Overlaps(@{ model_path }@::filter_json_array!($i $e), None));
-    ($i:ident -> ($p:expr) OVERLAPS [ $($e:expr),* ]) => (@{ model_path }@::Filter_::Overlaps(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), Some($p.to_string())));
-    ($i:ident -> ($p:expr) OVERLAPS $e:expr) => (@{ model_path }@::Filter_::Overlaps(@{ model_path }@::filter_json_array!($i $e), Some($p.to_string())));
-    ($i:ident -> ($p:expr) IN [ $($e:expr),* ]) => (@{ model_path }@::Filter_::JsonIn(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), Some($p.to_string())));
-    ($i:ident -> ($p:expr) IN $e:expr) => (@{ model_path }@::Filter_::JsonIn(@{ model_path }@::filter_json_array!($i $e), Some($p.to_string())));
+    ($i:ident -> ($p:expr) IN [ $($e:expr),* ]) => (@{ model_path }@::Filter_::JsonIn(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), $p.to_string()));
+    ($i:ident -> ($p:expr) IN $e:expr) => (@{ model_path }@::Filter_::JsonIn(@{ model_path }@::filter_json_array!($i $e), $p.to_string()));
     ($i:ident JSON_CONTAINS_PATH ($p:expr)) => (@{ model_path }@::Filter_::JsonContainsPath(@{ model_path }@::filter_json!($i 0), $p.to_string()));
     ($i:ident -> ($p:expr) = $e:expr) => (@{ model_path }@::Filter_::JsonEq(@{ model_path }@::filter_json!($i $e), $p.to_string()));
+    ($i:ident -> ($p:expr) IS NULL) => (@{ model_path }@::Filter_::JsonIsNull(@{ model_path }@::filter_json!($i 0), $p.to_string()));
+    ($i:ident -> ($p:expr) IS NOT NULL) => (@{ model_path }@::Filter_::JsonIsNotNull(@{ model_path }@::filter_json!($i 0), $p.to_string()));
     ($i:ident -> ($p:expr) < $e:expr) => (@{ model_path }@::Filter_::JsonLt(@{ model_path }@::filter_json!($i $e), $p.to_string()));
     ($i:ident -> ($p:expr) <= $e:expr) => (@{ model_path }@::Filter_::JsonLte(@{ model_path }@::filter_json!($i $e), $p.to_string()));
     ($i:ident -> ($p:expr) > $e:expr) => (@{ model_path }@::Filter_::JsonGt(@{ model_path }@::filter_json!($i $e), $p.to_string()));
     ($i:ident -> ($p:expr) >= $e:expr) => (@{ model_path }@::Filter_::JsonGte(@{ model_path }@::filter_json!($i $e), $p.to_string()));
-    ($i:ident WITHIN_WITH_SRID $e:expr, $s:expr) => (@{ model_path }@::Filter_::Within(@{ model_path }@::filter_geo!($i $e, $s)));
+    ($i:ident GEO_EQUALS $e:expr) => (@{ model_path }@::Filter_::GeoEquals(@{ model_path }@::filter_geo!($i $e)));
     ($i:ident WITHIN $e:expr) => (@{ model_path }@::Filter_::Within(@{ model_path }@::filter_geo!($i $e)));
-    ($i:ident INTERSECTS_WITH_SRID $e:expr, $s:expr) => (@{ model_path }@::Filter_::Intersects(@{ model_path }@::filter_geo!($i $e, $s)));
     ($i:ident INTERSECTS $e:expr) => (@{ model_path }@::Filter_::Intersects(@{ model_path }@::filter_geo!($i $e)));
-    ($i:ident CROSSES_WITH_SRID $e:expr, $s:expr) => (@{ model_path }@::Filter_::Crosses(@{ model_path }@::filter_geo!($i $e, $s)));
     ($i:ident CROSSES $e:expr) => (@{ model_path }@::Filter_::Crosses(@{ model_path }@::filter_geo!($i $e)));
-    ($i:ident D_WITHIN_WITH_SRID $e:expr, $d:expr, $s:expr) => (@{ model_path }@::Filter_::DWithin(@{ model_path }@::filter_geo_distance!($i $e, $d, $s)));
     ($i:ident D_WITHIN $e:expr, $d:expr) => (@{ model_path }@::Filter_::DWithin(@{ model_path }@::filter_geo_distance!($i $e, $d)));
     ($t1:tt AND $($t2:tt)AND+) => (@{ model_path }@::Filter_::And(vec![ @{ model_path }@::filter!($t1), $( @{ model_path }@::filter!($t2) ),* ]));
     ($t1:tt OR $($t2:tt)OR+) => (@{ model_path }@::Filter_::Or(vec![ @{ model_path }@::filter!($t1), $( @{ model_path }@::filter!($t2) ),* ]));
@@ -6369,7 +6381,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     @%- endif %@
     let sql = format!(r#"INSERT INTO @{ table_name|db_esc }@ 
         (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
-        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
+        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE SET") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
     @%- if !config.is_mysql() %@
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
@@ -6607,7 +6619,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         @%- else %@
         const SQL1: &str = r#"INTO @{ table_name|db_esc }@ AS new (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES "#;
         const SQL2: &str = r#"(@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)"#;
-        const SQL3: &str = r#" ON CONFLICT DO UPDATE @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@"#;
+        const SQL3: &str = r#" ON CONFLICT DO UPDATE SET @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=excluded.{col_esc}", ",") }@"#;
         @%- endif %@
         let mut sql = String::with_capacity(SQL_IGNORE.len() + SQL1.len() + (SQL2.len() + 1) * list.len() + SQL3.len()@% if !config.is_mysql() && def.is_auto_inc() %@ + 30@% endif %@);
         if ignore {
@@ -6764,7 +6776,7 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     @%- if def.versioned %@
     vec.push(r#"\"@{ version_col }@\" = IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0)"#.to_string());
     @%- endif %@
-    write!(sql, " @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE") }@ {}", &vec.join(","))?;
+    write!(sql, " @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE SET") }@ {}", &vec.join(","))?;
     @%- if !config.is_mysql() %@
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@

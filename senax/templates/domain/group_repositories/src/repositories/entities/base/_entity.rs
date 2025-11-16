@@ -759,16 +759,17 @@ pub enum Filter_ {
     AnyBits(ColOne_),
     In(ColMany_),
     NotIn(ColMany_),
-    MemberOf(ColJson_, Option<String>),
     Contains(ColJsonArray_, Option<String>),
-    Overlaps(ColJsonArray_, Option<String>),
     JsonIn(ColJsonArray_, String),
     JsonContainsPath(ColJson_, String),
     JsonEq(ColJson_, String),
+    JsonIsNull(ColJson_, String),
+    JsonIsNotNull(ColJson_, String),
     JsonLt(ColJson_, String),
     JsonLte(ColJson_, String),
     JsonGt(ColJson_, String),
     JsonGte(ColJson_, String),
+    GeoEquals(ColGeo_),
     Within(ColGeo_),
     Intersects(ColGeo_),
     Crosses(ColGeo_),
@@ -812,16 +813,17 @@ impl std::fmt::Display for Filter_ {
             Filter_::AnyBits(col) => write!(f, "AnyBits:{}", col._name()),
             Filter_::In(col) => write!(f, "In:{}", col._name()),
             Filter_::NotIn(col) => write!(f, "NotIn:{}", col._name()),
-            Filter_::MemberOf(col, _) => write!(f, "MemberOf:{}", col._name()),
             Filter_::Contains(col, _) => write!(f, "Contains:{}", col._name()),
-            Filter_::Overlaps(col, _) => write!(f, "Overlaps:{}", col._name()),
             Filter_::JsonIn(col, _) => write!(f, "JsonIn:{}", col._name()),
             Filter_::JsonContainsPath(col, _) => write!(f, "JsonContainsPath:{}", col._name()),
             Filter_::JsonEq(col, _) => write!(f, "JsonEq:{}", col._name()),
+            Filter_::JsonIsNull(col, _) => write!(f, "JsonIsNull:{}", col._name()),
+            Filter_::JsonIsNotNull(col, _) => write!(f, "JsonIsNotNull:{}", col._name()),
             Filter_::JsonLt(col, _) => write!(f, "JsonLt:{}", col._name()),
             Filter_::JsonLte(col, _) => write!(f, "JsonLte:{}", col._name()),
             Filter_::JsonGt(col, _) => write!(f, "JsonGt:{}", col._name()),
             Filter_::JsonGte(col, _) => write!(f, "JsonGte:{}", col._name()),
+            Filter_::GeoEquals(col) => write!(f, "GeoEquals:{}", col._name()),
             Filter_::Within(col) => write!(f, "Within:{}", col._name()),
             Filter_::Intersects(col) => write!(f, "Intersects:{}", col._name()),
             Filter_::Crosses(col) => write!(f, "Crosses:{}", col._name()),
@@ -1021,7 +1023,6 @@ pub use @{ filter_macro_name }@_json_array as filter_json_array;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_geo {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
-    (@{ col_name }@ $e:expr, $s:expr) => (@{ model_path }@::ColGeo_::@{ col_name|to_var_name }@($e.clone().try_into()?, $s));
     (@{ col_name }@ $e:expr) => (@{ model_path }@::ColGeo_::@{ col_name|to_var_name }@($e.clone().try_into()?, @{ column_def.srid() }@));
 @%- endfor %@
     () => ();
@@ -1031,7 +1032,6 @@ pub use @{ filter_macro_name }@_geo as filter_geo;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_geo_distance {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
-    (@{ col_name }@ $e:expr, $d:expr, $s:expr) => (@{ model_path }@::ColGeoDistance_::@{ col_name|to_var_name }@($e.clone().try_into()?, $d, $s));
     (@{ col_name }@ $e:expr, $d:expr) => (@{ model_path }@::ColGeoDistance_::@{ col_name|to_var_name }@($e.clone().try_into()?, $d, @{ column_def.srid() }@));
 @%- endfor %@
     () => ();
@@ -1107,31 +1107,24 @@ macro_rules! @{ filter_macro_name }@ {
     ($i:ident IN $e:expr) => (@{ model_path }@::Filter_::In(@{ model_path }@::filter_many!($i $e)));
     ($i:ident NOT IN ( $($e:expr),* )) => (@{ model_path }@::Filter_::NotIn(@{ model_path }@::filter_many!($i [ $( $e ),* ])));
     ($i:ident NOT IN $e:expr) => (@{ model_path }@::Filter_::NotIn(@{ model_path }@::filter_many!($i $e)));
-    ($i:ident HAS $e:expr) => (@{ model_path }@::Filter_::MemberOf(@{ model_path }@::filter_json!($i $e), None));
-    ($i:ident -> ($p:expr) HAS $e:expr) => (@{ model_path }@::Filter_::MemberOf(@{ model_path }@::filter_json!($i $e), Some($p.to_string())));
     ($i:ident CONTAINS [ $($e:expr),* ]) => (@{ model_path }@::Filter_::Contains(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), None));
     ($i:ident CONTAINS $e:expr) => (@{ model_path }@::Filter_::Contains(@{ model_path }@::filter_json_array!($i $e), None));
     ($i:ident -> ($p:expr) CONTAINS [ $($e:expr),* ]) => (@{ model_path }@::Filter_::Contains(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), Some($p.to_string())));
     ($i:ident -> ($p:expr) CONTAINS $e:expr) => (@{ model_path }@::Filter_::Contains(@{ model_path }@::filter_json_array!($i $e), Some($p.to_string())));
-    ($i:ident OVERLAPS [ $($e:expr),* ]) => (@{ model_path }@::Filter_::Overlaps(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), None));
-    ($i:ident OVERLAPS $e:expr) => (@{ model_path }@::Filter_::Overlaps(@{ model_path }@::filter_json_array!($i $e), None));
-    ($i:ident -> ($p:expr) OVERLAPS [ $($e:expr),* ]) => (@{ model_path }@::Filter_::Overlaps(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), Some($p.to_string())));
-    ($i:ident -> ($p:expr) OVERLAPS $e:expr) => (@{ model_path }@::Filter_::Overlaps(@{ model_path }@::filter_json_array!($i $e), Some($p.to_string())));
-    ($i:ident -> ($p:expr) IN [ $($e:expr),* ]) => (@{ model_path }@::Filter_::JsonIn(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), Some($p.to_string())));
-    ($i:ident -> ($p:expr) IN $e:expr) => (@{ model_path }@::Filter_::JsonIn(@{ model_path }@::filter_json_array!($i $e), Some($p.to_string())));
+    ($i:ident -> ($p:expr) IN [ $($e:expr),* ]) => (@{ model_path }@::Filter_::JsonIn(@{ model_path }@::filter_json_array!($i vec![ $( $e ),* ]), $p.to_string()));
+    ($i:ident -> ($p:expr) IN $e:expr) => (@{ model_path }@::Filter_::JsonIn(@{ model_path }@::filter_json_array!($i $e), $p.to_string()));
     ($i:ident JSON_CONTAINS_PATH ($p:expr)) => (@{ model_path }@::Filter_::JsonContainsPath(@{ model_path }@::filter_json!($i 0), $p.to_string()));
     ($i:ident -> ($p:expr) = $e:expr) => (@{ model_path }@::Filter_::JsonEq(@{ model_path }@::filter_json!($i $e), $p.to_string()));
+    ($i:ident -> ($p:expr) IS NULL) => (@{ model_path }@::Filter_::JsonIsNull(@{ model_path }@::filter_json!($i 0), $p.to_string()));
+    ($i:ident -> ($p:expr) IS NOT NULL) => (@{ model_path }@::Filter_::JsonIsNotNull(@{ model_path }@::filter_json!($i 0), $p.to_string()));
     ($i:ident -> ($p:expr) < $e:expr) => (@{ model_path }@::Filter_::JsonLt(@{ model_path }@::filter_json!($i $e), $p.to_string()));
     ($i:ident -> ($p:expr) <= $e:expr) => (@{ model_path }@::Filter_::JsonLte(@{ model_path }@::filter_json!($i $e), $p.to_string()));
     ($i:ident -> ($p:expr) > $e:expr) => (@{ model_path }@::Filter_::JsonGt(@{ model_path }@::filter_json!($i $e), $p.to_string()));
     ($i:ident -> ($p:expr) >= $e:expr) => (@{ model_path }@::Filter_::JsonGte(@{ model_path }@::filter_json!($i $e), $p.to_string()));
-    ($i:ident WITHIN_WITH_SRID $e:expr, $s:expr) => (@{ model_path }@::Filter_::Within(@{ model_path }@::filter_geo!($i $e, $s)));
+    ($i:ident GEO_EQUALS $e:expr) => (@{ model_path }@::Filter_::GeoEquals(@{ model_path }@::filter_geo!($i $e)));
     ($i:ident WITHIN $e:expr) => (@{ model_path }@::Filter_::Within(@{ model_path }@::filter_geo!($i $e)));
-    ($i:ident INTERSECTS_WITH_SRID $e:expr, $s:expr) => (@{ model_path }@::Filter_::Intersects(@{ model_path }@::filter_geo!($i $e, $s)));
     ($i:ident INTERSECTS $e:expr) => (@{ model_path }@::Filter_::Intersects(@{ model_path }@::filter_geo!($i $e)));
-    ($i:ident CROSSES_WITH_SRID $e:expr, $s:expr) => (@{ model_path }@::Filter_::Crosses(@{ model_path }@::filter_geo!($i $e, $s)));
     ($i:ident CROSSES $e:expr) => (@{ model_path }@::Filter_::Crosses(@{ model_path }@::filter_geo!($i $e)));
-    ($i:ident D_WITHIN_WITH_SRID $e:expr, $d:expr, $s:expr) => (@{ model_path }@::Filter_::DWithin(@{ model_path }@::filter_geo_distance!($i $e, $d, $s)));
     ($i:ident D_WITHIN $e:expr, $d:expr) => (@{ model_path }@::Filter_::DWithin(@{ model_path }@::filter_geo_distance!($i $e, $d)));
     ($t1:tt AND $($t2:tt)AND+) => (@{ model_path }@::Filter_::And(vec![ @{ model_path }@::filter!($t1), $( @{ model_path }@::filter!($t2) ),* ]));
     ($t1:tt OR $($t2:tt)OR+) => (@{ model_path }@::Filter_::Or(vec![ @{ model_path }@::filter!($t1), $( @{ model_path }@::filter!($t2) ),* ]));
@@ -1218,6 +1211,8 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
     }
     @%- endif %@
     fn convert_factory(&self, _factory: @{ pascal_name }@Factory) -> Box<dyn _Updater> {
+        #[allow(unused_imports)]
+        use base_domain::models::ToRawValue as _;
         Box::new(@{ pascal_name }@Entity {
 @{- def.non_auto_primary_for_factory()|fmt_join("
             {var}: _factory.{var}{convert_domain_factory},", "") }@

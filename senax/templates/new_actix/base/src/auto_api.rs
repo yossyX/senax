@@ -46,7 +46,7 @@ impl GqlError {
         let ctx = gql_ctx.data::<Ctx>().unwrap();
         if let Some(e) = reason.downcast_ref::<senax_common::err::RowNotFound>() {
             warn!(target: "server::row_not_found", ctx = ctx.ctx_no(), table = e.table; "{}", e.id);
-            GqlError::BadRequest.extend()
+            GqlError::NotFound.extend()
         } else if let Some(e) = reason.downcast_ref::<GqlError>() {
             e.extend()
         } else if let Some(e) = reason.downcast_ref::<sqlx::Error>() {
@@ -68,7 +68,7 @@ impl GqlError {
                 },
                 sqlx::Error::RowNotFound => {
                     log::warn!(ctx = ctx.ctx_no(); "{}", reason);
-                    GqlError::BadRequest.extend()
+                    GqlError::NotFound.extend()
                 }
                 _ => {
                     log::error!(ctx = ctx.ctx_no(); "{}", reason);

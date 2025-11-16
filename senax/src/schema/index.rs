@@ -16,8 +16,8 @@ pub enum IndexType {
     Unique,
     /// ### フルテキスト(mysqlのみ)
     Fulltext,
-    /// ### 空間インデックス(mysqlのみ)
-    Spatial,
+    /// ### 空間インデックス
+    Geometry,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]

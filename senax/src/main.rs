@@ -51,8 +51,9 @@ mod schema_md;
 
 pub const SCHEMA_PATH: &str = "0_schema";
 pub const DOMAIN_PATH: &str = "1_domain";
-pub const BASE_DOMAIN_PATH: &str = "1_domain/base_domain";
-pub const DOMAIN_REPOSITORIES_PATH: &str = "1_domain/repositories";
+pub const BASE_DOMAIN_PATH: &str = "base_domain";
+pub const USER_DEFINED_TYPES_PATH: &str = "user_defined_types";
+pub const DOMAIN_REPOSITORIES_PATH: &str = "repositories";
 pub const DB_PATH: &str = "2_db";
 pub const SIMPLE_VALUE_OBJECTS_FILE: &str = "_simple_value_objects.yml";
 pub const DEFAULT_CONFIG_HOST: &str = "0.0.0.0";

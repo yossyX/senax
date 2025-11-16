@@ -1,6 +1,6 @@
 use anyhow::{Result, bail};
 use indexmap::IndexMap;
-use senax_pgsql_parser::{ForeignKeyAction, PostgreSQLDataType};
+use senax_pgsql_parser::{ForeignKeyAction, IndexType, PostgreSQLDataType};
 
 use crate::ddl::sql_type::{IndexColumn, Literal, ReferenceOption, SqlType, TableKey};
 use crate::ddl::table::{Column, Constraint, Table};
@@ -109,6 +109,11 @@ fn convert_indexes(org: &[senax_pgsql_parser::IndexInfo]) -> IndexMap<String, Ta
                 index.index_name.clone(),
                 TableKey::UniqueKey(index.index_name.clone(), cols),
             );
+        } else if index.index_type == IndexType::Gist {
+            indexes.insert(
+                index.index_name.clone(),
+                TableKey::GeometryKey(index.index_name.clone(), cols),
+            );
         } else {
             indexes.insert(
                 index.index_name.clone(),
@@ -190,7 +195,7 @@ fn convert_type(typ: &PostgreSQLDataType) -> Result<(SqlType, Option<SqlType>)> 
         PostgreSQLDataType::Boolean => (SqlType::Bool, None),
         PostgreSQLDataType::Uuid => (SqlType::Uuid, None),
         PostgreSQLDataType::Json => (SqlType::Json, None),
-        PostgreSQLDataType::Jsonb => (SqlType::Json, None),
+        PostgreSQLDataType::Jsonb => (SqlType::Jsonb, None),
         PostgreSQLDataType::Array(_postgre_sqldata_type) => bail!("unsupported PostgreSQL Array"),
         PostgreSQLDataType::Geometry(info) => {
             if let Some(info) = info {
@@ -200,7 +205,7 @@ fn convert_type(typ: &PostgreSQLDataType) -> Result<(SqlType, Option<SqlType>)> 
                     (SqlType::Geometry, None)
                 }
             } else {
-                bail!("unsupported PostgreSQL Geometry");
+                (SqlType::Geometry, None)
             }
         }
         PostgreSQLDataType::Geography(info) => {
@@ -211,7 +216,7 @@ fn convert_type(typ: &PostgreSQLDataType) -> Result<(SqlType, Option<SqlType>)> 
                     (SqlType::Geometry, None)
                 }
             } else {
-                bail!("unsupported PostgreSQL Geography");
+                (SqlType::Geometry, None)
             }
         }
         PostgreSQLDataType::Custom(v) => bail!("unsupported PostgreSQL Custom: {}", v),
@@ -221,10 +226,12 @@ fn convert_type(typ: &PostgreSQLDataType) -> Result<(SqlType, Option<SqlType>)> 
 
 fn srid(typ: &PostgreSQLDataType) -> Option<u32> {
     match typ {
-        PostgreSQLDataType::Geography(geometry_info) => geometry_info
-            .as_ref()
-            .and_then(|v| v.srid)
-            .map(|v| v as u32),
+        PostgreSQLDataType::Geometry(geometry_info) => {
+            Some(geometry_info.as_ref().and_then(|v| v.srid).unwrap_or(0) as u32)
+        }
+        PostgreSQLDataType::Geography(geometry_info) => {
+            Some(geometry_info.as_ref().and_then(|v| v.srid).unwrap_or(4326) as u32)
+        }
         _ => None,
     }
 }

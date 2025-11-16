@@ -12,6 +12,7 @@ seeder = [ "schemars" ]
 [dependencies]
 @%- if !config.exclude_from_domain %@
 base_domain = { path = "../../../1_domain/base_domain" }
+user_defined_types = { path = "../../../1_domain/user_defined_types" }
 @%- endif %@
 @%- for db in config.outer_db() %@
 db_@{ db|snake }@ = { package="_db_@{ db|snake }@", path = "../../@{ db|snake }@/base" }

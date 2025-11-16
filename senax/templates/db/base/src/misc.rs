@@ -218,17 +218,18 @@ impl Size for JsonRawValue {
 }
 impl std::fmt::Debug for JsonRawValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self._into_json())
+        let s: String = self.into();
+        write!(f, "{}", s)
     }
 }
 impl JsonRawValue {
-    pub fn _into_json(&self) -> String {
-        let s: String = self.into();
-        assert!(s.len() <= 4294967295, "Incorrect JSON length.");
-        s
-    }
-    pub fn _to_value(&self) -> std::sync::Arc<Box<serde_json::value::RawValue>> {
+    pub fn to_raw_value(&self) -> std::sync::Arc<Box<serde_json::value::RawValue>> {
         std::sync::Arc::clone(&self.0)
+    }
+}
+impl AsRef<serde_json::value::RawValue> for JsonRawValue {
+    fn as_ref(&self) -> &serde_json::value::RawValue {
+        &self.0
     }
 }
 pub trait ToJsonRawValue {

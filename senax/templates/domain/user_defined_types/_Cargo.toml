@@ -1,0 +1,11 @@
+[package]
+name = "user_defined_types"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+async-graphql.workspace = true
+schemars.workspace = true
+serde.workspace = true
+utoipa.workspace = true

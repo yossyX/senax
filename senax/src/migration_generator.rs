@@ -200,6 +200,7 @@ pub fn make_table_def(
             schema::DataType::ArrayInt => SqlType::Json,
             schema::DataType::ArrayString => SqlType::Json,
             schema::DataType::Json => SqlType::Json,
+            schema::DataType::Jsonb => SqlType::Jsonb,
             schema::DataType::DbEnum => SqlType::Enum(
                 col.enum_values
                     .as_ref()
@@ -227,6 +228,8 @@ pub fn make_table_def(
             SqlType::Varchar(schema::UUID_LENGTH)
         } else if col.data_type == schema::DataType::BinaryUuid {
             SqlType::Varbinary(schema::BINARY_UUID_LENGTH)
+        } else if is_mysql_mode() && col.data_type == schema::DataType::Jsonb {
+            SqlType::Json
         } else {
             sql_type.clone()
         };
@@ -311,7 +314,7 @@ pub fn make_table_def(
                 } else {
                     None
                 };
-                if !col.not_null && index.index_type == Some(schema::IndexType::Spatial) {
+                if !col.not_null && index.index_type == Some(schema::IndexType::Geometry) && is_mysql_mode() {
                     error_exit!("All parts of a SPATIAL index must be NOT NULL: {}", n)
                 }
                 let desc = c
@@ -358,12 +361,12 @@ pub fn make_table_def(
                 index_name.clone(),
                 TableKey::FulltextKey(index_name, cols, index.parser.map(|v| v.to_string())),
             );
-        } else if index.index_type == Some(schema::IndexType::Spatial) {
+        } else if index.index_type == Some(schema::IndexType::Geometry) {
             let index_name = format!("SP_{}", index_name);
             idx_map.insert(org_index_name.clone(), index_name.clone());
             table
                 .indexes
-                .insert(index_name.clone(), TableKey::SpatialKey(index_name, cols));
+                .insert(index_name.clone(), TableKey::GeometryKey(index_name, cols));
         } else {
             let mut check = String::new();
             for col in &cols {
@@ -1011,6 +1014,18 @@ fn make_ddl(
                                 .join(",")
                         )?;
                     }
+                    if let TableKey::GeometryKey(index_name, cols) = index {
+                        writeln!(
+                            &mut result1,
+                            "CREATE INDEX {} ON {} USING GIST ({});",
+                            &escape_db_identifier(index_name),
+                            &escape_db_identifier(table_name),
+                            cols.iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        )?;
+                    }
                 }
             }
         }
@@ -1044,6 +1059,17 @@ fn make_ddl(
                         if let TableKey::UniqueKey(index_name, cols) = index {
                             result2.push(format!(
                                 "CREATE UNIQUE INDEX CONCURRENTLY {} ON {} ({});",
+                                &escape_db_identifier(index_name),
+                                &escape_db_identifier(table_name),
+                                cols.iter()
+                                    .map(|v| v.to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ));
+                        }
+                        if let TableKey::GeometryKey(index_name, cols) = index {
+                            result2.push(format!(
+                                "CREATE INDEX CONCURRENTLY {} ON {} USING GIST ({});",
                                 &escape_db_identifier(index_name),
                                 &escape_db_identifier(table_name),
                                 cols.iter()

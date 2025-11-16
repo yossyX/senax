@@ -6,6 +6,7 @@ publish = false
 
 [dependencies]
 domain = { path = "../../../../1_domain" }
+user_defined_types = { path = "../../../../1_domain/user_defined_types" }
 _@{ server|snake }@ = { path = "../../../base" }
 
 actix-web = "4.1"

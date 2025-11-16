@@ -224,17 +224,7 @@ macro_rules! filter {
                         buf.push_str(") AND ");
                     }
                 }
-                Filter_::MemberOf(c, p) => {
-                    buf.push_str("CAST(? AS JSON) MEMBER OF (");
-                    if p.is_some() {
-                        buf.push_str("JSON_EXTRACT(");
-                        buf.push_str(c.name());
-                        buf.push_str(", ?)");
-                    } else {
-                        buf.push_str(c.name());
-                    }
-                    buf.push_str(") AND ");
-                }
+@%- if config.is_mysql() %@
                 Filter_::Contains(c, p) => {
                     buf.push_str("JSON_CONTAINS(");
                     if p.is_some() {
@@ -245,17 +235,8 @@ macro_rules! filter {
                         buf.push_str(c.name());
                     }
                     buf.push_str(", CAST(? AS JSON)) AND ");
-                }
-                Filter_::Overlaps(c, p) => {
-                    buf.push_str("JSON_OVERLAPS(");
-                    if p.is_some() {
-                        buf.push_str("JSON_EXTRACT(");
-                        buf.push_str(c.name());
-                        buf.push_str(", ?)");
-                    } else {
-                        buf.push_str(c.name());
-                    }
-                    buf.push_str(", CAST(? AS JSON)) AND ");
+                    @#- JSON_EXTRACTのpathをJSON_CONTAINSの引数にするとインデックスが有効にならないので注意 #@
+                    @#- Be careful because using a path as an argument for JSON_CONTAINS will prevent the index from being used. #@
                 }
                 Filter_::JsonIn(c, p) => {
                     buf.push_str("JSON_OVERLAPS(JSON_EXTRACT(");
@@ -272,6 +253,16 @@ macro_rules! filter {
                     buf.push_str("JSON_EXTRACT(");
                     buf.push_str(c.name());
                     buf.push_str(", ?) = CAST(? AS JSON) AND ");
+                }
+                Filter_::JsonIsNull(c, _p) => {
+                    buf.push_str("JSON_EXTRACT(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ?) IS NULL AND ");
+                }
+                Filter_::JsonIsNotNull(c, _p) => {
+                    buf.push_str("JSON_EXTRACT(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ?) IS NOT NULL AND ");
                 }
                 Filter_::JsonLt(c, _p) => {
                     buf.push_str("JSON_EXTRACT(");
@@ -293,29 +284,118 @@ macro_rules! filter {
                     buf.push_str(c.name());
                     buf.push_str(", ?) >= CAST(? AS JSON) AND ");
                 }
+                Filter_::GeoEquals(c) => {
+                    buf.push_str("ST_Equals(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_GeomFromGeoJSON(?, 1, ?)) AND ");
+                }
                 Filter_::Within(c) => {
                     buf.push_str("ST_Within(");
                     buf.push_str(c.name());
-                    buf.push_str(", ST_GeomFromGeoJSON(?, 2, ?)) AND ");
+                    buf.push_str(", ST_GeomFromGeoJSON(?, 1, ?)) AND ");
                 }
                 Filter_::Intersects(c) => {
                     buf.push_str("ST_Intersects(");
                     buf.push_str(c.name());
-                    buf.push_str(", ST_GeomFromGeoJSON(?, 2, ?)) AND ");
+                    buf.push_str(", ST_GeomFromGeoJSON(?, 1, ?)) AND ");
                 }
                 Filter_::Crosses(c) => {
                     buf.push_str("ST_Crosses(");
                     buf.push_str(c.name());
-                    buf.push_str(", ST_GeomFromGeoJSON(?, 2, ?)) AND ");
+                    buf.push_str(", ST_GeomFromGeoJSON(?, 1, ?)) AND ");
                 }
                 Filter_::DWithin(c) => {
                     buf.push_str("ST_Distance(");
                     buf.push_str(c.name());
-                    buf.push_str(", ST_GeomFromGeoJSON(?, 2, ?)) <= ? AND ");
+                    buf.push_str(", ST_GeomFromGeoJSON(?, 1, ?)) <= ? AND ");
+                    buf.push_str("ST_Intersects(");  // For searches using an index
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_Buffer(ST_GeomFromGeoJSON(?, 1, ?), ? * 1.1)) AND ");
+                }
+@%- else %@
+                Filter_::Contains(c, p) => {
+                    if p.is_some() {
+                        buf.push_str("jsonb_path_query_first(");
+                        buf.push_str(c.name());
+                        buf.push_str("::jsonb, ?::jsonpath)");
+                    } else {
+                        buf.push_str(c.name());
+                        buf.push_str("::jsonb");
+                    }
+                    buf.push_str(" @> ?::jsonb AND ");
+                }
+                Filter_::JsonIn(c, p) => {
+                    buf.push_str("jsonb_path_query_first(");
+                    buf.push_str(c.name());
+                    buf.push_str("::jsonb, ?::jsonpath)");
+                    buf.push_str(" <@ ?::jsonb AND ");
+                }
+                Filter_::JsonContainsPath(c, _p) => {
+                    buf.push_str("jsonb_path_exists(");
+                    buf.push_str(c.name());
+                    buf.push_str("::jsonb, ?::jsonpath) AND ");
+                }
+                Filter_::JsonEq(c, _p) => {
+                    buf.push_str("jsonb_path_query_first(");
+                    buf.push_str(c.name());
+                    buf.push_str("::jsonb, ?::jsonpath) = ?::jsonb AND ");
+                }
+                Filter_::JsonIsNull(c, _p) => {
+                    buf.push_str("jsonb_path_query_first(");
+                    buf.push_str(c.name());
+                    buf.push_str("::jsonb, ?::jsonpath) IS NULL AND ");
+                }
+                Filter_::JsonIsNotNull(c, _p) => {
+                    buf.push_str("jsonb_path_query_first(");
+                    buf.push_str(c.name());
+                    buf.push_str("::jsonb, ?::jsonpath) IS NOT NULL AND ");
+                }
+                Filter_::JsonLt(c, _p) => {
+                    buf.push_str("jsonb_path_query_first(");
+                    buf.push_str(c.name());
+                    buf.push_str("::jsonb, ?::jsonpath) < ?::jsonb AND ");
+                }
+                Filter_::JsonLte(c, _p) => {
+                    buf.push_str("jsonb_path_query_first(");
+                    buf.push_str(c.name());
+                    buf.push_str("::jsonb, ?::jsonpath) <= ?::jsonb AND ");
+                }
+                Filter_::JsonGt(c, _p) => {
+                    buf.push_str("jsonb_path_query_first(");
+                    buf.push_str(c.name());
+                    buf.push_str("::jsonb, ?::jsonpath) > ?::jsonb AND ");
+                }
+                Filter_::JsonGte(c, _p) => {
+                    buf.push_str("jsonb_path_query_first(");
+                    buf.push_str(c.name());
+                    buf.push_str("::jsonb, ?::jsonpath) >= ?::jsonb AND ");
+                }
+                Filter_::GeoEquals(c) => {
+                    buf.push_str("ST_Equals(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_SetSRID(ST_GeomFromGeoJSON(?), ?)) AND ");
+                }
+                Filter_::Within(c) => {
+                    buf.push_str("ST_Within(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_SetSRID(ST_GeomFromGeoJSON(?), ?)) AND ");
+                }
+                Filter_::Intersects(c) => {
                     buf.push_str("ST_Intersects(");
                     buf.push_str(c.name());
-                    buf.push_str(", ST_Buffer(ST_GeomFromGeoJSON(?, 2, ?), ? * 1.1)) AND ");
+                    buf.push_str(", ST_SetSRID(ST_GeomFromGeoJSON(?), ?)) AND ");
                 }
+                Filter_::Crosses(c) => {
+                    buf.push_str("ST_Crosses(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_SetSRID(ST_GeomFromGeoJSON(?), ?)) AND ");
+                }
+                Filter_::DWithin(c) => {
+                    buf.push_str("ST_DWithin(");
+                    buf.push_str(c.name());
+                    buf.push_str(", ST_SetSRID(ST_GeomFromGeoJSON(?), ?), ?) AND ");
+                }
+@%- endif %@
                 Filter_::Not(c) => {
                     buf.push_str("NOT (");
                     c.write(buf, idx, trash_mode, shard_id, is_outer);
@@ -409,16 +489,17 @@ macro_rules! filter {
                 Filter_::AnyBits(c) => c.bind_to_query(query),
                 Filter_::In(c) => c.bind_to_query(query),
                 Filter_::NotIn(c) => c.bind_to_query(query),
-                Filter_::MemberOf(c, p) => if let Some(p) = p { c.bind_to_query(query).bind(p) } else { c.bind_to_query(query) },
                 Filter_::Contains(c, p) => if let Some(p) = p { c.bind_to_query(query.bind(p)) } else { c.bind_to_query(query) },
-                Filter_::Overlaps(c, p) => if let Some(p) = p { c.bind_to_query(query.bind(p)) } else { c.bind_to_query(query) },
                 Filter_::JsonIn(c, p) => c.bind_to_query(query.bind(p)),
                 Filter_::JsonContainsPath(c, p) => query.bind(p),
                 Filter_::JsonEq(c, p) => c.bind_to_query(query.bind(p)),
+                Filter_::JsonIsNull(c, p) => query.bind(p),
+                Filter_::JsonIsNotNull(c, p) => query.bind(p),
                 Filter_::JsonLt(c, p) => c.bind_to_query(query.bind(p)),
                 Filter_::JsonLte(c, p) => c.bind_to_query(query.bind(p)),
                 Filter_::JsonGt(c, p) => c.bind_to_query(query.bind(p)),
                 Filter_::JsonGte(c, p) => c.bind_to_query(query.bind(p)),
+                Filter_::GeoEquals(c) => c.bind_to_query(query),
                 Filter_::Within(c) => c.bind_to_query(query),
                 Filter_::Intersects(c) => c.bind_to_query(query),
                 Filter_::Crosses(c) => c.bind_to_query(query),
@@ -510,22 +591,28 @@ macro_rules! order {
 }
 pub use order;
 
-pub trait IntoJson<T> {
-    fn _into_json_str(&self) -> String;
-    fn _into_json(&self) -> Option<serde_json::Value>;
+pub trait ToBindableJson<T> {
+@%- if config.is_mysql() %@
+    fn _to_bindable_json(&self) -> String;
+@%- else %@
+    fn _to_bindable_json(&self) -> Option<serde_json::Value>;
+@% endif %@
 }
 
-impl<T> IntoJson<T> for T
+impl<T> ToBindableJson<T> for T
 where
     T: serde::Serialize,
 {
-    fn _into_json_str(&self) -> String {
+@%- if config.is_mysql() %@
+    fn _to_bindable_json(&self) -> String {
         let s = serde_json::to_string(self).unwrap();
         assert!(s.len() <= @{ config.max_db_str_len() }@, "Incorrect JSON length.");
         s
     }
-    fn _into_json(&self) -> Option<serde_json::Value> {
+@%- else %@
+    fn _to_bindable_json(&self) -> Option<serde_json::Value> {
         Some(serde_json::to_value(self).unwrap())
     }
+@% endif %@
 }
 @{-"\n"}@

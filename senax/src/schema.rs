@@ -363,6 +363,10 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         column_def.srid = Some(DEFAULT_SRID);
                     }
                 }
+                if let Some(user_defined_json_type) = &column_def.user_defined_json_type {
+                    column_def.user_defined_json_type =
+                        Some(format!("user_defined_types::{user_defined_json_type}"));
+                }
                 def.fields.insert(col_name.clone(), column_def.into());
             }
             def.merged_fields = def.fields.iter().fold(IndexMap::new(), |mut map, (k, v)| {

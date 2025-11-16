@@ -19,6 +19,7 @@ use crate::schema::{
 };
 use crate::schema::{IndexFieldDef, IndexType, Parser};
 
+#[allow(clippy::collapsible_if)]
 pub async fn generate(
     db: &str,
     db_url: &Option<String>,
@@ -286,6 +287,9 @@ pub async fn generate(
                 SqlType::Json => {
                     field.data_type = DataType::Json;
                 }
+                SqlType::Jsonb => {
+                    field.data_type = DataType::Jsonb;
+                }
                 SqlType::Point => {
                     field.data_type = DataType::GeoPoint;
                     field.srid = column.constraint.srid;
@@ -294,10 +298,10 @@ pub async fn generate(
                     field.data_type = DataType::Geometry;
                     field.srid = column.constraint.srid;
                 }
-                SqlType::UnSupported => unimplemented!(),
                 SqlType::Uuid => {
                     field.data_type = DataType::Uuid;
                 }
+                SqlType::UnSupported => unimplemented!(),
             };
             // field.character_set = column.constraint.character_set.clone();
             if is_mysql_mode() && field.data_type == DataType::Uuid {
@@ -696,7 +700,7 @@ pub async fn generate(
                         indexes.insert(name, Some(def));
                     }
                 }
-                TableKey::SpatialKey(name, cols) => {
+                TableKey::GeometryKey(name, cols) => {
                     let mut def = IndexDef {
                         fields: cols.iter().fold(IndexMap::new(), |mut map, col| {
                             map.insert(
@@ -713,7 +717,7 @@ pub async fn generate(
                             );
                             map
                         }),
-                        index_type: Some(IndexType::Spatial),
+                        index_type: Some(IndexType::Geometry),
                         parser: None,
                         force_index_on: Default::default(),
                     };

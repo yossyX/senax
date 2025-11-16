@@ -1339,6 +1339,7 @@ impl ModelDef {
                         || v.data_type == DataType::ArrayInt
                         || v.data_type == DataType::ArrayString
                         || v.data_type == DataType::Json
+                        || v.data_type == DataType::Jsonb
                         || v.data_type == DataType::Geometry)
             })
             .collect()
@@ -1356,6 +1357,7 @@ impl ModelDef {
                         || v.data_type == DataType::ArrayInt
                         || v.data_type == DataType::ArrayString
                         || v.data_type == DataType::Json
+                        || v.data_type == DataType::Jsonb
                         || v.data_type == DataType::Geometry)
             })
             .collect()
@@ -1367,6 +1369,7 @@ impl ModelDef {
                 !(v.data_type == DataType::ArrayInt
                     || v.data_type == DataType::ArrayString
                     || v.data_type == DataType::Json
+                    || v.data_type == DataType::Jsonb
                     || v.data_type == DataType::Point
                     || v.data_type == DataType::GeoPoint
                     || v.data_type == DataType::Geometry)
@@ -1386,6 +1389,7 @@ impl ModelDef {
                 !(v.data_type == DataType::ArrayInt
                     || v.data_type == DataType::ArrayString
                     || v.data_type == DataType::Json
+                    || v.data_type == DataType::Jsonb
                     || v.data_type == DataType::Point
                     || v.data_type == DataType::GeoPoint
                     || v.data_type == DataType::Geometry)
@@ -1405,6 +1409,7 @@ impl ModelDef {
                 !(v.data_type == DataType::ArrayInt
                     || v.data_type == DataType::ArrayString
                     || v.data_type == DataType::Json
+                    || v.data_type == DataType::Jsonb
                     || v.data_type == DataType::Point
                     || v.data_type == DataType::GeoPoint
                     || v.data_type == DataType::Geometry)
@@ -1435,6 +1440,7 @@ impl ModelDef {
                 v.data_type == DataType::ArrayInt
                     || v.data_type == DataType::ArrayString
                     || v.data_type == DataType::Json
+                    || v.data_type == DataType::Jsonb
             })
             .collect()
     }

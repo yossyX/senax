@@ -9,6 +9,7 @@ mock = ["mockall", "base_domain/mock"]
 
 [dependencies]
 base_domain = { path = "../../../../base_domain" }
+user_defined_types = { path = "../../../../user_defined_types" }
 anyhow.workspace = true
 async-graphql.workspace = true
 async-stream.workspace = true

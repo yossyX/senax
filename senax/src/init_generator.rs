@@ -6,7 +6,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{common::fs_write, schema::DbType, DOMAIN_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE};
+use crate::{
+    BASE_DOMAIN_PATH, DOMAIN_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE, USER_DEFINED_TYPES_PATH,
+    common::fs_write, schema::DbType,
+};
 
 pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     let base_path: PathBuf = if let Some(name) = name {
@@ -83,7 +86,8 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
 
     let domain_path = base_path.join(DOMAIN_PATH);
 
-    base_domain(&domain_path.join("base_domain"), non_snake_case)?;
+    base_domain(&domain_path.join(BASE_DOMAIN_PATH), non_snake_case)?;
+    user_defined_types(&domain_path.join(USER_DEFINED_TYPES_PATH))?;
 
     #[derive(Template)]
     #[template(path = "domain/_Cargo.toml", escape = "none")]
@@ -169,6 +173,26 @@ fn base_domain(path: &Path, non_snake_case: bool) -> Result<()> {
 
     let file_path = path.join("src/value_objects.rs");
     let tpl = DomainValueObjectsTemplate;
+    fs_write(file_path, tpl.render()?)?;
+
+    Ok(())
+}
+
+fn user_defined_types(path: &Path) -> Result<()> {
+    #[derive(Template)]
+    #[template(path = "domain/user_defined_types/_Cargo.toml", escape = "none")]
+    struct DomainCargoTemplate;
+
+    let file_path = path.join("Cargo.toml");
+    let tpl = DomainCargoTemplate;
+    fs_write(file_path, tpl.render()?)?;
+
+    #[derive(Template)]
+    #[template(path = "domain/user_defined_types/src/lib.rs", escape = "none")]
+    struct DomainLibTemplate;
+
+    let file_path = path.join("src/lib.rs");
+    let tpl = DomainLibTemplate;
     fs_write(file_path, tpl.render()?)?;
 
     Ok(())

@@ -114,10 +114,12 @@ impl ToGeoPoint for (f64, f64) {
 #[derive(utoipa::ToSchema)]
 #[schema(as = GeometryFilterType)]
 pub enum GeometryFilterType {
+    Equals,
     Within,
     Intersects,
     Crosses,
     DWithin,
+    NotEquals,
     NotWithin,
     NotIntersects,
     NotCrosses,
@@ -210,7 +212,13 @@ pub struct JsonValueFilter {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eq: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_null: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_not_null: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#in: Option<Vec<Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contains: Option<Vec<Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lt: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -242,7 +250,13 @@ pub struct JsonValueWithPathFilter {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eq: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_null: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_not_null: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#in: Option<Vec<Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contains: Option<Vec<Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lt: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -285,6 +285,8 @@ fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Que
     @%- else %@
     use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::filter;
     @%- endif %@
+    #[allow(unused_imports)]
+    use anyhow::Context;
     let mut fltr = filter!();
     @%- for (filter, filter_def) in filter_map.filters %@
     @{- filter_def.db_str(filter, filter_map.model, filter_map.suffix) }@

@@ -255,7 +255,7 @@ Doctrine の inheritance も一通り対応しています。
 |**enum_values**|Array<[EnumValue](##/definitions/EnumValue)>|列挙型の値||
 |**db_enum_values**|Array<[DbEnumValue](##/definitions/DbEnumValue)>|DBの列挙型を使用する場合の値||
 |**enum_model**|string|スキーマ内で定義された列挙値名　（名前は::区切り）||
-|**json_class**|string|Json型で使用する型名||
+|**user_defined_json_type**|string|Json型で使用する型名||
 |**exclude_from_cache**|boolean|キャッシュからの除外設定||
 |**skip_factory**|boolean|factoryからの除外設定||
 |**column_name**|string|カラム名の別名設定||

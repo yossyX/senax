@@ -37,8 +37,10 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     let model_dir = Path::new(DB_PATH).join(db.to_snake());
     let db_repositories_dir = model_dir.join("repositories");
     let domain_src_dir = Path::new(DOMAIN_PATH).join("src");
-    let base_domain_src_dir = Path::new(BASE_DOMAIN_PATH).join("src");
-    let domain_repositories_dir = Path::new(DOMAIN_REPOSITORIES_PATH).join(db.to_snake());
+    let base_domain_src_dir = Path::new(DOMAIN_PATH).join(BASE_DOMAIN_PATH).join("src");
+    let domain_repositories_dir = Path::new(DOMAIN_PATH)
+        .join(DOMAIN_REPOSITORIES_PATH)
+        .join(db.to_snake());
     let domain_repositories_src_dir = domain_repositories_dir.join("src");
 
     let file_path = model_dir.join("Cargo.toml");
