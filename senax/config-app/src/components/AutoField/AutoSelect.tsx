@@ -8,6 +8,7 @@ interface Props {
   form: any;
   definition: any;
   disabled?: boolean;
+  enables?: string[];
   required: boolean;
   errors: object;
   label: string;
@@ -24,15 +25,17 @@ function AutoSelect(props: Props) {
     { value: "", label: "", description: "Not selected" },
     ...props.values,
   ];
+  const enables = props.enables;
   const options = [] as any[];
   for (const val of values) {
     if (typeof val === "string") {
-      options.push({ value: val, label: val });
+      options.push({ value: val, label: val, disabled: enables && !enables.includes(val) });
     } else {
       options.push({
         value: val.const,
         label: val.title || val.const,
         description: val.description,
+        disabled: enables && !enables.includes(val.const),
       });
     }
   }

@@ -25,6 +25,7 @@ interface Props {
   definitions: any;
   formType?: string;
   disabled?: boolean;
+  enables?: string[];
   hidden?: boolean;
   columns?: any[];
   dialog?: ({ formData }: any) => any;
@@ -180,6 +181,7 @@ function AutoField(props: Props) {
         <AutoSelect
           name={name}
           disabled={props.disabled}
+          enables={props.enables}
           path={path}
           form={form}
           definition={definition}

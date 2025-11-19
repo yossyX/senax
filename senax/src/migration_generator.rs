@@ -314,7 +314,10 @@ pub fn make_table_def(
                 } else {
                     None
                 };
-                if !col.not_null && index.index_type == Some(schema::IndexType::Geometry) && is_mysql_mode() {
+                if !col.not_null
+                    && index.index_type == Some(schema::IndexType::Geometry)
+                    && is_mysql_mode()
+                {
                     error_exit!("All parts of a SPATIAL index must be NOT NULL: {}", n)
                 }
                 let desc = c

@@ -8,8 +8,10 @@
 #[derive(utoipa::ToSchema)]
 #[schema(as = Vo@{ pascal_name }@)]
 pub enum @{ pascal_name }@ {
-@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name }@@{ row.value_str() }@,
-@% endfor -%@
+@%- for row in values %@
+    #[graphql(name="@{ row.name }@")]
+@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name }@@{ row.value_str() }@,
+@%- endfor %@
 }
 
 impl @{ pascal_name }@ {
@@ -41,8 +43,10 @@ impl From<@{ pascal_name }@> for @{ def.get_inner_type(true, true) }@ {
 #[derive(utoipa::ToSchema)]
 #[schema(as = Vo@{ pascal_name }@)]
 pub enum @{ pascal_name }@ {
-@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name }@,
-@% endfor -%@
+@%- for row in values %@
+    #[graphql(name="@{ row.name }@")]
+@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name }@,
+@%- endfor %@
 }
 impl @{ pascal_name }@ {
     pub fn as_static_str(&self) -> &'static str {

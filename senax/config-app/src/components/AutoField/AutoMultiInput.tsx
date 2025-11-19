@@ -98,8 +98,11 @@ export default (props: Props) => {
                     mainAction={{
                       text: "Remove",
                       onClick: () => {
-                        const value = field.value || [];
+                        let value = field.value || [];
                         value.splice(itemIndex, 1);
+                        if (value.length == 0) {
+                          value = undefined;
+                        }
                         form.setValue(
                           fullPath,
                           value,

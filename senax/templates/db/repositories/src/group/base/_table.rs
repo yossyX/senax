@@ -6381,7 +6381,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     @%- endif %@
     let sql = format!(r#"INSERT INTO @{ table_name|db_esc }@ 
         (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
-        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE SET") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
+        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT ") }@@{ def.upsert_conflict_target() }@@{ config.db_type_switch("", " DO UPDATE SET") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
     @%- if !config.is_mysql() %@
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
@@ -6609,18 +6609,13 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         if list.is_empty() {
             return Ok(Vec::new());
         }
+        @%- if config.is_mysql() %@
         const SQL_NORMAL: &str = r#"INSERT "#; 
         const SQL_IGNORE: &str = r#"INSERT IGNORE "#; 
         const SQL_REPLACE: &str = r#"REPLACE "#; 
-        @%- if config.is_mysql() %@
         const SQL1: &str = r#"INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES "#;
         const SQL2: &str = r#"(@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)"#;
         const SQL3: &str = r#" AS new ON DUPLICATE KEY UPDATE @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@"#;
-        @%- else %@
-        const SQL1: &str = r#"INTO @{ table_name|db_esc }@ AS new (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES "#;
-        const SQL2: &str = r#"(@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)"#;
-        const SQL3: &str = r#" ON CONFLICT DO UPDATE SET @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=excluded.{col_esc}", ",") }@"#;
-        @%- endif %@
         let mut sql = String::with_capacity(SQL_IGNORE.len() + SQL1.len() + (SQL2.len() + 1) * list.len() + SQL3.len()@% if !config.is_mysql() && def.is_auto_inc() %@ + 30@% endif %@);
         if ignore {
             sql.push_str(SQL_IGNORE);
@@ -6638,9 +6633,30 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         if overwrite {
             sql.push_str(SQL3);
         }
-    @%- if !config.is_mysql() && def.is_auto_inc() %@
+        @%- else %@
+        const SQL1: &str = r#"INSERT INTO @{ table_name|db_esc }@ AS new (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES "#;
+        const SQL2: &str = r#"(@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)"#;
+        const SQL_IGNORE: &str = r#" ON CONFLICT DO NOTHING"#;
+        const SQL_REPLACE: &str = r#" ON CONFLICT @{ def.upsert_conflict_target() }@ DO UPDATE SET @{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}=excluded.{col_esc}", ",") }@"#;
+        const SQL_OVERWRITE: &str = r#" ON CONFLICT @{ def.upsert_conflict_target() }@ DO UPDATE SET @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=excluded.{col_esc}", ",") }@"#;
+        let mut sql = String::with_capacity(SQL1.len() + (SQL2.len() + 1) * list.len() + SQL_REPLACE.len());
+        sql.push_str(SQL1);
+        sql.push_str(SQL2);
+        for _i in 0..list.len() - 1 {
+            sql.push(',');
+            sql.push_str(SQL2);
+        }
+        if ignore {
+            sql.push_str(SQL_IGNORE);
+        } else if replace {
+            sql.push_str(SQL_REPLACE);
+        } else if overwrite {
+            sql.push_str(SQL_OVERWRITE);
+        }
+            @%- if def.is_auto_inc() %@
         sql.push_str(r#" RETURNING @{ def.auto_inc()|fmt_join("{col_esc}", "") }@"#);
-    @%- endif %@
+            @%- endif %@
+        @%- endif %@
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
@@ -6776,7 +6792,7 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     @%- if def.versioned %@
     vec.push(r#"\"@{ version_col }@\" = IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0)"#.to_string());
     @%- endif %@
-    write!(sql, " @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT DO UPDATE SET") }@ {}", &vec.join(","))?;
+    write!(sql, r#" @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT ") }@@{ def.upsert_conflict_target() }@@{ config.db_type_switch("", " DO UPDATE SET") }@ {}"#, &vec.join(","))?;
     @%- if !config.is_mysql() %@
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@

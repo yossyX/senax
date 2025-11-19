@@ -210,6 +210,9 @@ pub struct ModelDef {
     /// deprecated
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dummy_always_present: Option<bool>,
+    /// ### Upsertコンフリクト判定ユニークキー(PostgreSQLのみ)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upsert_conflict_target: Option<String>,
     /// ### 外部キー制約をDDLに出力しない
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore_foreign_key: Option<bool>,
@@ -356,6 +359,9 @@ pub struct ModelJson {
     /// deprecated
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dummy_always_present: Option<bool>,
+    /// ### Upsertコンフリクト判定ユニークキー(PostgreSQLのみ)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub upsert_conflict_target: Option<String>,
     /// ### 外部キー制約をDDLに出力しない
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore_foreign_key: Option<bool>,
@@ -479,6 +485,7 @@ impl From<ModelDef> for ModelJson {
             table_name: value.table_name,
             skip_ddl: value.skip_ddl,
             dummy_always_present: value.dummy_always_present,
+            upsert_conflict_target: value.upsert_conflict_target,
             ignore_foreign_key: value.ignore_foreign_key,
             timestampable: value.timestampable,
             disable_created_at: value.disable_created_at,
@@ -596,6 +603,7 @@ impl TryFrom<ModelJson> for ModelDef {
             table_name: value.table_name,
             skip_ddl: value.skip_ddl,
             dummy_always_present: value.dummy_always_present,
+            upsert_conflict_target: value.upsert_conflict_target,
             ignore_foreign_key: value.ignore_foreign_key,
             timestampable: value.timestampable,
             disable_created_at: value.disable_created_at,
@@ -1588,11 +1596,11 @@ impl ModelDef {
             if def.fields.len() > 1
                 && def.fields.iter().all(|(n, _)| {
                     let col = self.merged_fields.get(n).unwrap_or_else(|| {
-                        error_exit!(
+                    error_exit!(
                         "The {n} field of the {index_name} index in the {} model does not exist.",
                         self.name
                     )
-                    });
+                });
                     if cache_only && col.exclude_from_cache() {
                         return false;
                     }
@@ -2157,5 +2165,38 @@ impl ModelDef {
         }
         ids.insert(hash);
         hash
+    }
+
+    pub fn upsert_conflict_target(&self) -> String {
+        if is_mysql_mode() {
+            return String::new();
+        }
+        if let Some(upsert_conflict_target) = &self.upsert_conflict_target {
+            if let Some(index) = self.merged_indexes.get(upsert_conflict_target) {
+                if index.index_type != Some(IndexType::Unique) {
+                    error_exit!("{upsert_conflict_target} is not a unique index.");
+                }
+                format!(
+                    "({})",
+                    index
+                        .fields(upsert_conflict_target, self)
+                        .iter()
+                        .map(|(name, def)| format!("\"{}\"", def.get_col_name(name)))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            } else {
+                error_exit!("{upsert_conflict_target} is not a unique index.");
+            }
+        } else {
+            format!(
+                "({})",
+                self.primaries()
+                    .iter()
+                    .map(|(name, def)| format!("\"{}\"", def.get_col_name(name)))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
+        }
     }
 }

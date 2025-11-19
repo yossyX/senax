@@ -165,6 +165,11 @@ function EditModel() {
               <AutoField name="table_name" {...formData} />
               <AutoField name="skip_ddl" {...formData} />
               <AutoField name="dummy_always_present" {...formData} />
+              <AutoField name="upsert_conflict_target" {...formData} hidden={formData.additionalData.db == "mysql"}
+                autocomplete={formData.additionalData.selfModel.indexes?.filter((v: any) => v.type == "unique").map(
+                  (v: any) => v.name,
+                )}
+              />
               <AutoField
                 name="ignore_foreign_key"
                 {...formData}
@@ -244,7 +249,7 @@ function EditModel() {
                 hidden={!detail}
                 component={Inheritance}
               />
-              <AutoField name="engine" {...formData} hidden={!detail || formData.additionalData.db !== "mysql"}/>
+              <AutoField name="engine" {...formData} hidden={!detail || formData.additionalData.db !== "mysql"} />
               <AutoField
                 name="act_as"
                 {...formData}
@@ -524,15 +529,15 @@ function BelongsTo({ formData }: any) {
   return (
     <>
       <SpaceBetween direction="vertical" size="xs">
-        <AutoField name="name" {...formData} />
-        <AutoField name="label" {...formData} />
-        <AutoField name="comment" {...formData} textarea />
         <AutoField name="group" {...formData} autocomplete={formData.additionalData.group_names} />
         <AutoField
           name="model"
           {...formData}
           autocomplete={formData.additionalData.model_names[group || baseGroup] || []}
         />
+        <AutoField name="name" {...formData} />
+        <AutoField name="label" {...formData} />
+        <AutoField name="comment" {...formData} textarea />
         <AutoField
           name="local"
           {...formData}
@@ -589,25 +594,27 @@ function BelongsToOuterDb({ formData }: any) {
     control: formData.form.control,
     name: "model",
   });
-  if (formData.form.getValues("name") === undefined) {
-    if (model !== undefined) {
-      formData.form.setValue("name", model, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
+  React.useEffect(() => {
+    if (formData.form.getValues("name") === undefined) {
+      if (model !== undefined) {
+        formData.form.setValue("name", model, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
     }
-  }
+  }, [model]);
   return (
     <>
       <SpaceBetween direction="vertical" size="xs">
-        <AutoField name="name" {...formData} />
-        <AutoField name="label" {...formData} />
-        <AutoField name="comment" {...formData} textarea />
         <AutoField name="db" {...formData} autocomplete={dbs} />
         <AutoField name="group" {...formData} autocomplete={groups.map(
           (v: any) => v.name,
         )} />
         <AutoField name="model" {...formData} autocomplete={models} />
+        <AutoField name="name" {...formData} />
+        <AutoField name="label" {...formData} />
+        <AutoField name="comment" {...formData} textarea />
         <AutoField
           name="local"
           {...formData}
@@ -655,15 +662,15 @@ function HasOne({ formData }: any) {
   return (
     <>
       <SpaceBetween direction="vertical" size="xs">
-        <AutoField name="name" {...formData} />
-        <AutoField name="label" {...formData} />
-        <AutoField name="comment" {...formData} textarea />
         <AutoField name="group" {...formData} autocomplete={formData.additionalData.group_names} />
         <AutoField
           name="model"
           {...formData}
           autocomplete={formData.additionalData.model_names[group || baseGroup] || []}
         />
+        <AutoField name="name" {...formData} />
+        <AutoField name="label" {...formData} />
+        <AutoField name="comment" {...formData} textarea />
         <AutoField
           name="foreign"
           {...formData}
@@ -708,15 +715,15 @@ function HasMany({ formData }: any) {
   return (
     <>
       <SpaceBetween direction="vertical" size="xs">
-        <AutoField name="name" {...formData} />
-        <AutoField name="label" {...formData} />
-        <AutoField name="comment" {...formData} textarea />
         <AutoField name="group" {...formData} autocomplete={formData.additionalData.group_names} />
         <AutoField
           name="model"
           {...formData}
           autocomplete={formData.additionalData.model_names[group || baseGroup] || []}
         />
+        <AutoField name="name" {...formData} />
+        <AutoField name="label" {...formData} />
+        <AutoField name="comment" {...formData} textarea />
         <AutoField
           name="foreign"
           {...formData}
@@ -783,7 +790,7 @@ function IndexField({ formData }: any) {
         <AutoField
           name="name"
           {...formData}
-          autocomplete={getFields(formData.additionalData)}
+          autocomplete={getFieldNames(formData.additionalData)}
         />
         <AutoField name="direction" {...formData} />
         <AutoField name="length" {...formData} />
@@ -855,20 +862,25 @@ function Filter({ formData, definitions }: any) {
     control: formData.form.control,
     name: "relation",
   });
-  if (formData.form.getValues("name") === undefined) {
-    if (fields !== undefined) {
-      formData.form.setValue(
-        "name",
-        Array.isArray(fields) ? fields[0] : fields,
-        { shouldDirty: true, shouldValidate: true },
-      );
-    } else if (relation !== undefined) {
-      formData.form.setValue("name", relation, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
+  React.useEffect(() => {
+    if (formData.form.getValues("name") === undefined) {
+      if (fields !== undefined) {
+        const fieldName = Array.isArray(fields) ? fields[0] : fields;
+        if (fieldName) {
+          formData.form.setValue(
+            "name",
+            fieldName,
+            { shouldDirty: true, shouldValidate: true },
+          );
+        }
+      } else if (relation !== undefined) {
+        formData.form.setValue("name", relation, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
     }
-  }
+  }, [fields, relation]);
   const [foreign, setForeign] = React.useState(undefined as any);
   const db = formData.additionalData.db;
   const relationDef = relationList.find((v: any) => v.name === relation);
@@ -882,57 +894,84 @@ function Filter({ formData, definitions }: any) {
       });
   }, [db, group, name]);
   const fieldsAutocomplete = React.useMemo(() => {
+    return getFieldNames(formData.additionalData);
+  }, [formData.additionalData]);
+  const types = React.useMemo(() => {
     // TODO ValueObject
-    let types: string[] = [];
-    if (type === "range") {
-      types = [
-        "char",
-        "id_varchar",
-        "text_varchar",
-        "uuid",
-        "binary_uuid",
-        "tinyint",
-        "smallint",
-        "int",
-        "bigint",
-        "float",
-        "double",
-        "decimal",
-        "date",
-        "time",
-        "utc_datetime",
-        "naive_datetime",
-        "timestamp_with_timezone",
-      ];
-    } else if (type === "identity") {
-      types = [
-        "char",
-        "id_varchar",
-        "uuid",
-        "binary_uuid",
-        "tinyint",
-        "smallint",
-        "int",
-        "bigint",
-        "date",
-        "boolean",
-        "db_enum",
-        "db_set",
-        "auto_fk",
-      ];
-    } else if (type === "full_text") {
-      types = ["text"];
-    } else if (type === "array_int") {
-      types = ["array_int"];
-    } else if (type === "array_string") {
-      types = ["array_string"];
-    } else if (type === "json") {
-      types = ["json", "array_int", "array_string"];
-    } else if (type === "geometry") {
-      types = ["point", "geo_point", "geometry"];
+    if (!relation && !fields) {
+      return;
     }
-    return getFields(formData.additionalData, types);
-  }, [formData.additionalData, type]);
+    if (relation) {
+      return ["exists", "eq_any"]
+    }
+    let types: string[] = [];
+    const fieldName = Array.isArray(fields) ? fields[0] : fields;
+    let type = getFieldType(formData.additionalData, fieldName);
+    if ([
+      "char",
+      "id_varchar",
+      "text_varchar",
+      "uuid",
+      "binary_uuid",
+      "tinyint",
+      "smallint",
+      "int",
+      "bigint",
+      "float",
+      "double",
+      "decimal",
+      "date",
+      "time",
+      "utc_datetime",
+      "naive_datetime",
+      "timestamp_with_timezone",
+    ].includes(type)) {
+      types.push("range")
+    }
+    if ([
+      "char",
+      "id_varchar",
+      "uuid",
+      "binary_uuid",
+      "tinyint",
+      "smallint",
+      "int",
+      "bigint",
+      "date",
+      "boolean",
+      "db_enum",
+      "db_set",
+      "auto_fk",
+    ].includes(type)) {
+      types.push("identity")
+    }
+    if ([
+      "text"
+    ].includes(type)) {
+      types.push("full_text")
+    }
+    if ([
+      "array_int"
+    ].includes(type)) {
+      types.push("array_int")
+    }
+    if ([
+      "array_string"
+    ].includes(type)) {
+      types.push("array_string")
+    }
+    if ([
+      "json", "array_int", "array_string"
+    ].includes(type)) {
+      types.push("json")
+    }
+    if ([
+      "point", "geo_point", "geometry"
+    ].includes(type)) {
+      types.push("geometry")
+    }
+    return types;
+  }, [formData.additionalData, relation, fields]);
   const relationAutocomplete = React.useMemo(
     () => relationList.map((v: any) => v.name),
     [relationList],
@@ -950,21 +989,22 @@ function Filter({ formData, definitions }: any) {
   return (
     <>
       <SpaceBetween direction="vertical" size="xs">
-        <AutoField name="name" {...formData} />
-        <AutoField name="type" {...formData} />
-        <AutoField name="required" {...formData} />
+        {!relation && !fields && <p>Please enter fields or a relation.</p>}
         <AutoField
           name="fields"
           {...formData}
           autocomplete={fieldsAutocomplete}
-          hidden={type == "exists" || type == "any" || type == "raw_query"}
+          hidden={relation}
         />
         <AutoField
           name="relation"
           {...formData}
           autocomplete={relationAutocomplete}
-          hidden={type !== "exists" && type !== "any"}
+          hidden={fields}
         />
+        <AutoField name="name" {...formData} />
+        <AutoField name="type" {...formData} enables={types} />
+        <AutoField name="required" {...formData} />
         <AutoField
           name="relation_fields"
           {...formData}
@@ -977,7 +1017,7 @@ function Filter({ formData, definitions }: any) {
             createYupSchema(definitions.FilterJson, definitions),
           )}
           additionalData={additionalData}
-          hidden={type !== "exists" && type !== "any"}
+          hidden={!relation}
         />
         <AutoField name="json_path" {...formData} hidden={type !== "json"} />
         <AutoField
@@ -1019,14 +1059,26 @@ function OrderList({ formData }: any) {
         <AutoField
           name="name"
           {...formData}
-          autocomplete={getFields(formData.additionalData)}
+          autocomplete={getFieldNames(formData.additionalData)}
         />
       </SpaceBetween>
     </>
   );
 }
 
-function getFields(additionalData: any, types?: string[]) {
+function getFieldNames(additionalData: any) {
+  let fields = getFieldInfos(additionalData);
+  return fields
+    .map((v: any) => v.name);
+}
+
+function getFieldType(additionalData: any, name?: string) {
+  let fields = getFieldInfos(additionalData);
+  return fields
+    .find((v: any) => v.name == name)?.type
+}
+
+function getFieldInfos(additionalData: any) {
   let fields = additionalData.modelData?.fields || [];
   fields = [...fields];
   const timestampable =
@@ -1065,7 +1117,5 @@ function getFields(additionalData: any, types?: string[]) {
       type: "int",
     });
   }
-  return fields
-    .filter((v: any) => types === undefined || types.includes(v.type))
-    .map((v: any) => v.name);
+  return fields;
 }
