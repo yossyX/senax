@@ -18,8 +18,6 @@ text_collation: und-x-icu
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read
 use_cache: true
-use_all_rows_cache: false
-preserve_column_order: false
 @%- if exclude_from_domain %@
 exclude_from_domain: true
 @%- endif %@

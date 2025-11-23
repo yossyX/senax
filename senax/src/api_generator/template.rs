@@ -9,9 +9,7 @@ use super::schema::{ApiDbDef, ApiModelDef};
 #[template(
     source = r###"
     impl QueryRoot {
-    @%- if !camel_case %@
     #[graphql(name = "@{ db_route }@")]
-    @%- endif %@
     async fn @{ db_route|to_var_name }@(&self) -> @{ db_route|snake|to_var_name }@::GqlQuery@{ db_route|pascal }@ {
         @{ db_route|snake|to_var_name }@::GqlQuery@{ db_route|pascal }@
     }"###,
@@ -20,16 +18,13 @@ use super::schema::{ApiDbDef, ApiModelDef};
 )]
 pub struct QueryRootTemplate<'a> {
     pub db_route: &'a str,
-    pub camel_case: bool,
 }
 
 #[derive(Template)]
 #[template(
     source = r###"
     impl MutationRoot {
-    @%- if !camel_case %@
     #[graphql(name = "@{ db_route }@")]
-    @%- endif %@
     async fn @{ db_route|to_var_name }@(&self) -> @{ db_route|snake|to_var_name }@::GqlMutation@{ db_route|pascal }@ {
         @{ db_route|snake|to_var_name }@::GqlMutation@{ db_route|pascal }@
     }"###,
@@ -38,7 +33,6 @@ pub struct QueryRootTemplate<'a> {
 )]
 pub struct MutationRootTemplate<'a> {
     pub db_route: &'a str,
-    pub camel_case: bool,
 }
 
 #[derive(Template)]
@@ -155,7 +149,7 @@ pub struct ModelTsTemplate<'a> {
     pub path: String,
     pub model_route: &'a str,
     pub curly_begin: String,
-    pub curly_end: &'a str,
+    pub curly_end: String,
     pub pascal_name: String,
     pub graphql_name: &'a str,
     pub id_name: &'a str,

@@ -172,9 +172,9 @@ use @{ pascal_name }@Query@{ selector|pascal }@Builder as _Query@{ selector|pasc
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Default, validator::Validate, async_graphql::InputObject)]
 #[serde(deny_unknown_fields)]
 #[allow(non_camel_case_types)]
-#[graphql(name = "@{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter")]
+#[graphql(name = "@{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter")]
 #[derive(utoipa::ToSchema)]
-#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter)]
+#[schema(as = @{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter)]
 pub struct @{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter {
     @%- for (filter, filter_def) in filter_map.filters %@
     #[graphql(name = "@{ filter }@")]
@@ -202,9 +202,9 @@ pub struct @{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Default, async_graphql::InputObject)]
 #[serde(deny_unknown_fields)]
 #[allow(non_camel_case_types)]
-#[graphql(name = "@{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@Range@{ filter_map.pascal_name }@_@{ name|pascal }@")]
+#[graphql(name = "@{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@Range@{ filter_map.pascal_name }@_@{ name|pascal }@")]
 #[derive(utoipa::ToSchema)]
-#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@Range@{ filter_map.pascal_name }@_@{ name|pascal }@)]
+#[schema(as = @{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@Range@{ filter_map.pascal_name }@_@{ name|pascal }@)]
 pub struct @{ pascal_name }@Query@{ selector|pascal }@Range@{ filter_map.pascal_name }@_@{ name|pascal }@ {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eq: Option<@{ type_name }@>,
@@ -235,9 +235,9 @@ pub struct @{ pascal_name }@Query@{ selector|pascal }@Range@{ filter_map.pascal_
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Default, async_graphql::InputObject)]
 #[serde(deny_unknown_fields)]
 #[allow(non_camel_case_types)]
-#[graphql(name = "@{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@RangeValues@{ filter_map.pascal_name }@_@{ name|pascal }@")]
+#[graphql(name = "@{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@RangeValues@{ filter_map.pascal_name }@_@{ name|pascal }@")]
 #[derive(utoipa::ToSchema)]
-#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@RangeValues@{ filter_map.pascal_name }@_@{ name|pascal }@)]
+#[schema(as = @{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@RangeValues@{ filter_map.pascal_name }@_@{ name|pascal }@)]
 pub struct @{ pascal_name }@Query@{ selector|pascal }@RangeValues@{ filter_map.pascal_name }@_@{ name|pascal }@ {
     @%- for (field, _type) in fields.clone() %@
     #[graphql(name = "@{ field }@")]
@@ -255,9 +255,9 @@ impl @{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Rang
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Default, async_graphql::InputObject)]
 #[serde(deny_unknown_fields)]
 #[allow(non_camel_case_types)]
-#[graphql(name = "@{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@Identity@{ filter_map.pascal_name }@_@{ name|pascal }@")]
+#[graphql(name = "@{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@Identity@{ filter_map.pascal_name }@_@{ name|pascal }@")]
 #[derive(utoipa::ToSchema)]
-#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@Identity@{ filter_map.pascal_name }@_@{ name|pascal }@)]
+#[schema(as = @{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@Identity@{ filter_map.pascal_name }@_@{ name|pascal }@)]
 pub struct @{ pascal_name }@Query@{ selector|pascal }@Identity@{ filter_map.pascal_name }@_@{ name|pascal }@ {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub eq: Option<@{ type_name }@>,
@@ -274,9 +274,9 @@ pub struct @{ pascal_name }@Query@{ selector|pascal }@Identity@{ filter_map.pasc
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Debug, Clone, Default, async_graphql::InputObject)]
 #[serde(deny_unknown_fields)]
 #[allow(non_camel_case_types)]
-#[graphql(name = "@{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@IdentityValues@{ filter_map.pascal_name }@_@{ name|pascal }@")]
+#[graphql(name = "@{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@IdentityValues@{ filter_map.pascal_name }@_@{ name|pascal }@")]
 #[derive(utoipa::ToSchema)]
-#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@IdentityValues@{ filter_map.pascal_name }@_@{ name|pascal }@)]
+#[schema(as = @{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@IdentityValues@{ filter_map.pascal_name }@_@{ name|pascal }@)]
 pub struct @{ pascal_name }@Query@{ selector|pascal }@IdentityValues@{ filter_map.pascal_name }@_@{ name|pascal }@ {
     @%- for (field, _type) in fields.clone() %@
     #[graphql(name = "@{ field }@")]
@@ -293,9 +293,9 @@ impl @{ pascal_name }@Query@{ selector|pascal }@IdentityValues@{ filter_map.pasc
 
 #[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Debug, Clone, Copy, Default, async_graphql::Enum)]
 #[serde(deny_unknown_fields)]
-#[graphql(name = "@{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@Order")]
+#[graphql(name = "@{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@Order")]
 #[derive(utoipa::ToSchema)]
-#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ pascal_name }@Query@{ selector|pascal }@Order)]
+#[schema(as = @{ config.layer_name(db, group_name) }@@{ pascal_name }@Query@{ selector|pascal }@Order)]
 pub enum @{ pascal_name }@Query@{ selector|pascal }@Order {
     #[default]
     @%- for (order, _) in selector_def.orders %@

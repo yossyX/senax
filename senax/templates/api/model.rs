@@ -794,7 +794,7 @@ impl GqlMutation@{ graphql_name }@ {
     @%- endif %@
 }
 
-pub fn _route_config(_cfg: &mut utoipa_actix_web::service_config::ServiceConfig) {
+pub fn route_config(_cfg: &mut utoipa_actix_web::service_config::ServiceConfig) {
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
     @%- if api_selector_def.use_streaming_api() || api_def.use_json_api() %@

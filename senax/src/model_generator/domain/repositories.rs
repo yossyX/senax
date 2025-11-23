@@ -1,7 +1,7 @@
 use crate::common::ToCase as _;
 use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
 use crate::model_generator::REL_START;
-use crate::schema::{GroupsDef, IS_MAIN_GROUP};
+use crate::schema::{ConfigDef, GroupsDef, IS_MAIN_GROUP};
 use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{
     common::fs_write,
@@ -23,6 +23,7 @@ use std::{
 pub fn write_group_files(
     domain_repositories_dir: &Path,
     db: &str,
+    config: &ConfigDef,
     group_name: &str,
     groups: &GroupsDef,
     ref_groups: &[String],
@@ -427,6 +428,7 @@ pub mod @{ mod_name|to_var_name }@;
                 output.push_str(&write_entity(
                     &repositories_dir,
                     db,
+                    config,
                     group_name,
                     mod_name,
                     force,
@@ -640,6 +642,7 @@ pub fn write_cargo_toml(
 pub fn write_entity(
     repositories_dir: &Path,
     db: &str,
+    config: &ConfigDef,
     group_name: &str,
     mod_name: &str,
     force: bool,
@@ -861,6 +864,7 @@ pub use repository_{db_snake}_{group_snake}::repositories::{class_mod_var} as _{
     )]
     pub struct DomainBaseEntityTemplate<'a> {
         pub db: &'a str,
+        pub config: &'a ConfigDef,
         pub group_name: &'a str,
         pub mod_name: &'a str,
         pub model_name: &'a str,
@@ -870,6 +874,7 @@ pub use repository_{db_snake}_{group_snake}::repositories::{class_mod_var} as _{
 
     let tpl = DomainBaseEntityTemplate {
         db,
+        config,
         group_name,
         mod_name,
         model_name,

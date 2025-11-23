@@ -1,6 +1,6 @@
 #[allow(unused_imports)]
 use actix_web::cookie::Cookie;
-use actix_web::{web, HttpRequest, HttpResponse, Result};
+use actix_web::{HttpRequest, HttpResponse, Result, web};
 use async_graphql::http::GraphiQLSource;
 use async_graphql::{EmptySubscription, Object, Schema};
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
@@ -29,12 +29,20 @@ pub struct QueryRoot;
 #[Object]
 #[allow(non_snake_case)]
 impl QueryRoot {
+    #[graphql(name = "_dummy")] // async_graphql::Object cannot be empty.
+    async fn _dummy(&self) -> bool {
+        false
+    }
 }
 
 pub struct MutationRoot;
 #[Object]
 #[allow(non_snake_case)]
 impl MutationRoot {
+    #[graphql(name = "_dummy")]
+    async fn _dummy(&self) -> bool {
+        false
+    }
     #[cfg(debug_assertions)]
     #[graphql(complexity = LIMIT_COMPLEXITY)]
     async fn login(

@@ -74,7 +74,8 @@ pub fn generate(
     let file_path = src_dir.join("auto_api.rs");
     let mut content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
-    let db_var_name = _to_var_name(&db_route.to_snake());
+    let db_snake = db_route.to_snake();
+    let db_var_name = _to_var_name(&db_snake);
     let reg = Regex::new(&format!(r"pub mod {};", db_var_name))?;
     if !reg.is_match(&content) {
         content = content.replace(
@@ -87,27 +88,44 @@ pub fn generate(
         content = content.replace(
             "// Do not modify this line. (ApiRouteConfig)",
             &format!(
-                "cfg.service(scope(\"/{}\").configure({}::route_config));\n    // Do not modify this line. (ApiRouteConfig)",
-                &db_route,
-                db_var_name,
+                "let _flatten_{db_snake}_ = true;
+    if _flatten_{db_snake}_ {{
+        cfg.configure({db_var_name}::route_config);
+    }} else {{
+        cfg.service(scope(\"/{db_route}\").configure({db_var_name}::route_config));
+    }}
+    // Do not modify this line. (ApiRouteConfig)"
             ),
         );
         content = content.replace(
             "    // Do not modify this line. (ApiJsonSchema)",
             &format!("    {}::gen_json_schema(&dir.join(\"{}\"))?;\n    // Do not modify this line. (ApiJsonSchema)", db_var_name, &db_route.to_snake()),
         );
-        let tpl = QueryRootTemplate {
-            db_route,
-            camel_case: db_config.camel_case(),
-        };
+        let tpl = QueryRootTemplate { db_route };
         content = content.replace("impl QueryRoot {", tpl.render()?.trim_start());
-        let tpl = MutationRootTemplate {
-            db_route,
-            camel_case: db_config.camel_case(),
-        };
+        let tpl = MutationRootTemplate { db_route };
         content = content.replace("impl MutationRoot {", tpl.render()?.trim_start());
-        fs_write(file_path, &*content)?;
     }
+    if db_config.promote_children {
+        content = content.replace(
+            &format!(r#"#[graphql(name = "{db_route}")]"#),
+            &format!(r#"#[graphql(name = "{db_route}", flatten)]"#),
+        );
+        content = content.replace(
+            &format!("let _flatten_{db_snake}_ = false;"),
+            &format!("let _flatten_{db_snake}_ = true;"),
+        );
+    } else {
+        content = content.replace(
+            &format!(r#"#[graphql(name = "{db_route}", flatten)]"#),
+            &format!(r#"#[graphql(name = "{db_route}")]"#),
+        );
+        content = content.replace(
+            &format!("let _flatten_{db_snake}_ = true;"),
+            &format!("let _flatten_{db_snake}_ = false;"),
+        );
+    }
+    fs_write(file_path, &*content)?;
 
     let file_path = base_src_dir.join("auth.rs");
     let content = fs::read_to_string(&file_path)
@@ -365,7 +383,7 @@ pub fn generate(
                 db_route,
                 &group_route_mod_name,
                 &model_routes,
-                db_config.camel_case(),
+                &db_config,
                 force || clean,
                 &mut remove_files,
             )?;
@@ -420,7 +438,6 @@ fn write_db_file(
     force: bool,
     config: &ApiDbDef,
 ) -> Result<()> {
-    let camel_case = config.camel_case();
     let file_path = path
         .join("auto_api")
         .join(format!("{}.rs", &db_route.to_snake()));
@@ -436,12 +453,14 @@ fn write_db_file(
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
     for group_route in group_route_names.iter().rev() {
+        let group_snake = group_route.to_snake();
+        let group_var_name = _to_var_name(&group_snake);
         let chk = format!(
             "\npub use _{}_{}_{}::api as {};\n",
             server.to_snake(),
             db_route.to_snake(),
-            group_route.to_snake(),
-            _to_var_name(&group_route.to_snake())
+            group_snake,
+            group_var_name
         );
         if !content.contains(&chk) {
             #[derive(Template)]
@@ -468,9 +487,7 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
             #[derive(Template)]
             #[template(
                 source = r###"
-    @%- if !camel_case %@
     #[graphql(name = "@{ group_route }@")]
-    @%- endif %@
     async fn @{ group_route|to_var_name }@(&self) -> @{ group_route|snake|to_var_name }@::GqlQuery@{ db_route|pascal }@@{ group_route|pascal }@ {
         @{ group_route|snake|to_var_name }@::GqlQuery@{ db_route|pascal }@@{ group_route|pascal }@
     }
@@ -481,13 +498,11 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
             pub struct DbQueryTemplate<'a> {
                 pub db_route: &'a str,
                 pub group_route: &'a str,
-                pub camel_case: bool,
             }
 
             let tpl = DbQueryTemplate {
                 db_route,
                 group_route,
-                camel_case,
             };
             content = content.replace(
                 "\n    // Do not modify this line. (GqlQuery)",
@@ -497,9 +512,7 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
             #[derive(Template)]
             #[template(
                 source = r###"
-    @%- if !camel_case %@
     #[graphql(name = "@{ group_route }@")]
-    @%- endif %@
     async fn @{ group_route|to_var_name }@(&self) -> @{ group_route|snake|to_var_name }@::GqlMutation@{ db_route|pascal }@@{ group_route|pascal }@ {
         @{ group_route|snake|to_var_name }@::GqlMutation@{ db_route|pascal }@@{ group_route|pascal }@
     }
@@ -510,13 +523,11 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
             pub struct DbMutationTemplate<'a> {
                 pub db_route: &'a str,
                 pub group_route: &'a str,
-                pub camel_case: bool,
             }
 
             let tpl = DbMutationTemplate {
                 db_route,
                 group_route,
-                camel_case,
             };
             content = content.replace(
                 "\n    // Do not modify this line. (GqlMutation)",
@@ -525,9 +536,13 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
             content = content.replace(
                 "// Do not modify this line. (ApiRouteConfig)",
                 &format!(
-                    "cfg.service(scope(\"/{}\").configure({}::route_config));\n    // Do not modify this line. (ApiRouteConfig)",
-                    &group_route,
-                    _to_var_name(&group_route.to_snake()),
+                    "let _flatten_{group_snake}_ = true;
+    if _flatten_{group_snake}_ {{
+        cfg.configure({group_var_name}::route_config);
+    }} else {{
+        cfg.service(scope(\"/{group_route}\").configure({group_var_name}::route_config));
+    }}
+    // Do not modify this line. (ApiRouteConfig)"
                 ),
             );
 
@@ -549,6 +564,25 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
                 &tpl.render()?,
             );
         }
+        if config.promote_group_children(group_route) {
+            content = content.replace(
+                &format!(r#"#[graphql(name = "{group_route}")]"#),
+                &format!(r#"#[graphql(name = "{group_route}", flatten)]"#),
+            );
+            content = content.replace(
+                &format!("let _flatten_{group_snake}_ = false;"),
+                &format!("let _flatten_{group_snake}_ = true;"),
+            );
+        } else {
+            content = content.replace(
+                &format!(r#"#[graphql(name = "{group_route}", flatten)]"#),
+                &format!(r#"#[graphql(name = "{group_route}")]"#),
+            );
+            content = content.replace(
+                &format!("let _flatten_{group_snake}_ = true;"),
+                &format!("let _flatten_{group_snake}_ = false;"),
+            );
+        }
     }
     fs_write(file_path, &*content)?;
     Ok(())
@@ -559,10 +593,11 @@ fn write_group_file(
     db_route: &str,
     group_route: &str,
     model_routes: &[String],
-    camel_case: bool,
+    db_config: &ApiDbDef,
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
+    let camel_case = db_config.camel_case();
     let file_path = path.join("src/api.rs");
     remove_files.remove(file_path.as_os_str());
     let mut content = if force || !file_path.exists() {
@@ -598,8 +633,8 @@ pub mod @{ model_route|snake|to_var_name }@;
     @%- if !camel_case %@
     #[graphql(name = "@{ model_route }@")]
     @%- endif %@
-    async fn @{ model_route|to_var_name }@(&self) -> @{ model_route|snake|to_var_name }@::Gql@{ mode }@@{ db|pascal }@@{ group|pascal }@@{ model_route|pascal }@ {
-        @{ model_route|snake|to_var_name }@::Gql@{ mode }@@{ db|pascal }@@{ group|pascal }@@{ model_route|pascal }@
+    async fn @{ model_route|to_var_name }@(&self) -> @{ model_route|snake|to_var_name }@::Gql@{ mode }@@{ graphql_name }@ {
+        @{ model_route|snake|to_var_name }@::Gql@{ mode }@@{ graphql_name }@
     }
     // Do not modify this line. (Gql@{ mode }@)"###,
                 ext = "txt",
@@ -607,17 +642,16 @@ pub mod @{ model_route|snake|to_var_name }@;
             )]
             pub struct GroupImplTemplate<'a> {
                 pub mode: &'a str,
-                pub db: &'a str,
-                pub group: &'a str,
                 pub model_route: &'a str,
+                pub graphql_name: &'a str,
                 pub camel_case: bool,
             }
 
+            let graphql_name = &db_config.graphql_name(db_route, group_route, model_route);
             let tpl = GroupImplTemplate {
                 mode: "Query",
-                db: db_route,
-                group: group_route,
                 model_route,
+                graphql_name,
                 camel_case,
             };
             content = content.replace(
@@ -626,9 +660,8 @@ pub mod @{ model_route|snake|to_var_name }@;
             );
             let tpl = GroupImplTemplate {
                 mode: "Mutation",
-                db: db_route,
-                group: group_route,
                 model_route,
+                graphql_name,
                 camel_case,
             };
             content = content.replace(
@@ -639,7 +672,7 @@ pub mod @{ model_route|snake|to_var_name }@;
             content = content.replace(
             "// Do not modify this line. (ApiRouteConfig)",
             &format!(
-                "cfg.service(scope(\"/{}\").configure({}::_route_config));\n    // Do not modify this line. (ApiRouteConfig)",
+                "cfg.service(scope(\"/{}\").configure({}::route_config));\n    // Do not modify this line. (ApiRouteConfig)",
                 &model_route,
                 _to_var_name(&model_route.to_snake()),
                 ),
@@ -705,12 +738,7 @@ fn write_model_file(
     let mod_name = &mod_name;
     let model_route_mod_name = model_route.to_snake();
     let pascal_name = &model_name.to_pascal();
-    let graphql_name = &format!(
-        "{}{}{}",
-        db_route.to_pascal(),
-        group_route.to_pascal(),
-        model_route.to_pascal()
-    );
+    let graphql_name = &config.graphql_name(db_route, group_route, model_route);
     let file_path = path.join(format!("{}.rs", &model_route_mod_name));
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
@@ -782,16 +810,6 @@ fn write_model_file(
         let ts_dir = ts_dir.join(group_route);
         let file_path = ts_dir.join(format!("{}.tsx", model_name));
         use inflector::Inflector;
-        let db_case = if config.camel_case() {
-            db_route.to_camel_case()
-        } else {
-            db_route.to_string()
-        };
-        let group_case = if config.camel_case() {
-            group_route.to_camel_case()
-        } else {
-            group_route.to_string()
-        };
         let model_case = if config.camel_case() {
             model_route.to_camel_case()
         } else {
@@ -799,19 +817,56 @@ fn write_model_file(
         };
         let tpl = template::ModelTsTemplate {
             path: format!(
-                "{}_{}_{}",
-                db_route.to_snake(),
-                group_route.to_snake(),
+                "{}{}{}",
+                if config.promote_children {
+                    String::new()
+                } else {
+                    format!("{}_", db_route.to_snake())
+                },
+                if config.promote_group_children(group_route) {
+                    String::new()
+                } else {
+                    format!("{}_", group_route.to_snake())
+                },
                 model_route.to_snake()
             ),
             model_route,
-            curly_begin: format!("{}{{{}{{{}", db_case, group_case, model_case),
-            curly_end: "}}",
+            curly_begin: format!(
+                "{}{}{}",
+                if config.promote_children {
+                    String::new()
+                } else {
+                    format!("{db_route}{{")
+                },
+                if config.promote_group_children(group_route) {
+                    String::new()
+                } else {
+                    format!("{group_route}{{")
+                },
+                model_case
+            ),
+            curly_end: format!(
+                "{}{}",
+                if config.promote_children { "" } else { "}" },
+                if config.promote_group_children(group_route) {
+                    ""
+                } else {
+                    "}"
+                },
+            ),
             pascal_name: format!(
                 "{}{}{}",
-                &db.to_pascal(),
-                &group.to_pascal(),
-                &model_name.to_pascal()
+                if config.promote_children {
+                    String::new()
+                } else {
+                    db.to_pascal()
+                },
+                if config.promote_group_children(group_route) {
+                    String::new()
+                } else {
+                    group.to_pascal()
+                },
+                model_name.to_pascal()
             ),
             graphql_name,
             id_name: &to_id_name(model_name),

@@ -15,9 +15,9 @@ pub mod consts {
 #[repr(@{ column_def.get_inner_type(true, true) }@)]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
-#[graphql(name="@{ db|pascal }@@{ group_name|pascal }@@{ mod_name|pascal }@@{ name|pascal }@")]
+#[graphql(name="@{ config.layer_name(db, group_name) }@@{ mod_name|pascal }@@{ name|pascal }@")]
 #[derive(utoipa::ToSchema)]
-#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ mod_name|pascal }@@{ name|pascal }@)]
+#[schema(as = @{ config.layer_name(db, group_name) }@@{ mod_name|pascal }@@{ name|pascal }@)]
 pub enum @{ name|to_pascal_name }@ {
 @%- for row in values %@
     #[graphql(name="@{ row.name }@")]
@@ -56,9 +56,9 @@ impl From<@{ name|to_pascal_name }@> for @{ column_def.get_inner_type(true, true
 #[derive(async_graphql::Enum, serde::Deserialize, serde::Serialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, strum::EnumMessage, strum::EnumString, strum::IntoStaticStr, schemars::JsonSchema)]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
-#[graphql(name="@{ db|pascal }@@{ group_name|pascal }@@{ mod_name|pascal }@@{ name|pascal }@")]
+#[graphql(name="@{ config.layer_name(db, group_name) }@@{ mod_name|pascal }@@{ name|pascal }@")]
 #[derive(utoipa::ToSchema)]
-#[schema(as = @{ db|pascal }@@{ group_name|pascal }@@{ mod_name|pascal }@@{ name|pascal }@)]
+#[schema(as = @{ config.layer_name(db, group_name) }@@{ mod_name|pascal }@@{ name|pascal }@)]
 pub enum @{ name|to_pascal_name }@ {
 @%- for row in values %@
     #[graphql(name="@{ row.name }@")]

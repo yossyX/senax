@@ -194,6 +194,9 @@ pub struct ApiDbDef {
     /// ### タイムスタンプを非表示にする
     #[serde(default)]
     pub hide_timestamp: Option<bool>,
+    /// ### 下位パスを昇格する
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub promote_children: bool,
     /// ### グループ
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub groups: IndexMap<String, Option<ApiGroupDef>>,
@@ -227,6 +230,34 @@ impl ApiDbDef {
         self.hide_timestamp
             .unwrap_or_else(|| API_CONFIG.read().unwrap().as_ref().unwrap().hide_timestamp)
     }
+
+    pub fn promote_group_children(&self, group_route: &str) -> bool {
+        let group = self
+            .groups
+            .get(group_route)
+            .cloned()
+            .unwrap_or_default()
+            .unwrap_or_default();
+        group.promote_children
+    }
+
+    pub fn graphql_name(&self, db_route: &str, group_route: &str, model_route: &str) -> String {
+        use crate::common::ToCase;
+        format!(
+            "{}{}{}",
+            if self.promote_children {
+                String::new()
+            } else {
+                db_route.to_pascal()
+            },
+            if self.promote_group_children(group_route) {
+                String::new()
+            } else {
+                group_route.to_pascal()
+            },
+            model_route.to_pascal()
+        )
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema)]
@@ -249,6 +280,9 @@ pub struct ApiDbJson {
     /// ### タイムスタンプを非表示にする
     #[serde(default)]
     pub hide_timestamp: Option<bool>,
+    /// ### 下位パスを昇格する
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub promote_children: bool,
     /// ### グループ
     #[serde(default)]
     pub groups: Vec<ApiGroupJson>,
@@ -262,6 +296,7 @@ impl From<ApiDbDef> for ApiDbJson {
             with_label: value.with_label,
             with_comment: value.with_comment,
             hide_timestamp: value.hide_timestamp,
+            promote_children: value.promote_children,
             groups: value
                 .groups
                 .into_iter()
@@ -284,6 +319,7 @@ impl From<ApiDbJson> for ApiDbDef {
             with_label: value.with_label,
             with_comment: value.with_comment,
             hide_timestamp: value.hide_timestamp,
+            promote_children: value.promote_children,
             groups: value
                 .groups
                 .into_iter()
@@ -309,6 +345,9 @@ pub struct ApiGroupDef {
     /// グループパスと対象のグループが異なるときに指定する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
+    /// ### 下位パスを昇格する
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub promote_children: bool,
     /// ### デフォルト参照権限
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub readable_roles: Vec<String>,
@@ -338,6 +377,9 @@ pub struct ApiGroupJson {
     /// グループパスと対象のグループが異なるときに指定する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
+    /// ### 下位パスを昇格する
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub promote_children: bool,
     /// ### デフォルト参照権限
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub readable_roles: Vec<String>,
@@ -360,6 +402,7 @@ impl From<ApiGroupDef> for ApiGroupJson {
             name: String::new(),
             _name: None,
             group: value.group,
+            promote_children: value.promote_children,
             readable_roles: value.readable_roles,
             creatable_roles: value.creatable_roles,
             importable_roles: value.importable_roles,
@@ -372,6 +415,7 @@ impl From<ApiGroupJson> for ApiGroupDef {
     fn from(value: ApiGroupJson) -> Self {
         Self {
             group: value.group,
+            promote_children: value.promote_children,
             readable_roles: value.readable_roles,
             creatable_roles: value.creatable_roles,
             importable_roles: value.importable_roles,

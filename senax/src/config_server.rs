@@ -267,7 +267,7 @@ fn file_response(
 
 async fn get_db() -> impl IntoResponse {
     let _semaphore = SEMAPHORE.acquire().await;
-    let result = crate::db_generator::db_list(false);
+    let result = crate::db_generator::db_list(true);
     json_response(result)
 }
 

@@ -4,6 +4,8 @@ members = ["1_domain", "2_db/*"]
 
 [profile.release]
 strip = true
+lto = "thin"
+codegen-units = 1
 
 [workspace.dependencies]
 ahash = "0.8"

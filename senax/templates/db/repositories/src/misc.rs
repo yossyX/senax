@@ -373,12 +373,12 @@ macro_rules! filter {
                 Filter_::GeoEquals(c) => {
                     buf.push_str("ST_Equals(");
                     buf.push_str(c.name());
-                    buf.push_str(", ST_SetSRID(ST_GeomFromGeoJSON(?), ?)) AND ");
+                    buf.push_str("::geometry, ST_SetSRID(ST_GeomFromGeoJSON(?), ?)) AND ");
                 }
                 Filter_::Within(c) => {
                     buf.push_str("ST_Within(");
                     buf.push_str(c.name());
-                    buf.push_str(", ST_SetSRID(ST_GeomFromGeoJSON(?), ?)) AND ");
+                    buf.push_str("::geometry, ST_SetSRID(ST_GeomFromGeoJSON(?), ?)) AND ");
                 }
                 Filter_::Intersects(c) => {
                     buf.push_str("ST_Intersects(");
@@ -388,7 +388,7 @@ macro_rules! filter {
                 Filter_::Crosses(c) => {
                     buf.push_str("ST_Crosses(");
                     buf.push_str(c.name());
-                    buf.push_str(", ST_SetSRID(ST_GeomFromGeoJSON(?), ?)) AND ");
+                    buf.push_str("::geometry, ST_SetSRID(ST_GeomFromGeoJSON(?), ?)) AND ");
                 }
                 Filter_::DWithin(c) => {
                     buf.push_str("ST_DWithin(");

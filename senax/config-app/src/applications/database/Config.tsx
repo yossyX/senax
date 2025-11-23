@@ -135,6 +135,7 @@ function Config() {
               <AutoField name="ignore_foreign_key" {...formData} />
               <AutoField name="disable_relation_index" {...formData} />
               <AutoField name="plural_table_name" {...formData} />
+              <AutoField name="hidden_layer" {...formData} />
               <AutoField name="soft_delete" {...formData} />
               <AutoField
                 name="add_soft_delete_column_to_relation_index"
@@ -258,6 +259,7 @@ function Groups({ formData }: any) {
         <AutoField name="name" {...formData} />
         <AutoField name="label" {...formData} />
         <AutoField name="exclude_group_from_table_name" {...formData} />
+        <AutoField name="hidden_layer" {...formData} />
       </SpaceBetween>
     </>
   );

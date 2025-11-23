@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use strum_macros::{AsRefStr, EnumString};
 
+use crate::common::ToCase as _;
+
 use super::{AGGREGATION_TYPE, CREATED_AT, DELETED, DELETED_AT, ModelDef, UPDATED_AT, VERSION};
 
 /// ### データベース設定
@@ -32,6 +34,9 @@ pub struct ConfigDef {
     /// ### テーブル名を複数形にする
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub plural_table_name: bool,
+    /// ### この階層の名前を隠す
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub hidden_layer: bool,
     /// ### 論理削除のデフォルト設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub soft_delete: Option<SoftDelete>,
@@ -193,6 +198,9 @@ pub struct ConfigJson {
     /// ### テーブル名を複数形にする
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub plural_table_name: bool,
+    /// ### この階層の名前を隠す
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub hidden_layer: bool,
     /// ### 論理削除のデフォルト設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub soft_delete: Option<SoftDelete>,
@@ -340,6 +348,7 @@ impl From<ConfigDef> for ConfigJson {
             ignore_foreign_key: value.ignore_foreign_key,
             disable_relation_index: value.disable_relation_index,
             plural_table_name: value.plural_table_name,
+            hidden_layer: value.hidden_layer,
             timestampable: value.timestampable,
             output_time_zone: value.output_time_zone,
             timestamp_time_zone: value.timestamp_time_zone,
@@ -408,6 +417,7 @@ impl From<ConfigJson> for ConfigDef {
             ignore_foreign_key: value.ignore_foreign_key,
             disable_relation_index: value.disable_relation_index,
             plural_table_name: value.plural_table_name,
+            hidden_layer: value.hidden_layer,
             timestampable: value.timestampable,
             output_time_zone: value.output_time_zone,
             timestamp_time_zone: value.timestamp_time_zone,
@@ -570,6 +580,7 @@ impl ConfigDef {
             DbType::Postgres => 1024 * 1024 * 1024 - 1,
         }
     }
+
     pub fn outer_db(&self) -> BTreeSet<String> {
         let mut v = BTreeSet::new();
         let group_lock = super::GROUPS.read().unwrap();
@@ -583,6 +594,23 @@ impl ConfigDef {
         }
         v
     }
+
+    pub fn layer_name(&self, db: &str, group_name: &str) -> String {
+        let mut name = String::new();
+        if !self.hidden_layer {
+            name.push_str(&db.to_pascal());
+        }
+        let group = self
+            .groups
+            .get(group_name)
+            .cloned()
+            .unwrap_or_default()
+            .unwrap_or_default();
+        if !group.hidden_layer {
+            name.push_str(&group_name.to_pascal());
+        }
+        name
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema)]
@@ -595,6 +623,9 @@ pub struct GroupDef {
     /// ### テーブル名にグループ名を使用しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub exclude_group_from_table_name: bool,
+    /// ### この階層の名前を隠す
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub hidden_layer: bool,
     /// モデル数が少ない場合はここにモデルを記述可能
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub models: IndexMap<String, ModelDef>,
@@ -616,6 +647,9 @@ pub struct GroupJson {
     /// ### テーブル名にグループ名を使用しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub exclude_group_from_table_name: bool,
+    /// ### この階層の名前を隠す
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub hidden_layer: bool,
 }
 
 impl From<GroupDef> for GroupJson {
@@ -629,6 +663,7 @@ impl From<GroupDef> for GroupJson {
             _name: None,
             label: value.label,
             exclude_group_from_table_name: value.exclude_group_from_table_name,
+            hidden_layer: value.hidden_layer,
         }
     }
 }
@@ -638,6 +673,7 @@ impl From<GroupJson> for GroupDef {
         Self {
             label: value.label,
             exclude_group_from_table_name: value.exclude_group_from_table_name,
+            hidden_layer: value.hidden_layer,
             models: IndexMap::new(),
         }
     }

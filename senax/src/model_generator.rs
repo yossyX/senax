@@ -317,11 +317,11 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         db::repositories::write_group_files(
             &db_repositories_dir,
             db,
+            &config,
             group_name,
             &repo_include_groups,
             &ref_groups,
             &ref_db,
-            &config,
             force,
             exclude_from_domain,
             &mut remove_files,
@@ -331,6 +331,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             domain::repositories::write_group_files(
                 &domain_repositories_dir,
                 db,
+                &config,
                 group_name,
                 &repo_include_groups,
                 &ref_groups,
@@ -379,6 +380,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     base_domain_output.push_str(&domain::base_domain::write_abstract(
                         &domain_db_dir,
                         db,
+                        &config,
                         group_name,
                         mod_name,
                         model_name,
@@ -449,6 +451,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                     base_domain_output.push_str(&domain::base_domain::write_entity(
                         &domain_db_dir,
                         db,
+                        &config,
                         group_name,
                         mod_name,
                         model_name,

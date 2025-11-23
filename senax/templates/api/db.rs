@@ -10,7 +10,7 @@ pub struct GqlQuery@{ db_route|pascal }@;
 #[Object]
 #[allow(non_snake_case)]
 impl GqlQuery@{ db_route|pascal }@ {
-    // This function can be removed.
+    #[graphql(name = "_dummy")]
     async fn _dummy(&self) -> bool {
         false
     }
@@ -21,7 +21,7 @@ pub struct GqlMutation@{ db_route|pascal }@;
 #[Object]
 #[allow(non_snake_case)]
 impl GqlMutation@{ db_route|pascal }@ {
-    // This function can be removed.
+    #[graphql(name = "_dummy")]
     async fn _dummy(&self) -> bool {
         false
     }

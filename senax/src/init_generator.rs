@@ -57,6 +57,14 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
+    #[template(path = "init/config.toml", escape = "none")]
+    struct CargoConfigTemplate;
+
+    let file_path = base_path.join(".cargo").join("config.toml");
+    let tpl = CargoConfigTemplate;
+    fs_write(&file_path, tpl.render()?)?;
+
+    #[derive(Template)]
     #[template(path = "init/build.sh", escape = "none")]
     struct BuildShTemplate;
 

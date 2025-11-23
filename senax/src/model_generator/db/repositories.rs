@@ -26,11 +26,11 @@ mod impl_domain;
 pub fn write_group_files(
     db_repositories_dir: &Path,
     db: &str,
+    config: &ConfigDef,
     group: &str,
     groups: &GroupsDef,
     ref_groups: &[String],
     ref_db: &BTreeSet<(String, String)>,
-    config: &ConfigDef,
     force: bool,
     exclude_from_domain: bool,
     remove_files: &mut HashSet<OsString>,

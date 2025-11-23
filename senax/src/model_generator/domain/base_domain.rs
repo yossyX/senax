@@ -1,5 +1,6 @@
 use crate::common::OVERWRITTEN_MSG;
 use crate::common::ToCase as _;
+use crate::schema::ConfigDef;
 use crate::schema::{_to_var_name, GroupsDef};
 use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{
@@ -227,6 +228,7 @@ pub mod @{ name|snake|to_var_name }@;
 pub fn write_abstract(
     domain_db_dir: &Path,
     db: &str,
+    config: &ConfigDef,
     group_name: &String,
     mod_name: &str,
     model_name: &String,
@@ -242,6 +244,7 @@ pub fn write_abstract(
     )]
     pub struct DomainAbstractTemplate<'a> {
         pub db: &'a str,
+        pub config: &'a ConfigDef,
         pub group_name: &'a str,
         pub mod_name: &'a str,
         pub pascal_name: &'a str,
@@ -250,6 +253,7 @@ pub fn write_abstract(
 
     let tpl = DomainAbstractTemplate {
         db,
+        config,
         group_name,
         mod_name,
         pascal_name,
@@ -273,6 +277,7 @@ pub fn write_abstract(
 pub fn write_entity(
     domain_db_dir: &Path,
     db: &str,
+    config: &ConfigDef,
     group_name: &String,
     mod_name: &str,
     model_name: &String,
@@ -297,6 +302,7 @@ pub fn write_entity(
     )]
     pub struct DomainEntityTemplate<'a> {
         pub db: &'a str,
+        pub config: &'a ConfigDef,
         pub group_name: &'a str,
         pub mod_name: &'a str,
         pub pascal_name: &'a str,
@@ -307,6 +313,7 @@ pub fn write_entity(
 
     let tpl = DomainEntityTemplate {
         db,
+        config,
         group_name,
         mod_name,
         pascal_name,
