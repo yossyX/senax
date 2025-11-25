@@ -31,6 +31,23 @@ impl CycleCounter for u32 {
     }
 }
 
+impl CycleCounter for i32 {
+    fn cycle_add(&self, rhs: Self) -> Self {
+        let result = self.wrapping_add(rhs);
+        if result < 0 {
+            result - Self::MIN
+        } else {
+            result
+        }
+    }
+    fn less_than(&self, rhs: Self) -> bool {
+        ((*self as u32) << 1).wrapping_sub((rhs as u32) << 1) > u32::MAX / 2
+    }
+    fn greater_equal(&self, rhs: Self) -> bool {
+        !self.less_than(rhs)
+    }
+}
+
 impl CycleCounter for u64 {
     fn cycle_add(&self, rhs: Self) -> Self {
         self.wrapping_add(rhs)
@@ -79,6 +96,18 @@ mod tests {
         assert!(!2u32.cycle_add(u32::MAX).less_than(1.cycle_add(u32::MAX)));
         assert!(0u32.cycle_add(u32::MAX).less_than(2.cycle_add(u32::MAX)));
         assert!(!2u32.cycle_add(u32::MAX).less_than(0.cycle_add(u32::MAX)));
+
+        assert_eq!(1i32.cycle_add(1), 2);
+        assert!(1i32.less_than(2));
+        assert!(!2i32.less_than(2));
+        assert!(!3i32.less_than(2));
+        assert!(i32::MAX.less_than(1));
+        assert!(0i32.cycle_add(i32::MAX).less_than(1.cycle_add(i32::MAX)));
+        assert!(!1i32.cycle_add(i32::MAX).less_than(0.cycle_add(i32::MAX)));
+        assert!(1i32.cycle_add(i32::MAX).less_than(2.cycle_add(i32::MAX)));
+        assert!(!2i32.cycle_add(i32::MAX).less_than(1.cycle_add(i32::MAX)));
+        assert!(0i32.cycle_add(i32::MAX).less_than(2.cycle_add(i32::MAX)));
+        assert!(!2i32.cycle_add(i32::MAX).less_than(0.cycle_add(i32::MAX)));
     }
 
     #[test]

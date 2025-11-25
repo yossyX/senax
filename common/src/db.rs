@@ -6,7 +6,7 @@
 /// # Examples
 ///
 /// ```rust
-/// use senax_pgsql_parser::convert_mysql_placeholders_to_postgresql;
+/// use senax_common::convert_mysql_placeholders_to_postgresql;
 ///
 /// let mysql_sql = "SELECT * FROM users WHERE id = ? AND name = ?";
 /// let postgresql_sql = convert_mysql_placeholders_to_postgresql(mysql_sql);
