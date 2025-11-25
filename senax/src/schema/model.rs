@@ -228,7 +228,7 @@ pub struct ModelDef {
     /// ### 論理削除設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub soft_delete: Option<SoftDelete>,
-    /// ### キャッシュ整合性のためのバージョンを使用する
+    /// ### バージョンを使用する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub versioned: bool,
     /// ### save_delayed のカウンターに使用するフィールド
@@ -247,9 +247,10 @@ pub struct ModelDef {
     /// ### 更新時に常にすべてのキャッシュをクリアする
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_clear_whole_cache: Option<bool>,
-    /// ### リレーションとして登録される場合にリプレースを使用する
+    /// ### リレーションとして登録される場合にUPSERTで上書きする
+    /// この機能を作った理由を忘れたが、多対多テーブルで論理削除の場合、必要になるかもしれない。
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_auto_replace: Option<bool>,
+    pub use_auto_overwrite: Option<bool>,
     /// ### 更新通知を使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_update_notice: Option<bool>,
@@ -377,7 +378,7 @@ pub struct ModelJson {
     /// ### 論理削除設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub soft_delete: Option<SoftDelete>,
-    /// ### キャッシュ整合性のためのバージョンを使用する
+    /// ### バージョンを使用する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub versioned: bool,
     /// ### save_delayed のカウンターに使用するフィールド
@@ -396,9 +397,10 @@ pub struct ModelJson {
     /// ### 更新時に常にすべてのキャッシュをクリアする
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_clear_whole_cache: Option<bool>,
-    /// ### リレーションとして登録される場合にリプレースを使用する
+    /// ### リレーションとして登録される場合にUPSERTで上書きする
+    /// この機能を作った理由を忘れたが、多対多テーブルで論理削除の場合、必要になるかもしれない。
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_auto_replace: Option<bool>,
+    pub use_auto_overwrite: Option<bool>,
     /// ### 更新通知を使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_update_notice: Option<bool>,
@@ -497,7 +499,7 @@ impl From<ModelDef> for ModelJson {
             use_all_rows_cache: value.use_all_rows_cache,
             use_filtered_row_cache: value.use_filtered_row_cache,
             use_clear_whole_cache: value.use_clear_whole_cache,
-            use_auto_replace: value.use_auto_replace,
+            use_auto_overwrite: value.use_auto_overwrite,
             use_update_notice: value.use_update_notice,
             use_insert_delayed: value.use_insert_delayed,
             use_save_delayed: value.use_save_delayed,
@@ -615,7 +617,7 @@ impl TryFrom<ModelJson> for ModelDef {
             use_all_rows_cache: value.use_all_rows_cache,
             use_filtered_row_cache: value.use_filtered_row_cache,
             use_clear_whole_cache: value.use_clear_whole_cache,
-            use_auto_replace: value.use_auto_replace,
+            use_auto_overwrite: value.use_auto_overwrite,
             use_update_notice: value.use_update_notice,
             use_insert_delayed: value.use_insert_delayed,
             use_save_delayed: value.use_save_delayed,
@@ -874,8 +876,8 @@ impl ModelDef {
         )
     }
 
-    pub fn use_auto_replace(&self) -> bool {
-        self.use_auto_replace.unwrap_or(
+    pub fn use_auto_overwrite(&self) -> bool {
+        self.use_auto_overwrite.unwrap_or(
             !self.has_auto_primary() && self.is_soft_delete() && self.unique_index().is_empty(),
         )
     }
@@ -1044,12 +1046,15 @@ impl ModelDef {
     pub fn soft_delete_tpl2(&self, none: &str, time: &str, flag: &str, time_num: &str) -> String {
         let op = self.soft_delete();
         let time_num = Self::replace_deleted(time_num);
+        let unix_time_type = if is_mysql_mode() { "u32" } else { "i32" };
         match op {
             None => none.to_owned(),
             Some(SoftDelete::None) => self.soft_delete_tpl(none, time, flag),
             Some(SoftDelete::Time) => self.soft_delete_tpl(none, time, flag),
             Some(SoftDelete::Flag) => self.soft_delete_tpl(none, time, flag),
-            Some(SoftDelete::UnixTime) => time_num.replace("{pascal_name}", &self.name.to_pascal()),
+            Some(SoftDelete::UnixTime) => time_num
+                .replace("{pascal_name}", &self.name.to_pascal())
+                .replace("{u32}", unix_time_type),
         }
     }
 
@@ -1090,7 +1095,11 @@ impl ModelDef {
     pub fn all_fields_except_read_only_and_auto_inc(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
-            .filter(|v| v.1.query.is_none() && v.1.auto != Some(AutoGeneration::AutoIncrement))
+            .filter(|v| {
+                v.1.query.is_none()
+                    && v.1.auto != Some(AutoGeneration::AutoIncrement)
+                    && !v.1.is_version
+            })
             .collect()
     }
     pub fn all_except_secret(&self) -> Vec<(&String, &FieldDef)> {
@@ -1249,14 +1258,17 @@ impl ModelDef {
     pub fn non_primaries_except_read_only(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
-            .filter(|(_k, v)| !v.primary && v.query.is_none())
+            .filter(|(_k, v)| !v.primary && v.query.is_none() && !v.is_version)
             .collect()
     }
     pub fn non_primaries_except_created_at(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
             .filter(|(k, v)| {
-                !v.primary && v.query.is_none() && !ConfigDef::created_at().as_str().eq(k.as_str())
+                !v.primary
+                    && v.query.is_none()
+                    && !v.is_version
+                    && !ConfigDef::created_at().as_str().eq(k.as_str())
             })
             .collect()
     }
@@ -1289,6 +1301,7 @@ impl ModelDef {
                     && !ConfigDef::version().eq(&**k)
                     && !ConfigDef::aggregation_type().eq(&**k)
                     && v.query.is_none()
+                    && !v.is_version
             })
             .collect()
     }
@@ -1537,12 +1550,20 @@ impl ModelDef {
             })
             .collect()
     }
+    pub fn for_api_response_not_in_request(&self) -> Vec<(&String, &FieldDef)> {
+        let pri: HashMap<_, _> = self.auto_primary().into_iter().collect();
+        let req: HashMap<_, _> = self.for_api_request().into_iter().collect();
+        self.for_api_response()
+            .into_iter()
+            .filter(|(k, v)| !pri.contains_key(k) && !req.contains_key(k) && !v.is_version)
+            .collect()
+    }
     pub fn for_api_request(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
             .filter(|(k, v)| {
                 !v.exclude_from_cache()
-                    && !v.skip_factory()
+                    && (!v.skip_factory() || v.is_version)
                     && v.auto.is_none()
                     && ApiFieldDef::has(k)
                     && ApiFieldDef::check(k, true)
@@ -1587,7 +1608,7 @@ impl ModelDef {
     pub fn fields_with_default(&self) -> Vec<(&String, &FieldDef)> {
         self.for_api_request()
             .into_iter()
-            .filter(|(_k, v)| v.default.is_some())
+            .filter(|(k, _)| ApiFieldDef::default(k).is_some())
             .collect()
     }
     pub fn multi_index(&self, cache_only: bool) -> Vec<(String, IndexDef)> {

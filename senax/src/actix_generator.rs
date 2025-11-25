@@ -451,6 +451,16 @@ pub fn write_base_files(
         let tpl = ValidatorTemplate;
         fs_write(file_path, tpl.render()?)?;
     }
+
+    #[derive(Template)]
+    #[template(path = "new_actix/base/src/maybe_undefined.rs", escape = "none")]
+    pub struct MaybeUndefinedTemplate;
+
+    let file_path = src_path.join("maybe_undefined.rs");
+    if !file_path.exists() {
+        let tpl = MaybeUndefinedTemplate;
+        fs_write(file_path, tpl.render()?)?;
+    }
     Ok(())
 }
 
@@ -491,8 +501,7 @@ fn fix_build_sh(content: &str, name: &str) -> Result<String> {
         let content = content.replace(
             "# Do not modify this line. (Api)",
             &format!(
-                "senax actix api {} -c -f ${}_client\n# Do not modify this line. (Api)",
-                name, name
+                "senax actix api {name} -c -f ${name}_client\ncargo run -p {name} -- gen-gql-schema ${name}_client\n# Do not modify this line. (Api)",
             ),
         );
         return Ok(content);

@@ -483,6 +483,8 @@ pub struct FieldDef {
     pub is_timestamp: bool,
     #[serde(skip)]
     pub in_abstract: bool,
+    #[serde(skip)]
+    pub is_version: bool,
 
     /// ### リネーム元カラム名
     /// よくわからない場合は手動で修正しないこと。また、コピー&ペーストを行う場合は削除した方が良い。
@@ -845,6 +847,7 @@ impl From<FieldJson> for FieldDef {
             auto_gen: Default::default(),
             is_timestamp: Default::default(),
             in_abstract: Default::default(),
+            is_version: Default::default(),
             label: value.label,
             comment: value.comment,
             data_type: value.data_type,
@@ -949,6 +952,7 @@ impl From<ValueObjectJson> for FieldDef {
             auto_gen: Default::default(),
             is_timestamp: Default::default(),
             in_abstract: Default::default(),
+            is_version: Default::default(),
             label: value.label,
             comment: value.comment,
             data_type: value.data_type,
@@ -1169,13 +1173,11 @@ impl FieldDef {
             if self.not_null {
                 result
             } else {
-                format!("Some({})", &result)
+                format!("Some(Some({})).into()", &result)
             }
         };
         if let Some(value) = ApiFieldDef::default(name) {
             conv(&value)
-        } else if let Some(value) = &self.default {
-            conv(value)
         } else {
             "Default::default()".to_string()
         }
@@ -1485,18 +1487,33 @@ impl FieldDef {
         match self.data_type {
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
                 if !has_custom {
-                    validators.push(
-                        "custom(function = \"_server::validator::validate_varchar\")".to_string(),
-                    );
+                    if self.not_null {
+                        validators.push(
+                            "custom(function = \"_server::validator::validate_varchar\")"
+                                .to_string(),
+                        );
+                    } else {
+                        validators.push(
+                            "custom(function = \"_server::validator::validate_varchar_opt\")"
+                                .to_string(),
+                        );
+                    }
                 }
                 let length = self.length.unwrap_or(DEFAULT_VARCHAR_LENGTH);
                 validators.push(format!("length(max = {})", length));
             }
             DataType::Text => {
                 if !has_custom {
-                    validators.push(
-                        "custom(function = \"_server::validator::validate_text\")".to_string(),
-                    );
+                    if self.not_null {
+                        validators.push(
+                            "custom(function = \"_server::validator::validate_text\")".to_string(),
+                        );
+                    } else {
+                        validators.push(
+                            "custom(function = \"_server::validator::validate_text_opt\")"
+                                .to_string(),
+                        );
+                    }
                 }
                 if let Some(length) = self.length {
                     validators.push(format!("length(max = {})", length));
@@ -1504,10 +1521,17 @@ impl FieldDef {
             }
             DataType::ArrayString => {
                 if !has_custom {
-                    validators.push(
-                        "custom(function = \"_server::validator::validate_array_of_varchar\")"
-                            .to_string(),
-                    );
+                    if self.not_null {
+                        validators.push(
+                            "custom(function = \"_server::validator::validate_array_of_varchar\")"
+                                .to_string(),
+                        );
+                    } else {
+                        validators.push(
+                            "custom(function = \"_server::validator::validate_array_of_varchar_opt\")"
+                                .to_string(),
+                        );
+                    }
                 }
             }
             _ if self.min.is_some() && self.max.is_some() => {
@@ -1527,17 +1551,32 @@ impl FieldDef {
                 validators.push("range(min = 0.0)".to_string());
             }
             DataType::Decimal if !self.signed => {
-                validators.push(
-                    "custom(function = \"_server::validator::validate_unsigned_decimal\")"
-                        .to_string(),
-                );
+                if self.not_null {
+                    validators.push(
+                        "custom(function = \"_server::validator::validate_unsigned_decimal\")"
+                            .to_string(),
+                    );
+                } else {
+                    validators.push(
+                        "custom(function = \"_server::validator::validate_unsigned_decimal_opt\")"
+                            .to_string(),
+                    );
+                }
             }
             DataType::Json | DataType::Jsonb | DataType::Geometry
                 if self.user_defined_json_type.is_none() =>
             {
-                validators.push(
-                    "custom(function = \"_server::validator::validate_json_object\")".to_string(),
-                );
+                if self.not_null {
+                    validators.push(
+                        "custom(function = \"_server::validator::validate_json_object\")"
+                            .to_string(),
+                    );
+                } else {
+                    validators.push(
+                        "custom(function = \"_server::validator::validate_json_object_opt\")"
+                            .to_string(),
+                    );
+                }
             }
             _ => {}
         }
@@ -1555,9 +1594,13 @@ impl FieldDef {
         }
     }
 
-    pub fn get_api_serde_default(&self, name: &str) -> String {
-        if self.default.is_some() {
-            format!("    #[serde(default = \"default_{}\")]\n", name)
+    pub fn get_api_default_attribute(&self, name: &str) -> String {
+        if ApiFieldDef::default(name).is_some() {
+            format!(
+                "    #[serde(default = \"default_{}\")]\n    #[graphql(default_with = \"{}\")]\n",
+                name,
+                self.get_api_default(name)
+            )
         } else {
             "".to_string()
         }
@@ -2129,6 +2172,30 @@ impl FieldDef {
     }
 
     pub fn get_api_type(&self, option: bool, req: bool) -> String {
+        let typ = self._get_api_type(req);
+        let option = option || req && self.is_version;
+        if self.not_null && !option {
+            typ
+        } else if option || !req {
+            format!("Option<{}>", typ)
+        } else {
+            format!("_server::MaybeUndefined<{}>", typ)
+        }
+    }
+
+    pub fn get_api_schema(&self) -> String {
+        let typ = self._get_api_type(true);
+        if self.not_null {
+            String::new()
+        } else {
+            format!(
+                "    #[schema(value_type = Option<{typ}>)]
+    #[schemars(with = \"Option<{typ}>\")]\n"
+            )
+        }
+    }
+
+    fn _get_api_type(&self, req: bool) -> String {
         let signed_only: bool = CONFIG.read().unwrap().as_ref().unwrap().signed_only();
         let typ = match self.data_type {
             DataType::TinyInt if self.signed || signed_only => "i8",
@@ -2199,11 +2266,7 @@ impl FieldDef {
         } else if let Some(ref class) = self.enum_class {
             typ = class.to_string();
         }
-        if self.not_null && !option {
-            typ
-        } else {
-            format!("Option<{}>", typ)
-        }
+        typ
     }
 
     pub fn get_gql_type(&self) -> String {
@@ -2447,29 +2510,34 @@ impl FieldDef {
             }
         }
         if self.enum_class.is_some() {
-            return format!("input.{var}");
+            if !self.not_null {
+                return format!("input.{var}.take()");
+            } else {
+                return format!("input.{var}");
+            }
         }
         if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
             if !self.not_null {
-                return format!("input.{var}.map(|v| v.into())");
+                return format!("input.{var}.take().map(|v| v.into())");
             } else {
                 return format!("input.{var}.into()");
             }
         }
         if self.value_object.is_some() {
             if !self.not_null {
-                return format!("input.{var}.map(|v| v.into())");
+                return format!("input.{var}.take().map(|v| v.into())");
             } else {
                 return format!("input.{var}.into()");
             }
         }
         match self.data_type {
             DataType::Binary | DataType::Varbinary | DataType::Blob if !self.not_null => {
-                format!("input.{var}.map(|v| v.to_vec())")
+                format!("input.{var}.take().map(|v| v.to_vec())")
             }
             DataType::Binary | DataType::Varbinary | DataType::Blob => {
                 format!("input.{var}.to_vec()")
             }
+            _ if !self.not_null => format!("input.{var}.take()"),
             _ => format!("input.{var}"),
         }
     }

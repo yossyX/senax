@@ -52,9 +52,13 @@ impl Op {
             }
             Op::Add if nullable => {
                 buf.push_str(col);
+                @%- if config.is_mysql() %@
                 buf.push_str("=IFNULL(");
+                @%- else %@
+                buf.push_str("=COALESCE(");
+                @%- endif %@
                 buf.push_str(col);
-                buf.push_str(", 0)+");
+                buf.push_str(",0)+");
                 buf.push_str(ph);
             }
             Op::Add => {
@@ -66,9 +70,13 @@ impl Op {
             }
             Op::Sub if nullable => {
                 buf.push_str(col);
+                @%- if config.is_mysql() %@
                 buf.push_str("=IFNULL(");
+                @%- else %@
+                buf.push_str("=COALESCE(");
+                @%- endif %@
                 buf.push_str(col);
-                buf.push_str(", 0)-");
+                buf.push_str(",0)-");
                 buf.push_str(ph);
             }
             Op::Sub => {
@@ -80,55 +88,63 @@ impl Op {
             }
             Op::Max if nullable => {
                 buf.push_str(col);
-                buf.push_str("=IF(IFNULL(");
+                @%- if config.is_mysql() %@
+                buf.push_str("= CASE WHEN IFNULL(");
+                @%- else %@
+                buf.push_str("= CASE WHEN COALESCE(");
+                @%- endif %@
                 buf.push_str(col);
-                buf.push_str(", ");
+                buf.push(',');
                 buf.push_str(ph);
                 buf.push_str(")<");
                 buf.push_str(ph);
-                buf.push(',');
+                buf.push_str(" THEN ");
                 buf.push_str(ph);
-                buf.push(',');
+                buf.push_str(" ELSE ");
                 buf.push_str(col);
-                buf.push(')');
+                buf.push_str(" END");
             }
             Op::Max => {
                 buf.push_str(col);
-                buf.push_str("=IF(");
+                buf.push_str("= CASE WHEN ");
                 buf.push_str(col);
                 buf.push('<');
                 buf.push_str(ph);
-                buf.push(',');
+                buf.push_str(" THEN ");
                 buf.push_str(ph);
-                buf.push(',');
+                buf.push_str(" ELSE ");
                 buf.push_str(col);
-                buf.push(')');
+                buf.push_str(" END");
             }
             Op::Min if nullable => {
                 buf.push_str(col);
-                buf.push_str("=IF(IFNULL(");
+                @%- if config.is_mysql() %@
+                buf.push_str("= CASE WHEN IFNULL(");
+                @%- else %@
+                buf.push_str("= CASE WHEN COALESCE(");
+                @%- endif %@
                 buf.push_str(col);
-                buf.push_str(", ");
+                buf.push(',');
                 buf.push_str(ph);
                 buf.push_str(")>");
                 buf.push_str(ph);
-                buf.push(',');
+                buf.push_str(" THEN ");
                 buf.push_str(ph);
-                buf.push(',');
+                buf.push_str(" ELSE ");
                 buf.push_str(col);
-                buf.push(')');
+                buf.push_str(" END");
             }
             Op::Min => {
                 buf.push_str(col);
-                buf.push_str("=IF(");
+                buf.push_str("= CASE WHEN ");
                 buf.push_str(col);
                 buf.push('>');
                 buf.push_str(ph);
-                buf.push(',');
+                buf.push_str(" THEN ");
                 buf.push_str(ph);
-                buf.push(',');
+                buf.push_str(" ELSE ");
                 buf.push_str(col);
-                buf.push(')');
+                buf.push_str(" END");
             }
             Op::BitAnd => {
                 buf.push_str(col);
@@ -139,7 +155,11 @@ impl Op {
             }
             Op::BitOr if nullable => {
                 buf.push_str(col);
+                @%- if config.is_mysql() %@
                 buf.push_str("=IFNULL(");
+                @%- else %@
+                buf.push_str("=COALESCE(");
+                @%- endif %@
                 buf.push_str(col);
                 buf.push_str(", 0)|");
                 buf.push_str(ph);

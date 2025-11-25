@@ -88,6 +88,27 @@ pub fn fmt_join(v: Vec<(&String, &FieldDef)>, f: &str, sep: &str) -> ::askama::R
         .join(sep))
 }
 
+pub fn fmt_join_not_null_or_null(
+    v: Vec<(&String, &FieldDef)>,
+    not_null_case: &str,
+    null_case: &str,
+    sep: &str,
+) -> ::askama::Result<String> {
+    let mut index = -1;
+    Ok(v.iter()
+        .map(|(name, col)| {
+            let f = if col.not_null && !col.is_version {
+                not_null_case
+            } else {
+                null_case
+            };
+            index += 1;
+            _fmt_join(f, name, col, index, &Vec::new())
+        })
+        .collect::<Vec<_>>()
+        .join(sep))
+}
+
 pub fn fmt_join_with_foreign_default(
     v: Vec<(&String, &FieldDef)>,
     f: &str,
@@ -197,7 +218,10 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
         .replace("{api_validate_const}", &col.get_api_validate_const(name))
         .replace("{api_validate}", &col.get_api_validate(name))
         .replace("{api_default}", &col.get_api_default(name))
-        .replace("{api_serde_default}", &col.get_api_serde_default(name))
+        .replace(
+            "{api_default_attribute}",
+            &col.get_api_default_attribute(name),
+        )
         .replace("{graphql_secret}", col.graphql_secret())
         .replace("{outer}", &col.get_outer_type(false))
         .replace("{domain_outer}", &col.get_outer_type(true))
@@ -248,6 +272,7 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
         .replace("{res_api_type}", &col.get_api_type(false, false))
         .replace("{req_api_option_type}", &col.get_api_type(true, true))
         .replace("{req_api_type}", &col.get_api_type(false, true))
+        .replace("{req_api_schema}", &col.get_api_schema())
         .replace("{gql_type}", &col.get_gql_type())
         .replace("{ts_type}", col.get_ts_type())
         .replace("{to_res_api_type}", col.get_to_api_type(false))

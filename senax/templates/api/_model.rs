@@ -266,20 +266,28 @@ pub struct ReqObj {
     pub _id: Option<async_graphql::ID>,
 @%- if camel_case %@
 @{- def.auto_primary()|fmt_join("
-{label_wo_hash}{graphql_secret}{api_validate}{api_serde_default}    pub {var}: {req_api_option_type},", "") }@
+{label_wo_hash}{graphql_secret}{api_validate}{api_default_attribute}    pub {var}: {req_api_option_type},", "") }@
 @{- def.for_api_request()|fmt_join("
-{label_wo_hash}{graphql_secret}{api_validate}{api_serde_default}    pub {var}: {req_api_type},", "") }@
+{label_wo_hash}{graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {var}: {req_api_type},", "") }@
+@{- def.for_api_response_not_in_request()|fmt_join("
+    #[graphql(visible = false)]
+    #[serde(skip)]
+    pub {var}: {req_api_option_type},", "") }@
 @{- def.relations_one_for_api_request()|fmt_rel_join("
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ReqObj{rel_name_pascal}>,", "") }@
 @{- def.relations_many_for_api_request()|fmt_rel_join("
 {label_wo_hash}    pub {rel_name}: Option<Vec<_{raw_rel_name}::ReqObj{rel_name_pascal}>>,", "") }@
 @%- else %@
 @{- def.auto_primary()|fmt_join("
-{label_wo_hash}    #[graphql(name = \"{raw_var}\")]
-{graphql_secret}{api_validate}{api_serde_default}    pub {var}: {req_api_option_type},", "") }@
+    #[graphql(name = \"{raw_var}\")]
+{graphql_secret}{api_validate}{api_default_attribute}    pub {var}: {req_api_option_type},", "") }@
 @{- def.for_api_request()|fmt_join("
 {label_wo_hash}    #[graphql(name = \"{raw_var}\")]
-{graphql_secret}{api_validate}{api_serde_default}    pub {var}: {req_api_type},", "") }@
+{graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {var}: {req_api_type},", "") }@
+@{- def.for_api_response_not_in_request()|fmt_join("
+    #[graphql(name = \"{raw_var}\", visible = false)]
+    #[serde(skip)]
+    pub {var}: {req_api_option_type},", "") }@
 @{- def.relations_one_for_api_request()|fmt_rel_join("
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]
     pub {rel_name}: Option<_{raw_rel_name}::ReqObj{rel_name_pascal}>,", "") }@
@@ -287,6 +295,15 @@ pub struct ReqObj {
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]
     pub {rel_name}: Option<Vec<_{raw_rel_name}::ReqObj{rel_name_pascal}>>,", "") }@
 @%- endif %@
+    #[graphql(name = "_cursor", visible = false)]
+    #[serde(skip)]
+    pub _cursor: Option<String>,
+    #[graphql(name = "_updatable", visible = false)]
+    #[serde(skip)]
+    pub _updatable: Option<bool>,
+    #[graphql(name = "_deletable", visible = false)]
+    #[serde(skip)]
+    pub _deletable: Option<bool>,
 }
 
 @{- def.fields_with_default()|fmt_join("
@@ -302,12 +319,18 @@ impl From<&mut dyn _domain_::@{ pascal_name }@Updater> for ReqObj {
             _id: Some((&*v).into()),
             @{- def.auto_primary()|fmt_join("
             {var}: Some(v.{var}(){to_req_api_type}),", "") }@
-            @{- def.for_api_request()|fmt_join("
-            {var}: v.{var}(){to_req_api_type},", "") }@
+            @{- def.for_api_request()|fmt_join_not_null_or_null("
+            {var}: v.{var}(){to_req_api_type},", "
+            {var}: Some(v.{var}(){to_req_api_type}).into(),", "") }@
+            @{- def.for_api_response_not_in_request()|fmt_join("
+            {var}: None,", "") }@
             @{- def.relations_one_for_api_request()|fmt_rel_join("
             {rel_name}: (|| v.{rel_name}().unwrap().map(|v| v.into()))(),", "") }@
             @{- def.relations_many_for_api_request()|fmt_rel_join("
             {rel_name}: (|| Some(v.{rel_name}().unwrap().iter_mut().map(|v| v.into()).collect()))(),", "") }@
+            _cursor: None,
+            _updatable: None,
+            _deletable: None,
         }
     }
 }
@@ -349,8 +372,11 @@ pub fn create_list(
 #[rustfmt::skip]
 #[allow(unused_variables)]
 fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: ReqObj, repo: &dyn _Repository, auth: &AuthInfo) -> anyhow::Result<()> {
-@{- def.for_api_update_updater()|fmt_join("
-    updater.set_{raw_var}({from_api_type_for_update});", "") }@
+@{- def.for_api_update_updater()|fmt_join_not_null_or_null("
+    updater.set_{raw_var}({from_api_type_for_update});", "
+    if !input.{var}.is_undefined() {
+        updater.set_{raw_var}({from_api_type_for_update});
+    }", "") }@
 @{- def.relations_one_for_api_request_with_replace_type(true)|fmt_rel_join("
     if let Some(input) = input.{rel_name} {
         updater.set_{raw_rel_name}(_{raw_rel_name}::create_entity(input, repo, auth));

@@ -160,11 +160,20 @@ use _server::auth::AuthInfo;
 #[derive(utoipa::ToSchema)]
 #[schema(as = Req@{ graphql_name }@)]
 pub struct ReqObj@{ rel_name|pascal }@ {
+    #[graphql(name = "_id", visible = false)]
+    #[schemars(skip)]
+    #[schema(value_type = Option<String>)]
+    #[serde(skip)]
+    pub _id: Option<async_graphql::ID>,
 @%- if camel_case %@
 @{- def.auto_primary()|fmt_join("
-{label_wo_hash}{graphql_secret}{api_validate}{api_serde_default}    pub {var}: {req_api_option_type},", "") }@
+{label_wo_hash}{graphql_secret}{api_validate}{api_default_attribute}    pub {var}: {req_api_option_type},", "") }@
 @{- def.for_api_request_except(rel_id)|fmt_join("
-{label_wo_hash}{graphql_secret}{api_validate}{api_serde_default}    pub {var}: {req_api_type},", "") }@
+{label_wo_hash}{graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {var}: {req_api_type},", "") }@
+@{- def.for_api_response_not_in_request()|fmt_join("
+    #[graphql(visible = false)]
+    #[serde(skip)]
+    pub {var}: {req_api_option_type},", "") }@
 @{- def.relations_one_for_api_request()|fmt_rel_join("
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ReqObj{rel_name_pascal}>,", "") }@
 @{- def.relations_many_for_api_request()|fmt_rel_join("
@@ -172,10 +181,14 @@ pub struct ReqObj@{ rel_name|pascal }@ {
 @%- else %@
 @{- def.auto_primary()|fmt_join("
 {label_wo_hash}    #[graphql(name = \"{raw_var}\")]
-{graphql_secret}{api_validate}{api_serde_default}    pub {var}: {req_api_option_type},", "") }@
+{graphql_secret}{api_validate}{api_default_attribute}    pub {var}: {req_api_option_type},", "") }@
 @{- def.for_api_request_except(rel_id)|fmt_join("
 {label_wo_hash}    #[graphql(name = \"{raw_var}\")]
-{graphql_secret}{api_validate}{api_serde_default}    pub {var}: {req_api_type},", "") }@
+{graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {var}: {req_api_type},", "") }@
+@{- def.for_api_response_not_in_request()|fmt_join("
+    #[graphql(name = \"{raw_var}\", visible = false)]
+    #[serde(skip)]
+    pub {var}: {req_api_option_type},", "") }@
 @{- def.relations_one_for_api_request()|fmt_rel_join("
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]
     pub {rel_name}: Option<_{raw_rel_name}::ReqObj{rel_name_pascal}>,", "") }@
@@ -195,10 +208,14 @@ fn default_{raw_var}() -> {req_api_type} {
 impl From<&mut dyn _domain_::@{ pascal_name }@Updater> for ReqObj@{ rel_name|pascal }@ {
     fn from(v: &mut dyn _domain_::@{ pascal_name }@Updater) -> Self {
         Self {
+            _id: Some((&*v).into()),
             @{- def.auto_primary()|fmt_join("
             {var}: Some(v.{var}(){to_req_api_type}),", "") }@
-            @{- def.for_api_request_except(rel_id)|fmt_join("
-            {var}: v.{var}(){to_req_api_type},", "") }@
+            @{- def.for_api_request_except(rel_id)|fmt_join_not_null_or_null("
+            {var}: v.{var}(){to_req_api_type},", "
+            {var}: Some(v.{var}(){to_req_api_type}).into(),", "") }@
+            @{- def.for_api_response_not_in_request()|fmt_join("
+            {var}: None,", "") }@
             @{- def.relations_one_for_api_request()|fmt_rel_join("
             {rel_name}: (|| v.{rel_name}().unwrap().map(|v| v.into()))(),", "") }@
             @{- def.relations_many_for_api_request()|fmt_rel_join("
@@ -286,8 +303,11 @@ pub fn update_updater(
     repo: &dyn _Repository,
     auth: &AuthInfo,
 ) -> anyhow::Result<()> {
-@{- def.for_api_request_except_primary_and(rel_id)|fmt_join("
-    updater.set_{raw_var}({from_api_type_for_update});", "") }@
+@{- def.for_api_request_except_primary_and(rel_id)|fmt_join_not_null_or_null("
+    updater.set_{raw_var}({from_api_type_for_update});", "
+    if !input.{var}.is_undefined() {
+        updater.set_{raw_var}({from_api_type_for_update});
+    }", "") }@
 @{- def.relations_one_for_api_request_with_replace_type(true)|fmt_rel_join("
     if let Some(input) = input.{rel_name} {
         updater.set_{raw_rel_name}(_{raw_rel_name}::create_entity(input, repo, auth));

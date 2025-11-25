@@ -564,7 +564,7 @@ pub struct ApiModelDef {
     /// ### 主キーでのdeleteを使用
     #[serde(default, skip_serializing_if = "is_false")]
     pub use_delete_by_pk: bool,
-    /// ### 登録、更新、削除を使用しない
+    /// ### 登録、更新、削除を無効化
     #[serde(default, skip_serializing_if = "is_false")]
     pub disable_mutation: bool,
     /// ### インポートを使用
@@ -627,7 +627,7 @@ pub struct ApiModelJson {
     /// ### 主キーでのdeleteを使用
     #[serde(default, skip_serializing_if = "is_false")]
     pub use_delete_by_pk: bool,
-    /// ### 登録、更新、削除を使用しない
+    /// ### 登録、更新、削除を無効化
     #[serde(default, skip_serializing_if = "is_false")]
     pub disable_mutation: bool,
     /// ### インポートを使用

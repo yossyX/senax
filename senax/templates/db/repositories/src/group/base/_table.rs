@@ -250,7 +250,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
 @%- for (index_name, index) in def.unique_index() %@
         if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("op.{var} != Op::None", "op.{var} != Op::None && obj.{var}.is_some()", " && ") }@ {
             let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{var}(obj.{var}.clone(){inner_to_raw}.into())", "ColKey_::{var}(obj.{var}.as_ref().unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
-            Cache::insert_short(&key, Arc::new(id.to_wrapper(time))).await;
+            Cache::invalidate(&key, id._shard_id()).await;
         }
 @%- endfor %@
         obj
@@ -279,7 +279,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 },
                 @%- endif %@
                 @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
-                CacheOp::Insert { replace, shard_id, data
+                CacheOp::Insert { overwrite, shard_id, data
                     @{- def.relations_one_cache(false)|fmt_rel_join(", _{rel_name}", "") -}@ 
                     @{- def.relations_many_cache(false)|fmt_rel_join(", _{rel_name}", "") }@ } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
@@ -287,7 +287,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     let mut cache = CacheWrapper::from_data(data.clone(), shard_id, time);
                     let id = InnerPrimary::from(&cache._inner);
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        let op = if replace {
+                        let op = if overwrite {
                             db::models::NotifyOp::update
                         } else {
                             db::models::NotifyOp::insert
@@ -295,52 +295,32 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, op, &id).await;
                     }
                     let id = PrimaryHasher(id, shard_id);
-                    @%- if def.versioned %@
-                    let vw = VersionWrapper {
-                        id: id.0.clone(),
-                        shard_id,
-                        time,
-                        version: 0,
-                    };
-                    if !replace && Cache::get_version::<VersionWrapper>(&vw, shard_id).await.filter(|o| o.id == id.0).is_some() {
-                        return;
-                    }
-                    @%- endif %@
-                    if !replace && Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0).is_some() {
-                        return;
-                    }
-                    let can_cache = true@{ def.relations_one_cache(false)|fmt_rel_join(" && _{rel_name}.is_some()", "") }@@{ def.relations_many_cache(false)|fmt_rel_join(" && _{rel_name}.is_some()", "") }@;
     @{- def.relations_one_cache(false)|fmt_rel_join("
                     if let Some(_{rel_name}) = _{rel_name} {
-                        if let Some(rel) = &mut cache.{rel_name} {
-                            *rel = rel_{class_mod}::CacheOp::apply_to_obj(rel, &_{rel_name}, shard_id, time){soft_delete_filter};
-                        }
                         for msg in _{rel_name} {
                             msg.handle_cache_msg(Arc::clone(&sync_map)).await;
                         }
                     }", "")|replace1("_inner") }@
     @{- def.relations_many_cache(false)|fmt_rel_join("
                     if let Some(_{rel_name}) = _{rel_name} {
-                        if let Some(rel) = &mut cache.{rel_name} {
-                            *rel = rel_{class_mod}::CacheOp::apply_to_list(rel, &_{rel_name}, shard_id, time).into_iter(){soft_delete_filter}.collect();
-                            {cache_list_sort}
-                            {cache_list_limit}
-                        }
                         for msg in _{rel_name} {
                             msg.handle_cache_msg(Arc::clone(&sync_map)).await;
                         }
                     }", "")|replace1("_inner") }@
-                    if replace {
+                    if overwrite {
+                        let cs = CacheSyncWrapper {
+                            id: id.0.clone(),
+                            shard_id,
+                            time,
+                            sync,
+                        };
+                        Cache::insert_version(&cs, Arc::new(cs.clone())).await;
                         Cache::invalidate(&id, shard_id).await;
-                    }
-                    if can_cache {
-                        Cache::insert_short(&id, Arc::new(cache)).await;
                     }
                     @%- for (index_name, index) in def.unique_index() %@
                     if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("true", " data.{var}.is_some()", " && ") }@ {
                         let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{var}(data.{var}.clone(){inner_to_raw}.into())", "ColKey_::{var}(data.{var}.unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
                         Cache::invalidate(&key, shard_id).await;
-                        Cache::insert_short(&key, Arc::new(id.to_wrapper(time))).await;
                     }
                     @%- endfor %@
                 }
@@ -355,7 +335,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     for row in list {
                         let mut cache = CacheWrapper::from_data(row._data.clone(), shard_id, time);
                         let id = InnerPrimary::from(&cache._inner);
-                        if USE_UPDATE_NOTICE && DbConn::_has_update_notice() @% if def.has_auto_primary() %@&& !overwrite @% endif %@{
+                        if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                             DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, op, &id).await;
                         }
                         let id = PrimaryHasher(id, shard_id);
@@ -369,45 +349,21 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         if let Some(old) = Cache::get_version::<VersionWrapper>(&vw, shard_id).await.filter(|o| o.id == id.0) {
                             if old.version.less_than(vw.version) {
                                 Cache::insert_version(&vw, Arc::new(vw.clone())).await;
-                            } else {
-                                continue;
                             }
-                        } else if vw.version > 1 {
+                        } else if !row._is_new {
                             Cache::insert_version(&vw, Arc::new(vw.clone())).await;
                         }
                         @%- endif %@
-                        let mut has_cache = false;
-                        if let Some(_cache) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
-                            has_cache = true;
-                            @%- if def.versioned %@
-                            if _cache._inner.@{ ConfigDef::version()|to_var_name }@.greater_equal(cache._inner.@{ ConfigDef::version()|to_var_name }@) {
-                                continue;
-                            }
-                            @%- endif %@
-                            @{- def.relations_one_cache(false)|fmt_rel_join("
-                            if row.{rel_name}.is_none() {
-                                cache.{rel_name} = _cache.{rel_name}.clone();
-                            }", "") }@
-                            @{- def.relations_many_cache(false)|fmt_rel_join("
-                            if row.{rel_name}.is_none() {
-                                cache.{rel_name} = _cache.{rel_name}.clone();
-                            }", "") }@
-                        } else @%- if def.has_auto_primary() %@ if !overwrite @%- endif %@ {
-                            let cs = CacheSyncWrapper {
-                                id: id.0.clone(),
-                                shard_id,
-                                time,
-                                sync,
-                            };
-                            Cache::insert_version(&cs, Arc::new(cs.clone())).await;
-                            Cache::invalidate(&id, shard_id).await;
-                        }
-                        let can_cache = true@{ def.relations_one_cache(false)|fmt_rel_join(" && row.{rel_name}.is_some()", "") }@@{ def.relations_many_cache(false)|fmt_rel_join(" && row.{rel_name}.is_some()", "") }@;
+                        let cs = CacheSyncWrapper {
+                            id: id.0.clone(),
+                            shard_id,
+                            time,
+                            sync,
+                        };
+                        Cache::insert_version(&cs, Arc::new(cs.clone())).await;
+                        Cache::invalidate(&id, shard_id).await;
                         @{- def.relations_one_cache(false)|fmt_rel_join("
                         if let Some(_{rel_name}) = row.{rel_name} {
-                            if let Some(rel) = &mut cache.{rel_name} {
-                                *rel = _{rel_name}.as_ref(){soft_delete_filter}.map(|v| Arc::new(rel_{class_mod}::CacheWrapper::from_data(v._data.clone(), shard_id, time)));
-                            }
                             if let Some(_{rel_name}) = _{rel_name} {
                                 rel_{class_mod}::CacheOp::BulkInsert {
                                     replace,
@@ -420,11 +376,6 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         }", "")|replace1("_data") }@
                         @{- def.relations_many_cache(false)|fmt_rel_join("
                         if let Some(_{rel_name}) = row.{rel_name} {
-                            if let Some(rel) = &mut cache.{rel_name} {
-                                *rel = _{rel_name}.iter(){soft_delete_filter}.map(|v| Arc::new(rel_{class_mod}::CacheWrapper::from_data(v._data.clone(), shard_id, time))).collect();
-                                {cache_list_sort}
-                                {cache_list_limit}
-                            }
                             rel_{class_mod}::CacheOp::BulkInsert {
                                 replace,
                                 overwrite,
@@ -433,16 +384,10 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                                 list: _{rel_name},
                             }.handle_cache_msg(Arc::clone(&sync_map)).await;
                         }", "")|replace1("_data") }@
-                        if !ignore && (has_cache || can_cache) @% if def.has_auto_primary() %@&& !overwrite @% endif %@{
-                            Cache::insert(&id, Arc::new(cache), USE_FAST_CACHE, has_cache).await;
-                        }
                         @%- for (index_name, index) in def.unique_index() %@
                         if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("true", " row._data.{var}.is_some()", " && ") }@ {
                             let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{var}(row._data.{var}.clone(){inner_to_raw}.into())", "ColKey_::{var}(row._data.{var}.unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
                             Cache::invalidate(&key, shard_id).await;
-                            if !ignore {
-                                Cache::insert(&key, Arc::new(id.to_wrapper(time)), USE_FAST_CACHE, has_cache).await;
-                            }
                         }
                         @%- endfor %@
                     }
@@ -1185,7 +1130,7 @@ fn aggregate_update(x: &_@{ pascal_name }@Updater, old: &mut _@{ pascal_name }@U
 async fn _handle_delayed_msg_update(shard_id: ShardId) {
     @{- def.soft_delete_tpl2("","
     let deleted_at = Some(SystemTime::now().into());","","
-    let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32);")}@
+    let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as {u32});")}@
     let mut map: BTreeMap<InnerPrimary, IndexMap<OpData, __Updater__>> = BTreeMap::new();
     while let Some(mut x) = UPDATE_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
         @{- def.soft_delete_tpl2("","
@@ -1273,7 +1218,7 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
 async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
     @{- def.soft_delete_tpl2("","
     let deleted_at = Some(SystemTime::now().into());","","
-    let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32);")}@
+    let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as {u32});")}@
     let mut map: BTreeMap<InnerPrimary, IndexMap<OpData, __Updater__>> = BTreeMap::new();
     while let Some(mut x) = UPSERT_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
         @{- def.soft_delete_tpl2("","
@@ -4033,7 +3978,7 @@ impl QueryBuilder {
         obj.mut_deleted().set(true);
         self.update(conn, obj).await","
         let mut obj = _{pascal_name}_::updater();
-        let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32);
+        let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as {u32});
         obj.mut_deleted().set(deleted);
         self.update(conn, obj).await")}@
     }
@@ -4984,7 +4929,7 @@ impl _@{ pascal_name }@_ {
     pub async fn insert_dummy_cache(conn: &DbConn, obj: _@{ pascal_name }@Updater) -> Result<()> {
         let _lock = db::models::CACHE_UPDATE_LOCK.write().await;
         let cache_msg = CacheOp::Insert {
-            replace: false,
+            overwrite: false,
             shard_id: conn.shard_id(),
             data: obj._data,
 @{- def.relations_one_cache(false)|fmt_rel_join("\n            _{rel_name}: None,", "") }@
@@ -5036,7 +4981,7 @@ impl _@{ pascal_name }@_ {
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__set_default_value(conn).await?;
         let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
-            VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#;
+            VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING xmax,{col_esc}", "") }@@% endif %@;"#;
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(sql);
         @%- endif %@
@@ -5062,7 +5007,7 @@ impl _@{ pascal_name }@_ {
         @%- else %@
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             let cache_msg = CacheOp::Insert {
-                replace: false,
+                overwrite: false,
                 shard_id: conn.shard_id(),
                 data: obj._data.clone(),
 @{- def.relations_one_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
@@ -5259,7 +5204,7 @@ impl _@{ pascal_name }@_ {
             let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
             @{- def.soft_delete_tpl2("","
             let deleted_at: {filter_type} = {val}.into();","","
-            let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32);")}@
+            let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as {u32});")}@
             @%- if def.updated_at_conf().is_some() %@
             @%- let updated_at = def.get_updated_at() %@
             let updated_at: @{ updated_at.get_filter_type(false) }@ = @{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into();
@@ -5303,7 +5248,7 @@ impl _@{ pascal_name }@_ {
                 @{- def.soft_delete_tpl2("","
                 updater.mut_deleted_at().set(Some(deleted_at));","
                 updater.mut_deleted().set(true);","
-                let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32);
+                let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as {u32});
                 updater.mut_deleted().set(deleted);")}@
     @%- if def.updated_at_conf().is_some() %@
                 updater.mut_@{ ConfigDef::updated_at() }@().set(updated_at);
@@ -6185,7 +6130,7 @@ pub(crate) fn ___save(
             let (obj, cache_msg) = __save_upsert(conn, obj).await?;
             Ok((Some(obj), cache_msg))
         } else if obj.is_new() {
-            let (obj, cache_msg) = __save_insert(conn, obj, @%- if def.use_auto_replace() %@ rel_hash > 0 @%- else %@ rel_hash == 1 @%- endif %@).await?;
+            let (obj, cache_msg) = __save_insert(conn, obj, @%- if def.use_auto_overwrite() %@ rel_hash > 0 @%- else %@ rel_hash == 1 @%- endif %@).await?;
             Ok((Some(obj), Some(cache_msg)))
         } else {
             let (obj, cache_msg) = __save_update(conn, obj).await?;
@@ -6203,7 +6148,7 @@ pub(crate) fn ___save(
         }
         @%- else %@
         if obj.is_new() {
-            let (obj, cache_msg) = __save_insert(conn, obj, @%- if def.use_auto_replace() %@ rel_hash > 0 @%- else %@ rel_hash == 1 @%- endif %@).await?;
+            let (obj, cache_msg) = __save_insert(conn, obj, @%- if def.use_auto_overwrite() %@ rel_hash > 0 @%- else %@ rel_hash == 1 @%- endif %@).await?;
             Ok((Some(obj), Some(cache_msg)))
         } else {
             anyhow::bail!("Update is disabled.");
@@ -6213,11 +6158,15 @@ pub(crate) fn ___save(
 }
 
 #[allow(clippy::unnecessary_cast)]
-async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, replace: bool) -> Result<(_@{ pascal_name }@, CacheOp)> {
-    let sql = if replace {
-        r#"REPLACE INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#
+async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, overwrite: bool) -> Result<(_@{ pascal_name }@, CacheOp)> {
+    let sql = if overwrite {
+        @%- if config.is_mysql() %@
+        r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) AS new ON DUPLICATE KEY UPDATE @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@;"#
+        @%- else %@
+        r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) ON CONFLICT @{ def.upsert_conflict_target() }@ DO UPDATE SET @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=excluded.{col_esc}", ",") }@@{ def.auto_inc()|fmt_join(" RETURNING xmax,{col_esc}", "") }@;"#
+        @%- endif %@
     } else {
-        r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING {col_esc}", "") }@@% endif %@;"#
+        r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING xmax,{col_esc}", "") }@@% endif %@;"#
     };
     @%- if !config.is_mysql() %@
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(sql);
@@ -6229,7 +6178,7 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, re
     if obj._data.{var} == 0 {
         obj._data.{var} = _last_insert_id as {inner};
     }", "") }@
-    info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = if replace { "replace" } else { "insert" }, ctx = conn.ctx_no(); "{}", &obj);
+    info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "insert", ctx = conn.ctx_no(); "{}", &obj);
     debug!("{:?}", &obj);
     let mut obj2: _@{ pascal_name }@ = obj._data.clone().into();
     let mut update_cache = true;
@@ -6242,7 +6191,7 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, re
     @{- def.relations_many(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
     @%- else if !config.force_disable_cache && !def.use_clear_whole_cache() %@
     let cache_msg = CacheOp::Insert {
-        replace,
+        overwrite,
         shard_id: conn.shard_id(),
         data: obj._data,
 @{- def.relations_one_cache(false)|fmt_rel_join("\n            _{rel_name}: save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?,", "") }@
@@ -6274,20 +6223,20 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         @%- if config.is_mysql() %@
         @%- if def.versioned %@
-        vec.push(r#"\"@{ version_col }@\" = LAST_INSERT_ID(IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0))"#.to_string());
+        vec.push(r#""@{ version_col }@" = LAST_INSERT_ID(IF("@{ version_col }@" < 4294967295, "@{ version_col }@" + 1, 0))"#.to_string());
         @%- endif %@
         @%- if def.counting.is_some() %@
-        vec.push(r#"\"@{ def.get_counting_col() }@\" = LAST_INSERT_ID(\"@{ def.get_counting_col() }@\")"#.to_string());
+        vec.push(r#""@{ def.get_counting_col() }@" = LAST_INSERT_ID("@{ def.get_counting_col() }@")"#.to_string());
         @%- endif %@
         @%- else %@
         @%- if def.versioned %@
-        vec.push(r#"\"@{ version_col }@\" = IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0)"#.to_string());
+        vec.push(r#""@{ version_col }@" = CASE WHEN "@{ version_col }@" < 2147483647 THEN "@{ version_col }@" + 1 ELSE 0 END"#.to_string());
         @%- endif %@
         @%- endif %@
         @%- if def.versioned %@
-        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ AND \"@{ version_col }@\"=?@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
+        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ AND "@{ version_col }@"=?@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,"@{ version_col }@"@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,"@{ def.get_counting_col() }@"@% endif %@@% endif %@;"#, &vec.join(","));
         @%- else %@
-        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
+        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,"@{ version_col }@"@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,"@{ def.get_counting_col() }@"@% endif %@@% endif %@;"#, &vec.join(","));
         @%- endif %@
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
@@ -6304,12 +6253,14 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @%- endif %@
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "update", ctx = conn.ctx_no(); "{}", &obj);
         debug!("{:?}", &obj);
-        let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
+        let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned %@_with_last_insert_id@% endif %@(query).await?;
         if rows_affected == 0 {
             anyhow::bail!(err::RowNotFound::new("@{ table_name }@", id.to_string()));
         }
         @%- if def.versioned %@
-        obj.mut_@{ version_col }@().set(_last_insert_id as u32);
+        obj._data.@{ version_col }@ = _last_insert_id as @% if config.signed_only() %@i32@% else %@u32@% endif %@;
+        obj._update.@{ version_col }@ = _last_insert_id as @% if config.signed_only() %@i32@% else %@u32@% endif %@;
+        obj._op.@{ version_col }@ = Op::Set;
         @%- endif %@
         @%- if def.counting.is_some() %@
         if obj._op.@{ def.get_counting() }@ == Op::Add {
@@ -6369,26 +6320,26 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     let (mut vec, _) = assign_non_primaries(&obj);
     @%- if config.is_mysql() %@
     @%- if def.versioned %@
-    vec.push(r#"\"@{ version_col }@\" = LAST_INSERT_ID(IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0))"#.to_string());
+    vec.push(r#""@{ version_col }@" = LAST_INSERT_ID(IF("@{ version_col }@" < 4294967295, "@{ version_col }@" + 1, 0))"#.to_string());
     @%- endif %@
     @%- if def.counting.is_some() %@
-    vec.push(r#"\"@{ def.get_counting_col() }@\" = LAST_INSERT_ID(\"@{ def.get_counting_col() }@\")"#.to_string());
+    vec.push(r#""@{ def.get_counting_col() }@" = LAST_INSERT_ID("@{ def.get_counting_col() }@")"#.to_string());
     @%- endif %@
     @%- else %@
     @%- if def.versioned %@
-    vec.push(r#"\"@{ version_col }@\" = IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0)"#.to_string());
+    vec.push(r#""@{ version_col }@" = CASE WHEN @{ table_name|db_esc }@."@{ version_col }@" < 2147483647 THEN @{ table_name|db_esc }@."@{ version_col }@" + 1 ELSE 0 END"#.to_string());
     @%- endif %@
     @%- endif %@
     let sql = format!(r#"INSERT INTO @{ table_name|db_esc }@ 
         (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
-        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT ") }@@{ def.upsert_conflict_target() }@@{ config.db_type_switch("", " DO UPDATE SET") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING \"@{ version_col }@\"@% endif %@@% if def.counting.is_some() %@ RETURNING \"@{ def.get_counting_col() }@\"@% endif %@@% endif %@;"#, &vec.join(","));
+        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT ") }@@{ def.upsert_conflict_target() }@@{ config.db_type_switch("", " DO UPDATE SET") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,"@{ version_col }@"@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,"@{ def.get_counting_col() }@"@% endif %@@% endif %@;"#, &vec.join(","));
     @%- if !config.is_mysql() %@
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let query = bind_to_query(sqlx::query(&sql), &obj._data);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     let query = bind_non_primaries(&obj, query, &sql);
-    let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
+    let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned || def.counting.is_some() %@_with_last_insert_id@% endif %@(query).await?;
     info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "upsert", ctx = conn.ctx_no(); "{}", &obj);
     debug!("{:?}", &obj);
     if rows_affected == 1 {
@@ -6399,7 +6350,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         let mut obj2: _@{ pascal_name }@ = obj._data.clone().into();
         @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
         let cache_msg = Some(CacheOp::Insert {
-            replace: false,
+            overwrite: false,
             shard_id: conn.shard_id(),
             data: obj._data,
 @{- def.relations_one_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
@@ -6411,7 +6362,9 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         Ok((obj2, cache_msg))
     } else if rows_affected == 2 {
         @%- if def.versioned %@
-        obj.mut_@{ version_col }@().set(_last_insert_id as u32);
+        obj._data.@{ version_col }@ = _last_insert_id as @% if config.signed_only() %@i32@% else %@u32@% endif %@;
+        obj._update.@{ version_col }@ = _last_insert_id as @% if config.signed_only() %@i32@% else %@u32@% endif %@;
+        obj._op.@{ version_col }@ = Op::Set;
         @%- endif %@
         @%- if def.counting.is_some() %@
         if obj._op.@{ def.get_counting() }@ == Op::Add {
@@ -6616,7 +6569,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         const SQL1: &str = r#"INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES "#;
         const SQL2: &str = r#"(@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)"#;
         const SQL3: &str = r#" AS new ON DUPLICATE KEY UPDATE @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@"#;
-        let mut sql = String::with_capacity(SQL_IGNORE.len() + SQL1.len() + (SQL2.len() + 1) * list.len() + SQL3.len()@% if !config.is_mysql() && def.is_auto_inc() %@ + 30@% endif %@);
+        let mut sql = String::with_capacity(SQL_IGNORE.len() + SQL1.len() + (SQL2.len() + 1) * list.len() + SQL3.len() + 200);
         if ignore {
             sql.push_str(SQL_IGNORE);
         } else if replace {
@@ -6632,14 +6585,17 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         }
         if overwrite {
             sql.push_str(SQL3);
+            @%- if def.versioned %@
+            sql.push_str(r#","@{ version_col }@" = IF("@{ version_col }@" < 4294967295, "@{ version_col }@" + 1, 0)"#);
+            @%- endif %@
         }
         @%- else %@
-        const SQL1: &str = r#"INSERT INTO @{ table_name|db_esc }@ AS new (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES "#;
+        const SQL1: &str = r#"INSERT INTO @{ table_name|db_esc }@ AS old (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES "#;
         const SQL2: &str = r#"(@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)"#;
         const SQL_IGNORE: &str = r#" ON CONFLICT DO NOTHING"#;
         const SQL_REPLACE: &str = r#" ON CONFLICT @{ def.upsert_conflict_target() }@ DO UPDATE SET @{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}=excluded.{col_esc}", ",") }@"#;
         const SQL_OVERWRITE: &str = r#" ON CONFLICT @{ def.upsert_conflict_target() }@ DO UPDATE SET @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=excluded.{col_esc}", ",") }@"#;
-        let mut sql = String::with_capacity(SQL1.len() + (SQL2.len() + 1) * list.len() + SQL_REPLACE.len());
+        let mut sql = String::with_capacity(SQL1.len() + (SQL2.len() + 1) * list.len() + SQL_REPLACE.len() + 200);
         sql.push_str(SQL1);
         sql.push_str(SQL2);
         for _i in 0..list.len() - 1 {
@@ -6652,9 +6608,12 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
             sql.push_str(SQL_REPLACE);
         } else if overwrite {
             sql.push_str(SQL_OVERWRITE);
+            @%- if def.versioned %@
+            sql.push_str(r#","@{ version_col }@" = CASE WHEN old."@{ version_col }@" < 2147483647 THEN old."@{ version_col }@" + 1 ELSE 0 END"#);
+            @%- endif %@
         }
             @%- if def.is_auto_inc() %@
-        sql.push_str(r#" RETURNING @{ def.auto_inc()|fmt_join("{col_esc}", "") }@"#);
+        sql.push_str(r#" RETURNING xmax,@{ def.auto_inc()|fmt_join("{col_esc}", "") }@"#);
             @%- endif %@
         @%- endif %@
         @%- if !config.is_mysql() %@
@@ -6721,7 +6680,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
                 });
                 __{rel_name}.push(row);
             }", "") }@
-            data_list.push(obj._data);
+            data_list.push((obj._data, obj._is_new));
         }
         if ignore || replace || overwrite {
             @{- def.relations_one(false)|fmt_rel_join("
@@ -6751,12 +6710,13 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
             }
             map
         });", "") }@
-        let data_list = data_list.into_iter().map(|v| ForInsert {
+        let data_list = data_list.into_iter().map(|(v, n)| ForInsert {
             @{- def.relations_one(false)|fmt_rel_join("
             {rel_name}: Some(_{rel_name}.remove(&(&v).into()).map(Box::new)),", "") }@
             @{- def.relations_many(false)|fmt_rel_join("
             {rel_name}: _{rel_name}.remove(&(&v).into()),", "") }@
             _data: v,
+            _is_new: n,
         }).collect();
         Ok(data_list)
     }.boxed()
@@ -6790,7 +6750,11 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     }
     let (mut vec, _) = assign_non_primaries(obj);
     @%- if def.versioned %@
-    vec.push(r#"\"@{ version_col }@\" = IF(\"@{ version_col }@\" < 4294967295, \"@{ version_col }@\" + 1, 0)"#.to_string());
+    @%- if config.is_mysql() %@
+    vec.push(r#""@{ version_col }@" = IF("@{ version_col }@" < 4294967295, "@{ version_col }@" + 1, 0)"#.to_string());
+    @%- else %@
+    vec.push(r#""@{ version_col }@" = CASE WHEN @{ table_name|db_esc }@."@{ version_col }@" < 2147483647 THEN @{ table_name|db_esc }@."@{ version_col }@" + 1 ELSE 0 END"#.to_string());
+    @%- endif %@
     @%- endif %@
     write!(sql, r#" @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT ") }@@{ def.upsert_conflict_target() }@@{ config.db_type_switch("", " DO UPDATE SET") }@ {}"#, &vec.join(","))?;
     @%- if !config.is_mysql() %@
@@ -6845,7 +6809,7 @@ async fn __delete(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Resu
     obj.mut_deleted().set(true);
     let (_obj, cache_msg) = __save_update(conn, obj).await?;
     Ok(cache_msg)","
-    let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32);
+    let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as {u32});
     obj.mut_deleted().set(deleted);
     let (_obj, cache_msg) = __save_update(conn, obj).await?;
     Ok(cache_msg)")|replace1(pascal_name)}@

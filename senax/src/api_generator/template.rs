@@ -1,4 +1,5 @@
 use askama::Template;
+use compact_str::CompactString;
 use std::sync::Arc;
 
 use crate::{filters, schema::ModelDef};
@@ -90,6 +91,7 @@ pub struct ModelTemplate<'a> {
     pub def: &'a Arc<ModelDef>,
     pub camel_case: bool,
     pub api_def: &'a ApiModelDef,
+    pub version_col: CompactString,
 }
 
 #[derive(Template)]

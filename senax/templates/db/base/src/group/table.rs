@@ -66,7 +66,7 @@ pub enum CacheOp {
     #[senax(id = 3)]
     Insert {
         #[senax(id = 1)]
-        replace: bool,
+        overwrite: bool,
         #[senax(id = 2)]
         shard_id: ShardId,
         #[senax(id = 3)]
@@ -597,7 +597,7 @@ pub struct VersionWrapper {
     pub id: InnerPrimary,
     pub shard_id: ShardId,
     pub time: MSec,
-    pub version: u32,
+    pub version: @% if config.signed_only() %@i32@% else %@u32@% endif %@,
 }
 
 impl CacheVal for VersionWrapper {
@@ -725,6 +725,8 @@ pub struct _@{ pascal_name }@Updater {
 pub struct ForInsert {
     #[senax(id = 1)]
     pub _data: Data,
+    #[senax(id = 2)]
+    pub _is_new: bool,
 @{- def.relations_one(false)|fmt_rel_join("
     pub {rel_name}: Option<Option<Box<rel_{class_mod}::ForInsert>>>,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
@@ -735,6 +737,7 @@ impl From<_@{ pascal_name }@Updater> for ForInsert {
     fn from(v: _@{ pascal_name }@Updater) -> Self {
         Self {
             _data: v._data,
+            _is_new: v._is_new,
             @{- def.relations_one(false)|fmt_rel_join("
             {rel_name}: v.{rel_name}.map(|v| v.into_iter().filter(|v| !v.will_be_deleted()).next_back().map(|v| Box::new(v.into()))),", "") }@
             @{- def.relations_many(false)|fmt_rel_join("
@@ -747,6 +750,7 @@ impl From<Box<_@{ pascal_name }@Updater>> for Box<ForInsert> {
     fn from(v: Box<_@{ pascal_name }@Updater>) -> Self {
         Box::new(ForInsert {
             _data: v._data,
+            _is_new: v._is_new,
             @{- def.relations_one(false)|fmt_rel_join("
             {rel_name}: v.{rel_name}.map(|v| v.into_iter().filter(|v| !v.will_be_deleted()).next_back().map(|v| Box::new(v.into()))),", "") }@
             @{- def.relations_many(false)|fmt_rel_join("
@@ -1769,13 +1773,16 @@ impl crate::misc::UpdaterForInner for _@{ pascal_name }@Updater {
             panic!(\"DELETE is not supported.\");","
             self.mut_deleted_at().set(Some({val}.into()));","
             self.mut_deleted().set(true);","
-            let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as u32);
+            let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as {u32});
             self.mut_deleted().set(deleted);")}@
         }
         @%- if def.versioned %@
-        if !self.is_new() {
-            let version = self._@{ ConfigDef::version() }@().wrapping_add(1);
-            self.mut_@{ ConfigDef::version() }@().set(version);
+        if !self.is_new() {  // Object obtained with a row lock from the database
+            use senax_common::cache::CycleCounter as _;
+            let version = self._@{ ConfigDef::version() }@().cycle_add(1);
+            self._data.@{ ConfigDef::version() }@ = version;
+            self._update.@{ ConfigDef::version() }@ = version;
+            self._op.@{ ConfigDef::version() }@ = Op::Set;
         }
         @%- endif %@
         @{- def.relations_one_and_many(false)|fmt_rel_join("

@@ -1235,9 +1235,17 @@ impl DbConn {
         } else {
             query.fetch_all(self.get_tx().await?.as_mut()).await?
         };
-        let rows_affected = result.len() as u64;
-        let last_insert_id = result.first().map(|v| v.get_unchecked::<i64, usize>(0) as u64).unwrap_or_default();
-        Ok((rows_affected, last_insert_id))
+        if let Some(result) = result.first() {
+            let xmax = result.get_unchecked::<i64, usize>(0) as u64;
+            let last_insert_id = result.get_unchecked::<i64, usize>(1) as u64;
+            if xmax == 0 {
+                Ok((1, last_insert_id))
+            } else {
+                Ok((2, last_insert_id))
+            }
+        } else {
+            Ok((0, 0))
+        }
     }
     @%- endif %@
     @%- if !config.force_disable_cache %@

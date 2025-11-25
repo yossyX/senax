@@ -255,12 +255,12 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         data_type: DataType::Int,
                         not_null: true,
                         skip_factory: Some(true),
-                        default: Some(serde_yaml::Value::String("0".to_owned())),
+                        default: Some(serde_yaml::Value::String("1".to_owned())),
                         ..Default::default()
                     };
                     col.label.clone_from(&config.label_of_version);
                     col.auto_gen = true;
-                    col.hidden = Some(true);
+                    col.is_version = true;
                     def.fields
                         .insert(ConfigDef::version().to_string(), col.into());
                 }

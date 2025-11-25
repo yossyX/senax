@@ -76,7 +76,7 @@ async fn save_data(
                 updater.mut_data().set(save_data.data.compressed_data());
                 updater
                     .mut_eol()
-                    .set((save_data.data.eol() >> EOL_SHIFT) as u32);
+                    .set((save_data.data.eol() >> EOL_SHIFT) as @% if config.signed_only() %@i32@% else %@u32@% endif %@);
                 let mut data = save_data.data.clone();
                 data.set_version(updater._@{ ConfigDef::version() }@().wrapping_add(1));
                 save_list.push(updater);
@@ -113,7 +113,7 @@ async fn save_data(
         let session = _@{ pascal_name }@Factory {
             key: key.into(),
             data: save_data.data.compressed_data().into(),
-            eol: (save_data.data.eol() >> EOL_SHIFT) as u32,
+            eol: (save_data.data.eol() >> EOL_SHIFT) as @% if config.signed_only() %@i32@% else %@u32@% endif %@,
         }
         .create();
         save_list.push(session);
@@ -235,7 +235,7 @@ impl SessionStore for _@{ pascal_name }@Store {
         let s_key: String = session_key.into();
         let id: _@{ pascal_name }@Id = s_key.into();
         let mut session = id.updater();
-        session.mut_eol().set((data.eol() >> EOL_SHIFT) as u32);
+        session.mut_eol().set((data.eol() >> EOL_SHIFT) as @% if config.signed_only() %@i32@% else %@u32@% endif %@);
         session.mut_@{ ConfigDef::updated_at() }@().mark_for_skip();
         _@{ pascal_name }@_::update_delayed(&mut conn, session).await
     }
@@ -270,7 +270,7 @@ async fn gc(shard_id: ShardId, start_key: SessionKey) -> Result<()> {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs()
-        >> EOL_SHIFT) as u32;
+        >> EOL_SHIFT) as @% if config.signed_only() %@i32@% else %@u32@% endif %@;
     let mut filter = filter!((key < s_key) AND (eol < eol));
     const LIMIT: usize = 1000;
     loop {

@@ -206,7 +206,7 @@ function EditModel() {
                 hidden={!detail}
               />
               <AutoField
-                name="use_auto_replace"
+                name="use_auto_overwrite"
                 {...formData}
                 hidden={!detail}
               />

@@ -50,10 +50,12 @@ pub fn write_files(
 
     #[derive(Template)]
     #[template(path = "db/base/src/accessor.rs", escape = "none")]
-    struct AccessorTemplate {}
+    struct AccessorTemplate<'a> {
+        pub config: &'a ConfigDef,
+    }
 
     let file_path = src_dir.join("accessor.rs");
-    let tpl = AccessorTemplate {};
+    let tpl = AccessorTemplate { config };
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]

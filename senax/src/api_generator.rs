@@ -755,6 +755,7 @@ fn write_model_file(
             def,
             camel_case: config.camel_case(),
             api_def: &api_def,
+            version_col: crate::schema::ConfigDef::version(),
         }
         .render()?
     } else {

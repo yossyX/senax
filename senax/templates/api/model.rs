@@ -545,6 +545,11 @@ impl GqlMutation@{ graphql_name }@ {
             .query_for_update()
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
+        @%- if def.versioned %@
+        if let Some(v) = data.@{ version_col }@ && v != obj.@{ version_col }@() {
+            return Err(GqlError::VersionMismatch.extend());
+        }
+        @%- endif %@
         let obj = _repository_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;

@@ -34,6 +34,9 @@ pub enum GqlError {
     #[error("Conflict")]
     Conflict,
 
+    #[error("Version Mismatch")]
+    VersionMismatch,
+
     #[error("Internal Server Error")]
     ServerError,
 }
@@ -102,6 +105,7 @@ impl ErrorExtensions for GqlError {
             }
             GqlError::BadRequest => e.set("code", "BAD_REQUEST"),
             GqlError::Conflict => e.set("code", "CONFLICT"),
+            GqlError::VersionMismatch => e.set("code", "VERSION_MISMATCH"),
             GqlError::ServerError => e.set("code", "SERVER_ERROR"),
         })
     }
