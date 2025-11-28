@@ -40,7 +40,7 @@ async fn find(
     primary: &_domain_::@{ pascal_name }@Primary,
 ) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
     repo.begin_read_tx().await?;
-    let @{ mod_name }@_repo = repo.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group|ident }@().@{ mod_name|ident }@();
     let result = @{ mod_name }@_repo
         .find(primary.clone().into())
         .join(joiner(gql_ctx.look_ahead(), auth)?)
@@ -59,7 +59,7 @@ async fn find_for_update(
     auth: &AuthInfo,
     primary: &_domain_::@{ pascal_name }@Primary,
 ) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@>>> {
-    let @{ mod_name }@_repo = repo.@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ mod_name|ident }@();
     @{ mod_name }@_repo
         .find(primary.clone().into())
         .join(joiner(gql_ctx.look_ahead(), auth)?)
@@ -75,7 +75,7 @@ async fn delete(
     auth: &AuthInfo,
     primary: _domain_::@{ mod_name|pascal }@Primary,
 ) -> anyhow::Result<()> {
-    let @{ mod_name }@_repo = repo.@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ mod_name|ident }@();
     let mut query = @{ mod_name }@_repo.find(primary.into());
     query = query.filter(deletable_filter(auth)?);
     let obj = query.query_for_update().await?;
@@ -129,7 +129,7 @@ impl GqlQuery@{ graphql_name }@ {
         let auth: &AuthInfo = gql_ctx.data()?;
         let @{ db|snake }@_query = repo.@{ db|snake }@_query();
         @{ db|snake }@_query.begin_read_tx().await?;
-        let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+        let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|ident }@().@{ mod_name|ident }@();
         let list = @{ mod_name }@_repo
             .all()
             .await
@@ -153,7 +153,7 @@ impl GqlQuery@{ graphql_name }@ {
         {var}: {inner},", "") }@
         @%- else %@
         @{- def.primaries()|fmt_join("
-        #[graphql(name = \"{raw_var}\")] {var}: {inner},", "") }@
+        #[graphql(name = \"{raw_name}\")] {var}: {inner},", "") }@
         @%- endif %@
     ) -> async_graphql::Result<ResObj> {
         let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
@@ -180,7 +180,7 @@ impl GqlQuery@{ graphql_name }@ {
     #[allow(clippy::too_many_arguments)]
     #[rustfmt::skip]
     #[graphql(guard = "query_guard()")]
-    async fn @{ selector|to_var_name }@(
+    async fn @{ selector|ident }@(
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         after: Option<String>,
@@ -227,14 +227,14 @@ impl GqlQuery@{ graphql_name }@ {
             use domain::models::Cursor;
             let @{ db|snake }@_query = repo.@{ db|snake }@_query();
             @{ db|snake }@_query.begin_read_tx().await?;
-            let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+            let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|ident }@().@{ mod_name|ident }@();
             let node = if gql_ctx.look_ahead().field("nodes").exists() {
                 gql_ctx.look_ahead().field("nodes")
             } else {
                 gql_ctx.look_ahead().field("edges").field("node")
             };
             let joiner = joiner(node, auth)?;
-            let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(joiner);
+            let mut query = @{ mod_name }@_repo.@{ selector|ident }@().join(joiner);
             @%- if selector_def.filter_is_required() %@
             query = query.selector_filter(filter.clone());
             @%- else %@
@@ -380,8 +380,8 @@ impl GqlQuery@{ graphql_name }@ {
         ) -> anyhow::Result<i64> {
             let @{ db|snake }@_query = repo.@{ db|snake }@_query();
             @{ db|snake }@_query.begin_read_tx().await?;
-            let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-            let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
+            let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|ident }@().@{ mod_name|ident }@();
+            let mut query = @{ mod_name }@_repo.@{ selector|ident }@();
             @%- if selector_def.filter_is_required() %@
             query = query.selector_filter(filter.clone());
             @%- else %@
@@ -417,13 +417,13 @@ impl GqlMutation@{ graphql_name }@ {
         {var}: {inner},", "") }@
         @%- else %@
         @{- def.primaries()|fmt_join("
-        #[graphql(name = \"{raw_var}\")] {var}: {inner},", "") }@
+        #[graphql(name = \"{raw_name}\")] {var}: {inner},", "") }@
         @%- endif %@
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
-        crate::gql_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, &primary), repo, auth, gql_ctx)
+        crate::gql_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -436,7 +436,7 @@ impl GqlMutation@{ graphql_name }@ {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        crate::gql_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, &primary), repo, auth, gql_ctx)
+        crate::gql_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, &primary), repo, auth, gql_ctx)
     }
     @%- endif %@
 
@@ -447,7 +447,7 @@ impl GqlMutation@{ graphql_name }@ {
         data: ReqObj,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
-        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
         let auth: &AuthInfo = gql_ctx.data()?;
         data.validate()
             .map_err(|e| GqlError::ValidationError(e).extend())?;
@@ -479,12 +479,12 @@ impl GqlMutation@{ graphql_name }@ {
         if !errors.is_empty() {
             return Err(GqlError::ValidationErrorList(errors).extend());
         }
-        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
         @%- if def.has_auto_primary() %@
         for (idx, data) in list.into_iter().enumerate() {
             if let Some(_id) = data._id.clone() {
                 let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-                let query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().find(id.into());
+                let query = @{ group|snake }@_repo.@{ mod_name|ident }@().find(id.into());
                 match query.join(updater_joiner()).query_for_update().await {
                     Ok(obj) => {
                         _repository_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
@@ -537,8 +537,8 @@ impl GqlMutation@{ graphql_name }@ {
             }
         };
         let id: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
-        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
-        let mut query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().find(id.into());
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
+        let mut query = @{ group|snake }@_repo.@{ mod_name|ident }@().find(id.into());
         query = query.filter(updatable_filter(auth)?);
         let obj = query
             .join(updater_joiner())
@@ -588,8 +588,8 @@ impl GqlMutation@{ graphql_name }@ {
                 .await?;
         }
         let auth: &AuthInfo = gql_ctx.data()?;
-        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
-        let mut query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().@{ selector|to_var_name }@().join(updater_joiner());
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
+        let mut query = @{ group|snake }@_repo.@{ mod_name|ident }@().@{ selector|ident }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
         query = query.selector_filter(filter);
         @%- else %@
@@ -676,8 +676,8 @@ impl GqlMutation@{ graphql_name }@ {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
         let ctx: &crate::context::Ctx = gql_ctx.data()?;
-        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
-        let mut query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().@{ selector|to_var_name }@().join(updater_joiner());
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
+        let mut query = @{ group|snake }@_repo.@{ mod_name|ident }@().@{ selector|ident }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
         query = query.selector_filter(filter);
         @%- else %@
@@ -730,8 +730,8 @@ impl GqlMutation@{ graphql_name }@ {
         @%- endif %@
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@();
-        let mut query = @{ group|snake }@_repo.@{ mod_name|to_var_name }@().@{ selector|to_var_name }@();
+        let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
+        let mut query = @{ group|snake }@_repo.@{ mod_name|ident }@().@{ selector|ident }@();
         @%- if selector_def.filter_is_required() %@
         query = query.selector_filter(filter);
         @%- else %@
@@ -770,12 +770,12 @@ impl GqlMutation@{ graphql_name }@ {
         {var}: {inner},", "") }@
         @%- else %@
         @{- def.primaries()|fmt_join("
-        #[graphql(name = \"{raw_var}\")] {var}: {inner},", "") }@
+        #[graphql(name = \"{raw_name}\")] {var}: {inner},", "") }@
         @%- endif %@
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        delete(repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into()).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
+        delete(repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into()).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(true)
     }
     @%- endif %@
@@ -788,7 +788,7 @@ impl GqlMutation@{ graphql_name }@ {
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        delete(repo.@{ db|snake }@_repository().@{ group|to_var_name }@(), auth, (&_id).try_into()?).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
+        delete(repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, (&_id).try_into()?).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(true)
     }
     @%- endif %@
@@ -858,9 +858,9 @@ async fn @{ selector }@_handler(
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> + Send>>>
     {
         let @{ db|snake }@_query = repo.@{ db|snake }@_query();
-        let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
+        let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|ident }@().@{ mod_name|ident }@();
 
-        let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@().join(reader_joiner());
+        let mut query = @{ mod_name }@_repo.@{ selector|ident }@().join(reader_joiner());
         @%- if selector_def.filter_is_required() %@
         query = query.selector_filter(data.filter.clone());
         @%- else %@
@@ -954,8 +954,8 @@ async fn count_@{ selector }@_handler(
         @%- endif %@
     ) -> anyhow::Result<i64> {
         let @{ db|snake }@_query = repo.@{ db|snake }@_query();
-        let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
-        let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
+        let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|ident }@().@{ mod_name|ident }@();
+        let mut query = @{ mod_name }@_repo.@{ selector|ident }@();
         @%- if selector_def.filter_is_required() %@
         query = query.selector_filter(filter.clone());
         @%- else %@

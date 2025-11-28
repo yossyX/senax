@@ -6,9 +6,9 @@ use crate::models::{self, ToGeoPoint as _, ToPoint as _};
 use crate::value_objects;
 
 #[allow(unused_imports)]
-use crate::models::@{ db|snake|to_var_name }@ as _model_;
+use crate::models::@{ db|snake|ident }@ as _model_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
-pub use crate::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
+pub use crate::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 
 pub const MODEL_ID: u64 = @{ model_id }@;
@@ -176,7 +176,7 @@ impl From<&@{ pascal_name }@Primary> for async_graphql::ID {
 pub enum @{ name|to_pascal_name }@ {
 @%- for row in values %@
     #[graphql(name="@{ row.name }@")]
-@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@@{ row.value_str() }@,
+@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|ident }@@{ row.value_str() }@,
 @%- endfor %@
 }
 #[allow(non_snake_case)]
@@ -186,7 +186,7 @@ impl @{ name|to_pascal_name }@ {
     }
 @%- for row in values %@
     pub fn is_@{ row.name }@(&self) -> bool {
-        self == &Self::@{ row.name|to_var_name }@
+        self == &Self::@{ row.name|ident }@
     }
 @%- endfor %@
 }
@@ -217,7 +217,7 @@ impl From<@{ name|to_pascal_name }@> for @{ column_def.get_inner_type(true, true
 pub enum @{ name|to_pascal_name }@ {
 @%- for row in values %@
     #[graphql(name="@{ row.name }@")]
-@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@,
+@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|ident }@,
 @%- endfor %@
 }
 #[allow(non_snake_case)]
@@ -227,14 +227,14 @@ impl @{ name|to_pascal_name }@ {
     }
 @%- for row in values %@
     pub fn is_@{ row.name }@(&self) -> bool {
-        self == &Self::@{ row.name|to_var_name }@
+        self == &Self::@{ row.name|ident }@
     }
 @%- endfor %@
 }
 
 @% endfor -%@
 
-pub trait @{ pascal_name }@Common: std::fmt::Debug@% for parent in def.parent() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Common@% endfor %@ + 'static {
+pub trait @{ pascal_name }@Common: std::fmt::Debug@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common@% endfor %@ + 'static {
 @{- def.primaries()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {outer};", "") }@
 @{- def.only_version()|fmt_join("
@@ -245,66 +245,66 @@ pub trait @{ pascal_name }@Common: std::fmt::Debug@% for parent in def.parent() 
 
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
-pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common + dyn_clone::DynClone + Send + Sync@% for parent in def.parent() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Cache@% endfor %@ + 'static {
+pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common + dyn_clone::DynClone + Send + Sync@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Cache@% endfor %@ + 'static {
 @{- def.relations_one_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
 @{- def.relations_one_uncached(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>>;", "") }@
 @{- def.relations_many_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_var}::{class}Cache>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
 @{- def.relations_many_uncached(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_var}::{class}>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}>>>;", "") }@
 @{- def.relations_belonging(true)|fmt_rel_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_var}::{class}Primary> {
+    fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_{db_snake}_model_::{class_mod_var}::{class}Primary> {
+    fn _{raw_rel_name}_id(&self) -> Option<_{db_snake}_model_::{class_mod_path}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
 @{- def.relations_belonging_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
 @{- def.relations_belonging_uncached(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>>;", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_var}::{class}>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_path}::{class}>>>;", "") }@
 }
 
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
-pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent in def.parent() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@@% endfor %@ + 'static {
+pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@@% endfor %@ + 'static {
 @{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.relations_belonging(true)|fmt_rel_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_var}::{class}Primary> {
+    fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_{db_snake}_model_::{class_mod_var}::{class}Primary> {
+    fn _{raw_rel_name}_id(&self) -> Option<_{db_snake}_model_::{class_mod_path}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
 @{- def.relations_one_and_belonging(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_var}::{class}>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>>;", "") }@
 @{- def.relations_many(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_var}::{class}> + '_>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>>;", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_var}::{class}>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>>;", "") }@
 }
 
 @{ def.label|label0 -}@
-pub trait @{ pascal_name }@Updater: downcast_rs::Downcast + Send + Sync + @{ pascal_name }@Common + crate::models::MarkForDelete@% for parent in def.parent() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater@% endfor %@ + 'static {
+pub trait @{ pascal_name }@Updater: downcast_rs::Downcast + Send + Sync + @{ pascal_name }@Common + crate::models::MarkForDelete@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@ + 'static {
 @{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
-{label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
+{label}{comment}    fn set_{raw_name}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>>;
-{label}{comment}    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>);", "") }@
+{label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_path}::{class}Updater>>;
+{label}{comment}    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>);", "") }@
 @{- def.relations_many(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> + '_>>;
-{label}{comment}    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>>;
-{label}{comment}    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>);
-{label}{comment}    fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>);", "") }@
+{label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> + '_>>;
+{label}{comment}    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>>;
+{label}{comment}    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>);
+{label}{comment}    fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>);", "") }@
 }
 downcast_rs::impl_downcast!(@{ pascal_name }@Updater);
 
@@ -321,11 +321,11 @@ pub struct @{ pascal_name }@Entity {
 @{- def.non_primaries_except_invisibles(false)|fmt_join("
     pub {var}: {domain_outer_owned},", "") }@
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
-    pub {rel_name}: Option<Box<_model_::{class_mod_var}::{class}Entity>>,", "") }@
+    pub {rel_name}: Option<Box<_model_::{class_mod_path}::{class}Entity>>,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
-    pub {rel_name}: Vec<Box<_model_::{class_mod_var}::{class}Entity>>,", "") }@
+    pub {rel_name}: Vec<Box<_model_::{class_mod_path}::{class}Entity>>,", "") }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-    pub {rel_name}: Option<Box<_{db_snake}_model_::{class_mod_var}::{class}Entity>>,", "") }@
+    pub {rel_name}: Option<Box<_{db_snake}_model_::{class_mod_path}::{class}Entity>>,", "") }@
     #[serde(skip)]
     pub _delete: bool,
 }
@@ -334,9 +334,9 @@ pub struct @{ pascal_name }@Entity {
 
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
-impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Common for @{ pascal_name }@Entity {
+impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common for @{ pascal_name }@Entity {
 @{- parent.primaries()|fmt_join("
-    fn _{raw_var}(&self) -> {inner} {
+    fn _{raw_name}(&self) -> {inner} {
         self.{var}.0{clone}
     }", "") }@
 @{- parent.only_version()|fmt_join("
@@ -349,79 +349,79 @@ impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_na
     }", "") }@
 }
 #[cfg(any(feature = "mock", test))]
-impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Cache for @{ pascal_name }@Entity {
+impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Cache for @{ pascal_name }@Entity {
 @{- parent.relations_one_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_var}::{class}Cache>::from(v.clone())))
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
+        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())))
     }", "") }@
 @{- parent.relations_many_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_var}::{class}Cache>>> {
-        Ok(self.{rel_name}.iter().map(|v| Box::<dyn _model_::{class_mod_var}::{class}Cache>::from(v.clone())).collect())
+    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
+        Ok(self.{rel_name}.iter().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())).collect())
     }", "") }@
 @{- parent.relations_belonging_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_var}::{class}Cache>::from(v.clone())))
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
+        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())))
     }", "") }@
 }
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
-impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@ for @{ pascal_name }@Entity {
+impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@ for @{ pascal_name }@Entity {
 @{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
 @{- parent.relations_one_and_belonging(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_var}::{class}>> {
-        Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _model_::{class_mod_var}::{class}))
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
+        Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _model_::{class_mod_path}::{class}))
     }", "") }@
 @{- parent.relations_many(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_var}::{class}> + '_>> {
-        Ok(Box::new(self.{rel_name}.iter().map(|v| v.as_ref() as &dyn _model_::{class_mod_var}::{class})))
+    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
+        Ok(Box::new(self.{rel_name}.iter().map(|v| v.as_ref() as &dyn _model_::{class_mod_path}::{class})))
     }", "") }@
 }
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
-impl super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater for @{ pascal_name }@Entity {
+impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater for @{ pascal_name }@Entity {
 @{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
 @{- parent.non_primaries_except_invisible_and_read_only(true)|fmt_join("
-    fn set_{raw_var}(&mut self, v: {domain_factory}) {
+    fn set_{raw_name}(&mut self, v: {domain_factory}) {
         self.{var} = v{convert_domain_factory}
     }", "") }@
 @{- parent.relations_one(true)|fmt_rel_join("
-    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>> {
-        Ok(self.{rel_name}.as_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_var}::{class}Updater))
+    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_path}::{class}Updater>> {
+        Ok(self.{rel_name}.as_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_path}::{class}Updater))
     }
-    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>) {
-        self.{rel_name} = if let Ok(v) = v.downcast::<_model_::{class_mod_var}::{class}Entity>() {
+    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
+        self.{rel_name} = if let Ok(v) = v.downcast::<_model_::{class_mod_path}::{class}Entity>() {
             Some(v)
         } else {
             panic!(\"Only {class}Entity is accepted.\");
         };
     }", "") }@
 @{- parent.relations_many(true)|fmt_rel_join("
-    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> + '_>> {
+    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> + '_>> {
         struct V<'a, T>(&'a mut Vec<Box<T>>);
-        impl<T: _model_::{class_mod_var}::{class}Updater> domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> for V<'_, T> {
-            fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut (dyn _model_::{class_mod_var}::{class}Updater + 'static)> + '_> {
-                Box::new(self.0.iter_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_var}::{class}Updater))
+        impl<T: _model_::{class_mod_path}::{class}Updater> domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> for V<'_, T> {
+            fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut (dyn _model_::{class_mod_path}::{class}Updater + 'static)> + '_> {
+                Box::new(self.0.iter_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_path}::{class}Updater))
             }
         }
         Ok(Box::new(V(&mut self.{rel_name})))
     }
-    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>> {
-        Some(self.{rel_name}.drain(..).map(|v| v as Box<dyn _model_::{class_mod_var}::{class}Updater>).collect())
+    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>> {
+        Some(self.{rel_name}.drain(..).map(|v| v as Box<dyn _model_::{class_mod_path}::{class}Updater>).collect())
     }
-    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>) {
+    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>) {
         self.{rel_name}.clear();
         for row in list {
             self.push_{raw_rel_name}(row);
         }
     }
-    fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>) {
-        if let Ok(v) = v.downcast::<_model_::{class_mod_var}::{class}Entity>() {
+    fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
+        if let Ok(v) = v.downcast::<_model_::{class_mod_path}::{class}Entity>() {
             self.{rel_name}.push(v)
         } else {
             panic!(\"Only {class}Entity is accepted.\");
@@ -450,32 +450,32 @@ impl @{ pascal_name }@Common for @{ pascal_name }@Entity {
 #[cfg(any(feature = "mock", test))]
 impl @{ pascal_name }@Cache for @{ pascal_name }@Entity {
 @{- def.relations_one_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_var}::{class}Cache>::from(v.clone())))
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
+        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())))
     }", "") }@
 @{- def.relations_one_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_var}::{class}>::from(v.clone())))
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>> {
+        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}>::from(v.clone())))
     }", "") }@
 @{- def.relations_many_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_var}::{class}Cache>>> {
-        Ok(self.{rel_name}.iter().map(|v| Box::<dyn _model_::{class_mod_var}::{class}Cache>::from(v.clone())).collect())
+    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
+        Ok(self.{rel_name}.iter().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())).collect())
     }", "") }@
 @{- def.relations_many_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_var}::{class}>>> {
-        Ok(self.{rel_name}.iter().map(|v| Box::<dyn _model_::{class_mod_var}::{class}>::from(v.clone())).collect())
+    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}>>> {
+        Ok(self.{rel_name}.iter().map(|v| Box::<dyn _model_::{class_mod_path}::{class}>::from(v.clone())).collect())
     }", "") }@
 @{- def.relations_belonging_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_var}::{class}Cache>::from(v.clone())))
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
+        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())))
     }", "") }@
 @{- def.relations_belonging_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_var}::{class}>::from(v.clone())))
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>> {
+        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}>::from(v.clone())))
     }", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_var}::{class}>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _{db_snake}_model_::{class_mod_var}::{class}>::from(v.clone())))
+    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_path}::{class}>>> {
+        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _{db_snake}_model_::{class_mod_path}::{class}>::from(v.clone())))
     }", "") }@
 }
 
@@ -487,16 +487,16 @@ impl @{ pascal_name }@ for @{ pascal_name }@Entity {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
 @{- def.relations_one_and_belonging(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_var}::{class}>> {
-        Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _model_::{class_mod_var}::{class}))
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
+        Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _model_::{class_mod_path}::{class}))
     }", "") }@
 @{- def.relations_many(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_var}::{class}> + '_>> {
-        Ok(Box::new(self.{rel_name}.iter().map(|v| v.as_ref() as &dyn _model_::{class_mod_var}::{class})))
+    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
+        Ok(Box::new(self.{rel_name}.iter().map(|v| v.as_ref() as &dyn _model_::{class_mod_path}::{class})))
     }", "") }@
 @{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_var}::{class}>> {
-        Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _{db_snake}_model_::{class_mod_var}::{class}))
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
+        Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
     }", "") }@
 }
 
@@ -508,41 +508,41 @@ impl @{ pascal_name }@Updater for @{ pascal_name }@Entity {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
-    fn set_{raw_var}(&mut self, v: {domain_factory}) {
+    fn set_{raw_name}(&mut self, v: {domain_factory}) {
         self.{var} = v{convert_domain_factory}
     }", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
-    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>> {
-        Ok(self.{rel_name}.as_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_var}::{class}Updater))
+    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_path}::{class}Updater>> {
+        Ok(self.{rel_name}.as_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_path}::{class}Updater))
     }
-    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>) {
-        self.{rel_name} = if let Ok(v) = v.downcast::<_model_::{class_mod_var}::{class}Entity>() {
+    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
+        self.{rel_name} = if let Ok(v) = v.downcast::<_model_::{class_mod_path}::{class}Entity>() {
             Some(v)
         } else {
             panic!(\"Only {class}Entity is accepted.\");
         };
     }", "") }@
 @{- def.relations_many(true)|fmt_rel_join("
-    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> + '_>> {
+    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> + '_>> {
         struct V<'a, T>(&'a mut Vec<Box<T>>);
-        impl<T: _model_::{class_mod_var}::{class}Updater> domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> for V<'_, T> {
-            fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut (dyn _model_::{class_mod_var}::{class}Updater + 'static)> + '_> {
-                Box::new(self.0.iter_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_var}::{class}Updater))
+        impl<T: _model_::{class_mod_path}::{class}Updater> domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> for V<'_, T> {
+            fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut (dyn _model_::{class_mod_path}::{class}Updater + 'static)> + '_> {
+                Box::new(self.0.iter_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_path}::{class}Updater))
             }
         }
         Ok(Box::new(V(&mut self.{rel_name})))
     }
-    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>> {
-        Some(self.{rel_name}.drain(..).map(|v| v as Box<dyn _model_::{class_mod_var}::{class}Updater>).collect())
+    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>> {
+        Some(self.{rel_name}.drain(..).map(|v| v as Box<dyn _model_::{class_mod_path}::{class}Updater>).collect())
     }
-    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>) {
+    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>) {
         self.{rel_name}.clear();
         for row in list {
             self.push_{raw_rel_name}(row);
         }
     }
-    fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>) {
-        if let Ok(v) = v.downcast::<_model_::{class_mod_var}::{class}Entity>() {
+    fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
+        if let Ok(v) = v.downcast::<_model_::{class_mod_path}::{class}Entity>() {
             self.{rel_name}.push(v)
         } else {
             panic!(\"Only {class}Entity is accepted.\");

@@ -14,7 +14,7 @@ use std::{
 
 use crate::api_generator::schema::{ApiFieldDef, ApiRelationDef};
 use crate::common::{AtomicLoad as _, hash, if_then_else, to_plural, yaml_value_to_str};
-use crate::schema::_to_var_name;
+use crate::schema::_to_ident_name;
 
 use super::*;
 
@@ -1010,7 +1010,7 @@ impl ModelDef {
             Lazy::new(|| Regex::new(r"(?<!_)deleted_at(?!_)").unwrap());
         static MUT_DELETED_AT: Lazy<Regex> =
             Lazy::new(|| Regex::new(r"(?<!_)mut_deleted_at(?!_)").unwrap());
-        let s = DELETED_AT.replace_all(s, _to_var_name(ConfigDef::deleted_at().as_str()));
+        let s = DELETED_AT.replace_all(s, _to_ident_name(ConfigDef::deleted_at().as_str()));
         let s = MUT_DELETED_AT.replace_all(s.as_ref(), format!("mut_{}", ConfigDef::deleted_at()));
         s.to_string()
     }
@@ -1019,7 +1019,7 @@ impl ModelDef {
         static DELETED: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?<!_)deleted(?!_)").unwrap());
         static MUT_DELETED: Lazy<Regex> =
             Lazy::new(|| Regex::new(r"(?<!_)mut_deleted(?!_)").unwrap());
-        let s = DELETED.replace_all(s, _to_var_name(ConfigDef::deleted().as_str()));
+        let s = DELETED.replace_all(s, _to_ident_name(ConfigDef::deleted().as_str()));
         let s = MUT_DELETED.replace_all(s.as_ref(), format!("mut_{}", ConfigDef::deleted()));
         s.to_string()
     }

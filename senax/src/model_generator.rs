@@ -11,7 +11,7 @@ use std::sync::atomic::AtomicUsize;
 
 use crate::common::ToCase as _;
 use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
-use crate::schema::{_to_var_name, ConfigDef, GroupsDef, StringOrArray, Timestampable};
+use crate::schema::{_to_ident_name, ConfigDef, GroupsDef, StringOrArray, Timestampable};
 use crate::{BASE_DOMAIN_PATH, DOMAIN_REPOSITORIES_PATH};
 use crate::{
     DB_PATH, DOMAIN_PATH,
@@ -147,7 +147,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             &format!(
                 "pub mod repositories {{\n    pub use _repo_{}::repositories::{};",
                 group,
-                _to_var_name(group)
+                _to_ident_name(group)
             ),
         );
         content = content.replace(
@@ -348,7 +348,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         for (model_name, (_, def)) in defs {
             let mod_name = def.mod_name();
             let mod_name = &mod_name;
-            base_domain_output.push_str(&format!("pub mod {}", _to_var_name(mod_name)));
+            base_domain_output.push_str(&format!("pub mod {}", _to_ident_name(mod_name)));
             if def.abstract_mode {
                 #[derive(Template)]
                 #[template(path = "db/base/src/group/abstract.rs", escape = "none")]
@@ -371,7 +371,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 } else {
                     table_output.push_str(&format!(
                         "pub mod {} {{\n{}}}\n",
-                        _to_var_name(mod_name),
+                        _to_ident_name(mod_name),
                         output
                     ));
                 }
@@ -442,7 +442,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
                 } else {
                     table_output.push_str(&format!(
                         "pub mod {} {{\n{}}}\n",
-                        _to_var_name(mod_name),
+                        _to_ident_name(mod_name),
                         output
                     ));
                 }

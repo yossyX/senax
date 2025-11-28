@@ -17,7 +17,7 @@ pub use _base::models::CACHE_UPDATE_LOCK;
 // pub static CACHE_UPDATE_LOCK: RwLock<()> = RwLock::const_new(());
 @{-"\n"}@
 @%- for (name, (_, defs)) in groups %@
-pub use _base::models::@{ name|snake|to_var_name }@;
+pub use _base::models::@{ name|snake|ident }@;
 @%- endfor %@
 
 pub use _base::models::NotifyOp;

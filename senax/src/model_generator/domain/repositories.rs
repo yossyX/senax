@@ -101,10 +101,10 @@ pub fn write_group_files(
             source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, (_, defs)) in groups %@
-pub mod @{ name|snake|to_var_name }@;
+pub mod @{ name|snake|ident }@;
 @%- endfor %@
 @%- for name in ref_groups %@
-pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|to_var_name }@;
+pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
             ext = "txt",
@@ -136,7 +136,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             source = r###"
     // Do not modify below this line. (RepoStart)
     @%- for (name, (_, defs)) in groups %@
-    fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository>;
+    fn @{ name|snake|ident }@(&self) -> Box<dyn @{ name|snake|ident }@::@{ name|pascal }@Repository>;
     @%- endfor %@
     // Do not modify above this line. (RepoEnd)"###,
             ext = "txt",
@@ -161,7 +161,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             source = r###"
     // Do not modify below this line. (QueryServiceStart)
     @%- for (name, (_, defs)) in groups %@
-    fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService>;
+    fn @{ name|snake|ident }@(&self) -> Box<dyn @{ name|snake|ident }@::@{ name|pascal }@QueryService>;
     @%- endfor %@
     // Do not modify above this line. (QueryServiceEnd)"###,
             ext = "txt",
@@ -186,7 +186,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             source = r###"
     // Do not modify below this line. (EmuRepoStart)
     @%- for (name, (_, defs)) in groups %@
-    get_emu_repo!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@Repository);
+    get_emu_repo!(@{ name|snake|ident }@, dyn @{ name|snake|ident }@::@{ name|pascal }@Repository, @{ name|snake|ident }@::Emu@{ name|pascal }@Repository);
     @%- endfor %@
     // Do not modify above this line. (EmuRepoEnd)"###,
             ext = "txt",
@@ -211,7 +211,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
             source = r###"
     // Do not modify below this line. (EmuQueryServiceStart)
     @%- for (name, (_, defs)) in groups %@
-    get_emu_repo!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@QueryService);
+    get_emu_repo!(@{ name|snake|ident }@, dyn @{ name|snake|ident }@::@{ name|pascal }@QueryService, @{ name|snake|ident }@::Emu@{ name|pascal }@QueryService);
     @%- endfor %@
     // Do not modify above this line. (EmuQueryServiceEnd)"###,
             ext = "txt",
@@ -286,7 +286,7 @@ pub mod _base {
 pub mod _base;
 @%- endif %@
 @%- for mod_name in mod_names %@
-pub mod @{ mod_name|to_var_name }@;
+pub mod @{ mod_name|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
                 ext = "txt",
@@ -312,7 +312,7 @@ pub mod @{ mod_name|to_var_name }@;
                 source = r###"
     // Do not modify below this line. (RepoStart)
     @%- for (mod_name, model_name) in mod_names %@
-    fn @{ mod_name|to_var_name }@(&self) -> Box<dyn @{ mod_name|to_var_name }@::@{ model_name|pascal }@Repository>;
+    fn @{ mod_name|ident }@(&self) -> Box<dyn @{ mod_name|ident }@::@{ model_name|pascal }@Repository>;
     @%- endfor %@
     // Do not modify above this line. (RepoEnd)"###,
                 ext = "txt",
@@ -341,7 +341,7 @@ pub mod @{ mod_name|to_var_name }@;
                 source = r###"
     // Do not modify below this line. (QueryServiceStart)
     @%- for (mod_name, model_name) in mod_names %@
-    fn @{ mod_name|to_var_name }@(&self) -> Box<dyn @{ mod_name|to_var_name }@::@{ model_name|pascal }@QueryService>;
+    fn @{ mod_name|ident }@(&self) -> Box<dyn @{ mod_name|ident }@::@{ model_name|pascal }@QueryService>;
     @%- endfor %@
     // Do not modify above this line. (QueryServiceEnd)"###,
                 ext = "txt",
@@ -370,7 +370,7 @@ pub mod @{ mod_name|to_var_name }@;
                 source = r###"
     // Do not modify below this line. (EmuRepoStart)
     @%- for (mod_name, model_name) in mod_names %@
-    get_emu_table!(@{ mod_name|to_var_name }@, dyn @{ mod_name|to_var_name }@::@{ model_name|pascal }@Repository, @{ mod_name|to_var_name }@::Emu@{ model_name|pascal }@Repository);
+    get_emu_table!(@{ mod_name|ident }@, dyn @{ mod_name|ident }@::@{ model_name|pascal }@Repository, @{ mod_name|ident }@::Emu@{ model_name|pascal }@Repository);
     @%- endfor %@
     // Do not modify above this line. (EmuRepoEnd)"###,
                 ext = "txt",
@@ -399,7 +399,7 @@ pub mod @{ mod_name|to_var_name }@;
                 source = r###"
     // Do not modify below this line. (EmuQueryServiceStart)
     @%- for (mod_name, model_name) in mod_names %@
-    get_emu_table!(@{ mod_name|to_var_name }@, dyn @{ mod_name|to_var_name }@::@{ model_name|pascal }@QueryService, @{ mod_name|to_var_name }@::Emu@{ model_name|pascal }@Repository);
+    get_emu_table!(@{ mod_name|ident }@, dyn @{ mod_name|ident }@::@{ model_name|pascal }@QueryService, @{ mod_name|ident }@::Emu@{ model_name|pascal }@Repository);
     @%- endfor %@
     // Do not modify above this line. (EmuQueryServiceEnd)"###,
                 ext = "txt",
@@ -467,7 +467,7 @@ pub fn write_lib_rs(
         source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, (_, defs)) in groups %@
-pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|to_var_name }@ as @{ name|snake|to_var_name }@;
+pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|ident }@ as @{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
@@ -500,7 +500,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
         source = r###"
     // Do not modify below this line. (RepoStart)
     @%- for (name, (_, defs)) in groups %@
-    fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository>;
+    fn @{ name|snake|ident }@(&self) -> Box<dyn @{ name|snake|ident }@::@{ name|pascal }@Repository>;
     @%- endfor %@
     // Do not modify above this line. (RepoEnd)"###,
         ext = "txt",
@@ -526,7 +526,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
         source = r###"
     // Do not modify below this line. (QueryServiceStart)
     @%- for (name, (_, defs)) in groups %@
-    fn @{ name|snake|to_var_name }@(&self) -> Box<dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService>;
+    fn @{ name|snake|ident }@(&self) -> Box<dyn @{ name|snake|ident }@::@{ name|pascal }@QueryService>;
     @%- endfor %@
     // Do not modify above this line. (QueryServiceEnd)"###,
         ext = "txt",
@@ -552,7 +552,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
         source = r###"
     // Do not modify below this line. (EmuRepoStart)
     @%- for (name, (_, defs)) in groups %@
-    get_emu_group!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@Repository, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@Repository);
+    get_emu_group!(@{ name|snake|ident }@, dyn @{ name|snake|ident }@::@{ name|pascal }@Repository, @{ name|snake|ident }@::Emu@{ name|pascal }@Repository);
     @%- endfor %@
     // Do not modify above this line. (EmuRepoEnd)"###,
         ext = "txt",
@@ -578,7 +578,7 @@ pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|
         source = r###"
     // Do not modify below this line. (EmuQueryServiceStart)
     @%- for (name, (_, defs)) in groups %@
-    get_emu_group!(@{ name|snake|to_var_name }@, dyn @{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, @{ name|snake|to_var_name }@::Emu@{ name|pascal }@QueryService);
+    get_emu_group!(@{ name|snake|ident }@, dyn @{ name|snake|ident }@::@{ name|pascal }@QueryService, @{ name|snake|ident }@::Emu@{ name|pascal }@QueryService);
     @%- endfor %@
     // Do not modify above this line. (EmuQueryServiceEnd)"###,
         ext = "txt",
@@ -689,18 +689,18 @@ use async_trait::async_trait;
 #[allow(unused_imports)]
 use base_domain as domain;
 #[allow(unused_imports)]
-use base_domain::models::@{ db|snake|to_var_name }@ as _model_;
+use base_domain::models::@{ db|snake|ident }@ as _model_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
 #[allow(unused_imports)]
-pub use base_domain::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
+pub use base_domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 @%- for (enum_name, column_def) in def.num_enums(true) %@
 #[rustfmt::skip]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ enum_name|pascal }@;
+pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ enum_name|pascal }@;
 @%- endfor %@
 @%- for (enum_name, column_def) in def.str_enums(true) %@
 #[rustfmt::skip]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ enum_name|pascal }@;
+pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ enum_name|pascal }@;
 @%- endfor %@
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::{join, Joiner_};
@@ -708,21 +708,21 @@ pub use super::_base::_@{ mod_name }@::{join, Joiner_};
 pub use super::_base::_@{ mod_name }@::{filter, order, Filter_};
 pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Factory;
 use super::_base::_@{ mod_name }@::{_@{ pascal_name }@QueryService, _@{ pascal_name }@Repository};
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::consts;
+pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::consts;
 #[rustfmt::skip]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{
+pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{
     @{ pascal_name }@, @{ pascal_name }@Cache, @{ pascal_name }@Common, @{ pascal_name }@Updater,
 };
 @%- for id in def.id() %@
 #[rustfmt::skip]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ id_name }@;
+pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ id_name }@;
 @%- endfor %@
 #[rustfmt::skip]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Primary;
+pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Primary;
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::{_@{ pascal_name }@QueryFindBuilder, _@{ pascal_name }@RepositoryFindBuilder};
 #[cfg(any(feature = "mock", test))]
-pub use base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Entity;
+pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Entity;
 @%- for (selector, selector_def) in def.selectors %@
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Repository@{ selector|pascal }@Builder;
@@ -736,11 +736,11 @@ pub use self::{MockQueryService_ as Mock@{ pascal_name }@QueryService, MockRepos
 #[cfg(any(feature = "mock", test))]
 pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
 @{- def.relations()|fmt_rel_join("
-pub use base_domain::models::--1--::{class_mod_var} as _{raw_rel_name}_model_;
-pub use crate::repositories::{class_mod_var} as _{raw_rel_name}_repository_;", "")|replace1(db|snake|to_var_name) }@
+pub use base_domain::models::--1--::{class_mod_path} as _{raw_rel_name}_model_;
+pub use crate::repositories::{class_mod_path} as _{raw_rel_name}_repository_;", "")|replace1(db|snake|ident) }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-pub use base_domain::models::{db_mod_var}::{class_mod_var} as _{raw_rel_name}_model_;
-pub use repository_{db_snake}_{group_snake}::repositories::{class_mod_var} as _{raw_rel_name}_repository_;", "") }@
+pub use base_domain::models::{db_mod_ident}::{class_mod_path} as _{raw_rel_name}_model_;
+pub use repository_{db_snake}_{group_snake}::repositories::{class_mod_path} as _{raw_rel_name}_repository_;", "") }@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
         escape = "none"
@@ -800,7 +800,7 @@ pub use repository_{db_snake}_{group_snake}::repositories::{class_mod_var} as _{
         async fn fetch(&self, limit: usize) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>>;
         @%- endif %@
         @%- for (selector, selector_def) in def.selectors %@
-        fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder>;
+        fn @{ selector|ident }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder>;
         @%- endfor %@
     }
     // Do not modify above this line. (RepositoryMockEnd)"###,
@@ -832,7 +832,7 @@ pub use repository_{db_snake}_{group_snake}::repositories::{class_mod_var} as _{
         async fn all(&self) -> anyhow::Result<Box<dyn base_domain::models::EntityIterator<dyn @{ pascal_name }@Cache>>>;
         @%- endif %@
         @%- for (selector, selector_def) in def.selectors %@
-        fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder>;
+        fn @{ selector|ident }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder>;
         @%- endfor %@
         fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn _@{ pascal_name }@QueryFindBuilder>;
     }

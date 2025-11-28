@@ -16,7 +16,7 @@ use ::std::path::Path;
 use ::std::sync::Arc;
 use ::std::time::Duration;
 
-use db::{models::@{ group_name|snake|to_var_name }@::CacheOp, DbConn, DELAYED_DB_DIR};
+use db::{models::@{ group_name|snake|ident }@::CacheOp, DbConn, DELAYED_DB_DIR};
 
 #[rustfmt::skip]
 #[allow(clippy::map_identity)]
@@ -38,7 +38,7 @@ pub mod _base {
 pub mod _base;
 @%- endif %@
 @% for name in mod_names %@
-pub mod @{ name|to_var_name }@;
+pub mod @{ name|ident }@;
 @%- endfor %@
 
 #[rustfmt::skip]

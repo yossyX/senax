@@ -20,16 +20,16 @@ pub fn _to_db_col(s: &str, esc: bool) -> String {
     }
 }
 
-fn _raw_var_name(s: &str) -> String {
+fn _raw_ident_name(s: &str) -> String {
     s.to_owned()
 }
 
-pub fn to_var_name<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
-    Ok(_to_var_name(s.as_ref()))
+pub fn ident<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
+    Ok(_to_ident_name(s.as_ref()))
 }
 
 pub fn to_pascal_name<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
-    Ok(_to_var_name(&s.as_ref().to_pascal()))
+    Ok(_to_ident_name(&s.as_ref().to_pascal()))
 }
 pub fn pascal<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
     Ok(s.as_ref().to_pascal())
@@ -201,8 +201,8 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
     f.replace("{col}", &_to_db_col(name, false))
         .replace("{col_esc}", &_to_db_col(&col.get_col_name(name), true))
         .replace("{col_query}", &col.get_col_query(&col.get_col_name(name)))
-        .replace("{var}", &_to_var_name(name))
-        .replace("{raw_var}", &_raw_var_name(name))
+        .replace("{var}", &_to_ident_name(name))
+        .replace("{raw_name}", &_raw_ident_name(name))
         .replace("{var_pascal}", &name.to_pascal())
         .replace("{upper}", &name.to_upper_snake())
         .replace("{raw_inner}", &col.get_inner_type(true, false))
@@ -296,7 +296,7 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
         .replace("{filter_type}", &col.get_filter_type(domain_mode()))
         .replace(
             "{filter_check_null}",
-            &col.get_filter_null(&_to_var_name(name)),
+            &col.get_filter_null(&_to_ident_name(name)),
         )
         .replace("{filter_check_eq}", &col.get_filter_eq(None, false))
         .replace("{filter_check_cmp}", &col.get_filter_cmp(None))
@@ -358,7 +358,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         rel.get_local_cols(name, model)
             .iter()
             .map(|(k, v)| {
-                let name = _to_var_name(k);
+                let name = _to_ident_name(k);
                 if v.not_null {
                     format!("self.{name}()")
                 } else {
@@ -381,7 +381,7 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
         } else {
             col.into()
         };
-        let col = _to_var_name(&col);
+        let col = _to_ident_name(&col);
         (
             format!("repo_{class_mod}::Order_::{asc}(repo_{class_mod}::Col_::{col})"),
             format!("l.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
@@ -429,20 +429,20 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
     );
     let rel_hash =
         crate::common::rel_hash(format!("{}::{}::{}", &model.group_name, &model.name, name));
-    f.replace("{rel_name}", &_to_var_name(name))
+    f.replace("{rel_name}", &_to_ident_name(name))
         .replace("{raw_rel_name}", name)
-        .replace("{raw_var_rel_name}", &_to_raw_var_name(name))
+        .replace("{raw_ident_rel_name}", &_to_raw_ident_name(name))
         .replace("{rel_name_pascal}", &name.to_pascal())
         .replace("{rel_name_camel}", &name.to_camel())
         .replace("{rel_hash}", &rel_hash.to_string())
         .replace("{class}", &rel.get_foreign_class_name())
         .replace("{class_mod}", &rel.get_group_mod_name())
         .replace("{group_snake}", &rel.get_group_name().to_snake())
-        .replace("{group_var}", &rel.get_group_var())
-        .replace("{class_mod_var}", &rel.get_group_mod_var())
-        .replace("{base_class_mod_var}", &rel.get_base_group_mod_var())
+        .replace("{group_ident}", &rel.get_group_ident())
+        .replace("{class_mod_path}", &rel.get_group_mod_path())
+        .replace("{base_class_mod_path}", &rel.get_base_group_mod_path())
         .replace("{mod_name}", &rel.get_mod_name())
-        .replace("{mod_var}", &_to_var_name(&rel.get_mod_name()))
+        .replace("{mod_ident}", &_to_ident_name(&rel.get_mod_name()))
         .replace("{local_table}", &model.table_name())
         // .replace("{table}", &_to_db_col(&rel.get_foreign_table_name(), true))
         .replace("{raw_table}", &rel.get_foreign_table_name())
@@ -505,7 +505,7 @@ fn _fmt_rel_outer_db(
         .get_local_cols(name, model)
         .iter()
         .map(|(k, v)| {
-            let name = _to_var_name(k);
+            let name = _to_ident_name(k);
             if v.not_null {
                 format!("self.{name}()")
             } else {
@@ -525,22 +525,22 @@ fn _fmt_rel_outer_db(
     };
     let rel_hash =
         crate::common::rel_hash(format!("{}::{}::{}", &model.group_name, &model.name, name));
-    f.replace("{rel_name}", &_to_var_name(name))
+    f.replace("{rel_name}", &_to_ident_name(name))
         .replace("{raw_rel_name}", name)
-        .replace("{raw_var_rel_name}", &_to_raw_var_name(name))
+        .replace("{raw_ident_rel_name}", &_to_raw_ident_name(name))
         .replace("{db_snake}", &rel.db().to_snake())
-        .replace("{db_mod_var}", &_to_var_name(&rel.db().to_snake()))
+        .replace("{db_mod_ident}", &_to_ident_name(&rel.db().to_snake()))
         .replace("{rel_name_pascal}", &name.to_pascal())
         .replace("{rel_name_camel}", &name.to_camel())
         .replace("{rel_hash}", &rel_hash.to_string())
         .replace("{class}", &rel.get_foreign_class_name())
         .replace("{class_mod}", &rel.get_group_mod_name())
         .replace("{group_snake}", &rel.get_group_name().to_snake())
-        .replace("{group_var}", &rel.get_group_var())
-        .replace("{class_mod_var}", &rel.get_group_mod_var())
-        .replace("{base_class_mod_var}", &rel.get_base_group_mod_var())
+        .replace("{group_ident}", &rel.get_group_ident())
+        .replace("{class_mod_path}", &rel.get_group_mod_path())
+        .replace("{base_class_mod_path}", &rel.get_base_group_mod_path())
         .replace("{mod_name}", &rel.get_mod_name())
-        .replace("{mod_var}", &_to_var_name(&rel.get_mod_name()))
+        .replace("{mod_ident}", &_to_ident_name(&rel.get_mod_name()))
         .replace("{local_table}", &model.table_name())
         .replace("{index}", &index.to_string())
         .replace(
@@ -604,8 +604,8 @@ fn _fmt_index_col(name: &&String, col: &&FieldDef, f: &str, index: usize) -> Str
         .replace("{col_name}", &col.get_col_name(name))
         .replace("{col_esc}", &_to_db_col(&col.get_col_name(name), true))
         .replace("{col_pascal}", &name.to_pascal())
-        .replace("{var}", &_to_var_name(name))
-        .replace("{raw_var}", name)
+        .replace("{var}", &_to_ident_name(name))
+        .replace("{raw_name}", name)
         .replace("{bind_as_for_filter}", col.get_bind_as_for_filter())
         .replace("{filter_type}", &col.get_filter_type(domain_mode()))
         .replace("{index}", &index.to_string())
@@ -620,15 +620,15 @@ pub fn fmt_cache_owners(v: &[(String, String, String, u64)], f: &str) -> ::askam
                 "{mod}",
                 &format!(
                     "{}::{}",
-                    &_to_var_name(&group_name.to_snake()),
-                    &_to_var_name(&model_name.to_snake())
+                    &_to_ident_name(&group_name.to_snake()),
+                    &_to_ident_name(&model_name.to_snake())
                 ),
             )
             .replace(
                 "{base_mod}",
                 &format!(
                     "{}::_base::_{}",
-                    &_to_var_name(&group_name.to_snake()),
+                    &_to_ident_name(&group_name.to_snake()),
                     &model_name.to_snake()
                 ),
             )

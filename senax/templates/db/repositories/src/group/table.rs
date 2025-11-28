@@ -18,12 +18,12 @@ pub use super::_base::_@{ mod_name }@::{
 @%- if config.exclude_from_domain %@
 pub use super::_base::_@{ mod_name }@::{Joiner_, join};
 @%- else %@
-pub use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{Joiner_, join};
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{Joiner_, join};
 @%- endif %@
 @%- if config.exclude_from_domain %@
 pub use super::_base::_@{ mod_name }@::{filter, order};
 @%- else %@
-pub use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{filter, order};
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{filter, order};
 @%- endif %@
 @%- if def.act_as_job_queue() %@
 pub use super::_base::_@{ mod_name }@::QUEUE_NOTIFIER;
@@ -76,7 +76,7 @@ async fn save_data(
                 updater.mut_data().set(save_data.data.compressed_data());
                 updater
                     .mut_eol()
-                    .set((save_data.data.eol() >> EOL_SHIFT) as @% if config.signed_only() %@i32@% else %@u32@% endif %@);
+                    .set((save_data.data.eol() >> EOL_SHIFT) as @{ config.u32() }@);
                 let mut data = save_data.data.clone();
                 data.set_version(updater._@{ ConfigDef::version() }@().wrapping_add(1));
                 save_list.push(updater);
@@ -113,7 +113,7 @@ async fn save_data(
         let session = _@{ pascal_name }@Factory {
             key: key.into(),
             data: save_data.data.compressed_data().into(),
-            eol: (save_data.data.eol() >> EOL_SHIFT) as @% if config.signed_only() %@i32@% else %@u32@% endif %@,
+            eol: (save_data.data.eol() >> EOL_SHIFT) as @{ config.u32() }@,
         }
         .create();
         save_list.push(session);
@@ -235,7 +235,7 @@ impl SessionStore for _@{ pascal_name }@Store {
         let s_key: String = session_key.into();
         let id: _@{ pascal_name }@Id = s_key.into();
         let mut session = id.updater();
-        session.mut_eol().set((data.eol() >> EOL_SHIFT) as @% if config.signed_only() %@i32@% else %@u32@% endif %@);
+        session.mut_eol().set((data.eol() >> EOL_SHIFT) as @{ config.u32() }@);
         session.mut_@{ ConfigDef::updated_at() }@().mark_for_skip();
         _@{ pascal_name }@_::update_delayed(&mut conn, session).await
     }
@@ -270,7 +270,7 @@ async fn gc(shard_id: ShardId, start_key: SessionKey) -> Result<()> {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs()
-        >> EOL_SHIFT) as @% if config.signed_only() %@i32@% else %@u32@% endif %@;
+        >> EOL_SHIFT) as @{ config.u32() }@;
     let mut filter = filter!((key < s_key) AND (eol < eol));
     const LIMIT: usize = 1000;
     loop {

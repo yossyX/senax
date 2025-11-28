@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use domain::models::FromRawValue as _;
 #[allow(unused_imports)]
-use domain::models::@{ db|snake|to_var_name }@::@{ rel_mod }@ as _domain_;
+use domain::models::@{ db|snake|ident }@::@{ rel_mod }@ as _domain_;
 #[allow(unused_imports)]
 use super::_repository_::_@{ rel_name }@_repository_ as _repository_;
 #[allow(unused_imports)]
@@ -34,7 +34,7 @@ pub struct ResObj@{ rel_name|pascal }@ {
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @%- else %@
 @{- def.for_api_response()|fmt_join("
-{label_wo_hash}{res_api_schema_type}    #[graphql(name = \"{raw_var}\")]
+{label_wo_hash}{res_api_schema_type}    #[graphql(name = \"{raw_name}\")]
     pub {var}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]

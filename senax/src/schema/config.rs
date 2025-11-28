@@ -581,6 +581,10 @@ impl ConfigDef {
         }
     }
 
+    pub fn u32(&self) -> &'static str {
+        if self.signed_only() { "i32" } else { "u32" }
+    }
+
     pub fn outer_db(&self) -> BTreeSet<String> {
         let mut v = BTreeSet::new();
         let group_lock = super::GROUPS.read().unwrap();

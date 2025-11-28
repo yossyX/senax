@@ -1,8 +1,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use crate::DbConn;
-use domain::repository::@{ db|snake|to_var_name }@ as _repository;
-use domain::repository::@{ db|snake|to_var_name }@::{@{ db|pascal }@QueryService, @{ db|pascal }@Repository};
+use domain::repository::@{ db|snake|ident }@ as _repository;
+use domain::repository::@{ db|snake|ident }@::{@{ db|pascal }@QueryService, @{ db|pascal }@Repository};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

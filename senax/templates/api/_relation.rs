@@ -1,7 +1,7 @@
 #[allow(unused_imports)]
 use domain::models::FromRawValue as _;
 #[allow(unused_imports)]
-use domain::models::@{ db|snake|to_var_name }@::@{ rel_mod }@::{
+use domain::models::@{ db|snake|ident }@::@{ rel_mod }@::{
     self as _domain_, @{ pascal_name }@Updater as _
 };
 #[allow(unused_imports)]
@@ -42,7 +42,7 @@ pub struct ResObj@{ rel_name|pascal }@ {
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @%- else %@
 @{- def.for_api_response()|fmt_join("
-{label_wo_hash}{res_api_schema_type}    #[graphql(name = \"{raw_var}\")]
+{label_wo_hash}{res_api_schema_type}    #[graphql(name = \"{raw_name}\")]
     pub {var}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]
@@ -180,13 +180,13 @@ pub struct ReqObj@{ rel_name|pascal }@ {
 {label_wo_hash}    pub {rel_name}: Option<Vec<_{raw_rel_name}::ReqObj{rel_name_pascal}>>,", "") }@
 @%- else %@
 @{- def.auto_primary()|fmt_join("
-{label_wo_hash}    #[graphql(name = \"{raw_var}\")]
+{label_wo_hash}    #[graphql(name = \"{raw_name}\")]
 {graphql_secret}{api_validate}{api_default_attribute}    pub {var}: {req_api_option_type},", "") }@
 @{- def.for_api_request_except(rel_id)|fmt_join("
-{label_wo_hash}    #[graphql(name = \"{raw_var}\")]
+{label_wo_hash}    #[graphql(name = \"{raw_name}\")]
 {graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {var}: {req_api_type},", "") }@
 @{- def.for_api_response_not_in_request()|fmt_join("
-    #[graphql(name = \"{raw_var}\", visible = false)]
+    #[graphql(name = \"{raw_name}\", visible = false)]
     #[serde(skip)]
     pub {var}: {req_api_option_type},", "") }@
 @{- def.relations_one_for_api_request()|fmt_rel_join("
@@ -199,7 +199,7 @@ pub struct ReqObj@{ rel_name|pascal }@ {
 }
 
 @{- def.fields_with_default()|fmt_join("
-fn default_{raw_var}() -> {req_api_type} {
+fn default_{raw_name}() -> {req_api_type} {
     {api_default}
 }", "") }@
 
@@ -262,12 +262,12 @@ pub fn update_list(
     let mut map: HashMap<_, _> = list
         .into_iter()
         .map(|mut v| { v.mark_for_delete(); v} )
-        .map(|v| (v.@{ def.primary_except(rel_id)|to_var_name }@()@% if def.primary_except_has_inner(rel_id) %@.inner()@% endif %@, v))
+        .map(|v| (v.@{ def.primary_except(rel_id)|ident }@()@% if def.primary_except_has_inner(rel_id) %@.inner()@% endif %@, v))
         .collect();
     let mut list = Vec::new();
     for row in data_list.into_iter() {
         @%- if def.is_auto_primary_except(rel_id) %@
-        if let Some(id) = row.@{ def.primary_except(rel_id)|to_var_name }@ {
+        if let Some(id) = row.@{ def.primary_except(rel_id)|ident }@ {
             if let Some(mut updater) = map.remove(&id) {
                 updater.unmark_for_delete();
                 update_updater(&mut *updater, row, repo, auth)?;
@@ -279,7 +279,7 @@ pub fn update_list(
             list.push(create_entity(row, repo, auth));
         }
         @%- else %@
-        if let Some(mut updater) = map.remove(&row.@{ def.primary_except(rel_id)|to_var_name }@) {
+        if let Some(mut updater) = map.remove(&row.@{ def.primary_except(rel_id)|ident }@) {
             updater.unmark_for_delete();
             update_updater(&mut *updater, row, repo, auth)?;
             list.push(updater);
@@ -304,9 +304,9 @@ pub fn update_updater(
     auth: &AuthInfo,
 ) -> anyhow::Result<()> {
 @{- def.for_api_request_except_primary_and(rel_id)|fmt_join_not_null_or_null("
-    updater.set_{raw_var}({from_api_type_for_update});", "
+    updater.set_{raw_name}({from_api_type_for_update});", "
     if !input.{var}.is_undefined() {
-        updater.set_{raw_var}({from_api_type_for_update});
+        updater.set_{raw_name}({from_api_type_for_update});
     }", "") }@
 @{- def.relations_one_for_api_request_with_replace_type(true)|fmt_rel_join("
     if let Some(input) = input.{rel_name} {

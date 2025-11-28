@@ -11,8 +11,8 @@ use super::schema::{ApiDbDef, ApiModelDef};
     source = r###"
     impl QueryRoot {
     #[graphql(name = "@{ db_route }@")]
-    async fn @{ db_route|to_var_name }@(&self) -> @{ db_route|snake|to_var_name }@::GqlQuery@{ db_route|pascal }@ {
-        @{ db_route|snake|to_var_name }@::GqlQuery@{ db_route|pascal }@
+    async fn @{ db_route|ident }@(&self) -> @{ db_route|snake|ident }@::GqlQuery@{ db_route|pascal }@ {
+        @{ db_route|snake|ident }@::GqlQuery@{ db_route|pascal }@
     }"###,
     ext = "txt",
     escape = "none"
@@ -26,8 +26,8 @@ pub struct QueryRootTemplate<'a> {
     source = r###"
     impl MutationRoot {
     #[graphql(name = "@{ db_route }@")]
-    async fn @{ db_route|to_var_name }@(&self) -> @{ db_route|snake|to_var_name }@::GqlMutation@{ db_route|pascal }@ {
-        @{ db_route|snake|to_var_name }@::GqlMutation@{ db_route|pascal }@
+    async fn @{ db_route|ident }@(&self) -> @{ db_route|snake|ident }@::GqlMutation@{ db_route|pascal }@ {
+        @{ db_route|snake|ident }@::GqlMutation@{ db_route|pascal }@
     }"###,
     ext = "txt",
     escape = "none"

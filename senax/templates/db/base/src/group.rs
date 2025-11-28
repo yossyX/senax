@@ -20,7 +20,7 @@ use crate::{DbConn, DELAYED_DB_DIR};
 
 @%- if SEPARATED_BASE_FILES %@
 @%- for name in mod_names %@
-pub mod @{ name|to_var_name }@;
+pub mod @{ name|ident }@;
 @%- endfor %@
 @%- else %@
 @{ table_output }@
@@ -31,7 +31,7 @@ pub mod @{ name|to_var_name }@;
 #[derive(Pack, Unpack, Clone, Debug)]
 pub enum CacheOp {
 @%- for (name, (_, def)) in models %@
-    @{ name|to_pascal_name }@(@{ def.mod_name()|to_var_name }@::CacheOp),
+    @{ name|to_pascal_name }@(@{ def.mod_name()|ident }@::CacheOp),
 @%- endfor %@
 }
 
@@ -43,7 +43,7 @@ pub enum CacheOp {
 pub struct @{ group_name|pascal }@ {
 @%- for (name, (_, def)) in models %@
     #[serde(default)]
-    @{ name|to_var_name }@: IndexMap<String, @{ def.mod_name()|to_var_name }@::_@{ name|pascal }@Factory>,
+    @{ name|ident }@: IndexMap<String, @{ def.mod_name()|ident }@::_@{ name|pascal }@Factory>,
 @%- endfor %@
 }
 @{-"\n"}@

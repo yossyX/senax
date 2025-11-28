@@ -15,7 +15,7 @@ use crate::api_generator::template::{DbConfigTemplate, MutationRootTemplate, Que
 use crate::common::ToCase as _;
 use crate::common::{fs_write, parse_yml_file, simplify_yml};
 use crate::filters;
-use crate::schema::{_to_var_name, GROUPS, ModelDef, to_id_name};
+use crate::schema::{_to_ident_name, GROUPS, ModelDef, to_id_name};
 use crate::{API_SCHEMA_PATH, model_generator};
 
 use self::schema::{ApiRelationDef, RelationVisibility};
@@ -75,14 +75,14 @@ pub fn generate(
     let mut content = fs::read_to_string(&file_path)
         .with_context(|| format!("Cannot read file: {:?}", &file_path))?;
     let db_snake = db_route.to_snake();
-    let db_var_name = _to_var_name(&db_snake);
-    let reg = Regex::new(&format!(r"pub mod {};", db_var_name))?;
+    let db_ident_name = _to_ident_name(&db_snake);
+    let reg = Regex::new(&format!(r"pub mod {};", db_ident_name))?;
     if !reg.is_match(&content) {
         content = content.replace(
             "// Do not modify this line. (ApiDbMod)",
             &format!(
                 "pub mod {};\n// Do not modify this line. (ApiDbMod)",
-                db_var_name
+                db_ident_name
             ),
         );
         content = content.replace(
@@ -90,16 +90,16 @@ pub fn generate(
             &format!(
                 "let _flatten_{db_snake}_ = true;
     if _flatten_{db_snake}_ {{
-        cfg.configure({db_var_name}::route_config);
+        cfg.configure({db_ident_name}::route_config);
     }} else {{
-        cfg.service(scope(\"/{db_route}\").configure({db_var_name}::route_config));
+        cfg.service(scope(\"/{db_route}\").configure({db_ident_name}::route_config));
     }}
     // Do not modify this line. (ApiRouteConfig)"
             ),
         );
         content = content.replace(
             "    // Do not modify this line. (ApiJsonSchema)",
-            &format!("    {}::gen_json_schema(&dir.join(\"{}\"))?;\n    // Do not modify this line. (ApiJsonSchema)", db_var_name, &db_route.to_snake()),
+            &format!("    {}::gen_json_schema(&dir.join(\"{}\"))?;\n    // Do not modify this line. (ApiJsonSchema)", db_ident_name, &db_route.to_snake()),
         );
         let tpl = QueryRootTemplate { db_route };
         content = content.replace("impl QueryRoot {", tpl.render()?.trim_start());
@@ -153,7 +153,7 @@ pub fn generate(
             writeln!(&mut buf, "    #[display({:?})]", alias).unwrap();
             writeln!(&mut buf, "    #[serde(rename = {:?})]", alias).unwrap();
         }
-        writeln!(&mut buf, "    {},", _to_var_name(role.0)).unwrap();
+        writeln!(&mut buf, "    {},", _to_ident_name(role.0)).unwrap();
         buf
     });
     let tpl = format!(
@@ -172,7 +172,7 @@ pub fn generate(
             &mut buf,
             "    pub fn is_{}(&self) -> bool {{\n        self == &Self::{}\n    }}\n",
             role.0,
-            _to_var_name(role.0)
+            _to_ident_name(role.0)
         )
         .unwrap();
         buf
@@ -454,19 +454,19 @@ fn write_db_file(
     };
     for group_route in group_route_names.iter().rev() {
         let group_snake = group_route.to_snake();
-        let group_var_name = _to_var_name(&group_snake);
+        let group_ident_name = _to_ident_name(&group_snake);
         let chk = format!(
             "\npub use _{}_{}_{}::api as {};\n",
             server.to_snake(),
             db_route.to_snake(),
             group_snake,
-            group_var_name
+            group_ident_name
         );
         if !content.contains(&chk) {
             #[derive(Template)]
             #[template(
                 source = r###"
-pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as @{ group_route|snake|to_var_name }@;
+pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as @{ group_route|snake|ident }@;
 // Do not modify this line. (GqlMod)"###,
                 ext = "txt",
                 escape = "none"
@@ -488,8 +488,8 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
             #[template(
                 source = r###"
     #[graphql(name = "@{ group_route }@")]
-    async fn @{ group_route|to_var_name }@(&self) -> @{ group_route|snake|to_var_name }@::GqlQuery@{ db_route|pascal }@@{ group_route|pascal }@ {
-        @{ group_route|snake|to_var_name }@::GqlQuery@{ db_route|pascal }@@{ group_route|pascal }@
+    async fn @{ group_route|ident }@(&self) -> @{ group_route|snake|ident }@::GqlQuery@{ db_route|pascal }@@{ group_route|pascal }@ {
+        @{ group_route|snake|ident }@::GqlQuery@{ db_route|pascal }@@{ group_route|pascal }@
     }
     // Do not modify this line. (GqlQuery)"###,
                 ext = "txt",
@@ -513,8 +513,8 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
             #[template(
                 source = r###"
     #[graphql(name = "@{ group_route }@")]
-    async fn @{ group_route|to_var_name }@(&self) -> @{ group_route|snake|to_var_name }@::GqlMutation@{ db_route|pascal }@@{ group_route|pascal }@ {
-        @{ group_route|snake|to_var_name }@::GqlMutation@{ db_route|pascal }@@{ group_route|pascal }@
+    async fn @{ group_route|ident }@(&self) -> @{ group_route|snake|ident }@::GqlMutation@{ db_route|pascal }@@{ group_route|pascal }@ {
+        @{ group_route|snake|ident }@::GqlMutation@{ db_route|pascal }@@{ group_route|pascal }@
     }
     // Do not modify this line. (GqlMutation)"###,
                 ext = "txt",
@@ -538,9 +538,9 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
                 &format!(
                     "let _flatten_{group_snake}_ = true;
     if _flatten_{group_snake}_ {{
-        cfg.configure({group_var_name}::route_config);
+        cfg.configure({group_ident_name}::route_config);
     }} else {{
-        cfg.service(scope(\"/{group_route}\").configure({group_var_name}::route_config));
+        cfg.service(scope(\"/{group_route}\").configure({group_ident_name}::route_config));
     }}
     // Do not modify this line. (ApiRouteConfig)"
                 ),
@@ -549,7 +549,7 @@ pub use _@{ server|snake }@_@{ db_route|snake }@_@{ group_route|snake }@::api as
             #[derive(Template)]
             #[template(
                 source = r###"
-    @{ group_route|snake|to_var_name }@::gen_json_schema(&dir.join("@{ group_route }@"))?;
+    @{ group_route|snake|ident }@::gen_json_schema(&dir.join("@{ group_route }@"))?;
     // Do not modify this line. (JsonSchema)"###,
                 ext = "txt",
                 escape = "none"
@@ -610,12 +610,12 @@ fn write_group_file(
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
     for model_route in model_routes.iter() {
-        let chk = format!("\npub mod {};\n", _to_var_name(&model_route.to_snake()));
+        let chk = format!("\npub mod {};\n", _to_ident_name(&model_route.to_snake()));
         if !content.contains(&chk) {
             #[derive(Template)]
             #[template(
                 source = r###"
-pub mod @{ model_route|snake|to_var_name }@;
+pub mod @{ model_route|snake|ident }@;
 // Do not modify this line. (GqlMod)"###,
                 ext = "txt",
                 escape = "none"
@@ -633,8 +633,8 @@ pub mod @{ model_route|snake|to_var_name }@;
     @%- if !camel_case %@
     #[graphql(name = "@{ model_route }@")]
     @%- endif %@
-    async fn @{ model_route|to_var_name }@(&self) -> @{ model_route|snake|to_var_name }@::Gql@{ mode }@@{ graphql_name }@ {
-        @{ model_route|snake|to_var_name }@::Gql@{ mode }@@{ graphql_name }@
+    async fn @{ model_route|ident }@(&self) -> @{ model_route|snake|ident }@::Gql@{ mode }@@{ graphql_name }@ {
+        @{ model_route|snake|ident }@::Gql@{ mode }@@{ graphql_name }@
     }
     // Do not modify this line. (Gql@{ mode }@)"###,
                 ext = "txt",
@@ -674,14 +674,14 @@ pub mod @{ model_route|snake|to_var_name }@;
             &format!(
                 "cfg.service(scope(\"/{}\").configure({}::route_config));\n    // Do not modify this line. (ApiRouteConfig)",
                 &model_route,
-                _to_var_name(&model_route.to_snake()),
+                _to_ident_name(&model_route.to_snake()),
                 ),
             );
 
             #[derive(Template)]
             #[template(
                 source = r###"
-    @{ model_route|snake|to_var_name }@::gen_json_schema(dir)?;
+    @{ model_route|snake|ident }@::gen_json_schema(dir)?;
     // Do not modify this line. (JsonSchema)"###,
                 ext = "txt",
                 escape = "none"
@@ -1000,7 +1000,7 @@ fn write_relation(
                 pascal_name,
                 def: &rel_model,
                 camel_case,
-                rel_mod: rel.get_group_mod_var(),
+                rel_mod: rel.get_group_mod_path(),
                 has_many: false,
                 no_read: no_read || api_relation.visibility == Some(RelationVisibility::WriteOnly),
                 no_update: no_update
@@ -1051,7 +1051,7 @@ fn write_relation(
                 pascal_name,
                 def: &rel_model,
                 camel_case,
-                rel_mod: rel.get_group_mod_var(),
+                rel_mod: rel.get_group_mod_path(),
                 has_many: true,
                 no_read: no_read || api_relation.visibility == Some(RelationVisibility::WriteOnly),
                 no_update: no_update
@@ -1099,7 +1099,7 @@ fn write_relation(
                 pascal_name,
                 def: &rel_model,
                 camel_case,
-                rel_mod: rel.get_group_mod_var(),
+                rel_mod: rel.get_group_mod_path(),
             }
             .render()?
             .replace('\n', "\n    "),

@@ -1,7 +1,7 @@
 use crate::common::OVERWRITTEN_MSG;
 use crate::common::ToCase as _;
 use crate::schema::ConfigDef;
-use crate::schema::{_to_var_name, GroupsDef};
+use crate::schema::{_to_ident_name, GroupsDef};
 use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{
     common::fs_write,
@@ -48,10 +48,10 @@ mod _base {
 mod _base;
 @%- endif %@
 @%- for (mod_name, _) in mod_names %@
-mod @{ mod_name|to_var_name }@;
+mod @{ mod_name|ident }@;
 @%- endfor %@
 @%- for (mod_name, name) in mod_names %@
-pub use @{ mod_name|to_var_name }@::@{ name }@;
+pub use @{ mod_name|ident }@::@{ name }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
@@ -148,7 +148,7 @@ pub fn write_models_rs(base_domain_src_dir: &Path, db: &str) -> Result<()> {
     #[derive(Template)]
     #[template(
         source = r###"
-pub mod @{ db|snake|to_var_name }@;
+pub mod @{ db|snake|ident }@;
 // Do not modify this line. (Mod)"###,
         ext = "txt",
         escape = "none"
@@ -167,7 +167,7 @@ pub mod @{ db|snake|to_var_name }@;
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let chk = format!("\npub mod {};\n", _to_var_name(&db.to_snake()));
+    let chk = format!("\npub mod {};\n", _to_ident_name(&db.to_snake()));
     if !content.contains(&chk) {
         let tpl = ModTemplate { db }.render()?;
         content = content.replace("// Do not modify this line. (Mod)", tpl.trim_start());
@@ -206,7 +206,7 @@ pub fn write_models_db_rs(
         source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, (_, defs)) in groups %@
-pub mod @{ name|snake|to_var_name }@;
+pub mod @{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",

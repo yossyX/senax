@@ -615,7 +615,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                                 get_model(&rel_def.model, cur_group_name, &groups).borrow_mut();
                             model.on_delete_list.insert(format!(
                                 "{}::_base::_{}",
-                                &_to_var_name(&cur_group_name.to_snake()),
+                                &_to_ident_name(&cur_group_name.to_snake()),
                                 &cur_model_name.to_snake()
                             ));
                         }
@@ -897,7 +897,7 @@ pub fn to_id_name_wo_changing_case(name: &str) -> String {
         format!("_{}Id", name)
     }
 }
-pub fn _to_var_name(s: &str) -> String {
+pub fn _to_ident_name(s: &str) -> String {
     let name = s;
     if BAD_KEYWORDS.contains(&name) {
         format!("_{}", name)
@@ -907,7 +907,7 @@ pub fn _to_var_name(s: &str) -> String {
         name.to_owned()
     }
 }
-pub fn _to_raw_var_name(s: &str) -> String {
+pub fn _to_raw_ident_name(s: &str) -> String {
     let name = s;
     if BAD_KEYWORDS.contains(&name) {
         format!("_{}", name)

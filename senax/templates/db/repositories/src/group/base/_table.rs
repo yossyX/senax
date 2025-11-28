@@ -49,28 +49,28 @@ use crate::repositories::{CacheOpTr, IdFetcher, IdFetcherWithCache};
 use ::db::misc::{BindValue, Count, Updater, Size, TrashMode, UpdaterForInner as _};
 use ::db::models::USE_FAST_CACHE;
 use ::db::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
-pub use ::db::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
+pub use ::db::models::@{ group_name|snake|ident }@::@{ mod_name|ident }@::*;
 @%- if !config.exclude_from_domain %@
 #[allow(unused_imports)]
 use ::domain::value_objects;
-pub use ::domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{join, Joiner_};
+pub use ::domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{join, Joiner_};
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
-use ::db_@{ rel_def.db()|snake }@::models::@{ rel_def.get_group_mod_var() }@ as rel_@{ rel_def.get_group_mod_name() }@;
+use ::db_@{ rel_def.db()|snake }@::models::@{ rel_def.get_group_mod_path() }@ as rel_@{ rel_def.get_group_mod_name() }@;
 @%- if !config.exclude_from_domain %@
-use ::domain::repository::@{ rel_def.db()|snake|to_var_name }@::@{ rel_def.get_group_name()|snake|to_var_name }@::_super::@{ rel_def.get_group_mod_var() }@ as join_@{ rel_def.get_group_mod_name() }@;
+use ::domain::repository::@{ rel_def.db()|snake|ident }@::@{ rel_def.get_group_name()|snake|ident }@::_super::@{ rel_def.get_group_mod_path() }@ as join_@{ rel_def.get_group_mod_name() }@;
 @%- else %@
-use ::db_@{ rel_def.db()|snake }@::repository::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name()|snake }@ as join_@{ rel_def.get_group_mod_name() }@;
+use ::db_@{ rel_def.db()|snake }@::repository::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name()|snake }@ as join_@{ rel_def.get_group_mod_name() }@;
 @%- endif %@
-use _repo_@{ rel_def.db()|snake }@_@{ rel_def.get_group_name()|snake }@::repositories::@{ rel_def.get_base_group_mod_var() }@ as repo_@{ rel_def.get_group_mod_name() }@;
+use _repo_@{ rel_def.db()|snake }@_@{ rel_def.get_group_name()|snake }@::repositories::@{ rel_def.get_base_group_mod_path() }@ as repo_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 @%- endif %@
 @%- for mod_name in def.relation_mods() %@
-use ::db::models::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
-use crate::repositories::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as repo_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use ::db::models::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use crate::repositories::@{ mod_name[0]|ident }@::_base::_@{ mod_name[1] }@ as repo_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- if !config.exclude_from_domain %@
-use ::domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use ::domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- else %@
-use crate::repository::@{ mod_name[0]|to_var_name }@::_base::_@{ mod_name[1] }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use crate::repository::@{ mod_name[0]|ident }@::_base::_@{ mod_name[1] }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- endif %@
 @%- endfor %@
 const USE_CACHE: bool = @{ def.use_cache() }@;
@@ -292,7 +292,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         } else {
                             db::models::NotifyOp::insert
                         };
-                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, op, &id).await;
+                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, op, &id).await;
                     }
                     let id = PrimaryHasher(id, shard_id);
     @{- def.relations_one_cache(false)|fmt_rel_join("
@@ -336,7 +336,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         let mut cache = CacheWrapper::from_data(row._data.clone(), shard_id, time);
                         let id = InnerPrimary::from(&cache._inner);
                         if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, op, &id).await;
+                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, op, &id).await;
                         }
                         let id = PrimaryHasher(id, shard_id);
                         @%- if def.versioned %@
@@ -344,7 +344,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                             id: id.0.clone(),
                             shard_id,
                             time,
-                            version: cache._inner.@{ ConfigDef::version()|to_var_name }@,
+                            version: cache._inner.@{ ConfigDef::version()|ident }@,
                         };
                         if let Some(old) = Cache::get_version::<VersionWrapper>(&vw, shard_id).await.filter(|o| o.id == id.0) {
                             if old.version.less_than(vw.version) {
@@ -395,7 +395,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     if overwrite {
                         __clear_cache(shard_id, sync, false).await;
                         if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::invalidate_all, &serde_json::Value::Null).await;
+                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::invalidate_all, &serde_json::Value::Null).await;
                         }
                     }
                     @%- endif %@
@@ -406,7 +406,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::update, &id).await;
+                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::update, &id).await;
                     }
                     if USE_CACHE {
                         let id = PrimaryHasher(id.clone(), shard_id);
@@ -478,7 +478,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     clear_all_rows_cache(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
-                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::update, id).await;
+                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::update, id).await;
                         }
                     }
                     if USE_CACHE {
@@ -515,7 +515,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for data in &data_list {
                             let id = InnerPrimary::from(data);
-                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::upsert, &id).await;
+                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::upsert, &id).await;
                         }
                     }
                     if USE_CACHE {
@@ -542,7 +542,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::delete, &id).await;
+                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::delete, &id).await;
                     }
                     if USE_CACHE {
                         let id = PrimaryHasher(id.clone(), shard_id);
@@ -570,7 +570,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     clear_all_rows_cache(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
-                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::delete, id).await;
+                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::delete, id).await;
                         }
                     }
                     if USE_CACHE {
@@ -600,7 +600,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     let sync = *sync_map.get(&shard_id).unwrap();
                     __clear_cache(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::delete_all, &serde_json::Value::Null).await;
+                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::delete_all, &serde_json::Value::Null).await;
                     }
                 }
                 CacheOp::Cascade { ids, shard_id } => {
@@ -608,7 +608,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     clear_all_rows_cache(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
-                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::delete, id).await;
+                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::delete, id).await;
                         }
                     }
                     if USE_CACHE {
@@ -638,7 +638,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::invalidate, &id).await;
+                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::invalidate, &id).await;
                     }
                     if USE_CACHE {
                         let id = PrimaryHasher(id.clone(), shard_id);
@@ -663,7 +663,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 }
                 CacheOp::Notify { id, shard_id  } => {
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::invalidate, &id).await;
+                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::invalidate, &id).await;
                     }
                 }
                 @%- for (mod_name, rel_name, local, val, val2, rel) in def.relations_on_delete_not_cascade() %@
@@ -672,7 +672,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     clear_all_rows_cache(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
-                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::update, id).await;
+                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::update, id).await;
                         }
                     }
                     if USE_CACHE {
@@ -680,8 +680,8 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                             let id = PrimaryHasher(id.clone(), shard_id);
                             let mut update = Data::default();
                             let mut op = OpData::default();
-                            update.@{ local|to_var_name }@ = @{ val2 }@;
-                            op.@{ local|to_var_name }@ = Op::Set;
+                            update.@{ local|ident }@ = @{ val2 }@;
+                            op.@{ local|ident }@ = Op::Set;
                             if let Some(cache) = Cache::get::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
                                 let mut cache = cache.as_ref().clone();
                                 cache._inner = CacheOp::update(cache._inner, &update, &op);
@@ -705,7 +705,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         __clear_cache(*shard_id, *sync, false).await;
                     }
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|to_var_name }@, db::models::NotifyOp::invalidate_all, &serde_json::Value::Null).await;
+                        DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::invalidate_all, &serde_json::Value::Null).await;
                     }
                 }
             }
@@ -1192,7 +1192,7 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
                     {rel_name}: None,", "") }@
                 };
                 @%- if def.updated_at_conf().is_some() %@
-                if updater._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
+                if updater._op.@{ ConfigDef::updated_at()|ident }@ == Op::None {
                     updater.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
                 }
                 @%- endif %@
@@ -1279,7 +1279,7 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
                     {rel_name}: None,", "") }@
                 };
                 @%- if def.updated_at_conf().is_some() %@
-                if updater._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
+                if updater._op.@{ ConfigDef::updated_at()|ident }@ == Op::None {
                     updater.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
                 }
                 @%- endif %@
@@ -1317,18 +1317,18 @@ trait RelPk@{ rel_name|pascal }@ {
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 @%- endif %@
@@ -1349,18 +1349,18 @@ trait RelPk@{ rel_name|pascal }@ {
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 @%- endif %@
@@ -1537,34 +1537,34 @@ pub(crate) trait RelFk@{ rel_name|pascal }@ {
 }
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Data {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_var} = pk.{index}{raw_to_inner};", "
-        self.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self.{raw_name} = pk.{index}{raw_to_inner};", "
+        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::CacheData {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_var} = pk.{index}{raw_to_inner};", "
-        self.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self.{raw_name} = pk.{index}{raw_to_inner};", "
+        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- endif %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::ForInsert {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self._data.{raw_var} = pk.{index}{raw_to_inner};", "
-        self._data.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self._data.{raw_name} = pk.{index}{raw_to_inner};", "
+        self._data.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- endfor %@
@@ -1740,34 +1740,34 @@ pub(crate) trait RelFk@{ rel_name|pascal }@ {
 }
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Data {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_var} = pk.{index}{raw_to_inner};", "
-        self.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self.{raw_name} = pk.{index}{raw_to_inner};", "
+        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::CacheData {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_var} = pk.{index}{raw_to_inner};", "
-        self.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self.{raw_name} = pk.{index}{raw_to_inner};", "
+        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- endif %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::ForInsert {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self._data.{raw_var} = pk.{index}{raw_to_inner};", "
-        self._data.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self._data.{raw_name} = pk.{index}{raw_to_inner};", "
+        self._data.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- endfor %@
@@ -2534,7 +2534,7 @@ impl Col_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::Col_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Col_;
 @%- endif %@
 impl ColTr for Col_ {
     fn name(&self) -> &'static str {
@@ -2568,7 +2568,7 @@ impl ColOne_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::ColOne_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColOne_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColOne_ {
@@ -2624,7 +2624,7 @@ impl ColKey_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::ColKey_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColKey_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColKey_ {
@@ -2690,7 +2690,7 @@ impl ColMany_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::ColMany_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColMany_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColMany_ {
@@ -2755,7 +2755,7 @@ impl ColJson_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::ColJson_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColJson_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColJson_ {
@@ -2798,7 +2798,7 @@ impl ColJsonArray_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::ColJsonArray_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColJsonArray_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColJsonArray_ {
@@ -2854,7 +2854,7 @@ impl ColGeo_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::ColGeo_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColGeo_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColGeo_ {
@@ -2897,7 +2897,7 @@ impl ColGeoDistance_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::ColGeoDistance_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColGeoDistance_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColGeoDistance_ {
@@ -2961,7 +2961,7 @@ impl std::fmt::Display for ColRel_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::ColRel_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColRel_;
 @%- endif %@
 impl ColRelTr for ColRel_ {
     #[allow(unused_mut)]
@@ -3259,19 +3259,19 @@ impl Filter_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::Filter_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_;
 @%- endif %@
 impl FilterTr for Filter_ {
     crate::misc::filter!(Data);
 }
 @% let filter_macro_name = "filter_{}_{}_{}"|format(db|snake, group_name|snake, model_name) -%@
-@% let model_path = "$crate::repositories::{}::_base::_{}"|format(group_name|snake|to_var_name, mod_name) -%@
+@% let model_path = "$crate::repositories::{}::_base::_{}"|format(group_name|snake|ident, mod_name) -%@
 @%- if config.exclude_from_domain %@
 
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_null {
 @%- for (col_name, column_def) in def.nullable() %@
-    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
+    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|ident }@);
 @%- endfor %@
     () => (); // For empty case
 }
@@ -3280,7 +3280,7 @@ pub use @{ filter_macro_name }@_null as filter_null;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_text {
 @%- for (col_name, column_def) in def.text() %@
-    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
+    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|ident }@);
 @%- endfor %@
     () => (); // For empty case
 }
@@ -3289,7 +3289,7 @@ pub use @{ filter_macro_name }@_text as filter_text;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_one {
 @%- for (col_name, column_def) in def.all_fields_except_json() %@
-    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColOne_::@{ col_name|to_var_name }@($e.clone().try_into()?));
+    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColOne_::@{ col_name|ident }@($e.clone().try_into()?));
 @%- endfor %@
 }
 pub use @{ filter_macro_name }@_one as filter_one;
@@ -3297,8 +3297,8 @@ pub use @{ filter_macro_name }@_one as filter_one;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_many {
 @%- for (col_name, column_def) in def.all_fields_except_json() %@
-    (@{ col_name }@ [$($e:expr),*]) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@(vec![ $( $e.clone().try_into()? ),* ]));
-    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@($e.into_iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
+    (@{ col_name }@ [$($e:expr),*]) => (@{ model_path }@::ColMany_::@{ col_name|ident }@(vec![ $( $e.clone().try_into()? ),* ]));
+    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColMany_::@{ col_name|ident }@($e.into_iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
 @%- endfor %@
 }
 pub use @{ filter_macro_name }@_many as filter_many;
@@ -3306,7 +3306,7 @@ pub use @{ filter_macro_name }@_many as filter_many;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_json {
 @%- for (col_name, column_def) in def.all_fields_only_json() %@
-    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJson_::@{ col_name|to_var_name }@($e.clone().try_into()?));
+    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJson_::@{ col_name|ident }@($e.clone().try_into()?));
 @%- endfor %@
     () => ();
 }
@@ -3315,7 +3315,7 @@ pub use @{ filter_macro_name }@_json as filter_json;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_json_array {
 @%- for (col_name, column_def) in def.all_fields_only_json() %@
-    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJsonArray_::@{ col_name|to_var_name }@($e.iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
+    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJsonArray_::@{ col_name|ident }@($e.iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
 @%- endfor %@
     () => ();
 }
@@ -3324,7 +3324,7 @@ pub use @{ filter_macro_name }@_json_array as filter_json_array;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_geo {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
-    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColGeo_::@{ col_name|to_var_name }@($e.clone().try_into()?, @{ column_def.srid() }@));
+    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColGeo_::@{ col_name|ident }@($e.clone().try_into()?, @{ column_def.srid() }@));
 @%- endfor %@
     () => ();
 }
@@ -3333,7 +3333,7 @@ pub use @{ filter_macro_name }@_geo as filter_geo;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_geo_distance {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
-    (@{ col_name }@ $e:expr, $d:expr) => (@{ model_path }@::ColGeoDistance_::@{ col_name|to_var_name }@($e.clone().try_into()?, $d, @{ column_def.srid() }@));
+    (@{ col_name }@ $e:expr, $d:expr) => (@{ model_path }@::ColGeoDistance_::@{ col_name|ident }@($e.clone().try_into()?, $d, @{ column_def.srid() }@));
 @%- endfor %@
     () => ();
 }
@@ -3342,12 +3342,12 @@ pub use @{ filter_macro_name }@_geo_distance as filter_geo_distance;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_rel {
 @%- for (model_def, col_name, rel_def) in def.relations_one_and_belonging(false) %@
-    (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(None));
-    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(Some(Box::new($crate::models::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
+    (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
+    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::models::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
 @%- for (model_def, col_name, rel_def) in def.relations_many(false) %@
-    (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(None));
-    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(Some(Box::new($crate::models::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
+    (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
+    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::models::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
     () => ();
 }
@@ -3438,7 +3438,7 @@ pub enum Order_ {
     IsNullDesc(Col_),
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::Order_;
+pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Order_;
 @%- endif %@
 impl OrderTr for Order_ {
     crate::misc::order!();
@@ -3449,7 +3449,7 @@ impl OrderTr for Order_ {
 #[macro_export]
 macro_rules! @{ order_macro_name }@_col {
 @%- for (col_name, column_def) in def.all_fields() %@
-    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
+    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|ident }@);
 @%- endfor %@
 }
 pub use @{ order_macro_name }@_col as order_by_col;
@@ -3491,7 +3491,7 @@ impl Joiner_ {
             if let Some(rhs) = rhs {
                 Some(Box::new(Joiner_{
                     @{- def.relations()|fmt_rel_join("
-                    {rel_name}: _model_::{class_mod_var}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
+                    {rel_name}: _model_::{class_mod_path}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
                     ..Default::default()
                 }))
             } else {
@@ -3503,12 +3503,12 @@ impl Joiner_ {
     }
 }
 @%- let fetch_macro_name = "{}_{}_{}"|format(db|snake, group_name, model_name) %@
-@%- let base_path = "$crate::models::{}::{}::_base::_{}"|format(db|snake|to_var_name, group_name|to_var_name, mod_name) %@
+@%- let base_path = "$crate::models::{}::{}::_base::_{}"|format(db|snake|ident, group_name|ident, mod_name) %@
 #[macro_export]
 macro_rules! _join_@{ fetch_macro_name }@ {
 @{- def.relations()|fmt_rel_join("
-    ({rel_name}) => ($crate::models::{class_mod_var}::_{mod_name}::join!({}));
-    ({rel_name}: $p:tt) => ($crate::models::{class_mod_var}::_{mod_name}::join!($p));", "") }@
+    ({rel_name}) => ($crate::models::{class_mod_path}::_{mod_name}::join!({}));
+    ({rel_name}: $p:tt) => ($crate::models::{class_mod_path}::_{mod_name}::join!($p));", "") }@
     () => ();
 }
 pub use _join_@{ fetch_macro_name }@ as _join;
@@ -3903,7 +3903,7 @@ impl QueryBuilder {
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         @%- if def.updated_at_conf().is_some() %@
-        if obj._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
+        if obj._op.@{ ConfigDef::updated_at()|ident }@ == Op::None {
             obj.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
         }
         @%- endif %@
@@ -4413,7 +4413,7 @@ impl _@{ pascal_name }@_ {
     }
 @%- for parent in def.downcast_aggregation() %@
 
-    pub fn downcast_from(base: &db::models::@{ parent.group_name|snake|to_var_name }@::@{ parent.name|snake|to_var_name }@::_@{ parent.name|pascal }@) -> Option<_@{ pascal_name }@> {
+    pub fn downcast_from(base: &db::models::@{ parent.group_name|snake|ident }@::@{ parent.name|snake|ident }@::_@{ parent.name|pascal }@) -> Option<_@{ pascal_name }@> {
         if base._inner.@{ def.inheritance_check() }@ {
             let clone = base._inner.clone();
             Some(_@{ pascal_name }@ {
@@ -4432,7 +4432,7 @@ impl _@{ pascal_name }@_ {
 @%- endfor %@
 @%- for parent in def.downcast_simple() %@
 
-    pub fn downcast_from(base: &db::models::@{ parent.group_name|snake|to_var_name }@::@{ parent.name|snake|to_var_name }@::_@{ parent.name|pascal }@) -> _@{ pascal_name }@ {
+    pub fn downcast_from(base: &db::models::@{ parent.group_name|snake|ident }@::@{ parent.name|snake|ident }@::_@{ parent.name|pascal }@) -> _@{ pascal_name }@ {
         let clone = base._inner.clone();
         _@{ pascal_name }@ {
             _inner: Data {
@@ -4908,7 +4908,7 @@ impl _@{ pascal_name }@_ {
         let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col("ColKey_::{var}(c{index}.clone().into())", ", ") }@]);
         if let Some(id) = Cache::get::<PrimaryWrapper>(&key, conn.shard_id(), true).await {
             if let Some(obj) = Self::find_optional_from_cache(conn, &id.0, joiner.clone()).await? {
-                if @{ index.fields(index_name, def)|fmt_index_col("obj._{raw_var}(){filter_check_eq}", " && ") }@ {
+                if @{ index.fields(index_name, def)|fmt_index_col("obj._{raw_name}(){filter_check_eq}", " && ") }@ {
                     return Ok(obj);
                 }
             }
@@ -4965,7 +4965,7 @@ impl _@{ pascal_name }@_ {
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
         @%- if def.updated_at_conf().is_some() %@
-        if updater._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
+        if updater._op.@{ ConfigDef::updated_at()|ident }@ == Op::None {
             updater.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
         }
         @%- endif %@
@@ -5179,7 +5179,7 @@ impl _@{ pascal_name }@_ {
             vec.push(obj._data);
         }
         @%- if def.updated_at_conf().is_some() %@
-        if updater._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
+        if updater._op.@{ ConfigDef::updated_at()|ident }@ == Op::None {
             updater.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
         }
         @%- endif %@
@@ -5339,7 +5339,7 @@ impl _@{ pascal_name }@_ {
     #[allow(unused_mut)]
     pub async fn delete(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
         @%- if def.updated_at_conf().is_some() %@
-        if obj._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
+        if obj._op.@{ ConfigDef::updated_at()|ident }@ == Op::None {
             obj.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
         }
         @%- endif %@
@@ -5384,7 +5384,7 @@ impl _@{ pascal_name }@_ {
         }
         @%- endif %@
         @%- if def.updated_at_conf().is_some() %@
-        if obj._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
+        if obj._op.@{ ConfigDef::updated_at()|ident }@ == Op::None {
             obj.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
         }
         @%- endif %@
@@ -6258,8 +6258,8 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
             anyhow::bail!(err::RowNotFound::new("@{ table_name }@", id.to_string()));
         }
         @%- if def.versioned %@
-        obj._data.@{ version_col }@ = _last_insert_id as @% if config.signed_only() %@i32@% else %@u32@% endif %@;
-        obj._update.@{ version_col }@ = _last_insert_id as @% if config.signed_only() %@i32@% else %@u32@% endif %@;
+        obj._data.@{ version_col }@ = _last_insert_id as @{ config.u32() }@;
+        obj._update.@{ version_col }@ = _last_insert_id as @{ config.u32() }@;
         obj._op.@{ version_col }@ = Op::Set;
         @%- endif %@
         @%- if def.counting.is_some() %@
@@ -6362,8 +6362,8 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         Ok((obj2, cache_msg))
     } else if rows_affected == 2 {
         @%- if def.versioned %@
-        obj._data.@{ version_col }@ = _last_insert_id as @% if config.signed_only() %@i32@% else %@u32@% endif %@;
-        obj._update.@{ version_col }@ = _last_insert_id as @% if config.signed_only() %@i32@% else %@u32@% endif %@;
+        obj._data.@{ version_col }@ = _last_insert_id as @{ config.u32() }@;
+        obj._update.@{ version_col }@ = _last_insert_id as @{ config.u32() }@;
         obj._op.@{ version_col }@ = Op::Set;
         @%- endif %@
         @%- if def.counting.is_some() %@
@@ -6850,7 +6850,7 @@ pub(crate) async fn _seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Res
             let obj = seed.create();
             if let Some(obj) = _@{ pascal_name }@_::save(conn, obj).await? {
                 @{- def.auto_inc_or_seq()|fmt_join("
-                let id = obj._{raw_var}();
+                let id = obj._{raw_name}();
                 if GENERATED_IDS.get().is_none() {
                     let _ = GENERATED_IDS.set(std::sync::RwLock::new(HashMap::new()));
                 }

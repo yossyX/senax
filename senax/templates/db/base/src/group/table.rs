@@ -42,10 +42,10 @@ use base_domain as domain;
 use domain::value_objects;
 @%- endif %@
 @%- for mod_name in def.relation_mods() %@
-use crate::models::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use crate::models::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- endfor %@
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
-use db_@{ rel_def.db()|snake }@::models::@{ rel_def.get_group_mod_var() }@ as rel_@{ rel_def.get_group_mod_name() }@;
+use db_@{ rel_def.db()|snake }@::models::@{ rel_def.get_group_mod_path() }@ as rel_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 
 static PRIMARY_TYPE_ID: u64 = @{ def.get_type_id("PRIMARY_TYPE_ID") }@;
@@ -191,7 +191,7 @@ impl CacheOp {
     }
     @%- endif %@
     pub fn wrap(self) -> crate::CacheOp {
-        crate::CacheOp::@{ group_name|to_pascal_name }@(crate::models::@{ group_name|snake|to_var_name }@::CacheOp::@{ model_name|to_pascal_name }@(self))
+        crate::CacheOp::@{ group_name|to_pascal_name }@(crate::models::@{ group_name|snake|ident }@::CacheOp::@{ model_name|to_pascal_name }@(self))
     }
 }
 
@@ -396,7 +396,7 @@ impl fmt::Display for Data {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{{")?;
         @{- def.all_except_secret()|fmt_join("
-        Accessor{accessor_with_sep_type}::_write_insert(f, \"{comma}\", \"{raw_var}\", &self.{var})?;", "") }@
+        Accessor{accessor_with_sep_type}::_write_insert(f, \"{comma}\", \"{raw_name}\", &self.{var})?;", "") }@
         write!(f, "}}")?;
         Ok(())
     }
@@ -444,7 +444,7 @@ impl sqlx::FromRow<'_, DbRow> for CacheData {
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum _@{ name|pascal }@ {
-@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@@{ row.value_str() }@,
+@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|ident }@@{ row.value_str() }@,
 @% endfor -%@
 }
 #[allow(non_snake_case)]
@@ -454,7 +454,7 @@ impl _@{ name|pascal }@ {
     }
 @%- for row in values %@
     pub fn is_@{ row.name }@(&self) -> bool {
-        self == &Self::@{ row.name|to_var_name }@
+        self == &Self::@{ row.name|ident }@
     }
 @%- endfor %@
 }
@@ -513,7 +513,7 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum _@{ name|pascal }@ {
-@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@,
+@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|ident }@,
 @% endfor -%@
 }
 #[allow(non_snake_case)]
@@ -523,7 +523,7 @@ impl _@{ name|pascal }@ {
     }
 @%- for row in values %@
     pub fn is_@{ row.name }@(&self) -> bool {
-        self == &Self::@{ row.name|to_var_name }@
+        self == &Self::@{ row.name|ident }@
     }
 @%- endfor %@
 }
@@ -566,7 +566,7 @@ pub struct _@{ pascal_name }@ {
 #[allow(non_camel_case_types)]
 pub enum _@{ pascal_name }@Info {
 @%- for (col_name, column_def) in def.all_fields() %@
-@{ column_def.label|strum_message4 }@@{ column_def.comment|strum_detailed4 }@@{ column_def|strum_props4 }@    @{ col_name|to_var_name }@,
+@{ column_def.label|strum_message4 }@@{ column_def.comment|strum_detailed4 }@@{ column_def|strum_props4 }@    @{ col_name|ident }@,
 @%- endfor %@
 }
 @%- if !config.force_disable_cache %@
@@ -597,7 +597,7 @@ pub struct VersionWrapper {
     pub id: InnerPrimary,
     pub shard_id: ShardId,
     pub time: MSec,
-    pub version: @% if config.signed_only() %@i32@% else %@u32@% endif %@,
+    pub version: @{ config.u32() }@,
 }
 
 impl CacheVal for VersionWrapper {
@@ -767,7 +767,7 @@ impl fmt::Display for ForInsert {
 }
 
 pub trait _@{ pascal_name }@Getter: Send + Sync + 'static {
-@{ def.all_fields()|fmt_join("{label}{comment}    fn _{raw_var}(&self) -> {outer};
+@{ def.all_fields()|fmt_join("{label}{comment}    fn _{raw_name}(&self) -> {outer};
 ", "") -}@
 @{ def.relations_one_and_belonging(false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
 ", "") -}@
@@ -793,18 +793,18 @@ trait RelPk@{ rel_name|pascal }@ {
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 @%- endif %@
@@ -825,18 +825,18 @@ trait RelPk@{ rel_name|pascal }@ {
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_var}(){null_question}", ", ") }@.into())
+        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
     }
 }
 @%- endif %@
@@ -1013,34 +1013,34 @@ pub(crate) trait RelFk@{ rel_name|pascal }@ {
 }
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Data {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_var} = pk.{index}{raw_to_inner};", "
-        self.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self.{raw_name} = pk.{index}{raw_to_inner};", "
+        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::CacheData {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_var} = pk.{index}{raw_to_inner};", "
-        self.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self.{raw_name} = pk.{index}{raw_to_inner};", "
+        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- endif %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::ForInsert {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self._data.{raw_var} = pk.{index}{raw_to_inner};", "
-        self._data.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self._data.{raw_name} = pk.{index}{raw_to_inner};", "
+        self._data.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- endfor %@
@@ -1216,34 +1216,34 @@ pub(crate) trait RelFk@{ rel_name|pascal }@ {
 }
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Data {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_var} = pk.{index}{raw_to_inner};", "
-        self.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self.{raw_name} = pk.{index}{raw_to_inner};", "
+        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::CacheData {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_var} = pk.{index}{raw_to_inner};", "
-        self.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self.{raw_name} = pk.{index}{raw_to_inner};", "
+        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- endif %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::ForInsert {
     fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_var}{null_question}{clone}", ", ") }@.into())
+        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_name}{null_question}{clone}", ", ") }@.into())
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self._data.{raw_var} = pk.{index}{raw_to_inner};", "
-        self._data.{raw_var} = Some(pk.{index}{raw_to_inner});", "") }@
+        self._data.{raw_name} = pk.{index}{raw_to_inner};", "
+        self._data.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
     }
 }
 @%- endfor %@
@@ -1472,7 +1472,7 @@ impl fmt::Display for InnerPrimary {
 
 impl _@{ pascal_name }@Getter for _@{ pascal_name }@ {
     @{- def.all_fields()|fmt_join("
-    fn _{raw_var}(&self) -> {outer} {
+    fn _{raw_name}(&self) -> {outer} {
         {convert_outer_prefix}self._inner.{var}{clone_for_outer}{convert_outer}
     }", "") }@
     @{- def.relations_one_and_belonging(false)|fmt_rel_join("
@@ -1490,13 +1490,13 @@ impl _@{ pascal_name }@Getter for _@{ pascal_name }@ {
 }
 
 @%- for parent in def.parents() %@
-impl crate::models::@{ parent.group_name|snake|to_var_name }@::@{ parent.name|snake|to_var_name }@::_@{ parent.name|pascal }@Getter for _@{ pascal_name }@ {
+impl crate::models::@{ parent.group_name|snake|ident }@::@{ parent.name|snake|ident }@::_@{ parent.name|pascal }@Getter for _@{ pascal_name }@ {
     @{- parent.primaries()|fmt_join("
-    fn _{raw_var}(&self) -> &{inner} {
+    fn _{raw_name}(&self) -> &{inner} {
         &self._inner.{var}
     }", "") }@
     @{- parent.non_primaries()|fmt_join("
-    fn _{raw_var}(&self) -> {outer} {
+    fn _{raw_name}(&self) -> {outer} {
         {convert_outer_prefix}self._inner.{var}{clone_for_outer}{convert_outer}
     }", "") }@
     @{- parent.relations_one_and_belonging(false)|fmt_rel_join("
@@ -1559,7 +1559,7 @@ impl CacheVal for CacheWrapper {
 
 impl CacheWrapper {
     @{- def.cache_cols()|fmt_join("
-    fn _{raw_var}(&self) -> {outer} {
+    fn _{raw_name}(&self) -> {outer} {
         {convert_outer_prefix}self._inner.{var}{clone_for_outer}{convert_outer}
     }", "") }@
     @{- def.relations_one_cache(false)|fmt_rel_join("
@@ -1574,8 +1574,8 @@ impl CacheWrapper {
 
 impl _@{ pascal_name }@Cache {
     @{- def.cache_cols()|fmt_join("
-{label}{comment}    pub fn _{raw_var}(&self) -> {outer} {
-        self._wrapper._{raw_var}()
+{label}{comment}    pub fn _{raw_name}(&self) -> {outer} {
+        self._wrapper._{raw_name}()
     }", "") }@
     @{- def.relations_one_cache(false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}Cache>> {
@@ -1663,18 +1663,18 @@ impl Updater for _@{ pascal_name }@Updater {
 #[allow(non_snake_case)]
 impl _@{ pascal_name }@Updater {
 @{- def.all_fields()|fmt_join("
-{label}{comment}    pub fn _{raw_var}(&self) -> {outer} {
+{label}{comment}    pub fn _{raw_name}(&self) -> {outer} {
         {convert_outer_prefix}self._data.{var}{clone_for_outer}{convert_outer}
     }", "") }@
 @{- def.primaries()|fmt_join("
-{label}{comment}    pub fn mut_{raw_var}(&self) -> Accessor{accessor_with_type} {
+{label}{comment}    pub fn mut_{raw_name}(&self) -> Accessor{accessor_with_type} {
         Accessor{accessor} {
             val: &self._data.{var},
             _phantom: Default::default(),
         }
     }", "") }@
 @{- def.non_primaries_except_read_only()|fmt_join("
-{label}{comment}    pub fn mut_{raw_var}(&mut self) -> Accessor{accessor_with_type} {
+{label}{comment}    pub fn mut_{raw_name}(&mut self) -> Accessor{accessor_with_type} {
         Accessor{accessor} {
             op: &mut self._op.{var},
             val: &mut self._data.{var},
@@ -1736,13 +1736,13 @@ impl crate::misc::UpdaterForInner for _@{ pascal_name }@Updater {
                 }
             }", "") }@
             @%- if def.created_at_conf().is_some() %@
-            if self._op.@{ ConfigDef::created_at()|to_var_name }@ == Op::None {
-                self._data.@{ ConfigDef::created_at()|to_var_name }@ = @{(def.created_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into();
+            if self._op.@{ ConfigDef::created_at()|ident }@ == Op::None {
+                self._data.@{ ConfigDef::created_at()|ident }@ = @{(def.created_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into();
             }
             @%- endif %@
             @%- if def.updated_at_conf().is_some() %@
-            if self._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
-                self._data.@{ ConfigDef::updated_at()|to_var_name }@ = @{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into();
+            if self._op.@{ ConfigDef::updated_at()|ident }@ == Op::None {
+                self._data.@{ ConfigDef::updated_at()|ident }@ = @{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into();
             }
             @%- endif %@
             @%- if def.versioned %@
@@ -1751,7 +1751,7 @@ impl crate::misc::UpdaterForInner for _@{ pascal_name }@Updater {
             @{ def.inheritance_set() }@
         }
         @%- if def.updated_at_conf().is_some() %@
-        if (self.is_updated() || self.will_be_deleted()) && self._op.@{ ConfigDef::updated_at()|to_var_name }@ == Op::None {
+        if (self.is_updated() || self.will_be_deleted()) && self._op.@{ ConfigDef::updated_at()|ident }@ == Op::None {
             self.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
         }
         @%- endif %@
@@ -1802,9 +1802,9 @@ impl fmt::Display for _@{ pascal_name }@Updater {
             write!(f, "{{UPDATE: {{")?;
             @%- if !def.disable_update() %@
             @{- def.primaries()|fmt_join("
-            Accessor{accessor_with_sep_type}::_write_insert(f, \"{comma}\", \"{raw_var}\", &self._data.{var})?;", "") }@
+            Accessor{accessor_with_sep_type}::_write_insert(f, \"{comma}\", \"{raw_name}\", &self._data.{var})?;", "") }@
             @{- def.all_except_secret_and_primary()|fmt_join("
-            Accessor{accessor_with_sep_type}::_write_update(f, \"{comma}\", \"{raw_var}\", self._op.{var}, &self._update.{var})?;", "") }@
+            Accessor{accessor_with_sep_type}::_write_update(f, \"{comma}\", \"{raw_name}\", self._op.{var}, &self._update.{var})?;", "") }@
             @%- endif %@
             write!(f, "}}}}")?;
         }
@@ -1932,15 +1932,15 @@ impl Serialize for _@{ pascal_name }@Cache {
         state.serialize_field(\"{var}\", &(self._wrapper._inner.{var}{convert_serialize}))?;", "") }@
         @{- def.relations_one_cache(false)|fmt_rel_join("
         if let Ok(v) = &self._{raw_rel_name}() {
-            state.serialize_field(\"{raw_var_rel_name}\", v)?;
+            state.serialize_field(\"{raw_ident_rel_name}\", v)?;
         }", "") }@
         @{- def.relations_many_cache(false)|fmt_rel_join("
         if let Ok(v) = &self._{raw_rel_name}() {
-            state.serialize_field(\"{raw_var_rel_name}\", v)?;
+            state.serialize_field(\"{raw_ident_rel_name}\", v)?;
         }", "") }@
         @{- def.relations_belonging_cache(false)|fmt_rel_join("
         if self.{rel_name}.is_some() {
-            state.serialize_field(\"{raw_var_rel_name}\", &self.{rel_name})?;
+            state.serialize_field(\"{raw_ident_rel_name}\", &self.{rel_name})?;
         }", "") }@
         state.end()
     }

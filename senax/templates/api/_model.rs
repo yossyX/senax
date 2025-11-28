@@ -1,9 +1,9 @@
 #[allow(unused_imports)]
 #[rustfmt::skip]
-use domain::models::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ mod_name|to_var_name }@::{self as _domain_, @{ pascal_name }@Updater as _};
-use domain::repository::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ mod_name|to_var_name }@ as _repository_;
-use domain::repository::@{ db|snake|to_var_name }@::@{ group|to_var_name }@::@{ group|pascal }@Repository as _Repository;
-use domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@QueryService as _QueryService;
+use domain::models::@{ db|snake|ident }@::@{ group|ident }@::@{ mod_name|ident }@::{self as _domain_, @{ pascal_name }@Updater as _};
+use domain::repository::@{ db|snake|ident }@::@{ group|ident }@::@{ mod_name|ident }@ as _repository_;
+use domain::repository::@{ db|snake|ident }@::@{ group|ident }@::@{ group|pascal }@Repository as _Repository;
+use domain::repository::@{ db|snake|ident }@::@{ db|pascal }@QueryService as _QueryService;
 
 fn query_guard() -> impl async_graphql::Guard {
     @{ api_def.readable_roles(config, group)|to_gql_guard }@
@@ -100,7 +100,7 @@ pub struct ResObj {
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @%- else %@
 @{- def.for_api_response()|fmt_join("
-{label_wo_hash}{res_api_schema_type}    #[graphql(name = \"{raw_var}\")]
+{label_wo_hash}{res_api_schema_type}    #[graphql(name = \"{raw_name}\")]
     pub {var}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]
@@ -279,13 +279,13 @@ pub struct ReqObj {
 {label_wo_hash}    pub {rel_name}: Option<Vec<_{raw_rel_name}::ReqObj{rel_name_pascal}>>,", "") }@
 @%- else %@
 @{- def.auto_primary()|fmt_join("
-    #[graphql(name = \"{raw_var}\")]
+    #[graphql(name = \"{raw_name}\")]
 {graphql_secret}{api_validate}{api_default_attribute}    pub {var}: {req_api_option_type},", "") }@
 @{- def.for_api_request()|fmt_join("
-{label_wo_hash}    #[graphql(name = \"{raw_var}\")]
+{label_wo_hash}    #[graphql(name = \"{raw_name}\")]
 {graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {var}: {req_api_type},", "") }@
 @{- def.for_api_response_not_in_request()|fmt_join("
-    #[graphql(name = \"{raw_var}\", visible = false)]
+    #[graphql(name = \"{raw_name}\", visible = false)]
     #[serde(skip)]
     pub {var}: {req_api_option_type},", "") }@
 @{- def.relations_one_for_api_request()|fmt_rel_join("
@@ -307,7 +307,7 @@ pub struct ReqObj {
 }
 
 @{- def.fields_with_default()|fmt_join("
-fn default_{raw_var}() -> {req_api_type} {
+fn default_{raw_name}() -> {req_api_type} {
     {api_default}
 }", "") }@
 
@@ -373,9 +373,9 @@ pub fn create_list(
 #[allow(unused_variables)]
 fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: ReqObj, repo: &dyn _Repository, auth: &AuthInfo) -> anyhow::Result<()> {
 @{- def.for_api_update_updater()|fmt_join_not_null_or_null("
-    updater.set_{raw_var}({from_api_type_for_update});", "
+    updater.set_{raw_name}({from_api_type_for_update});", "
     if !input.{var}.is_undefined() {
-        updater.set_{raw_var}({from_api_type_for_update});
+        updater.set_{raw_name}({from_api_type_for_update});
     }", "") }@
 @{- def.relations_one_for_api_request_with_replace_type(true)|fmt_rel_join("
     if let Some(input) = input.{rel_name} {

@@ -16,7 +16,7 @@ use crate::{
 };
 use crate::{common::ToCase as _, schema::to_id_name_wo_changing_case};
 
-use super::{_to_var_name, CONFIG, TimeZone, domain_mode};
+use super::{_to_ident_name, CONFIG, TimeZone, domain_mode};
 
 pub const DEFAULT_VARCHAR_LENGTH: u32 = 255;
 pub const DEFAULT_PRECISION: u16 = 36;
@@ -416,9 +416,9 @@ impl std::fmt::Display for IdClass {
             write!(
                 f,
                 "domain::models::{}::{}::{}::{}Id",
-                _to_var_name(&self.db),
-                _to_var_name(&self.group),
-                _to_var_name(&self.mod_name),
+                _to_ident_name(&self.db),
+                _to_ident_name(&self.group),
+                _to_ident_name(&self.mod_name),
                 &self.name
             )
         } else {
@@ -442,10 +442,10 @@ impl std::fmt::Display for EnumClass {
             write!(
                 f,
                 "domain::models::{}::{}::{}::{}",
-                _to_var_name(&self.db),
-                _to_var_name(&self.group),
-                _to_var_name(&self.mod_name),
-                _to_var_name(&self.name)
+                _to_ident_name(&self.db),
+                _to_ident_name(&self.group),
+                _to_ident_name(&self.mod_name),
+                _to_ident_name(&self.name)
             )
         } else {
             write!(
@@ -456,8 +456,8 @@ impl std::fmt::Display for EnumClass {
                     format!("db_{}", self.db),
                     "db".to_string()
                 ),
-                _to_var_name(&self.group),
-                _to_var_name(&self.mod_name),
+                _to_ident_name(&self.group),
+                _to_ident_name(&self.mod_name),
                 &self.name
             )
         }
@@ -1313,13 +1313,13 @@ impl FieldDef {
     }
 
     pub fn get_validate(&self, name: &str) -> String {
-        let var_name = &_to_var_name(name);
+        let ident_name = &_to_ident_name(name);
         match self.data_type {
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => {
                 let length = self.length.unwrap_or(DEFAULT_VARCHAR_LENGTH);
                 format!(
                     r#"
-        if let Some(v) = &self.{var_name} {{
+        if let Some(v) = &self.{ident_name} {{
             if v.as_ref().chars().count() > {length} {{
                 errors.add({name:?}, validator::ValidationError::new("length"))
             }}
@@ -1330,7 +1330,7 @@ impl FieldDef {
                 let length = self.length.unwrap_or(DEFAULT_VARCHAR_LENGTH);
                 format!(
                     r#"
-        if self.{var_name}.as_ref().chars().count() > {length} {{
+        if self.{ident_name}.as_ref().chars().count() > {length} {{
             errors.add({name:?}, validator::ValidationError::new("length"))
         }}"#
                 )
@@ -1343,7 +1343,7 @@ impl FieldDef {
                     .unwrap_or(limit);
                 format!(
                     r#"
-        if let Some(v) = &self.{var_name} {{
+        if let Some(v) = &self.{ident_name} {{
             if v.as_ref().len() > {length} {{
                 errors.add({name:?}, validator::ValidationError::new("length"))
             }}
@@ -1358,7 +1358,7 @@ impl FieldDef {
                     .unwrap_or(limit);
                 format!(
                     r#"
-        if self.{var_name}.as_ref().len() > {length} {{
+        if self.{ident_name}.as_ref().len() > {length} {{
             errors.add({name:?}, validator::ValidationError::new("length"))
         }}"#
                 )
@@ -1368,7 +1368,7 @@ impl FieldDef {
                 let length = self.length.map(|l| limit.min(l as u64)).unwrap_or(limit);
                 format!(
                     r#"
-        if let Some(v) = &self.{var_name} {{
+        if let Some(v) = &self.{ident_name} {{
             if v.as_ref().len() > {length} {{
                 errors.add({name:?}, validator::ValidationError::new("length"))
             }}
@@ -1380,7 +1380,7 @@ impl FieldDef {
                 let length = self.length.map(|l| limit.min(l as u64)).unwrap_or(limit);
                 format!(
                     r#"
-        if self.{var_name}.as_ref().len() > {length} {{
+        if self.{ident_name}.as_ref().len() > {length} {{
             errors.add({name:?}, validator::ValidationError::new("length"))
         }}"#
                 )
@@ -1388,7 +1388,7 @@ impl FieldDef {
             DataType::Double | DataType::Float if !self.signed && !self.not_null => {
                 format!(
                     r#"
-        if let Some(v) = self.{var_name} {{
+        if let Some(v) = self.{ident_name} {{
             if v < 0.0 {{
                 errors.add({name:?}, validator::ValidationError::new("range"))
             }}
@@ -1398,7 +1398,7 @@ impl FieldDef {
             DataType::Double | DataType::Float if !self.signed => {
                 format!(
                     r#"
-        if self.{var_name} < 0.0 {{
+        if self.{ident_name} < 0.0 {{
             errors.add({name:?}, validator::ValidationError::new("range"))
         }}"#
                 )
@@ -1406,7 +1406,7 @@ impl FieldDef {
             DataType::Decimal if !self.signed && !self.not_null => {
                 format!(
                     r#"
-        if let Some(v) = self.{var_name} {{
+        if let Some(v) = self.{ident_name} {{
             if v.is_sign_negative() {{
                 errors.add({name:?}, validator::ValidationError::new("range"))
             }}
@@ -1416,7 +1416,7 @@ impl FieldDef {
             DataType::Decimal if !self.signed => {
                 format!(
                     r#"
-        if self.{var_name}.is_sign_negative() {{
+        if self.{ident_name}.is_sign_negative() {{
             errors.add({name:?}, validator::ValidationError::new("range"))
         }}"#
                 )
@@ -1788,8 +1788,8 @@ impl FieldDef {
             let (_rel_name, def) = rel;
             let name = def.get_id_name();
             if domain_mode() {
-                let mod_name = def.get_group_mod_var();
-                return format!("_model_::{}::{}", mod_name, name);
+                let mod_path = def.get_group_mod_path();
+                return format!("_model_::{}::{}", mod_path, name);
             } else {
                 let mod_name = def.get_group_mod_name();
                 return format!("rel_{}::{}", mod_name, name);
@@ -1799,8 +1799,8 @@ impl FieldDef {
             let (_rel_name, def) = rel;
             let name = def.get_id_name();
             if domain_mode() {
-                let mod_name = def.get_group_mod_var();
-                return format!("_{}_model_::{}::{}", def.db().to_snake(), mod_name, name);
+                let mod_path = def.get_group_mod_path();
+                return format!("_{}_model_::{}::{}", def.db().to_snake(), mod_path, name);
             } else {
                 let mod_name = def.get_group_mod_name();
                 return format!("rel_{}::{}", mod_name, name);
@@ -2485,7 +2485,7 @@ impl FieldDef {
         } else if let Some(value) = ApiFieldDef::on_insert_formula(name) {
             return value;
         }
-        let var = super::_to_var_name(name);
+        let var = super::_to_ident_name(name);
         if self.auto.is_some() {
             if rel {
                 return format!("input.{var}.unwrap_or_default()");
@@ -2554,8 +2554,8 @@ impl FieldDef {
             let (_rel_name, def) = rel;
             let name = def.get_id_name();
             if domain_mode() {
-                let mod_name = def.get_group_mod_var();
-                format!("_model_::{}::{}", mod_name, name)
+                let mod_path = def.get_group_mod_path();
+                format!("_model_::{}::{}", mod_path, name)
             } else {
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)
@@ -2564,8 +2564,8 @@ impl FieldDef {
             let (_rel_name, def) = rel;
             let name = def.get_id_name();
             if domain_mode() {
-                let mod_name = def.get_group_mod_var();
-                format!("_{}_model_::{}::{}", def.db().to_snake(), mod_name, name)
+                let mod_path = def.get_group_mod_path();
+                format!("_{}_model_::{}::{}", def.db().to_snake(), mod_path, name)
             } else {
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)
@@ -2644,8 +2644,8 @@ impl FieldDef {
             let (_rel_name, def) = rel;
             let name = def.get_id_name();
             if domain_mode() {
-                let mod_name = def.get_group_mod_var();
-                return format!("&_model_::{}::{}", mod_name, name);
+                let mod_path = def.get_group_mod_path();
+                return format!("&_model_::{}::{}", mod_path, name);
             } else {
                 let mod_name = def.get_group_mod_name();
                 return format!("&rel_{}::{}", mod_name, name);
@@ -2655,8 +2655,8 @@ impl FieldDef {
             let (_rel_name, def) = rel;
             let name = def.get_id_name();
             if domain_mode() {
-                let mod_name = def.get_group_mod_var();
-                return format!("&_{}_model_::{}::{}", def.db().to_snake(), mod_name, name);
+                let mod_path = def.get_group_mod_path();
+                return format!("&_{}_model_::{}::{}", def.db().to_snake(), mod_path, name);
             } else {
                 let mod_name = def.get_group_mod_name();
                 return format!("&rel_{}::{}", mod_name, name);
@@ -2732,8 +2732,8 @@ impl FieldDef {
             let (_rel_name, def) = rel;
             let name = def.get_id_name();
             if domain_mode() {
-                let mod_name = def.get_group_mod_var();
-                format!("_model_::{}::{}", mod_name, name)
+                let mod_path = def.get_group_mod_path();
+                format!("_model_::{}::{}", mod_path, name)
             } else {
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)
@@ -2742,8 +2742,8 @@ impl FieldDef {
             let (_rel_name, def) = rel;
             let name = def.get_id_name();
             if domain_mode() {
-                let mod_name = def.get_group_mod_var();
-                format!("_{}_model_::{}::{}", def.db().to_snake(), mod_name, name)
+                let mod_path = def.get_group_mod_path();
+                format!("_{}_model_::{}::{}", def.db().to_snake(), mod_path, name)
             } else {
                 let mod_name = def.get_group_mod_name();
                 format!("rel_{}::{}", mod_name, name)
@@ -3084,7 +3084,7 @@ impl FieldDef {
         }
     }
     pub fn convert_impl_domain_outer_for_updater(&self, name: &str) -> String {
-        let var = format!("self._data.{}", _to_var_name(name));
+        let var = format!("self._data.{}", _to_ident_name(name));
         let clone = self.clone_for_outer_str();
         let var_clone = format!("{var}{clone}");
         if self.enum_class.is_some() {

@@ -4,22 +4,22 @@ use ::validator::Validate as _;
 
 #[allow(unused_imports)]
 use ::base_domain as domain;
-use ::base_domain::models::{@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::{@{ pascal_name }@, @{ pascal_name }@Cache, @{ pascal_name }@Common, @{ pascal_name }@Updater as _Updater}, Check_};
+use ::base_domain::models::{@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{@{ pascal_name }@, @{ pascal_name }@Cache, @{ pascal_name }@Common, @{ pascal_name }@Updater as _Updater}, Check_};
 #[allow(unused_imports)]
 use ::base_domain::models::{self, ToGeoPoint as _, ToPoint as _};
 #[allow(unused_imports)]
 use ::base_domain::value_objects;
 
 #[allow(unused_imports)]
-use ::base_domain::models::@{ db|snake|to_var_name }@ as _model_;
+use ::base_domain::models::@{ db|snake|ident }@ as _model_;
 #[allow(unused_imports)]
 use crate::repositories as _repository_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
-pub use base_domain::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
+pub use base_domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 pub use repository_@{ rel_def.db()|snake }@_@{ rel_def.get_group_name()|snake }@::repositories as _@{ rel_def.db()|snake }@_repository_;
 @%- endfor %@
 #[cfg(any(feature = "mock", test))]
-use ::base_domain::models::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Entity;
+use ::base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Entity;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -33,7 +33,7 @@ impl @{ pascal_name }@Factory {
         Ok(::serde_json::from_value(value)?)
     }
     pub fn create(self, repo: Box<dyn crate::repositories::Repository_>) -> Box<dyn _Updater> {
-        let repo = repo.@{ group_name|snake|to_var_name }@().@{ mod_name|to_var_name }@();
+        let repo = repo.@{ group_name|snake|ident }@().@{ mod_name|ident }@();
         repo.convert_factory(self)
     }
 }
@@ -41,9 +41,9 @@ impl @{ pascal_name }@Factory {
 #[derive(Debug, Clone, Default)]
 pub struct Joiner_ {
 @{- def.relations()|fmt_rel_join("
-    pub {rel_name}: Option<Box<_repository_::{class_mod_var}::Joiner_>>,", "") }@
+    pub {rel_name}: Option<Box<_repository_::{class_mod_path}::Joiner_>>,", "") }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-    pub {rel_name}: Option<Box<_{db_snake}_repository_::{class_mod_var}::Joiner_>>,", "") }@
+    pub {rel_name}: Option<Box<_{db_snake}_repository_::{class_mod_path}::Joiner_>>,", "") }@
 }
 impl Joiner_ {
     #[allow(clippy::nonminimal_bool)]
@@ -60,9 +60,9 @@ impl Joiner_ {
             if let Some(rhs) = rhs {
                 Some(Box::new(Joiner_{
                     @{- def.relations()|fmt_rel_join("
-                    {rel_name}: _repository_::{class_mod_var}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
+                    {rel_name}: _repository_::{class_mod_path}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
                     @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-                    {rel_name}: _{db_snake}_repository_::{class_mod_var}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
+                    {rel_name}: _{db_snake}_repository_::{class_mod_path}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
                 }))
             } else {
                 Some(lhs)
@@ -73,16 +73,16 @@ impl Joiner_ {
     }
 }
 @%- let fetch_macro_name = "{}_{}_{}"|format(db|snake, group_name, model_name) %@
-@% let model_path = "$crate::models::{}::{}::{}"|format(db|snake|to_var_name, group_name|to_var_name, mod_name|to_var_name) -%@
-@% let base_path = "$crate::models::{}::{}::_base::_{}"|format(db|snake|to_var_name, group_name|to_var_name, mod_name) -%@
+@% let model_path = "$crate::models::{}::{}::{}"|format(db|snake|ident, group_name|ident, mod_name|ident) -%@
+@% let base_path = "$crate::models::{}::{}::_base::_{}"|format(db|snake|ident, group_name|ident, mod_name) -%@
 #[macro_export]
 macro_rules! _join_@{ fetch_macro_name }@ {
 @{- def.relations()|fmt_rel_join("
-    ({rel_name}) => ($crate::models::--1--::{group_var}::{mod_var}::join!({}));
-    ({rel_name}: $p:tt) => ($crate::models::--1--::{group_var}::{mod_var}::join!($p));", "")|replace1(db|snake|to_var_name) }@
+    ({rel_name}) => ($crate::models::--1--::{group_ident}::{mod_ident}::join!({}));
+    ({rel_name}: $p:tt) => ($crate::models::--1--::{group_ident}::{mod_ident}::join!($p));", "")|replace1(db|snake|ident) }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-    ({rel_name}) => (--1--::_{db_snake}_model_::{group_var}::{mod_var}::join!({}));
-    ({rel_name}: $p:tt) => (--1--::_{db_snake}_model_::{group_var}::{mod_var}::join!($p));", "")|replace1(base_path) }@
+    ({rel_name}) => (--1--::_{db_snake}_model_::{group_ident}::{mod_ident}::join!({}));
+    ({rel_name}: $p:tt) => (--1--::_{db_snake}_model_::{group_ident}::{mod_ident}::join!($p));", "")|replace1(base_path) }@
     () => ();
 }
 pub use _join_@{ fetch_macro_name }@ as _join;
@@ -139,7 +139,7 @@ pub trait _@{ pascal_name }@Repository: Send + Sync {
     async fn fetch(&self, limit: usize) -> anyhow::Result<Vec<Box<dyn _Updater>>>;
 @%- endif %@
 @%- for (selector, selector_def) in def.selectors %@
-    fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder>;
+    fn @{ selector|ident }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder>;
 @%- endfor %@
 }
 @%- for (selector, selector_def) in def.selectors %@
@@ -184,7 +184,7 @@ pub struct @{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name 
     @%- if filter_def.has_default() %@
     #[validate(custom(function = "base_domain::models::reject_empty_filter"))]
     @%- endif %@
-    pub @{ filter|to_var_name }@: @{ filter_def.type_str(filter, pascal_name, selector, filter_map.pascal_name) }@,
+    pub @{ filter|ident }@: @{ filter_def.type_str(filter, pascal_name, selector, filter_map.pascal_name) }@,
     @%- endfor %@
     #[graphql(name = "_and")]
     #[schema(no_recursion)]
@@ -241,12 +241,12 @@ pub struct @{ pascal_name }@Query@{ selector|pascal }@Range@{ filter_map.pascal_
 pub struct @{ pascal_name }@Query@{ selector|pascal }@RangeValues@{ filter_map.pascal_name }@_@{ name|pascal }@ {
     @%- for (field, _type) in fields.clone() %@
     #[graphql(name = "@{ field }@")]
-    pub @{ field|to_var_name }@: @{ _type }@,
+    pub @{ field|ident }@: @{ _type }@,
     @%- endfor %@
 }
 impl @{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@RangeValues@{ filter_map.pascal_name }@_@{ name|pascal }@ {
     pub fn values(&self) -> (@% for (field, _type) in fields.clone() %@@{ _type }@, @% endfor %@) {
-        (@% for (field, _type) in fields.clone() %@self.@{ field|to_var_name }@, @% endfor %@)
+        (@% for (field, _type) in fields.clone() %@self.@{ field|ident }@, @% endfor %@)
     }
 }
 @%- endfor %@
@@ -280,12 +280,12 @@ pub struct @{ pascal_name }@Query@{ selector|pascal }@Identity@{ filter_map.pasc
 pub struct @{ pascal_name }@Query@{ selector|pascal }@IdentityValues@{ filter_map.pascal_name }@_@{ name|pascal }@ {
     @%- for (field, _type) in fields.clone() %@
     #[graphql(name = "@{ field }@")]
-    pub @{ field|to_var_name }@: @{ _type }@,
+    pub @{ field|ident }@: @{ _type }@,
     @%- endfor %@
 }
 impl @{ pascal_name }@Query@{ selector|pascal }@IdentityValues@{ filter_map.pascal_name }@_@{ name|pascal }@ {
     pub fn values(&self) -> (@% for (field, _type) in fields.clone() %@@{ _type }@, @% endfor %@) {
-        (@% for (field, _type) in fields.clone() %@self.@{ field|to_var_name }@, @% endfor %@)
+        (@% for (field, _type) in fields.clone() %@self.@{ field|ident }@, @% endfor %@)
     }
 }
 @%- endfor %@
@@ -390,7 +390,7 @@ pub trait _@{ pascal_name }@QueryService: Send + Sync {
     async fn all(&self) -> anyhow::Result<Box<dyn base_domain::models::EntityIterator<dyn @{ pascal_name }@Cache>>>;
     @%- endif %@
     @%- for (selector, selector_def) in def.selectors %@
-    fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder>;
+    fn @{ selector|ident }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder>;
     @%- endfor %@
     fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn _@{ pascal_name }@QueryFindBuilder>;
 }
@@ -618,11 +618,11 @@ impl ColGeoDistance_ {
 #[derive(Clone, Debug)]
 pub enum ColRel_ {
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
-    {rel_name}(Option<Box<_repository_::{base_class_mod_var}::Filter_>>),", "") }@
+    {rel_name}(Option<Box<_repository_::{base_class_mod_path}::Filter_>>),", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
-    {rel_name}(Option<Box<_repository_::{base_class_mod_var}::Filter_>>),", "") }@
+    {rel_name}(Option<Box<_repository_::{base_class_mod_path}::Filter_>>),", "") }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-    {rel_name}(Option<Box<_{db_snake}_repository_::{base_class_mod_var}::Filter_>>),", "") }@
+    {rel_name}(Option<Box<_{db_snake}_repository_::{base_class_mod_path}::Filter_>>),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -966,11 +966,11 @@ impl Check_<dyn @{ pascal_name }@> for Filter_ {
 }
 
 @% let filter_macro_name = "filter_{}_{}_{}"|format(db|snake, group_name|snake, model_name) -%@
-@% let model_path = "$crate::repositories::{}::_base::_{}"|format(group_name|snake|to_var_name, mod_name) -%@
+@% let model_path = "$crate::repositories::{}::_base::_{}"|format(group_name|snake|ident, mod_name) -%@
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_null {
 @%- for (col_name, column_def) in def.nullable() %@
-    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
+    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|ident }@);
 @%- endfor %@
     () => (); // For empty case
 }
@@ -979,7 +979,7 @@ pub use @{ filter_macro_name }@_null as filter_null;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_text {
 @%- for (col_name, column_def) in def.text() %@
-    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
+    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|ident }@);
 @%- endfor %@
     () => (); // For empty case
 }
@@ -988,7 +988,7 @@ pub use @{ filter_macro_name }@_text as filter_text;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_one {
 @%- for (col_name, column_def) in def.all_fields_except_json() %@
-    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColOne_::@{ col_name|to_var_name }@($e.clone().try_into()?));
+    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColOne_::@{ col_name|ident }@($e.clone().try_into()?));
 @%- endfor %@
 }
 pub use @{ filter_macro_name }@_one as filter_one;
@@ -996,8 +996,8 @@ pub use @{ filter_macro_name }@_one as filter_one;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_many {
 @%- for (col_name, column_def) in def.all_fields_except_json() %@
-    (@{ col_name }@ [$($e:expr),*]) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@(vec![ $( $e.clone().try_into()? ),* ]));
-    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColMany_::@{ col_name|to_var_name }@($e.into_iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
+    (@{ col_name }@ [$($e:expr),*]) => (@{ model_path }@::ColMany_::@{ col_name|ident }@(vec![ $( $e.clone().try_into()? ),* ]));
+    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColMany_::@{ col_name|ident }@($e.into_iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
 @%- endfor %@
 }
 pub use @{ filter_macro_name }@_many as filter_many;
@@ -1005,7 +1005,7 @@ pub use @{ filter_macro_name }@_many as filter_many;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_json {
 @%- for (col_name, column_def) in def.all_fields_only_json() %@
-    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJson_::@{ col_name|to_var_name }@($e.clone().try_into()?));
+    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJson_::@{ col_name|ident }@($e.clone().try_into()?));
 @%- endfor %@
     () => ();
 }
@@ -1014,7 +1014,7 @@ pub use @{ filter_macro_name }@_json as filter_json;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_json_array {
 @%- for (col_name, column_def) in def.all_fields_only_json() %@
-    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJsonArray_::@{ col_name|to_var_name }@($e.iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
+    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColJsonArray_::@{ col_name|ident }@($e.iter().map(|v| v.clone().try_into()).collect::<Result<Vec<_>, _>>()?));
 @%- endfor %@
     () => ();
 }
@@ -1023,7 +1023,7 @@ pub use @{ filter_macro_name }@_json_array as filter_json_array;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_geo {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
-    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColGeo_::@{ col_name|to_var_name }@($e.clone().try_into()?, @{ column_def.srid() }@));
+    (@{ col_name }@ $e:expr) => (@{ model_path }@::ColGeo_::@{ col_name|ident }@($e.clone().try_into()?, @{ column_def.srid() }@));
 @%- endfor %@
     () => ();
 }
@@ -1032,7 +1032,7 @@ pub use @{ filter_macro_name }@_geo as filter_geo;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_geo_distance {
 @%- for (col_name, column_def) in def.all_fields_only_geo() %@
-    (@{ col_name }@ $e:expr, $d:expr) => (@{ model_path }@::ColGeoDistance_::@{ col_name|to_var_name }@($e.clone().try_into()?, $d, @{ column_def.srid() }@));
+    (@{ col_name }@ $e:expr, $d:expr) => (@{ model_path }@::ColGeoDistance_::@{ col_name|ident }@($e.clone().try_into()?, $d, @{ column_def.srid() }@));
 @%- endfor %@
     () => ();
 }
@@ -1041,16 +1041,16 @@ pub use @{ filter_macro_name }@_geo_distance as filter_geo_distance;
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_rel {
 @%- for (model_def, col_name, rel_def) in def.relations_one_and_belonging(false) %@
-    (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(None));
-    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(Some(Box::new($crate::models::@{ db|snake|to_var_name }@::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
+    (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
+    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::models::@{ db|snake|ident }@::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
 @%- for (model_def, col_name, rel_def) in def.relations_many(false) %@
-    (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(None));
-    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(Some(Box::new($crate::models::@{ db|snake|to_var_name }@::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
+    (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
+    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::models::@{ db|snake|ident }@::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
 @%- for (model_def, col_name, rel_def) in def.relations_belonging_outer_db(false) %@
-    (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(None));
-    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|to_var_name }@(Some(Box::new(@{ model_path }@::_@{ rel_def.db()|snake }@_model_::@{ rel_def.get_group_name()|snake|to_var_name }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
+    (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
+    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new(@{ model_path }@::_@{ rel_def.db()|snake }@_model_::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
     () => ();
 }
@@ -1143,7 +1143,7 @@ pub enum Order_ {
 #[macro_export]
 macro_rules! @{ order_macro_name }@_col {
 @%- for (col_name, column_def) in def.all_fields() %@
-    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|to_var_name }@);
+    (@{ col_name }@) => (@{ model_path }@::Col_::@{ col_name|ident }@);
 @%- endfor %@
 }
 pub use @{ order_macro_name }@_col as order_by_col;
@@ -1235,13 +1235,13 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
         } else {
             let mut map = self._data.lock().unwrap();
             @%- for (name, column_def) in def.auto_inc_or_seq() %@
-            if obj.@{ name|to_var_name }@ == 0.into() {
-                obj.@{ name|to_var_name }@ = (map.iter().map(|(_k, v)| @{ column_def.get_inner_type(true, false) }@::from(v.@{ name|to_var_name }@)).max().unwrap_or_default() + 1).into();
+            if obj.@{ name|ident }@ == 0.into() {
+                obj.@{ name|ident }@ = (map.iter().map(|(_k, v)| @{ column_def.get_inner_type(true, false) }@::from(v.@{ name|ident }@)).max().unwrap_or_default() + 1).into();
             }
             @%- endfor %@
             @%- for (name, column_def) in def.auto_uuid() %@
-            if obj.@{ name|to_var_name }@.is_nil() {
-                obj.@{ name|to_var_name }@ = uuid::Uuid::new_v4().into();
+            if obj.@{ name|ident }@.is_nil() {
+                obj.@{ name|ident }@ = uuid::Uuid::new_v4().into();
             }
             @%- endfor %@
             map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{var}{clone}", ", ") }@, *obj.clone());
@@ -1265,13 +1265,13 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
             } else {
                 let mut map = self._data.lock().unwrap();
                 @%- for (name, column_def) in def.auto_inc_or_seq() %@
-                if obj.@{ name|to_var_name }@ == 0.into() {
-                    obj.@{ name|to_var_name }@ = (map.iter().map(|(_k, v)| @{ column_def.get_inner_type(true, false) }@::from(v.@{ name|to_var_name }@)).max().unwrap_or_default() + 1).into();
+                if obj.@{ name|ident }@ == 0.into() {
+                    obj.@{ name|ident }@ = (map.iter().map(|(_k, v)| @{ column_def.get_inner_type(true, false) }@::from(v.@{ name|ident }@)).max().unwrap_or_default() + 1).into();
                 }
                 @%- endfor %@
                 @%- for (name, column_def) in def.auto_uuid() %@
-                if obj.@{ name|to_var_name }@.is_nil() {
-                    obj.@{ name|to_var_name }@ = uuid::Uuid::new_v4().into();
+                if obj.@{ name|ident }@.is_nil() {
+                    obj.@{ name|ident }@ = uuid::Uuid::new_v4().into();
                 }
                 @%- endfor %@
                 map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{var}{clone}", ", ") }@, *obj.clone());
@@ -1290,13 +1290,13 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
         };
         let mut map = self._data.lock().unwrap();
         @%- for (name, column_def) in def.auto_inc_or_seq() %@
-        if obj.@{ name|to_var_name }@ == 0.into() {
-            obj.@{ name|to_var_name }@ = (map.iter().map(|(_k, v)| @{ column_def.get_inner_type(true, false) }@::from(v.@{ name|to_var_name }@)).max().unwrap_or_default() + 1).into();
+        if obj.@{ name|ident }@ == 0.into() {
+            obj.@{ name|ident }@ = (map.iter().map(|(_k, v)| @{ column_def.get_inner_type(true, false) }@::from(v.@{ name|ident }@)).max().unwrap_or_default() + 1).into();
         }
         @%- endfor %@
         @%- for (name, column_def) in def.auto_uuid() %@
-        if obj.@{ name|to_var_name }@.is_empty() {
-            obj.@{ name|to_var_name }@ = uuid::Uuid::new_v4().to_string().into();
+        if obj.@{ name|ident }@.is_empty() {
+            obj.@{ name|ident }@ = uuid::Uuid::new_v4().to_string().into();
         }
         @%- endfor %@
         map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{var}{clone}", ", ") }@, *obj.clone());
@@ -1334,7 +1334,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
     }
     @%- endif %@
     @%- for (selector, selector_def) in def.selectors %@
-    fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder> {
+    fn @{ selector|ident }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder> {
         #[derive(Default)]
         struct V {
             _list: Vec<@{ pascal_name }@Entity>,
@@ -1416,8 +1416,8 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
 #[cfg(any(feature = "mock", test))]
 #[allow(unused_variables)]
 #[allow(unused_imports)]
-fn _filter@{ filter_map.suffix }@(v: &impl super::super::super::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::@{ filter_map.model_name()|pascal }@, filter: &@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> bool {
-    use super::super::super::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::*;
+fn _filter@{ filter_map.suffix }@(v: &impl super::super::super::@{ filter_map.model_group()|snake|ident }@::@{ filter_map.model_name()|snake|ident }@::@{ filter_map.model_name()|pascal }@, filter: &@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> bool {
+    use super::super::super::@{ filter_map.model_group()|snake|ident }@::@{ filter_map.model_name()|snake|ident }@::*;
     @%- for (filter, filter_def) in filter_map.filters %@
     @{- filter_def.emu_str(filter, filter_map.model) }@
     @%- endfor %@
@@ -1454,7 +1454,7 @@ impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
     }
     @%- endif %@
     @%- for (selector, selector_def) in def.selectors %@
-    fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder> {
+    fn @{ selector|ident }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder> {
         #[derive(Default)]
         struct V {
             _list: Vec<@{ pascal_name }@Entity>,

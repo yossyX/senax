@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::filters::_to_db_col;
 
-use super::{_to_var_name, ConfigDef, FieldDef, ModelDef, StringOrArray};
+use super::{_to_ident_name, ConfigDef, FieldDef, ModelDef, StringOrArray};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -289,7 +289,7 @@ impl IndexDef {
             });
             v.push(
                 tpl.replace("{name}", name)
-                    .replace("{var}", &_to_var_name(name))
+                    .replace("{var}", &_to_ident_name(name))
                     .replace("{filter_type}", &col.get_filter_type(super::domain_mode()))
                     .replace("{col_esc}", &_to_db_col(name, true))
                     .replace("{index}", &index.to_string())

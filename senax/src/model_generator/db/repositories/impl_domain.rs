@@ -47,7 +47,7 @@ pub fn write_impl_domain_rs(
         source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, (_, defs)) in groups %@
-pub mod @{ name|snake|to_var_name }@;
+pub mod @{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
@@ -73,7 +73,7 @@ pub mod @{ name|snake|to_var_name }@;
         source = r###"
     // Do not modify below this line. (RepoStart)
     @%- for (group, _) in groups %@
-    get_repo!(@{ group|snake|to_var_name }@, dyn _domain::@{ group|snake|to_var_name }@::@{ group|pascal }@Repository, @{ group|snake|to_var_name }@::@{ group|pascal }@RepositoryImpl);
+    get_repo!(@{ group|snake|ident }@, dyn _domain::@{ group|snake|ident }@::@{ group|pascal }@Repository, @{ group|snake|ident }@::@{ group|pascal }@RepositoryImpl);
     @%- endfor %@
     // Do not modify above this line. (RepoEnd)"###,
         ext = "txt",
@@ -99,7 +99,7 @@ pub mod @{ name|snake|to_var_name }@;
         source = r###"
     // Do not modify below this line. (QueryServiceStart)
     @%- for (group, _) in groups %@
-    get_repo!(@{ group|snake|to_var_name }@, dyn _domain::@{ group|snake|to_var_name }@::@{ group|pascal }@QueryService, @{ group|snake|to_var_name }@::@{ group|pascal }@QueryServiceImpl);
+    get_repo!(@{ group|snake|ident }@, dyn _domain::@{ group|snake|ident }@::@{ group|pascal }@QueryService, @{ group|snake|ident }@::@{ group|pascal }@QueryServiceImpl);
     @%- endfor %@
     // Do not modify above this line. (QueryServiceEnd)"###,
         ext = "txt",
@@ -169,7 +169,7 @@ pub mod _base {
 pub mod _base;
 @%- endif %@
 @%- for mod_name in mod_names %@
-pub mod @{ mod_name|to_var_name }@;
+pub mod @{ mod_name|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
@@ -198,7 +198,7 @@ pub mod @{ mod_name|to_var_name }@;
         source = r###"
     // Do not modify below this line. (RepoStart)
     @%- for (mod_name, model_name) in mod_names %@
-    get_repo!(@{ mod_name|to_var_name }@, dyn _domain::@{ mod_name|to_var_name }@::@{ model_name|pascal }@Repository, @{ mod_name|to_var_name }@::@{ model_name|pascal }@RepositoryImpl);
+    get_repo!(@{ mod_name|ident }@, dyn _domain::@{ mod_name|ident }@::@{ model_name|pascal }@Repository, @{ mod_name|ident }@::@{ model_name|pascal }@RepositoryImpl);
     @%- endfor %@
     // Do not modify above this line. (RepoEnd)"###,
         ext = "txt",
@@ -227,7 +227,7 @@ pub mod @{ mod_name|to_var_name }@;
         source = r###"
     // Do not modify below this line. (QueryServiceStart)
     @%- for (mod_name, model_name) in mod_names %@
-    get_repo!(@{ mod_name|to_var_name }@, dyn _domain::@{ mod_name|to_var_name }@::@{ model_name|pascal }@QueryService, @{ mod_name|to_var_name }@::@{ model_name|pascal }@RepositoryImpl);
+    get_repo!(@{ mod_name|ident }@, dyn _domain::@{ mod_name|ident }@::@{ model_name|pascal }@QueryService, @{ mod_name|ident }@::@{ model_name|pascal }@RepositoryImpl);
     @%- endfor %@
     // Do not modify above this line. (QueryServiceEnd)"###,
         ext = "txt",

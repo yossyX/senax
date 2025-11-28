@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::common::ToCase as _;
 use crate::common::{OVERWRITTEN_MSG, fs_write};
-use crate::schema::{_to_var_name, ConfigDef, GroupsDef, ModelDef, set_domain_mode};
+use crate::schema::{_to_ident_name, ConfigDef, GroupsDef, ModelDef, set_domain_mode};
 use crate::{SEPARATED_BASE_FILES, filters};
 
 pub fn write_impl_domain_rs(
@@ -43,7 +43,7 @@ pub fn write_impl_domain_rs(
         source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, (_, defs)) in groups %@
-pub use _base::impl_domain::@{ name|snake|to_var_name }@;
+pub use _base::impl_domain::@{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
@@ -69,7 +69,7 @@ pub use _base::impl_domain::@{ name|snake|to_var_name }@;
         source = r###"
     // Do not modify below this line. (RepoStart)
     @%- for (name, (_, defs)) in groups %@
-    get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@Repository, _repo_@{ name|snake }@::impl_domain::@{ name|snake|to_var_name }@::@{ name|pascal }@RepositoryImpl);
+    get_repo!(@{ name|snake|ident }@, dyn _repository::@{ name|snake|ident }@::@{ name|pascal }@Repository, _repo_@{ name|snake }@::impl_domain::@{ name|snake|ident }@::@{ name|pascal }@RepositoryImpl);
     @%- endfor %@
     // Do not modify above this line. (RepoEnd)"###,
         ext = "txt",
@@ -95,7 +95,7 @@ pub use _base::impl_domain::@{ name|snake|to_var_name }@;
         source = r###"
     // Do not modify below this line. (QueryServiceStart)
     @%- for (name, (_, defs)) in groups %@
-    get_repo!(@{ name|snake|to_var_name }@, dyn _repository::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryService, _repo_@{ name|snake }@::impl_domain::@{ name|snake|to_var_name }@::@{ name|pascal }@QueryServiceImpl);
+    get_repo!(@{ name|snake|ident }@, dyn _repository::@{ name|snake|ident }@::@{ name|pascal }@QueryService, _repo_@{ name|snake }@::impl_domain::@{ name|snake|ident }@::@{ name|pascal }@QueryServiceImpl);
     @%- endfor %@
     // Do not modify above this line. (QueryServiceEnd)"###,
         ext = "txt",
@@ -183,7 +183,7 @@ pub fn write_entity(
     } else {
         Ok(format!(
             "pub mod {} {{\n{}}}\n",
-            _to_var_name(mod_name),
+            _to_ident_name(mod_name),
             ret
         ))
     }

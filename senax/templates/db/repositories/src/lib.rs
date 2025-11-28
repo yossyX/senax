@@ -14,20 +14,20 @@ pub mod misc;
 
 pub async fn start(db_dir: &Path) -> Result<()> {
     @%- for (name, (_, defs)) in groups %@
-    repositories::@{ name|snake|to_var_name }@::start(Some(db_dir)).await?;
+    repositories::@{ name|snake|ident }@::start(Some(db_dir)).await?;
     @%- endfor %@
     Ok(())
 }
 pub async fn start_test() -> Result<()> {
     @%- for (name, (_, defs)) in groups %@
-    repositories::@{ name|snake|to_var_name }@::start(None).await?;
+    repositories::@{ name|snake|ident }@::start(None).await?;
     @%- endfor %@
     Ok(())
 }
 pub async fn check(shard_id: ShardId) -> Result<()> {
-    repositories::@{ group|snake|to_var_name }@::check(shard_id).await
+    repositories::@{ group|snake|ident }@::check(shard_id).await
 }
 pub async fn seed(value: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()> {
-    repositories::@{ group|snake|to_var_name }@::seed(value, conns).await
+    repositories::@{ group|snake|ident }@::seed(value, conns).await
 }
 @{-"\n"}@

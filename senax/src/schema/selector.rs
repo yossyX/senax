@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use super::{_to_var_name, FieldDef, ModelDef};
+use super::{_to_ident_name, FieldDef, ModelDef};
 use crate::common::ToCase as _;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
@@ -244,7 +244,7 @@ impl FilterDef {
         }
     }
     pub fn emu_str(&self, name: &str, model: &ModelDef) -> String {
-        let vname = _to_var_name(name);
+        let vname = _to_ident_name(name);
         let mut cmp = String::new();
         let mut eq_vec = vec![];
         let mut null_ng_vec = vec!["false".to_string()];
@@ -262,8 +262,8 @@ impl FilterDef {
                     )
                 });
                 let unwrap = if !t.not_null {
-                    null_ng_vec.push(format!("v.{}().is_none()", _to_var_name(field)));
-                    null_ok_vec.push(format!("v.{}().is_some()", _to_var_name(field)));
+                    null_ng_vec.push(format!("v.{}().is_none()", _to_ident_name(field)));
+                    null_ok_vec.push(format!("v.{}().is_some()", _to_ident_name(field)));
                     ".unwrap()"
                 } else {
                     ""
@@ -279,7 +279,7 @@ impl FilterDef {
                     ""
                 };
 
-                let f = _to_var_name(field);
+                let f = _to_ident_name(field);
                 let s = if self.fields.len() == 1 {
                     format!("v.{}(){}{}.cmp(p)", f, unwrap, unwrap_arc)
                 } else {
@@ -405,11 +405,11 @@ impl FilterDef {
                         )
                     });
                     if t.not_null {
-                        v.push(format!("!v.{}().contains(p)", _to_var_name(field)));
+                        v.push(format!("!v.{}().contains(p)", _to_ident_name(field)));
                     } else {
                         v.push(format!(
                             "!v.{}().map(|v| v.contains(p)).unwrap_or_default()",
-                            _to_var_name(field)
+                            _to_ident_name(field)
                         ));
                     }
                 }
@@ -434,7 +434,7 @@ impl FilterDef {
         }
     }
     pub fn db_str(&self, name: &str, model: &ModelDef, suffix: &str) -> String {
-        let vname = _to_var_name(name);
+        let vname = _to_ident_name(name);
         let mut cols = Vec::new();
         let mut is_null_vec = vec!["(BOOLEAN false)".to_string()];
         let mut not_null_vec = vec!["(BOOLEAN true)".to_string()];
@@ -545,8 +545,8 @@ impl FilterDef {
             }
             FilterType::Exists => {
                 let relation = self.relation.as_deref().unwrap_or(name);
-                let _relation = _to_var_name(relation);
-                let group = _to_var_name(&model.group_name.to_snake());
+                let _relation = _to_ident_name(relation);
+                let group = _to_ident_name(&model.group_name.to_snake());
                 let mod_name = model.name.to_snake();
                 if self.relation_fields.is_empty() {
                     format!(
@@ -566,8 +566,8 @@ impl FilterDef {
             }
             FilterType::EqAny => {
                 let relation = self.relation.as_deref().unwrap_or(name);
-                let _relation = _to_var_name(relation);
-                let group = _to_var_name(&model.group_name.to_snake());
+                let _relation = _to_ident_name(relation);
+                let group = _to_ident_name(&model.group_name.to_snake());
                 let mod_name = model.name.to_snake();
                 if self.relation_fields.is_empty() {
                     format!(
@@ -876,14 +876,14 @@ impl OrderDef {
             });
             if t.is_copyable() {
                 if t.not_null {
-                    v.push(format!("_obj.{}()", _to_var_name(field)));
+                    v.push(format!("_obj.{}()", _to_ident_name(field)));
                 } else {
-                    v.push(format!("_obj.{}()?", _to_var_name(field)));
+                    v.push(format!("_obj.{}()?", _to_ident_name(field)));
                 }
             } else if t.not_null {
-                v.push(format!("_obj.{}().clone()", _to_var_name(field)));
+                v.push(format!("_obj.{}().clone()", _to_ident_name(field)));
             } else {
-                v.push(format!("_obj.{}().clone()?", _to_var_name(field)));
+                v.push(format!("_obj.{}().clone()?", _to_ident_name(field)));
             }
         }
         format!("({})", &v.join(", "))
@@ -907,7 +907,7 @@ impl OrderDef {
                 )
             });
             let unwrap = if !t.not_null {
-                null_chk_vec.push(format!("v.{}().is_none()", _to_var_name(field)));
+                null_chk_vec.push(format!("v.{}().is_none()", _to_ident_name(field)));
                 ".unwrap()"
             } else {
                 ""
@@ -923,7 +923,7 @@ impl OrderDef {
                 ""
             };
 
-            let f = _to_var_name(field);
+            let f = _to_ident_name(field);
             let s = if self.fields.len() == 1 {
                 format!("v.{}(){}{}.cmp(f)", f, unwrap, unwrap_arc)
             } else {
@@ -1278,7 +1278,7 @@ impl SelectorDef {
         }
         let mut result = String::new();
         for (field, _) in &order.fields {
-            let f = _to_var_name(field);
+            let f = _to_ident_name(field);
             let s = match order.direction {
                 Some(FilterSortDirection::Desc) => format!("b.{}().cmp(&a.{}())", f, f),
                 _ => format!("a.{}().cmp(&b.{}())", f, f),
@@ -1302,7 +1302,7 @@ impl SelectorDef {
         }
         let mut result = Vec::new();
         for (field, _) in &order.fields {
-            let f = _to_var_name(field);
+            let f = _to_ident_name(field);
             if !reverse {
                 let s = match order.direction {
                     Some(FilterSortDirection::Desc) => format!("{f} DESC"),

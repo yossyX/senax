@@ -1,5 +1,5 @@
 use db::DbConn;
-use domain::repository::@{ db|snake|to_var_name }@::@{ group_name|snake|to_var_name }@::_super::{self as _domain, QueryService_, Repository_};
+use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_super::{self as _domain, QueryService_, Repository_};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

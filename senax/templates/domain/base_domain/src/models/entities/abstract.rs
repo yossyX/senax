@@ -3,7 +3,7 @@ use crate as domain;
 #[allow(unused_imports)]
 use crate::value_objects;
 #[allow(unused_imports)]
-use crate::models::@{ db|snake|to_var_name }@ as _model_;
+use crate::models::@{ db|snake|ident }@ as _model_;
 
 pub mod consts {
 @{- def.all_fields()|fmt_join("{api_validate_const}", "") }@
@@ -21,7 +21,7 @@ pub mod consts {
 pub enum @{ name|to_pascal_name }@ {
 @%- for row in values %@
     #[graphql(name="@{ row.name }@")]
-@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@@{ row.value_str() }@,
+@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|ident }@@{ row.value_str() }@,
 @%- endfor %@
 }
 #[allow(non_snake_case)]
@@ -31,7 +31,7 @@ impl @{ name|to_pascal_name }@ {
     }
 @%- for row in values %@
     pub fn is_@{ row.name }@(&self) -> bool {
-        self == &Self::@{ row.name|to_var_name }@
+        self == &Self::@{ row.name|ident }@
     }
 @%- endfor %@
 }
@@ -62,7 +62,7 @@ impl From<@{ name|to_pascal_name }@> for @{ column_def.get_inner_type(true, true
 pub enum @{ name|to_pascal_name }@ {
 @%- for row in values %@
     #[graphql(name="@{ row.name }@")]
-@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@,
+@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|ident }@,
 @%- endfor %@
 }
 #[allow(non_snake_case)]
@@ -72,15 +72,15 @@ impl @{ name|to_pascal_name }@ {
     }
 @%- for row in values %@
     pub fn is_@{ row.name }@(&self) -> bool {
-        self == &Self::@{ row.name|to_var_name }@
+        self == &Self::@{ row.name|ident }@
     }
 @%- endfor %@
 }
 @% endfor -%@
 
-pub trait @{ pascal_name }@Common: std::fmt::Debug@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Common@% endfor %@@% endif %@ {
+pub trait @{ pascal_name }@Common: std::fmt::Debug@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common@% endfor %@@% endif %@ {
 @{- def.primaries()|fmt_join("
-{label}{comment}    fn _{raw_var}(&self) -> {inner};", "") }@
+{label}{comment}    fn _{raw_name}(&self) -> {inner};", "") }@
 @{- def.only_version()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {outer};", "") }@
 @{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
@@ -89,48 +89,48 @@ pub trait @{ pascal_name }@Common: std::fmt::Debug@% if !def.parents().is_empty(
 
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
-pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Cache@% endfor %@@% endif %@ {
+pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Cache@% endfor %@@% endif %@ {
 @{- def.relations_one_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
 @{- def.relations_many_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_var}::{class}Cache>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
 @{- def.relations_belonging_cache(true)|fmt_rel_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_var}::{class}Primary> {
+    fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
 @{- def.relations_belonging_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_var}::{class}Cache>>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
 }
 
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
-pub trait @{ pascal_name }@: @{ pascal_name }@Common@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@@% endfor %@@% endif %@ {
+pub trait @{ pascal_name }@: @{ pascal_name }@Common@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@@% endfor %@@% endif %@ {
 @{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.relations_belonging(true)|fmt_rel_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_var}::{class}Primary> {
+    fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
 @{- def.relations_one_and_belonging(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_var}::{class}>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>>;", "") }@
 @{- def.relations_many(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_var}::{class}> + '_>>;", "") }@
+{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>>;", "") }@
 }
 
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
-pub trait @{ pascal_name }@Updater: @{ pascal_name }@Common + crate::models::MarkForDelete@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|to_var_name }@::@{ parent.name|to_var_name }@::@{ parent.name|pascal }@Updater@% endfor %@@% endif %@ {
+pub trait @{ pascal_name }@Updater: @{ pascal_name }@Common + crate::models::MarkForDelete@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@@% endif %@ {
 @{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
-{label}{comment}    fn set_{raw_var}(&mut self, v: {domain_factory});", "") }@
+{label}{comment}    fn set_{raw_name}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_var}::{class}Updater>>;
-{label}{comment}    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>);", "") }@
+{label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_path}::{class}Updater>>;
+{label}{comment}    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>);", "") }@
 @{- def.relations_many(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_var}::{class}Updater> + '_>>;
-{label}{comment}    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>>;
-{label}{comment}    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_var}::{class}Updater>>);
-{label}{comment}    fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_var}::{class}Updater>);", "") }@
+{label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> + '_>>;
+{label}{comment}    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>>;
+{label}{comment}    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>);
+{label}{comment}    fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>);", "") }@
 }
 @{-"\n"}@

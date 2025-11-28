@@ -15,7 +15,7 @@ pub const USE_STORAGE_CACHE: bool = @{ config.use_storage_cache }@;
 pub static CACHE_UPDATE_LOCK: RwLock<()> = RwLock::const_new(());
 @{-"\n"}@
 @%- for (name, (_, defs)) in groups %@
-pub mod @{ name|snake|to_var_name }@;
+pub mod @{ name|snake|ident }@;
 @%- endfor %@
 
 #[derive(serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Clone, Copy, Debug, strum::IntoStaticStr)]
@@ -36,7 +36,7 @@ pub enum NotifyOp {
 #[allow(dead_code)]
 pub enum TableName {
     @%- for table_name in table_names %@
-    @{ table_name|to_var_name }@,
+    @{ table_name|ident }@,
     @%- endfor %@
 }
 
@@ -49,7 +49,7 @@ pub struct CacheMsg(pub Vec<CacheOp>, pub FxHashMap<ShardId, u64>);
 #[derive(Pack, Unpack, Clone, Debug)]
 pub enum CacheOp {
 @%- for (name, (_, defs)) in groups %@
-    @{ name|to_pascal_name }@(@{ name|snake|to_var_name }@::CacheOp),
+    @{ name|to_pascal_name }@(@{ name|snake|ident }@::CacheOp),
 @%- endfor %@
     _AllClear,
 }

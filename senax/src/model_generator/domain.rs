@@ -1,5 +1,5 @@
 use crate::common::ToCase as _;
-use crate::{common::fs_write, model_generator::filters, schema::_to_var_name};
+use crate::{common::fs_write, model_generator::filters, schema::_to_ident_name};
 use anyhow::Result;
 use askama::Template;
 use regex::Regex;
@@ -23,13 +23,13 @@ pub fn write_repositories_rs(domain_src_dir: &Path, db: &str) -> Result<()> {
     let chk = format!(
         "\npub use repository_{} as {};\n",
         db_snake,
-        _to_var_name(&db_snake)
+        _to_ident_name(&db_snake)
     );
     if !content.contains(&chk) {
         #[derive(Template)]
         #[template(
             source = r###"
-pub use repository_@{ db|snake }@ as @{ db|snake|to_var_name }@;
+pub use repository_@{ db|snake }@ as @{ db|snake|ident }@;
 // Do not modify this line. (Mod)"###,
             ext = "txt",
             escape = "none"
@@ -45,7 +45,7 @@ pub use repository_@{ db|snake }@ as @{ db|snake|to_var_name }@;
         #[template(
             source = r###"
 #[cfg(any(feature = "mock", test))]
-use self::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository as _;
+use self::@{ db|snake|ident }@::@{ db|pascal }@Repository as _;
 // Do not modify this line. (UseRepo)"###,
             ext = "txt",
             escape = "none"
@@ -61,10 +61,10 @@ use self::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository as _;
         #[derive(Template)]
         #[template(
             source = r###"
-    fn @{ db|snake }@_repository(&self) -> Box<dyn @{ db|snake|to_var_name }@::@{ db|pascal }@Repository> {
+    fn @{ db|snake }@_repository(&self) -> Box<dyn @{ db|snake|ident }@::@{ db|pascal }@Repository> {
         unimplemented!("@{ db|snake }@_repository is unimplemented.")
     }
-    fn @{ db|snake }@_query(&self) -> Box<dyn @{ db|snake|to_var_name }@::@{ db|pascal }@QueryService> {
+    fn @{ db|snake }@_query(&self) -> Box<dyn @{ db|snake|ident }@::@{ db|pascal }@QueryService> {
         unimplemented!("@{ db|snake }@_query is unimplemented.")
     }
     // Do not modify this line. (Repo)"###,
@@ -81,7 +81,7 @@ use self::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository as _;
         #[derive(Template)]
         #[template(
             source = r###"
-    pub @{ db|snake|to_var_name }@: @{ db|snake|to_var_name }@::Emu@{ db|pascal }@Repository,
+    pub @{ db|snake|ident }@: @{ db|snake|ident }@::Emu@{ db|pascal }@Repository,
     // Do not modify this line. (EmuRepo)"###,
             ext = "txt",
             escape = "none"
@@ -97,11 +97,11 @@ use self::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository as _;
         #[derive(Template)]
         #[template(
             source = r###"
-    fn @{ db|snake|to_var_name }@_repository(&self) -> Box<dyn @{ db|snake|to_var_name }@::@{ db|pascal }@Repository> {
-        Box::new(self.@{ db|snake|to_var_name }@.clone())
+    fn @{ db|snake|ident }@_repository(&self) -> Box<dyn @{ db|snake|ident }@::@{ db|pascal }@Repository> {
+        Box::new(self.@{ db|snake|ident }@.clone())
     }
-    fn @{ db|snake|to_var_name }@_query(&self) -> Box<dyn @{ db|snake|to_var_name }@::@{ db|pascal }@QueryService> {
-        Box::new(self.@{ db|snake|to_var_name }@.clone())
+    fn @{ db|snake|ident }@_query(&self) -> Box<dyn @{ db|snake|ident }@::@{ db|pascal }@QueryService> {
+        Box::new(self.@{ db|snake|ident }@.clone())
     }
     // Do not modify this line. (EmuImpl)"###,
             ext = "txt",
@@ -118,7 +118,7 @@ use self::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository as _;
         #[derive(Template)]
         #[template(
             source = r###"
-        self.@{ db|snake|to_var_name }@.begin().await?;
+        self.@{ db|snake|ident }@.begin().await?;
         // Do not modify this line. (EmuImplStart)"###,
             ext = "txt",
             escape = "none"
@@ -134,7 +134,7 @@ use self::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository as _;
         #[derive(Template)]
         #[template(
             source = r###"
-        self.@{ db|snake|to_var_name }@.commit().await?;
+        self.@{ db|snake|ident }@.commit().await?;
         // Do not modify this line. (EmuImplCommit)"###,
             ext = "txt",
             escape = "none"
@@ -150,7 +150,7 @@ use self::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository as _;
         #[derive(Template)]
         #[template(
             source = r###"
-        self.@{ db|snake|to_var_name }@.rollback().await?;
+        self.@{ db|snake|ident }@.rollback().await?;
         // Do not modify this line. (EmuImplRollback)"###,
             ext = "txt",
             escape = "none"

@@ -613,7 +613,7 @@ pub struct DbClearCacheTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    @{ db|snake|to_var_name }@: Arc<Mutex<_db_@{ db|snake }@::DbConn>>,
+    @{ db|snake|ident }@: Arc<Mutex<_db_@{ db|snake }@::DbConn>>,
     // Do not modify this line. (Repo)"###,
     ext = "txt",
     escape = "none"
@@ -625,7 +625,7 @@ pub struct DbRepoTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-            @{ db|snake|to_var_name }@: Arc::new(Mutex::new(_db_@{ db|snake }@::DbConn::new_with_time(ctx.ctx_no(), ctx.time()))),
+            @{ db|snake|ident }@: Arc::new(Mutex::new(_db_@{ db|snake }@::DbConn::new_with_time(ctx.ctx_no(), ctx.time()))),
             // Do not modify this line. (RepoNew)"###,
     ext = "txt",
     escape = "none"
@@ -637,8 +637,8 @@ pub struct DbRepoNewTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-pub static @{ db|upper_snake }@_REPO: OnceCell<Box<dyn Fn(&Arc<Mutex<_db_@{ db|snake }@::DbConn>>) -> Box<dyn domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository> + Send + Sync>> = OnceCell::new();
-pub static @{ db|upper_snake }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<_db_@{ db|snake }@::DbConn>>) -> Box<dyn domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@QueryService> + Send + Sync>> = OnceCell::new();
+pub static @{ db|upper_snake }@_REPO: OnceCell<Box<dyn Fn(&Arc<Mutex<_db_@{ db|snake }@::DbConn>>) -> Box<dyn domain::repository::@{ db|snake|ident }@::@{ db|pascal }@Repository> + Send + Sync>> = OnceCell::new();
+pub static @{ db|upper_snake }@_QS: OnceCell<Box<dyn Fn(&Arc<Mutex<_db_@{ db|snake }@::DbConn>>) -> Box<dyn domain::repository::@{ db|snake|ident }@::@{ db|pascal }@QueryService> + Send + Sync>> = OnceCell::new();
 // Do not modify this line. (RepoStatic)"###,
     ext = "txt",
     escape = "none"
@@ -650,11 +650,11 @@ pub struct DbRepoStaticTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    fn @{ db|snake }@_repository(&self) -> Box<dyn domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@Repository> {
-        @{ db|upper_snake }@_REPO.get().expect("No @{ db|upper_snake }@_REPO")(&self.@{ db|snake|to_var_name }@)
+    fn @{ db|snake }@_repository(&self) -> Box<dyn domain::repository::@{ db|snake|ident }@::@{ db|pascal }@Repository> {
+        @{ db|upper_snake }@_REPO.get().expect("No @{ db|upper_snake }@_REPO")(&self.@{ db|snake|ident }@)
     }
-    fn @{ db|snake }@_query(&self) -> Box<dyn domain::repository::@{ db|snake|to_var_name }@::@{ db|pascal }@QueryService> {
-        @{ db|upper_snake }@_QS.get().expect("No @{ db|upper_snake }@_QS")(&self.@{ db|snake|to_var_name }@)
+    fn @{ db|snake }@_query(&self) -> Box<dyn domain::repository::@{ db|snake|ident }@::@{ db|pascal }@QueryService> {
+        @{ db|upper_snake }@_QS.get().expect("No @{ db|upper_snake }@_QS")(&self.@{ db|snake|ident }@)
     }
     // Do not modify this line. (RepoImpl)"###,
     ext = "txt",
@@ -667,7 +667,7 @@ pub struct DbRepoImplTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-        self.@{ db|snake|to_var_name }@.lock().await.begin().await?;
+        self.@{ db|snake|ident }@.lock().await.begin().await?;
         // Do not modify this line. (RepoImplStart)"###,
     ext = "txt",
     escape = "none"
@@ -679,7 +679,7 @@ pub struct DbRepoImplStartTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-        self.@{ db|snake|to_var_name }@.lock().await.commit().await?;
+        self.@{ db|snake|ident }@.lock().await.commit().await?;
         // Do not modify this line. (RepoImplCommit)"###,
     ext = "txt",
     escape = "none"
@@ -691,7 +691,7 @@ pub struct DbRepoImplCommitTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-        self.@{ db|snake|to_var_name }@.lock().await.rollback().await?;
+        self.@{ db|snake|ident }@.lock().await.rollback().await?;
         // Do not modify this line. (RepoImplRollback)"###,
     ext = "txt",
     escape = "none"

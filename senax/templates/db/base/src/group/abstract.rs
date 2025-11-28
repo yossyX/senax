@@ -14,7 +14,7 @@ use base_domain as domain;
 @% endif %@
 
 @% for mod_name in def.relation_mods() -%@
-use crate::models::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use crate::models::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @% endfor %@
 @% for (name, column_def) in def.num_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
@@ -24,7 +24,7 @@ use crate::models::@{ mod_name[0]|to_var_name }@::@{ mod_name[1]|to_var_name }@ 
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum _@{ name|pascal }@ {
-@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@@{ row.value_str() }@,
+@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|ident }@@{ row.value_str() }@,
 @% endfor -%@
 }
 #[allow(non_snake_case)]
@@ -34,7 +34,7 @@ impl _@{ name|pascal }@ {
     }
 @%- for row in values %@
     pub fn is_@{ row.name }@(&self) -> bool {
-        self == &Self::@{ row.name|to_var_name }@
+        self == &Self::@{ row.name|ident }@
     }
 @%- endfor %@
 }
@@ -93,7 +93,7 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum _@{ name|pascal }@ {
-@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|to_var_name }@,
+@% for row in values -%@@{ row.label|label4 }@@{ row.comment|comment4 }@@{ row.label|strum_message4 }@@{ row.comment|strum_detailed4 }@    @% if loop.first %@#[default]@% endif %@@{ row.name|ident }@,
 @% endfor -%@
 }
 #[allow(non_snake_case)]
@@ -103,7 +103,7 @@ impl _@{ name|pascal }@ {
     }
 @%- for row in values %@
     pub fn is_@{ row.name }@(&self) -> bool {
-        self == &Self::@{ row.name|to_var_name }@
+        self == &Self::@{ row.name|ident }@
     }
 @%- endfor %@
 }
@@ -135,9 +135,9 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 @{ def.comment|comment0 -}@
 pub trait _@{ pascal_name }@Getter: Send + Sync {
 @{- def.primaries()|fmt_join("
-{label}{comment}    fn _{raw_var}(&self) -> &{inner};", "") -}@
+{label}{comment}    fn _{raw_name}(&self) -> &{inner};", "") -}@
 @{- def.non_primaries()|fmt_join("
-{label}{comment}    fn _{raw_var}(&self) -> {outer};", "") -}@
+{label}{comment}    fn _{raw_name}(&self) -> {outer};", "") -}@
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("
 {label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;", "") -}@
 @{- def.relations_many(false)|fmt_rel_join("

@@ -5,7 +5,7 @@ pub async fn create(
     repo: Box<dyn crate::repositories::Repository_>,
     obj: Box<dyn @{ pascal_name }@Updater>,
 ) -> anyhow::Result<Box<dyn @{ pascal_name }@>> {
-    let @{ mod_name }@_repo = repo.@{ group_name|snake|to_var_name }@().@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group_name|snake|ident }@().@{ mod_name|ident }@();
     #[allow(deprecated)]
     let res = @{ mod_name }@_repo.save(obj).await?;
     Ok(res.unwrap())
@@ -17,7 +17,7 @@ pub async fn import(
     list: Vec<Box<dyn @{ pascal_name }@Updater>>,
     option: Option<domain::models::ImportOption>,
 ) -> anyhow::Result<()> {
-    let @{ mod_name }@_repo = repo.@{ group_name|snake|to_var_name }@().@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group_name|snake|ident }@().@{ mod_name|ident }@();
     #[allow(deprecated)]
     @{ mod_name }@_repo.import(list, option).await
 }
@@ -30,7 +30,7 @@ pub async fn update<F>(
 where
     F: FnOnce(&mut dyn @{ pascal_name }@Updater) -> anyhow::Result<()>,
 {
-    let @{ mod_name }@_repo = repo.@{ group_name|snake|to_var_name }@().@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group_name|snake|ident }@().@{ mod_name|ident }@();
     update_updater(&mut *obj)?;
     #[allow(deprecated)]
     let res = @{ mod_name }@_repo.save(obj).await?;
@@ -43,7 +43,7 @@ pub async fn delete(
     repo: Box<dyn crate::repositories::Repository_>,
     obj: Box<dyn @{ pascal_name }@Updater>,
 ) -> anyhow::Result<()> {
-    let @{ mod_name }@_repo = repo.@{ group_name|snake|to_var_name }@().@{ mod_name|to_var_name }@();
+    let @{ mod_name }@_repo = repo.@{ group_name|snake|ident }@().@{ mod_name|ident }@();
     #[allow(deprecated)]
     @{ mod_name }@_repo.delete(obj).await
 }

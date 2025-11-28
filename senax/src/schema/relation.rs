@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::common::ToCase as _;
 use crate::common::to_singular;
-use crate::schema::_to_var_name;
+use crate::schema::_to_ident_name;
 
 use super::{FieldDef, GROUPS, ModelDef, domain_mode, to_id_name};
 
@@ -720,8 +720,8 @@ impl RelDef {
         }
         to_id_name(&self.get_foreign_model_name())
     }
-    pub fn get_group_var(&self) -> String {
-        _to_var_name(&self.get_group_name().to_snake())
+    pub fn get_group_ident(&self) -> String {
+        _to_ident_name(&self.get_group_name().to_snake())
     }
     pub fn get_mod_name(&self) -> String {
         self.get_foreign_model_name().to_snake()
@@ -742,17 +742,17 @@ impl RelDef {
             )
         }
     }
-    pub fn get_group_mod_var(&self) -> String {
+    pub fn get_group_mod_path(&self) -> String {
         format!(
             "{}::{}",
-            _to_var_name(&self.get_group_name().to_snake()),
-            _to_var_name(&self.get_mod_name())
+            _to_ident_name(&self.get_group_name().to_snake()),
+            _to_ident_name(&self.get_mod_name())
         )
     }
-    pub fn get_base_group_mod_var(&self) -> String {
+    pub fn get_base_group_mod_path(&self) -> String {
         format!(
             "{}::_base::_{}",
-            _to_var_name(&self.get_group_name().to_snake()),
+            _to_ident_name(&self.get_group_name().to_snake()),
             &self.get_mod_name()
         )
     }

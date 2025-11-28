@@ -4,8 +4,8 @@ use db::misc::{Updater as _, ToJsonRawValue as _};
 #[allow(unused_imports)]
 use domain::models::ToRawValue as _;
 #[allow(unused_imports)]
-use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::{self, *};
-use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
+use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{self, *};
+use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::*;
 #[allow(unused_imports)]
 use senax_common::types::geo_point::ToGeoPoint as _;
 #[allow(unused_imports)]
@@ -13,13 +13,13 @@ use senax_common::types::point::ToPoint as _;
 #[allow(unused_imports)]
 use std::ops::{Deref as _, DerefMut as _};
 #[allow(unused_imports)]
-use domain::models::@{ db|snake|to_var_name }@ as _model_;
+use domain::models::@{ db|snake|ident }@ as _model_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
 #[allow(unused_imports)]
-use domain::models::@{ rel_def.db()|snake|to_var_name }@ as _@{ rel_def.db()|snake }@_model_;
+use domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 
-use crate::repositories::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::*;
+use crate::repositories::@{ group_name|snake|ident }@::@{ mod_name|ident }@::*;
 
 #[derive(derive_new::new, Clone)]
 pub struct @{ pascal_name }@RepositoryImpl {
@@ -27,9 +27,9 @@ pub struct @{ pascal_name }@RepositoryImpl {
 }
 
 #[allow(clippy::needless_update)]
-fn updater_from_factory(_v: domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::@{ pascal_name }@Factory) -> _@{ pascal_name }@Updater {
+fn updater_from_factory(_v: domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Factory) -> _@{ pascal_name }@Updater {
     _@{ pascal_name }@Updater {
-        _data: ::db::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::Data {
+        _data: ::db::models::@{ group_name|snake|ident }@::@{ mod_name|ident }@::Data {
 @{ def.for_factory()|fmt_join("            {var}: _v.{var}{convert_domain_factory}{convert_from_entity},", "\n") }@
             ..Default::default()
         },
@@ -186,12 +186,12 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
     @%- endif %@
     @%- if def.act_as_job_queue() %@
     async fn fetch(&self, limit: usize) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>> {
-        let list = _@{ pascal_name }@_::query().order_by(order!(@{ def.primaries()|fmt_join_with_paren("{raw_var}", ", ") }@)).limit(limit).skip_locked().select_for_update(self._conn.lock().await.deref_mut()).await?;
+        let list = _@{ pascal_name }@_::query().order_by(order!(@{ def.primaries()|fmt_join_with_paren("{raw_name}", ", ") }@)).limit(limit).skip_locked().select_for_update(self._conn.lock().await.deref_mut()).await?;
         Ok(list.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@Updater>).collect())
     }
     @%- endif %@
     @%- for (selector, selector_def) in def.selectors %@
-    fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder> {
+    fn @{ selector|ident }@(&self) -> Box<dyn @{ pascal_name }@Repository@{ selector|pascal }@Builder> {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<db::DbConn>>,
             selector_filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
@@ -209,7 +209,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 with_trashed: bool,
                 @%- endif %@
                 joiner: Option<Box<Joiner_>>,
-            ) -> anyhow::Result<crate::repositories::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::QueryBuilder> {
+            ) -> anyhow::Result<crate::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::QueryBuilder> {
                 let mut query = _@{ pascal_name }@_::query();
                 let mut fltr = if let Some(filter) = selector_filter {
                     _filter_@{ selector }@(&filter)?
@@ -278,12 +278,12 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
 @%- for filter_map in selector_def.nested_filters(selector, def) %@
 #[allow(unused_variables)]
 #[allow(unused_mut)]
-fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> anyhow::Result<crate::repositories::@{ filter_map.model_group()|snake|to_var_name }@::_base::_@{ filter_map.model_name()|snake }@::Filter_> {
+fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> anyhow::Result<crate::repositories::@{ filter_map.model_group()|snake|ident }@::_base::_@{ filter_map.model_name()|snake }@::Filter_> {
     #[allow(unused_imports)]
     @%- if config.exclude_from_domain %@
-    use crate::repository::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::filter;
+    use crate::repository::@{ filter_map.model_group()|snake|ident }@::@{ filter_map.model_name()|snake|ident }@::filter;
     @%- else %@
-    use domain::repository::@{ db|snake|to_var_name }@::@{ base_group_name|snake|to_var_name }@::_super::@{ filter_map.model_group()|snake|to_var_name }@::@{ filter_map.model_name()|snake|to_var_name }@::filter;
+    use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ filter_map.model_group()|snake|ident }@::@{ filter_map.model_name()|snake|ident }@::filter;
     @%- endif %@
     #[allow(unused_imports)]
     use anyhow::Context;
@@ -328,7 +328,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
     }
     @%- endif %@
     @%- for (selector, selector_def) in def.selectors %@
-    fn @{ selector|to_var_name }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder> {
+    fn @{ selector|ident }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder> {
         struct V {
             conn: std::sync::Arc<tokio::sync::Mutex<db::DbConn>>,
             selector_filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
@@ -346,7 +346,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
         #[allow(unused_mut)]
         #[allow(unused_variables)]
         #[allow(clippy::match_single_binding)]
-        fn _cursor(mut fltr: crate::repositories::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::Filter_, cursor: &@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> anyhow::Result<crate::repositories::@{ group_name|snake|to_var_name }@::_base::_@{ mod_name }@::Filter_> {
+        fn _cursor(mut fltr: crate::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_, cursor: &@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> anyhow::Result<crate::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_> {
             @%- if !selector_def.orders.is_empty() %@
             match cursor {
                 @%- for (cursor, cursor_def) in selector_def.orders %@
@@ -464,7 +464,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 @%- if def.is_soft_delete() %@
                 query = query.when(self.with_trashed, |v| v.with_trashed());
                 @%- endif %@
-                use db::models::@{ group_name|snake|to_var_name }@::@{ mod_name|to_var_name }@::InnerPrimary as _InnerPrimary_;
+                use db::models::@{ group_name|snake|ident }@::@{ mod_name|ident }@::InnerPrimary as _InnerPrimary_;
                 let list: Vec<_InnerPrimary_> = query.select_for(conn).await?;
                 if !single_transaction {
                     conn.release_read_tx()?;
