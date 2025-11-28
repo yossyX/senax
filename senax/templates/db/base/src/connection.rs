@@ -1812,13 +1812,13 @@ async fn writer_connect_with(
             Box::pin(async move {
                 let sql = if let Some(iso) = TX_ISOLATION {
                     format!(
-                        "{};SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES,PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;SET SESSION TRANSACTION ISOLATION LEVEL {};",
+                        "{};SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;SET SESSION TRANSACTION ISOLATION LEVEL {};",
                         CHECK_SQL,
                         iso,
                     )
                 } else {
                     format!(
-                        "{};SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES,PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;",
+                        "{};SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;",
                         CHECK_SQL,
                     )
                 };
@@ -2013,12 +2013,12 @@ async fn reader_connect_with(
             Box::pin(async move {
                 if let Some(iso) = READ_TX_ISOLATION {
                     conn.execute(&*format!(
-                        "SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES,PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;SET SESSION TRANSACTION ISOLATION LEVEL {}, READ ONLY;",
+                        "SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;SET SESSION TRANSACTION ISOLATION LEVEL {}, READ ONLY;",
                         iso
                     ))
                     .await?;
                 } else {
-                    conn.execute("SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',ANSI_QUOTES,PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;SET SESSION TRANSACTION READ ONLY;").await?;
+                    conn.execute("SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode,',PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')),time_zone='+00:00',NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;SET SESSION TRANSACTION READ ONLY;").await?;
                 }
                 Ok(())
             })

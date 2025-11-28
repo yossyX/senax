@@ -287,7 +287,7 @@ impl sqlx::FromRow<'_, DbRow> for InnerPrimary {
     }
 }
 impl SqlColumns for InnerPrimary {
-    fn _sql_cols() -> &'static str {
+    fn _sql_cols(_is_mysql: bool) -> &'static str {
         r#"@{ def.primaries()|fmt_join("{col_query}", ", ") }@"#
     }
 }

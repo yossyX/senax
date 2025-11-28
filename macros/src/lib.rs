@@ -32,7 +32,8 @@ fn generator(derive_input: &DeriveInput) -> Result<TokenStream, syn::Error> {
         }
     };
 
-    let mut sql_cols = Vec::new();
+    let mut type_mysql = Vec::new();
+    let mut type_pgsql = Vec::new();
     for field in &struct_data.fields {
         let option = SqlOption::from_field(field).unwrap();
         if option.skip {
@@ -42,22 +43,29 @@ fn generator(derive_input: &DeriveInput) -> Result<TokenStream, syn::Error> {
         let ident = ident.trim_start_matches("r#");
         match option.query {
             Some(query) => {
-                sql_cols.push(format!("{} as \"{}\"", query, ident));
+                type_mysql.push(format!("{} as `{}`", query, ident));
+                type_pgsql.push(format!("{} as \"{}\"", query, ident));
             }
             None => {
-                sql_cols.push(format!("\"{}\"", ident));
+                type_mysql.push(format!("`{}`", ident));
+                type_pgsql.push(format!("\"{}\"", ident));
             }
         };
     }
-    let sql_cols = proc_macro2::Literal::string(&sql_cols.join(","));
+    let type_mysql = proc_macro2::Literal::string(&type_mysql.join(","));
+    let type_pgsql = proc_macro2::Literal::string(&type_pgsql.join(","));
 
     let struct_name = &derive_input.ident;
     let (impl_generics, ty_generics, where_clause) = &derive_input.generics.split_for_impl();
 
     let result = quote! {
         impl #impl_generics senax_common::SqlColumns for #struct_name #ty_generics #where_clause {
-            fn _sql_cols() -> &'static str {
-                #sql_cols
+            fn _sql_cols(is_mysql: bool) -> &'static str {
+                if is_mysql {
+                    #type_mysql
+                } else {
+                    #type_pgsql
+                }
             }
         }
     };

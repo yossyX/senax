@@ -24,5 +24,5 @@ macro_rules! if_then_else {
 }
 
 pub trait SqlColumns {
-    fn _sql_cols() -> &'static str;
+    fn _sql_cols(is_mysql: bool) -> &'static str;
 }

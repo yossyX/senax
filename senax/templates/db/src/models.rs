@@ -96,12 +96,12 @@ pub(crate) async fn exec_migrate(
     @%- if config.is_mysql() %@
     exec_ddl(
         r#"
-            CREATE TABLE IF NOT EXISTS "_sequence" (
-                "id" INT UNSIGNED NOT NULL PRIMARY KEY,
-                "seq" BIGINT UNSIGNED NOT NULL
+            CREATE TABLE IF NOT EXISTS _sequence (
+                id INT UNSIGNED NOT NULL PRIMARY KEY,
+                seq BIGINT UNSIGNED NOT NULL
             );
-            INSERT IGNORE INTO "_sequence" VALUES (1, 0);
-            INSERT IGNORE INTO "_sequence" VALUES (2, 0);
+            INSERT IGNORE INTO _sequence VALUES (1, 0);
+            INSERT IGNORE INTO _sequence VALUES (2, 0);
         "#,
         writer.as_mut(),
     )

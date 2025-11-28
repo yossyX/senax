@@ -288,7 +288,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     let id = InnerPrimary::from(&cache._inner);
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         let op = if overwrite {
-                            db::models::NotifyOp::update
+                            db::models::NotifyOp::upsert
                         } else {
                             db::models::NotifyOp::insert
                         };
@@ -328,7 +328,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
                     let op = if replace || overwrite {
-                        db::models::NotifyOp::update
+                        db::models::NotifyOp::upsert
                     } else {
                         db::models::NotifyOp::insert
                     };
@@ -3616,7 +3616,7 @@ impl QueryBuilder {
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
     {
-        let result: sqlx::Result<Vec<_>> = self.__select(T::_sql_cols(), conn).await?.iter().map(T::from_row).collect();
+        let result: sqlx::Result<Vec<_>> = self.__select(T::_sql_cols(@{ is_mysql_str }@), conn).await?.iter().map(T::from_row).collect();
         Ok(result?)
     }
     async fn __select(self, sql_cols: &str, conn: &mut DbConn) -> Result<Vec<DbRow>> {
@@ -3772,7 +3772,7 @@ impl QueryBuilder {
     pub async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
-        let sql = self._sql(Data::_sql_cols(), !conn.wo_tx(), conn.shard_id(), &filter_digest);
+        let sql = self._sql(Data::_sql_cols(@{ is_mysql_str }@), !conn.wo_tx(), conn.shard_id(), &filter_digest);
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
@@ -3858,7 +3858,7 @@ impl QueryBuilder {
     }
 
     pub async fn select_stream(self, conn: &mut DbConn) -> Result<impl Stream<Item = _@{ pascal_name }@>> {
-        let mut rx = self._select_stream(Data::_sql_cols(), conn).await?;
+        let mut rx = self._select_stream(Data::_sql_cols(@{ is_mysql_str }@), conn).await?;
         Ok(async_stream::stream! {
             while let Some(v) = rx.recv().await {
                 match Data::from_row(&v) {
@@ -3878,7 +3878,7 @@ impl QueryBuilder {
     where
         T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin + 'static,
     {
-        let mut rx = self._select_stream(T::_sql_cols(), conn).await?;
+        let mut rx = self._select_stream(T::_sql_cols(@{ is_mysql_str }@), conn).await?;
         Ok(async_stream::stream! {
             while let Some(v) = rx.recv().await {
                 match T::from_row(&v) {
@@ -4169,7 +4169,7 @@ impl UnionBuilder for Vec<QueryBuilder> {
         if self.is_empty() {
             return Ok(Vec::new());
         }
-        let result = _union(self, conn, Data::_sql_cols(), order, limit, offset, false).await?;
+        let result = _union(self, conn, Data::_sql_cols(@{ is_mysql_str }@), order, limit, offset, false).await?;
         let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
         Ok(result?.into_iter().map(_@{ pascal_name }@::from).collect())
     }
@@ -4177,7 +4177,7 @@ impl UnionBuilder for Vec<QueryBuilder> {
         if self.is_empty() {
             return Ok(Vec::new());
         }
-        let result = _union(self, conn, Data::_sql_cols(), None, None, None, true).await?;
+        let result = _union(self, conn, Data::_sql_cols(@{ is_mysql_str }@), None, None, None, true).await?;
         let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
         Ok(result?.into_iter().map(_@{ pascal_name }@Updater::from).collect())
     }
@@ -4188,7 +4188,7 @@ impl UnionBuilder for Vec<QueryBuilder> {
 #[async_trait]
 impl _UnionBuilder for Vec<QueryBuilder> {
     async fn __select_union_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
-        let result = _union(self, conn, CacheData::_sql_cols(), None, None, None, false).await?;
+        let result = _union(self, conn, CacheData::_sql_cols(@{ is_mysql_str }@), None, None, None, false).await?;
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
         let list = result?.into_iter().map(|v| Arc::new(CacheWrapper::from_inner(v, conn.shard_id(), time)).into()).collect();
@@ -4479,7 +4479,7 @@ impl _@{ pascal_name }@_ {
             } else {
                 String::new()
             },
-            CacheData::_sql_cols(),
+            CacheData::_sql_cols(@{ is_mysql_str }@),
             Filter_::write_where(
                 &filter,
                 TrashMode::Not,
@@ -4539,7 +4539,7 @@ impl _@{ pascal_name }@_ {
         conn.begin_cache_tx().await?;
         let mut sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {} {}"#,
-            CacheData::_sql_cols(),
+            CacheData::_sql_cols(@{ is_mysql_str }@),
             Filter_::write_where(
                 &None,
                 TrashMode::Not,
@@ -4731,7 +4731,7 @@ impl _@{ pascal_name }@_ {
             ..Default::default()
         });
         @%- else %@
-        let data: Option<Data> = __find_optional(conn, Data::_sql_cols(), id, TrashMode::Not, filter).await?.map(|v| Data::from_row(&v)).transpose()?;
+        let data: Option<Data> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter).await?.map(|v| Data::from_row(&v)).transpose()?;
         @%- endif %@
         let mut obj = data.map(_@{ pascal_name }@::from);
         if let Some(obj) = obj.as_mut() {
@@ -4748,7 +4748,7 @@ impl _@{ pascal_name }@_ {
         @%- if def.dummy_always_present() %@
         Ok(true)
         @%- else %@
-        let data: Option<Count> = __find_optional(conn, Count::_sql_cols(), id, TrashMode::Not, filter).await?.map(|v| Count::from_row(&v)).transpose()?;
+        let data: Option<Count> = __find_optional(conn, Count::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter).await?.map(|v| Count::from_row(&v)).transpose()?;
         Ok(data.unwrap_or_default().c > 0)
         @%- endif %@
     }
@@ -4781,7 +4781,7 @@ impl _@{ pascal_name }@_ {
             ..Default::default()
         });
         @%- else %@
-        let data: Option<Data> = __find_optional(conn, Data::_sql_cols(), id, TrashMode::With, filter).await?.map(|v| Data::from_row(&v)).transpose()?;
+        let data: Option<Data> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter).await?.map(|v| Data::from_row(&v)).transpose()?;
         @%- endif %@
         let mut obj = data.map(_@{ pascal_name }@::from);
         if let Some(obj) = obj.as_mut() {
@@ -4798,7 +4798,7 @@ impl _@{ pascal_name }@_ {
         @%- if def.dummy_always_present() %@
         Ok(true)
         @%- else %@
-        let data: Option<Count> = __find_optional(conn, Count::_sql_cols(), id, TrashMode::With, filter).await?.map(|v| Count::from_row(&v)).transpose()?;
+        let data: Option<Count> = __find_optional(conn, Count::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter).await?.map(|v| Count::from_row(&v)).transpose()?;
         Ok(data.unwrap_or_default().c > 0)
         @%- endif %@
     }
@@ -5747,7 +5747,7 @@ async fn __find_many(
             .collect();
         list.append(&mut v);
         @%- else %@
-        let v = ___find_many(conn, Data::_sql_cols(), ids, trash_mode, filter.clone()).await?;
+        let v = ___find_many(conn, Data::_sql_cols(@{ is_mysql_str }@), ids, trash_mode, filter.clone()).await?;
         let mut v: sqlx::Result<Vec<_>> = v.iter().map(Data::from_row).collect();
         list.append(&mut v?);
         @%- endif %@
@@ -5813,7 +5813,7 @@ async fn ___find_many_for_cache(
             .collect();
         result.append(&mut v);
         @%- else %@
-        let v = ___find_many(conn, CacheData::_sql_cols(), ids, TrashMode::With, None).await?;
+        let v = ___find_many(conn, CacheData::_sql_cols(@{ is_mysql_str }@), ids, TrashMode::With, None).await?;
         let mut v: sqlx::Result<Vec<_>> = v.iter().map(CacheData::from_row).collect();
         result.append(&mut v?);
         @%- endif %@
@@ -6006,7 +6006,7 @@ async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: Tra
     } else {
         filter_str.push_str(" AND ");
     }
-    let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ FOR UPDATE"#, Data::_sql_cols());
+    let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ FOR UPDATE"#, Data::_sql_cols(@{ is_mysql_str }@));
     @%- if !config.is_mysql() %@
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
@@ -6042,7 +6042,7 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
         let q = "@{ def.primaries()|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
         let sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ {filter_str} @{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({}) FOR UPDATE;"#,
-            Data::_sql_cols(),
+            Data::_sql_cols(@{ is_mysql_str }@),
             &q[0..q.len() - 1],
         );
         @%- if !config.is_mysql() %@
@@ -6223,20 +6223,20 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         @%- if config.is_mysql() %@
         @%- if def.versioned %@
-        vec.push(r#""@{ version_col }@" = LAST_INSERT_ID(IF("@{ version_col }@" < 4294967295, "@{ version_col }@" + 1, 0))"#.to_string());
+        vec.push(r#"@{ version_col|db_esc }@ = LAST_INSERT_ID(IF(@{ version_col|db_esc }@ < 4294967295, @{ version_col|db_esc }@ + 1, 0))"#.to_string());
         @%- endif %@
         @%- if def.counting.is_some() %@
-        vec.push(r#""@{ def.get_counting_col() }@" = LAST_INSERT_ID("@{ def.get_counting_col() }@")"#.to_string());
+        vec.push(r#"@{ def.get_counting_col()|db_esc }@ = LAST_INSERT_ID(@{ def.get_counting_col()|db_esc }@)"#.to_string());
         @%- endif %@
         @%- else %@
         @%- if def.versioned %@
-        vec.push(r#""@{ version_col }@" = CASE WHEN "@{ version_col }@" < 2147483647 THEN "@{ version_col }@" + 1 ELSE 0 END"#.to_string());
+        vec.push(r#"@{ version_col|db_esc }@ = CASE WHEN @{ version_col|db_esc }@ < 2147483647 THEN @{ version_col|db_esc }@ + 1 ELSE 0 END"#.to_string());
         @%- endif %@
         @%- endif %@
         @%- if def.versioned %@
-        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ AND "@{ version_col }@"=?@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,"@{ version_col }@"@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,"@{ def.get_counting_col() }@"@% endif %@@% endif %@;"#, &vec.join(","));
+        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ AND @{ version_col|db_esc }@=?@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,@{ version_col|db_esc }@@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,@{ def.get_counting_col()|db_esc }@@% endif %@@% endif %@;"#, &vec.join(","));
         @%- else %@
-        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,"@{ version_col }@"@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,"@{ def.get_counting_col() }@"@% endif %@@% endif %@;"#, &vec.join(","));
+        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,@{ version_col|db_esc }@@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,@{ def.get_counting_col()|db_esc }@@% endif %@@% endif %@;"#, &vec.join(","));
         @%- endif %@
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
@@ -6320,19 +6320,19 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     let (mut vec, _) = assign_non_primaries(&obj);
     @%- if config.is_mysql() %@
     @%- if def.versioned %@
-    vec.push(r#""@{ version_col }@" = LAST_INSERT_ID(IF("@{ version_col }@" < 4294967295, "@{ version_col }@" + 1, 0))"#.to_string());
+    vec.push(r#"@{ version_col|db_esc }@ = LAST_INSERT_ID(IF(@{ version_col|db_esc }@ < 4294967295, @{ version_col|db_esc }@ + 1, 0))"#.to_string());
     @%- endif %@
     @%- if def.counting.is_some() %@
-    vec.push(r#""@{ def.get_counting_col() }@" = LAST_INSERT_ID("@{ def.get_counting_col() }@")"#.to_string());
+    vec.push(r#"@{ def.get_counting_col()|db_esc }@ = LAST_INSERT_ID(@{ def.get_counting_col()|db_esc }@)"#.to_string());
     @%- endif %@
     @%- else %@
     @%- if def.versioned %@
-    vec.push(r#""@{ version_col }@" = CASE WHEN @{ table_name|db_esc }@."@{ version_col }@" < 2147483647 THEN @{ table_name|db_esc }@."@{ version_col }@" + 1 ELSE 0 END"#.to_string());
+    vec.push(r#"@{ version_col|db_esc }@ = CASE WHEN @{ table_name|db_esc }@.@{ version_col|db_esc }@ < 2147483647 THEN @{ table_name|db_esc }@.@{ version_col|db_esc }@ + 1 ELSE 0 END"#.to_string());
     @%- endif %@
     @%- endif %@
     let sql = format!(r#"INSERT INTO @{ table_name|db_esc }@ 
         (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
-        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT ") }@@{ def.upsert_conflict_target() }@@{ config.db_type_switch("", " DO UPDATE SET") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,"@{ version_col }@"@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,"@{ def.get_counting_col() }@"@% endif %@@% endif %@;"#, &vec.join(","));
+        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT ") }@@{ def.upsert_conflict_target() }@@{ config.db_type_switch("", " DO UPDATE SET") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,@{ version_col|db_esc }@@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,@{ def.get_counting_col()|db_esc }@@% endif %@@% endif %@;"#, &vec.join(","));
     @%- if !config.is_mysql() %@
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
@@ -6586,7 +6586,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         if overwrite {
             sql.push_str(SQL3);
             @%- if def.versioned %@
-            sql.push_str(r#","@{ version_col }@" = IF("@{ version_col }@" < 4294967295, "@{ version_col }@" + 1, 0)"#);
+            sql.push_str(r#",@{ version_col|db_esc }@ = IF(@{ version_col|db_esc }@ < 4294967295, @{ version_col|db_esc }@ + 1, 0)"#);
             @%- endif %@
         }
         @%- else %@
@@ -6609,7 +6609,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         } else if overwrite {
             sql.push_str(SQL_OVERWRITE);
             @%- if def.versioned %@
-            sql.push_str(r#","@{ version_col }@" = CASE WHEN old."@{ version_col }@" < 2147483647 THEN old."@{ version_col }@" + 1 ELSE 0 END"#);
+            sql.push_str(r#",@{ version_col|db_esc }@ = CASE WHEN old.@{ version_col|db_esc }@ < 2147483647 THEN old.@{ version_col|db_esc }@ + 1 ELSE 0 END"#);
             @%- endif %@
         }
             @%- if def.is_auto_inc() %@
@@ -6751,9 +6751,9 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     let (mut vec, _) = assign_non_primaries(obj);
     @%- if def.versioned %@
     @%- if config.is_mysql() %@
-    vec.push(r#""@{ version_col }@" = IF("@{ version_col }@" < 4294967295, "@{ version_col }@" + 1, 0)"#.to_string());
+    vec.push(r#"@{ version_col|db_esc }@ = IF(@{ version_col|db_esc }@ < 4294967295, @{ version_col|db_esc }@ + 1, 0)"#.to_string());
     @%- else %@
-    vec.push(r#""@{ version_col }@" = CASE WHEN @{ table_name|db_esc }@."@{ version_col }@" < 2147483647 THEN @{ table_name|db_esc }@."@{ version_col }@" + 1 ELSE 0 END"#.to_string());
+    vec.push(r#"@{ version_col|db_esc }@ = CASE WHEN @{ table_name|db_esc }@.@{ version_col|db_esc }@ < 2147483647 THEN @{ table_name|db_esc }@.@{ version_col|db_esc }@ + 1 ELSE 0 END"#.to_string());
     @%- endif %@
     @%- endif %@
     write!(sql, r#" @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT ") }@@{ def.upsert_conflict_target() }@@{ config.db_type_switch("", " DO UPDATE SET") }@ {}"#, &vec.join(","))?;

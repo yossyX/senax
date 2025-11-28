@@ -304,10 +304,10 @@ pub fn make_table_def(
                 let query = if let Some(Some(query)) = c.as_ref().map(|c| &c.query) {
                     Some(query.clone())
                 } else if col.data_type == schema::DataType::ArrayInt {
-                    Some(format!("CAST(\"{}\" AS UNSIGNED ARRAY)", name))
+                    Some(format!("CAST(`{}` AS UNSIGNED ARRAY)", name))
                 } else if col.data_type == schema::DataType::ArrayString {
                     Some(format!(
-                        "CAST(\"{}\" AS CHAR({}) ARRAY)",
+                        "CAST(`{}` AS CHAR({}) ARRAY)",
                         name,
                         len.unwrap_or(255)
                     ))

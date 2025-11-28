@@ -1189,20 +1189,20 @@ impl FieldDef {
                 DataType::Uuid => {
                     format!(
                         "    #[sql(query = {:?})]\n",
-                        &format!("UUID_TO_BIN(\"{}\")", self.get_col_name(name))
+                        &format!("UUID_TO_BIN(`{}`)", self.get_col_name(name))
                     )
                 }
                 DataType::Point => {
                     format!(
                         "    #[sql(query = {:?})]\n",
-                        &format!("ST_AsBinary(\"{}\")", self.get_col_name(name))
+                        &format!("ST_AsBinary(`{}`)", self.get_col_name(name))
                     )
                 }
                 DataType::GeoPoint => {
                     format!(
                         "    #[sql(query = {:?})]\n",
                         &format!(
-                            "ST_AsBinary(\"{}\", 'axis-order=long-lat')",
+                            "ST_AsBinary(`{}`, 'axis-order=long-lat')",
                             self.get_col_name(name)
                         )
                     )
@@ -1210,7 +1210,7 @@ impl FieldDef {
                 DataType::Geometry => {
                     format!(
                         "    #[sql(query = {:?})]\n",
-                        &format!("ST_AsGeoJSON(\"{}\")", self.get_col_name(name))
+                        &format!("ST_AsGeoJSON(`{}`)", self.get_col_name(name))
                     )
                 }
                 _ => {
@@ -1221,12 +1221,12 @@ impl FieldDef {
                     {
                         format!(
                             "    #[sql(query = {:?})]\n",
-                            &format!("CONVERT(\"{}\" USING utf8mb4)", self.get_col_name(name))
+                            &format!("CONVERT(`{}` USING utf8mb4)", self.get_col_name(name))
                         )
                     } else if self.column_name.is_some() || self.query.is_some() {
                         format!(
                             "    #[sql(query = {:?})]\n",
-                            &format!("\"{}\"", self.get_col_name(name))
+                            &format!("`{}`", self.get_col_name(name))
                         )
                     } else {
                         "".to_owned()
@@ -1277,16 +1277,16 @@ impl FieldDef {
         if is_mysql_mode() {
             match self.data_type {
                 DataType::Uuid => {
-                    format!("UUID_TO_BIN(\"{}\")", name)
+                    format!("UUID_TO_BIN(`{}`)", name)
                 }
                 DataType::Point => {
-                    format!("ST_AsBinary(\"{}\")", name)
+                    format!("ST_AsBinary(`{}`)", name)
                 }
                 DataType::GeoPoint => {
-                    format!("ST_AsBinary(\"{}\", 'axis-order=long-lat')", name)
+                    format!("ST_AsBinary(`{}`, 'axis-order=long-lat')", name)
                 }
                 DataType::Geometry => {
-                    format!("ST_AsGeoJSON(\"{}\")", name)
+                    format!("ST_AsGeoJSON(`{}`)", name)
                 }
                 _ => {
                     if self
@@ -1294,9 +1294,9 @@ impl FieldDef {
                         .as_deref()
                         .is_some_and(|v| v.ends_with("_bin"))
                     {
-                        format!("CONVERT(\"{}\" USING utf8mb4)", name)
+                        format!("CONVERT(`{}` USING utf8mb4)", name)
                     } else {
-                        format!("\"{}\"", name)
+                        format!("`{}`", name)
                     }
                 }
             }

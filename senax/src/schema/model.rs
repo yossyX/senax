@@ -248,7 +248,8 @@ pub struct ModelDef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_clear_whole_cache: Option<bool>,
     /// ### リレーションとして登録される場合にUPSERTで上書きする
-    /// この機能を作った理由を忘れたが、多対多テーブルで論理削除の場合、必要になるかもしれない。
+    // この機能を作った理由を忘れたが、多対多テーブルで論理削除の場合、必要になるかもしれない。
+    // MySQLの場合、replaceでないとオートインクリメント主キーの値が取得できない
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_auto_overwrite: Option<bool>,
     /// ### 更新通知を使用する
@@ -398,7 +399,6 @@ pub struct ModelJson {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_clear_whole_cache: Option<bool>,
     /// ### リレーションとして登録される場合にUPSERTで上書きする
-    /// この機能を作った理由を忘れたが、多対多テーブルで論理削除の場合、必要になるかもしれない。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_auto_overwrite: Option<bool>,
     /// ### 更新通知を使用する
@@ -789,12 +789,21 @@ impl ModelDef {
                     Value::Mapping(_) => panic!("invalid key_value"),
                     Value::Tagged(_) => panic!("invalid key_value"),
                 };
-                format!(
-                    "\"{}\"={}{}",
-                    inheritance.key_field.as_ref().unwrap(),
-                    key_value,
-                    param
-                )
+                if is_mysql_mode() {
+                    format!(
+                        "`{}`={}{}",
+                        inheritance.key_field.as_ref().unwrap(),
+                        key_value,
+                        param
+                    )
+                } else {
+                    format!(
+                        "\"{}\"={}{}",
+                        inheritance.key_field.as_ref().unwrap(),
+                        key_value,
+                        param
+                    )
+                }
             } else {
                 "".to_owned()
             }

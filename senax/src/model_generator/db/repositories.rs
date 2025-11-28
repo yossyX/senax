@@ -16,8 +16,8 @@ use crate::common::AtomicLoad as _;
 use crate::common::ToCase as _;
 use crate::common::{OVERWRITTEN_MSG, fs_write};
 use crate::model_generator::REL_START;
-use crate::schema::IS_MAIN_GROUP;
 use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable, to_id_name};
+use crate::schema::{IS_MAIN_GROUP, is_mysql_mode};
 use crate::{SEPARATED_BASE_FILES, filters};
 
 mod impl_domain;
@@ -274,6 +274,7 @@ pub fn write_group_files(
                     pub force_indexes: Vec<(String, String)>,
                     pub config: &'a ConfigDef,
                     pub version_col: CompactString,
+                    pub is_mysql_str: &'a str,
                 }
 
                 let tpl = GroupBaseTableTemplate {
@@ -289,6 +290,7 @@ pub fn write_group_files(
                     force_indexes,
                     config,
                     version_col: ConfigDef::version(),
+                    is_mysql_str: if is_mysql_mode() { "true" } else { "false" },
                 };
                 let ret = tpl.render()?;
                 if SEPARATED_BASE_FILES {

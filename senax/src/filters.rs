@@ -10,7 +10,11 @@ pub static SHOW_COMMNET: AtomicBool = AtomicBool::new(true);
 
 pub fn _to_db_col(s: &str, esc: bool) -> String {
     if esc {
-        format!("\"{}\"", s.replace('"', r#""""#))
+        if is_mysql_mode() {
+            format!("`{}`", s.replace('`', r#"``"#))
+        } else {
+            format!("\"{}\"", s.replace('"', r#""""#))
+        }
     } else {
         s.to_owned()
     }
@@ -24,32 +28,32 @@ pub fn to_var_name<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
     Ok(_to_var_name(s.as_ref()))
 }
 
-pub fn to_pascal_name(s: &str) -> ::askama::Result<String> {
-    Ok(_to_var_name(&s.to_pascal()))
+pub fn to_pascal_name<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
+    Ok(_to_var_name(&s.as_ref().to_pascal()))
 }
-pub fn pascal(s: &str) -> ::askama::Result<String> {
-    Ok(s.to_pascal())
+pub fn pascal<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
+    Ok(s.as_ref().to_pascal())
 }
 #[allow(dead_code)]
-pub fn camel(s: &str) -> ::askama::Result<String> {
-    Ok(s.to_camel())
+pub fn camel<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
+    Ok(s.as_ref().to_camel())
 }
-pub fn gql_pascal(s: &str) -> ::askama::Result<String> {
+pub fn gql_pascal<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
     use inflector::Inflector;
-    Ok(s.to_pascal_case())
+    Ok(s.as_ref().to_pascal_case())
 }
-pub fn gql_camel(s: &str) -> ::askama::Result<String> {
+pub fn gql_camel<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
     use inflector::Inflector;
-    Ok(s.to_camel_case())
+    Ok(s.as_ref().to_camel_case())
 }
 pub fn snake<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
     Ok(s.as_ref().to_snake())
 }
-pub fn upper_snake(s: &str) -> ::askama::Result<String> {
-    Ok(s.to_upper_snake())
+pub fn upper_snake<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
+    Ok(s.as_ref().to_upper_snake())
 }
-pub fn db_esc(s: &str) -> ::askama::Result<String> {
-    Ok(_to_db_col(s, true))
+pub fn db_esc<S: AsRef<str>>(s: S) -> ::askama::Result<String> {
+    Ok(_to_db_col(s.as_ref(), true))
 }
 
 pub fn fmt_join_with_paren(
