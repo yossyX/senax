@@ -66,11 +66,10 @@ pub async fn migrate(db: Option<&str>, use_test: bool, clean: bool, ignore_missi
     // Do not modify this line. (migrate)
     let mut error = None;
     while let Some(res) = join_set.join_next().await {
-        if let Err(e) = res? {
-            if let Some(e) = error.replace(e) {
+        if let Err(e) = res? 
+            && let Some(e) = error.replace(e) {
                 log::error!("{}", e);
             }
-        }
     }
     if let Some(e) = error {
         return Err(e);

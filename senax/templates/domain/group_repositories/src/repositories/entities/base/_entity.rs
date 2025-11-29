@@ -1221,7 +1221,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
     }
     #[allow(unused_mut)]
     async fn save(&self, obj: Box<dyn _Updater>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
-        let mut obj = if let Ok(obj) = obj.downcast::<@{ pascal_name }@Entity>() {
+        let mut obj = if let Ok(obj) = (obj as Box<dyn std::any::Any>).downcast::<@{ pascal_name }@Entity>() {
             obj
         } else {
             panic!("Only @{ pascal_name }@Entity is accepted.");
@@ -1252,7 +1252,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
     #[allow(unused_mut)]
     async fn import(&self, list: Vec<Box<dyn _Updater>>, _option: Option<base_domain::models::ImportOption>) -> anyhow::Result<()> {
         for obj in list {
-            let mut obj = if let Ok(obj) = obj.downcast::<@{ pascal_name }@Entity>() {
+            let mut obj = if let Ok(obj) = (obj as Box<dyn std::any::Any>).downcast::<@{ pascal_name }@Entity>() {
                 obj
             } else {
                 panic!("Only @{ pascal_name }@Entity is accepted.");
@@ -1283,7 +1283,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
     @%- if def.use_insert_delayed() %@
     #[allow(unused_mut)]
     async fn insert_delayed(&self, obj: Box<dyn _Updater>) -> anyhow::Result<()> {
-        let mut obj = if let Ok(obj) = obj.downcast::<@{ pascal_name }@Entity>() {
+        let mut obj = if let Ok(obj) = (obj as Box<dyn std::any::Any>).downcast::<@{ pascal_name }@Entity>() {
             obj
         } else {
             panic!("Only @{ pascal_name }@Entity is accepted.");

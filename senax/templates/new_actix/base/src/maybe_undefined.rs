@@ -127,9 +127,7 @@ where
     T: validator::ValidateLength<u64>,
 {
     fn length(&self) -> Option<u64> {
-        let Some(s) = self.value() else {
-            return None;
-        };
+        let s = self.value()?;
         T::length(s)
     }
 }

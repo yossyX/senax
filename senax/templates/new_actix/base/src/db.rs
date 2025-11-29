@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use anyhow::Result;
 use async_trait::async_trait;
 use domain::repository::Repository;

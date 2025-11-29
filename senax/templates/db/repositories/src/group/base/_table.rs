@@ -363,16 +363,14 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         Cache::insert_version(&cs, Arc::new(cs.clone())).await;
                         Cache::invalidate(&id, shard_id).await;
                         @{- def.relations_one_cache(false)|fmt_rel_join("
-                        if let Some(_{rel_name}) = row.{rel_name} {
-                            if let Some(_{rel_name}) = _{rel_name} {
-                                rel_{class_mod}::CacheOp::BulkInsert {
-                                    replace,
-                                    overwrite,
-                                    ignore, 
-                                    shard_id,
-                                    list: vec![*_{rel_name}],
-                                }.handle_cache_msg(Arc::clone(&sync_map)).await;
-                            }
+                        if let Some(Some(_{rel_name})) = row.{rel_name} {
+                            rel_{class_mod}::CacheOp::BulkInsert {
+                                replace,
+                                overwrite,
+                                ignore, 
+                                shard_id,
+                                list: vec![*_{rel_name}],
+                            }.handle_cache_msg(Arc::clone(&sync_map)).await;
                         }", "")|replace1("_data") }@
                         @{- def.relations_many_cache(false)|fmt_rel_join("
                         if let Some(_{rel_name}) = row.{rel_name} {
@@ -4983,9 +4981,9 @@ impl _@{ pascal_name }@_ {
         let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
             VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING xmax,{col_esc}", "") }@@% endif %@;"#;
         @%- if !config.is_mysql() %@
-        let sql = senax_common::convert_mysql_placeholders_to_postgresql(sql);
+        let sql = &senax_common::convert_mysql_placeholders_to_postgresql(sql);
         @%- endif %@
-        let query = bind_to_query(sqlx::query(&sql), &obj._data);
+        let query = bind_to_query(sqlx::query(sql), &obj._data);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
         if rows_affected == 0 {
@@ -5415,7 +5413,7 @@ impl _@{ pascal_name }@_ {
     pub async fn force_delete(conn: &mut DbConn, obj: _@{ pascal_name }@Updater) -> Result<()> {
         let id: InnerPrimary = (&obj).into();
 @%- for on_delete_str in def.on_delete_list %@
-        crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, &[id.clone()], false).await?;
+        crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, std::slice::from_ref(&id), false).await?;
 @%- endfor %@
         let sql = r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#;
         @%- if !config.is_mysql() %@
@@ -5457,7 +5455,7 @@ impl _@{ pascal_name }@_ {
     pub async fn force_delete_relations(conn: &mut DbConn, obj: _@{ pascal_name }@Updater) -> Result<()> {
         let id: InnerPrimary = (&obj).into();
 @%- for on_delete_str in def.on_delete_list %@
-        crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, &[id.clone()], true).await?;
+        crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, std::slice::from_ref(&id), true).await?;
 @%- endfor %@
         Ok(())
     }
@@ -6169,9 +6167,9 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, ov
         r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING xmax,{col_esc}", "") }@@% endif %@;"#
     };
     @%- if !config.is_mysql() %@
-    let sql = senax_common::convert_mysql_placeholders_to_postgresql(sql);
+    let sql = &senax_common::convert_mysql_placeholders_to_postgresql(sql);
     @%- endif %@
-    let query = bind_to_query(sqlx::query(&sql), &obj._data);
+    let query = bind_to_query(sqlx::query(sql), &obj._data);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     let (_, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
 @{- def.auto_inc()|fmt_join("

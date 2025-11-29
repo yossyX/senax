@@ -316,6 +316,7 @@ where
 }
 
 pub trait FromRawValue<T> {
+    #[allow(clippy::wrong_self_convention)]
     fn from_raw_value(&self) -> serde_json::Result<T>;
 }
 

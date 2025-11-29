@@ -399,8 +399,8 @@ impl AccessorNotNullBool<'_> {
     }
     pub fn set(&mut self, val: bool) {
         *self.op = Op::Set;
-        *self.val = val.into();
-        *self.update = val.into();
+        *self.val = val;
+        *self.update = val;
     }
 }
 impl AccessorForDb<bool> for AccessorNotNullBool<'_> {
@@ -451,7 +451,6 @@ impl AccessorNullBool<'_> {
     }
     pub fn set(&mut self, val: Option<bool>) {
         *self.op = Op::Set;
-        let val = val.map(|v| v.into());
         *self.val = val;
         *self.update = val;
     }
@@ -681,7 +680,7 @@ pub struct AccessorNullJson<'a, I: Serialize + DeserializeOwned> {
 }
 impl<I: Serialize + DeserializeOwned> AccessorNullJson<'_, I> {
     pub fn get(&self) -> Option<std::sync::Arc<Box<serde_json::value::RawValue>>> {
-        self.val.as_ref().and_then(|v| Some(v.to_raw_value()))
+        self.val.as_ref().map(|v| v.to_raw_value())
     }
     pub fn mark_for_skip(&mut self) {
         *self.op = Op::Skip;

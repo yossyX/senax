@@ -292,7 +292,7 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent 
 }
 
 @{ def.label|label0 -}@
-pub trait @{ pascal_name }@Updater: downcast_rs::Downcast + Send + Sync + @{ pascal_name }@Common + crate::models::MarkForDelete@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@ + 'static {
+pub trait @{ pascal_name }@Updater: std::any::Any + Send + Sync + @{ pascal_name }@Common + crate::models::MarkForDelete@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@ + 'static {
 @{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
@@ -306,7 +306,6 @@ pub trait @{ pascal_name }@Updater: downcast_rs::Downcast + Send + Sync + @{ pas
 {label}{comment}    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>);
 {label}{comment}    fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>);", "") }@
 }
-downcast_rs::impl_downcast!(@{ pascal_name }@Updater);
 
 #[cfg(any(feature = "mock", test))]
 #[allow(unused_imports)]
@@ -395,7 +394,7 @@ impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ pa
         Ok(self.{rel_name}.as_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_path}::{class}Updater))
     }
     fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
-        self.{rel_name} = if let Ok(v) = v.downcast::<_model_::{class_mod_path}::{class}Entity>() {
+        self.{rel_name} = if let Ok(v) = (v as Box<dyn std::any::Any>).downcast::<_model_::{class_mod_path}::{class}Entity>() {
             Some(v)
         } else {
             panic!(\"Only {class}Entity is accepted.\");
@@ -421,7 +420,7 @@ impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ pa
         }
     }
     fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
-        if let Ok(v) = v.downcast::<_model_::{class_mod_path}::{class}Entity>() {
+        if let Ok(v) = (v as Box<dyn std::any::Any>).downcast::<_model_::{class_mod_path}::{class}Entity>() {
             self.{rel_name}.push(v)
         } else {
             panic!(\"Only {class}Entity is accepted.\");
@@ -516,7 +515,7 @@ impl @{ pascal_name }@Updater for @{ pascal_name }@Entity {
         Ok(self.{rel_name}.as_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_path}::{class}Updater))
     }
     fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
-        self.{rel_name} = if let Ok(v) = v.downcast::<_model_::{class_mod_path}::{class}Entity>() {
+        self.{rel_name} = if let Ok(v) = (v as Box<dyn std::any::Any>).downcast::<_model_::{class_mod_path}::{class}Entity>() {
             Some(v)
         } else {
             panic!(\"Only {class}Entity is accepted.\");
@@ -542,7 +541,7 @@ impl @{ pascal_name }@Updater for @{ pascal_name }@Entity {
         }
     }
     fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
-        if let Ok(v) = v.downcast::<_model_::{class_mod_path}::{class}Entity>() {
+        if let Ok(v) = (v as Box<dyn std::any::Any>).downcast::<_model_::{class_mod_path}::{class}Entity>() {
             self.{rel_name}.push(v)
         } else {
             panic!(\"Only {class}Entity is accepted.\");

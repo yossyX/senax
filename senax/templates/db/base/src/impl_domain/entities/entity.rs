@@ -169,7 +169,7 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
     }
     fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
         __Updater__::mut_{raw_rel_name}(self).set(
-            if let Ok(v) = v.downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
+            if let Ok(v) = (v as Box<dyn std::any::Any>).downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
                 *v
             } else {
                 panic!(\"Only _{class}Updater is accepted.\");
@@ -193,7 +193,7 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
     fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>) {
         let mut vec = Vec::new();
         for row in list {
-            match row.downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
+            match (row as Box<dyn std::any::Any>).downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
                 Ok(v) => { vec.push(*v); }
                 Err(_) => panic!(\"Only _{class}Updater is accepted.\"),
             }
@@ -201,7 +201,7 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
         __Updater__::mut_{raw_rel_name}(self).replace(vec);
     }
     fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
-        if let Ok(v) = v.downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
+        if let Ok(v) = (v as Box<dyn std::any::Any>).downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
             __Updater__::mut_{raw_rel_name}(self).push(*v)
         } else {
             panic!(\"Only _{class}Updater is accepted.\");
@@ -331,7 +331,7 @@ impl @{ pascal_name }@Updater for _@{ pascal_name }@Updater {
     }
     fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
         __Updater__::mut_{raw_rel_name}(self).set(
-            if let Ok(v) = v.downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
+            if let Ok(v) = (v as Box<dyn std::any::Any>).downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
                 *v
             } else {
                 panic!(\"Only _{class}Updater is accepted.\");
@@ -355,7 +355,7 @@ impl @{ pascal_name }@Updater for _@{ pascal_name }@Updater {
     fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>) {
         let mut vec = Vec::new();
         for row in list {
-            match row.downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
+            match (row as Box<dyn std::any::Any>).downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
                 Ok(v) => { vec.push(*v); }
                 Err(_) => panic!(\"Only _{class}Updater is accepted.\"),
             }
@@ -363,7 +363,7 @@ impl @{ pascal_name }@Updater for _@{ pascal_name }@Updater {
         __Updater__::mut_{raw_rel_name}(self).replace(vec);
     }
     fn push_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>) {
-        if let Ok(v) = v.downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
+        if let Ok(v) = (v as Box<dyn std::any::Any>).downcast::<crate::models::{group_ident}::{mod_ident}::_{class}Updater>() {
             __Updater__::mut_{raw_rel_name}(self).push(*v)
         } else {
             panic!(\"Only _{class}Updater is accepted.\");

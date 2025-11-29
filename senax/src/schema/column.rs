@@ -2882,7 +2882,7 @@ impl FieldDef {
             DataType::ArrayString if !self.not_null => ".as_ref()",
             DataType::ArrayString => "",
             DataType::Json | DataType::Jsonb if !self.not_null => {
-                ".as_ref().and_then(|v| Some(v.to_raw_value()))"
+                ".as_ref().map(|v| v.to_raw_value())"
             }
             DataType::Json | DataType::Jsonb => ".to_raw_value()",
             DataType::DbEnum => "",
@@ -2890,9 +2890,7 @@ impl FieldDef {
             DataType::DbSet => ".as_ref()",
             DataType::Point => "",
             DataType::GeoPoint => "",
-            DataType::Geometry if !self.not_null => {
-                ".as_ref().and_then(|v| Some(v.to_raw_value()))"
-            }
+            DataType::Geometry if !self.not_null => ".as_ref().map(|v| v.to_raw_value())",
             DataType::Geometry => ".to_raw_value()",
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
@@ -3159,7 +3157,7 @@ impl FieldDef {
             }
             DataType::ArrayString => format!("&{var}{clone}"),
             DataType::Json | DataType::Jsonb if !self.not_null => {
-                format!("{var}.as_ref().and_then(|v| Some(v.to_raw_value()))")
+                format!("{var}.as_ref().map(|v| v.to_raw_value())")
             }
             DataType::Json | DataType::Jsonb => format!("{var}.to_raw_value()"),
             DataType::DbEnum => unimplemented!(),
@@ -3174,7 +3172,7 @@ impl FieldDef {
                 format!("{var}{clone}.as_ref().map(|v| v.to_tuple().geo_point())")
             }
             DataType::Geometry if !self.not_null => {
-                format!("{var}.as_ref().and_then(|v| Some(v.to_raw_value()))")
+                format!("{var}.as_ref().map(|v| v.to_raw_value())")
             }
             DataType::Geometry => format!("{var}.to_raw_value()"),
             DataType::ValueObject => unimplemented!(),

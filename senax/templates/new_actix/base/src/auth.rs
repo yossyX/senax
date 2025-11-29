@@ -90,7 +90,7 @@ impl AuthInfo {
             return Some(true);
         }
         let role = self.role()?;
-        Some(roles.iter().any(|v| *v == role))
+        Some(roles.contains(&role))
     }
 }
 
@@ -124,14 +124,14 @@ pub fn retrieve_auth(http_req: &HttpRequest) -> Option<AuthInfo> {
     #[cfg(debug_assertions)]
     {
         let cookie_string = get_cookie_string_from_header(http_req);
-        if let Some(s) = cookie_string {
-            if let Some(v) = get_cookie_value("jwt", s) {
-                use base64::{engine::general_purpose::URL_SAFE, Engine as _};
-                if let Ok(v) = URL_SAFE.decode(&v) {
-                    if let Ok(v) = String::from_utf8(v) {
-                        return Some(serde_json::from_str(&v).unwrap());
-                    }
-                }
+        if let Some(s) = cookie_string
+            && let Some(v) = get_cookie_value("jwt", s)
+        {
+            use base64::{Engine as _, engine::general_purpose::URL_SAFE};
+            if let Ok(v) = URL_SAFE.decode(&v)
+                && let Ok(v) = String::from_utf8(v)
+            {
+                return Some(serde_json::from_str(&v).unwrap());
             }
         }
     }

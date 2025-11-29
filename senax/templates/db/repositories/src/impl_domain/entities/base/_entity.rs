@@ -128,7 +128,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
     }
     #[allow(unused_mut)]
     async fn save(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
-        let obj: _@{ pascal_name }@Updater = match obj.downcast::<_@{ pascal_name }@Updater>() {
+        let obj: _@{ pascal_name }@Updater = match (obj as Box<dyn std::any::Any>).downcast::<_@{ pascal_name }@Updater>() {
             Ok(obj) => *obj,
             Err(_) => panic!("Only _@{ pascal_name }@Updater is accepted."),
         };
@@ -137,7 +137,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
     @%- if !def.disable_update() %@
     async fn import(&self, list: Vec<Box<dyn @{ pascal_name }@Updater>>, option: Option<domain::models::ImportOption>) -> anyhow::Result<()> {
         let list = list.into_iter().map(|obj| {
-            let obj: _@{ pascal_name }@Updater = match obj.downcast::<_@{ pascal_name }@Updater>() {
+            let obj: _@{ pascal_name }@Updater = match (obj as Box<dyn std::any::Any>).downcast::<_@{ pascal_name }@Updater>() {
                 Ok(obj) => *obj,
                 Err(_) => panic!("Only _@{ pascal_name }@Updater is accepted."),
             };
@@ -156,20 +156,16 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
     @%- endif %@
     @%- if def.use_insert_delayed() %@
     async fn insert_delayed(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()> {
-        let obj: _@{ pascal_name }@Updater = if obj.is::<_@{ pascal_name }@Updater>() {
-            *obj.downcast::<_@{ pascal_name }@Updater>().unwrap()
-        } else {
+        let Ok(obj) = (obj as Box<dyn std::any::Any>).downcast::<_@{ pascal_name }@Updater>() else {
             panic!("Only _@{ pascal_name }@Updater is accepted.");
         };
-        _@{ pascal_name }@_::insert_delayed(self._conn.lock().await.deref_mut(), obj).await?;
+        _@{ pascal_name }@_::insert_delayed(self._conn.lock().await.deref_mut(), *obj).await?;
         Ok(())
     }
     @%- endif %@
     @%- if !def.disable_delete() %@
     async fn delete(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()> {
-        let obj = if let Ok(obj) = obj.downcast::<_@{ pascal_name }@Updater>() {
-            obj
-        } else {
+        let Ok(obj) = (obj as Box<dyn std::any::Any>).downcast::<_@{ pascal_name }@Updater>() else {
             panic!("Only _@{ pascal_name }@Updater is accepted.");
         };
         _@{ pascal_name }@_::delete(self._conn.lock().await.deref_mut(), *obj).await
