@@ -247,11 +247,10 @@ pub struct ModelDef {
     /// ### 更新時に常にすべてのキャッシュをクリアする
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_clear_whole_cache: Option<bool>,
-    /// ### リレーションとして登録される場合にUPSERTで上書きする
-    // この機能を作った理由を忘れたが、多対多テーブルで論理削除の場合、必要になるかもしれない。
-    // MySQLの場合、replaceでないとオートインクリメント主キーの値が取得できない
+    /// ### リレーションとして登録される場合に上書きする
+    // 多対多テーブルで論理削除の場合、必要になる。リレーション以外のユニークキーがあると意図しない結果になるので注意が必要。
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_auto_overwrite: Option<bool>,
+    pub overwrite_on_relation_save: Option<bool>,
     /// ### 更新通知を使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_update_notice: Option<bool>,
@@ -398,9 +397,10 @@ pub struct ModelJson {
     /// ### 更新時に常にすべてのキャッシュをクリアする
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_clear_whole_cache: Option<bool>,
-    /// ### リレーションとして登録される場合にUPSERTで上書きする
+    /// ### リレーションとして登録される場合に上書きする
+    // 多対多テーブルで論理削除の場合、必要になる。リレーション以外のユニークキーがあると意図しない結果になるので注意が必要。
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_auto_overwrite: Option<bool>,
+    pub overwrite_on_relation_save: Option<bool>,
     /// ### 更新通知を使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_update_notice: Option<bool>,
@@ -499,7 +499,7 @@ impl From<ModelDef> for ModelJson {
             use_all_rows_cache: value.use_all_rows_cache,
             use_filtered_row_cache: value.use_filtered_row_cache,
             use_clear_whole_cache: value.use_clear_whole_cache,
-            use_auto_overwrite: value.use_auto_overwrite,
+            overwrite_on_relation_save: value.overwrite_on_relation_save,
             use_update_notice: value.use_update_notice,
             use_insert_delayed: value.use_insert_delayed,
             use_save_delayed: value.use_save_delayed,
@@ -617,7 +617,7 @@ impl TryFrom<ModelJson> for ModelDef {
             use_all_rows_cache: value.use_all_rows_cache,
             use_filtered_row_cache: value.use_filtered_row_cache,
             use_clear_whole_cache: value.use_clear_whole_cache,
-            use_auto_overwrite: value.use_auto_overwrite,
+            overwrite_on_relation_save: value.overwrite_on_relation_save,
             use_update_notice: value.use_update_notice,
             use_insert_delayed: value.use_insert_delayed,
             use_save_delayed: value.use_save_delayed,
@@ -885,8 +885,8 @@ impl ModelDef {
         )
     }
 
-    pub fn use_auto_overwrite(&self) -> bool {
-        self.use_auto_overwrite.unwrap_or(
+    pub fn overwrite_on_relation_save(&self) -> bool {
+        self.overwrite_on_relation_save.unwrap_or(
             !self.has_auto_primary() && self.is_soft_delete() && self.unique_index().is_empty(),
         )
     }

@@ -206,7 +206,7 @@ function EditModel() {
                 hidden={!detail}
               />
               <AutoField
-                name="use_auto_overwrite"
+                name="overwrite_on_relation_save"
                 {...formData}
                 hidden={!detail}
               />

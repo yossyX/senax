@@ -4949,7 +4949,7 @@ impl _@{ pascal_name }@_ {
         __save(conn, obj, 0).await
     }
 
-    pub async fn replace(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<Option<_@{ pascal_name }@>> {
+    pub async fn overwrite(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<Option<_@{ pascal_name }@>> {
         obj.__validate()?;
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__set_default_value(conn).await?;
@@ -6130,7 +6130,7 @@ pub(crate) fn ___save(
             let (obj, cache_msg) = __save_upsert(conn, obj).await?;
             Ok((Some(obj), cache_msg))
         } else if obj.is_new() {
-            let (obj, cache_msg) = __save_insert(conn, obj, @%- if def.use_auto_overwrite() %@ rel_hash > 0 @%- else %@ rel_hash == 1 @%- endif %@).await?;
+            let (obj, cache_msg) = __save_insert(conn, obj, @%- if def.overwrite_on_relation_save() %@ rel_hash > 0 @%- else %@ rel_hash == 1 @%- endif %@).await?;
             Ok((Some(obj), Some(cache_msg)))
         } else {
             let (obj, cache_msg) = __save_update(conn, obj).await?;
@@ -6148,7 +6148,7 @@ pub(crate) fn ___save(
         }
         @%- else %@
         if obj.is_new() {
-            let (obj, cache_msg) = __save_insert(conn, obj, @%- if def.use_auto_overwrite() %@ rel_hash > 0 @%- else %@ rel_hash == 1 @%- endif %@).await?;
+            let (obj, cache_msg) = __save_insert(conn, obj, @%- if def.overwrite_on_relation_save() %@ rel_hash > 0 @%- else %@ rel_hash == 1 @%- endif %@).await?;
             Ok((Some(obj), Some(cache_msg)))
         } else {
             anyhow::bail!("Update is disabled.");
@@ -6161,7 +6161,7 @@ pub(crate) fn ___save(
 async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, overwrite: bool) -> Result<(_@{ pascal_name }@, CacheOp)> {
     let sql = if overwrite {
         @%- if config.is_mysql() %@
-        r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) AS new ON DUPLICATE KEY UPDATE @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@;"#
+        r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) AS new ON DUPLICATE KEY UPDATE @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=new.{col_esc}", ",") }@@{ def.auto_inc()|fmt_join(",{col_esc}=LAST_INSERT_ID({col_esc})", "") }@;"#
         @%- else %@
         r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) ON CONFLICT @{ def.upsert_conflict_target() }@ DO UPDATE SET @{ def.non_primaries_except_created_at()|fmt_join("{col_esc}=excluded.{col_esc}", ",") }@@{ def.auto_inc()|fmt_join(" RETURNING xmax,{col_esc}", "") }@;"#
         @%- endif %@
@@ -6613,7 +6613,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
             @%- endif %@
         }
             @%- if def.is_auto_inc() %@
-        sql.push_str(r#" RETURNING xmax,@{ def.auto_inc()|fmt_join("{col_esc}", "") }@"#);
+        sql.push_str(r#" RETURNING @{ def.auto_inc()|fmt_join("{col_esc}", "") }@"#);
             @%- endif %@
         @%- endif %@
         @%- if !config.is_mysql() %@
