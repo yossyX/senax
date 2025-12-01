@@ -16,7 +16,7 @@ use senax_encoder::{Pack, Unpack};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::boxed::Box;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -556,6 +556,7 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 #[derive(Clone, Debug)]
 pub struct _@{ pascal_name }@ {
     pub _inner: Data,
+    pub _filter_flag: BTreeMap<&'static str, bool>,
 @{ def.relations_one(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 @{ def.relations_many(false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}>>,\n", "") -}@
 @{ def.relations_belonging(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
@@ -583,6 +584,7 @@ pub struct CacheWrapper {
 #[derive(Clone, Debug)]
 pub struct _@{ pascal_name }@Cache {
     pub _wrapper: Arc<CacheWrapper>,
+    pub _filter_flag: BTreeMap<&'static str, bool>,
 @{ def.relations_one_cache(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}Cache>>>,\n", "") -}@
 @{ def.relations_one_uncached(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 @{ def.relations_many_cache(false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}Cache>>,\n", "") -}@
@@ -710,6 +712,7 @@ pub struct _@{ pascal_name }@Factory {
 pub struct _@{ pascal_name }@Updater {
     pub _data: Data,
     pub _update: Data,
+    pub _filter_flag: BTreeMap<&'static str, bool>,
     pub _is_new: bool,
     pub _do_delete: bool,
     pub _upsert: bool,
@@ -1287,6 +1290,7 @@ impl @{ id_name }@ {
                 ..Data::default()
             },
             _update: Data::default(),
+            _filter_flag: Default::default(),
             _is_new: false,
             _do_delete: false,
             _upsert: false,
@@ -1327,6 +1331,13 @@ impl From<&@{ column_def.get_inner_type(true, false) }@> for @{ id_name }@ {
         Self(id.clone().into())
     }
 }
+@%- if column_def.get_inner_type(true, false) == "String" %@
+impl From<&str> for @{ id_name }@ {
+    fn from(id: &str) -> Self {
+        Self(id.to_string().into())
+    }
+}
+@%- endif %@
 impl From<@{ id_name }@> for @{ column_def.get_inner_type(true, false) }@ {
     fn from(id: @{ id_name }@) -> Self {
         id.0.as_ref().clone()
@@ -1582,7 +1593,7 @@ impl _@{ pascal_name }@Cache {
         if let Some(v) = &self.{rel_name} {
             Ok(v.as_ref().map(|v| (**v).clone()))
         } else {
-            Ok(self._wrapper._{raw_rel_name}()?.map(|v| v.clone().into()))
+            Ok(self._wrapper._{raw_rel_name}()?.map(|v| (v.clone(), Default::default()).into()))
         }
     }", "") }@
     @{- def.relations_one_uncached(false)|fmt_rel_join("
@@ -1594,7 +1605,7 @@ impl _@{ pascal_name }@Cache {
         if let Some(v) = &self.{rel_name} {
             Ok(v.to_vec())
         } else {
-            Ok(self._wrapper._{raw_rel_name}()?.iter().map(|v| v.clone().into()).collect())
+            Ok(self._wrapper._{raw_rel_name}()?.iter().map(|v| (v.clone(), Default::default()).into()).collect())
         }
     }", "") }@
     @{- def.relations_many_uncached(false)|fmt_rel_join("
@@ -1812,21 +1823,23 @@ impl fmt::Display for _@{ pascal_name }@Updater {
     }
 }
 
-impl From<Data> for _@{ pascal_name }@ {
-    fn from(_inner: Data) -> Self {
+impl From<(Data, BTreeMap<&'static str, bool>)> for _@{ pascal_name }@ {
+    fn from(v: (Data, BTreeMap<&'static str, bool>)) -> Self {
         Self {
-            _inner,
+            _inner: v.0,
+            _filter_flag: v.1,
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
-impl From<Data> for _@{ pascal_name }@Updater {
-    fn from(_data: Data) -> Self {
+impl From<(Data, BTreeMap<&'static str, bool>)> for _@{ pascal_name }@Updater {
+    fn from(v: (Data, BTreeMap<&'static str, bool>)) -> Self {
         Self {
-            _data,
+            _data: v.0,
             _update: Data::default(),
+            _filter_flag: v.1,
             _is_new: false,
             _do_delete: false,
             _upsert: false,
@@ -1841,10 +1854,11 @@ impl From<Data> for _@{ pascal_name }@Updater {
 }
 @%- if !config.force_disable_cache %@
 
-impl From<Arc<CacheWrapper>> for _@{ pascal_name }@Cache {
-    fn from(wrapper: Arc<CacheWrapper>) -> Self {
+impl From<(Arc<CacheWrapper>, BTreeMap<&'static str, bool>)> for _@{ pascal_name }@Cache {
+    fn from(v: (Arc<CacheWrapper>, BTreeMap<&'static str, bool>)) -> Self {
         Self {
-            _wrapper: wrapper,
+            _wrapper: v.0,
+            _filter_flag: v.1,
 @{- def.relations_one_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_one_uncached(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
@@ -1956,6 +1970,7 @@ impl _@{ pascal_name }@Factory {
                 ..Data::default()
             },
             _update: Data::default(),
+            _filter_flag: Default::default(),
             _is_new: true,
             _do_delete: false,
             _upsert: false,
@@ -1971,7 +1986,7 @@ impl _@{ pascal_name }@Factory {
 
 impl From<_@{ pascal_name }@Updater> for _@{ pascal_name }@ {
     fn from(from: _@{ pascal_name }@Updater) -> Self {
-        let mut to: _@{ pascal_name }@ = from._data.into();
+        let mut to: _@{ pascal_name }@ = (from._data, from._filter_flag).into();
 @{- def.relations_one(false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name}.map(|v| v.into_iter().filter(|v| !v.will_be_deleted()).next_back().map(|v| Box::new(v.into())));", "") }@
 @{- def.relations_many(false)|fmt_rel_join("
@@ -1985,7 +2000,7 @@ impl From<_@{ pascal_name }@Updater> for _@{ pascal_name }@ {
 }
 impl From<Box<_@{ pascal_name }@Updater>> for Box<_@{ pascal_name }@> {
     fn from(from: Box<_@{ pascal_name }@Updater>) -> Self {
-        let mut to: _@{ pascal_name }@ = from._data.into();
+        let mut to: _@{ pascal_name }@ = (from._data, from._filter_flag).into();
 @{- def.relations_one(false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name}.map(|v| v.into_iter().filter(|v| !v.will_be_deleted()).next_back().map(|v| Box::new(v.into())));", "") }@
 @{- def.relations_many(false)|fmt_rel_join("

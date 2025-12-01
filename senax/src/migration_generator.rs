@@ -868,6 +868,20 @@ fn make_ddl(
                                     &escape_db_identifier(name),
                                 ));
                             }
+                            if old_field.constraint.auto_increment && !new_field.constraint.auto_increment {
+                                alter_columns.push(format!(
+                                    "ALTER COLUMN {} DROP DEFAULT",
+                                    &escape_db_identifier(name),
+                                ));
+                            }
+                            if !old_field.constraint.auto_increment && new_field.constraint.auto_increment {
+                                alter_columns.push(format!(
+                                    "ALTER COLUMN {} SET DEFAULT nextval('{}_{}_seq'::regclass)",
+                                    &escape_db_identifier(name),
+                                    table_name,
+                                    name
+                                ));
+                            }
                             if old_field.default.is_some() && new_field.default.is_none() {
                                 alter_columns.push(format!(
                                     "ALTER COLUMN {} DROP DEFAULT",

@@ -1755,7 +1755,7 @@ impl ModelDef {
     pub fn relations_in_cache(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
-            .filter(|v| v.1.in_cache() && v.1.is_type_of_has())
+            .filter(|v| v.1.is_type_of_has() && v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
     }

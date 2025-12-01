@@ -1385,6 +1385,24 @@ impl FieldDef {
         }}"#
                 )
             }
+            DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt if !is_mysql_mode() && !self.signed && self.enum_values.is_none() && !self.not_null => {
+                format!(
+                    r#"
+        if let Some(v) = self.{ident_name} {{
+            if v < 0 {{
+                errors.add({name:?}, validator::ValidationError::new("range"))
+            }}
+        }}"#
+                )
+            }
+            DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt if !is_mysql_mode() && !self.signed && self.enum_values.is_none() => {
+                format!(
+                    r#"
+        if self.{ident_name} < 0 {{
+            errors.add({name:?}, validator::ValidationError::new("range"))
+        }}"#
+                )
+            }
             DataType::Double | DataType::Float if !self.signed && !self.not_null => {
                 format!(
                     r#"
@@ -1546,6 +1564,9 @@ impl FieldDef {
             }
             _ if self.max.is_some() => {
                 validators.push(format!("range(max = {})", self.max.unwrap(),));
+            }
+            DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt if !is_mysql_mode() && !self.signed && self.enum_values.is_none() => {
+                validators.push("range(min = 0)".to_string());
             }
             DataType::Double | DataType::Float if !self.signed => {
                 validators.push("range(min = 0.0)".to_string());
@@ -3532,74 +3553,61 @@ impl FieldDef {
                 return ".as_ref().map(|v| v.as_static_str())";
             }
         }
-        if is_mysql_mode() {
-            match self.data_type {
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text
-                    if self.not_null =>
-                {
-                    ".as_str()"
-                }
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
-                    ".as_ref().map(|v| v.as_str())"
-                }
-                DataType::Binary | DataType::Varbinary | DataType::Blob if self.not_null => {
-                    ".as_slice()"
-                }
-                DataType::Binary | DataType::Varbinary | DataType::Blob => {
-                    ".as_ref().map(|v| v.as_slice())"
-                }
-                DataType::GeoPoint | DataType::Point if self.not_null => ".to_lng_lat_wkb()",
-                DataType::GeoPoint | DataType::Point => ".as_ref().map(|v| v.to_lng_lat_wkb())",
-                DataType::ArrayInt
-                | DataType::ArrayString
-                | DataType::Json
-                | DataType::Jsonb
-                | DataType::Geometry
-                    if self.not_null =>
-                {
-                    "._to_bindable_json()"
-                }
-                DataType::ArrayInt
-                | DataType::ArrayString
-                | DataType::Json
-                | DataType::Jsonb
-                | DataType::Geometry => ".as_ref().map(|v| v._to_bindable_json())",
-                _ => "",
+        match self.data_type {
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text
+                if self.not_null =>
+            {
+                ".as_str()"
             }
-        } else {
-            match self.data_type {
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text
-                    if self.not_null =>
-                {
-                    ".as_str()"
-                }
-                DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
-                    ".as_ref().map(|v| v.as_str())"
-                }
-                DataType::Binary | DataType::Varbinary | DataType::Blob if self.not_null => {
-                    ".as_slice()"
-                }
-                DataType::Binary | DataType::Varbinary | DataType::Blob => {
-                    ".as_ref().map(|v| v.as_slice())"
-                }
-                DataType::GeoPoint | DataType::Point if self.not_null => ".to_lng_lat_wkb()",
-                DataType::GeoPoint | DataType::Point => ".as_ref().map(|v| v.to_lng_lat_wkb())",
-                DataType::ArrayInt
-                | DataType::ArrayString
-                | DataType::Json
-                | DataType::Jsonb
-                | DataType::Geometry
-                    if self.not_null =>
-                {
-                    "._to_bindable_json()"
-                }
-                DataType::ArrayInt
-                | DataType::ArrayString
-                | DataType::Json
-                | DataType::Jsonb
-                | DataType::Geometry => ".as_ref().map(|v| v._to_bindable_json())",
-                _ => "",
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
+                ".as_ref().map(|v| v.as_str())"
             }
+            DataType::Binary | DataType::Varbinary | DataType::Blob if self.not_null => {
+                ".as_slice()"
+            }
+            DataType::Binary | DataType::Varbinary | DataType::Blob => {
+                ".as_ref().map(|v| v.as_slice())"
+            }
+            DataType::GeoPoint | DataType::Point if self.not_null => ".to_lng_lat_wkb()",
+            DataType::GeoPoint | DataType::Point => ".as_ref().map(|v| v.to_lng_lat_wkb())",
+            DataType::ArrayInt
+            | DataType::ArrayString
+            | DataType::Json
+            | DataType::Jsonb
+            | DataType::Geometry
+                if self.not_null =>
+            {
+                "._to_bindable_json()"
+            }
+            DataType::ArrayInt
+            | DataType::ArrayString
+            | DataType::Json
+            | DataType::Jsonb
+            | DataType::Geometry => ".as_ref().map(|v| v._to_bindable_json())",
+            _ => "",
+        }
+    }
+
+    pub fn get_bind_as_not_null(&self) -> &'static str {
+        if let Some(ref _class) = self.enum_class {
+            if self.is_integer() {
+                return "";
+            } else {
+                return ".as_static_str()";
+            }
+        }
+        match self.data_type {
+            DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
+                ".as_str()"
+            }
+            DataType::Binary | DataType::Varbinary | DataType::Blob => ".as_slice()",
+            DataType::GeoPoint | DataType::Point => ".to_lng_lat_wkb()",
+            DataType::ArrayInt
+            | DataType::ArrayString
+            | DataType::Json
+            | DataType::Jsonb
+            | DataType::Geometry => "._to_bindable_json()",
+            _ => "",
         }
     }
 

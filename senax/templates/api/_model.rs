@@ -129,14 +129,11 @@ pub struct ResObj {
 }
 
 trait TryFrom_<T>: Sized {
-    fn try_from_(value: T, _auth: &AuthInfo, _cursor: Option<String>) -> anyhow::Result<Self>;
+    fn try_from_(value: T, _cursor: Option<String>) -> anyhow::Result<Self>;
 }
 
 impl TryFrom_<&dyn _domain_::@{ pascal_name }@> for ResObj {
-    fn try_from_(v: &dyn _domain_::@{ pascal_name }@, _auth: &AuthInfo, _cursor: Option<String>) -> anyhow::Result<Self> {
-        @%- if !api_def.disable_mutation %@
-        use domain::models::Check_ as _;
-        @%- endif %@
+    fn try_from_(v: &dyn _domain_::@{ pascal_name }@,  _cursor: Option<String>) -> anyhow::Result<Self> {
         Ok(Self {
             _id: v.into(),
             @{- def.for_api_response()|fmt_join("
@@ -150,8 +147,8 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@> for ResObj {
             {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| v.into()),", "") }@
             _cursor,
             @%- if !api_def.disable_mutation %@
-            _updatable: updatable_filter(_auth).ok().and_then(|f| f.check(v).ok()),
-            _deletable: deletable_filter(_auth).ok().and_then(|f| f.check(v).ok()),
+            _updatable: v.get_flag("_updatable"),
+            _deletable: v.get_flag("_deletable"),
             @%- endif %@
         })
     }
@@ -159,10 +156,7 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@> for ResObj {
 @%- if def.use_all_rows_cache() || def.use_cache() %@
 
 impl TryFrom_<&dyn _domain_::@{ pascal_name }@Cache> for ResObj {
-    fn try_from_(v: &dyn _domain_::@{ pascal_name }@Cache, _auth: &AuthInfo, _cursor: Option<String>) -> anyhow::Result<Self> {
-        @%- if !api_def.disable_mutation %@
-        use domain::models::Check_ as _;
-        @%- endif %@
+    fn try_from_(v: &dyn _domain_::@{ pascal_name }@Cache, _cursor: Option<String>) -> anyhow::Result<Self> {
         Ok(Self {
             _id: v.into(),
             @{- def.for_api_response()|fmt_join("
@@ -176,8 +170,8 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@Cache> for ResObj {
             {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| (&*v).into()),", "") }@
             _cursor,
             @%- if !api_def.disable_mutation %@
-            _updatable: updatable_filter(_auth).ok().and_then(|f| f.check(v).ok()),
-            _deletable: deletable_filter(_auth).ok().and_then(|f| f.check(v).ok()),
+            _updatable: v.get_flag("_updatable"),
+            _deletable: v.get_flag("_deletable"),
             @%- endif %@
         })
     }
@@ -187,7 +181,7 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@Cache> for ResObj {
 #[rustfmt::skip]
 #[allow(unused_mut)]
 #[allow(clippy::needless_update)]
-fn joiner(_look_ahead: async_graphql::Lookahead<'_>, _auth: &AuthInfo) -> anyhow::Result<Option<Box<_repository_::Joiner_>>> {
+fn joiner(_look_ahead: &async_graphql::Lookahead<'_>) -> anyhow::Result<Option<Box<_repository_::Joiner_>>> {
     let mut joiner = Some(Box::new(_repository_::Joiner_ {
         @%- if camel_case %@
         @{- def.relations_one_for_api_response()|fmt_rel_join("
@@ -206,14 +200,6 @@ fn joiner(_look_ahead: async_graphql::Lookahead<'_>, _auth: &AuthInfo) -> anyhow
         @%- endif %@
         ..Default::default()
     }));
-    @%- if !api_def.disable_mutation %@
-    if _look_ahead.field("_updatable").exists() {
-        joiner = _repository_::Joiner_::merge(joiner, updatable_filter(_auth)?.joiner()); 
-    }
-    if _look_ahead.field("_deletable").exists() {
-        joiner = _repository_::Joiner_::merge(joiner, deletable_filter(_auth)?.joiner()); 
-    }
-    @%- endif %@
     Ok(joiner)
 }
 

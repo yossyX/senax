@@ -16,6 +16,12 @@ pub struct Count {
     pub c: i64,
 }
 
+#[derive(Default, sqlx::FromRow, senax_macros::SqlCol)]
+pub struct Exists {
+    #[sql(query = "1")]
+    pub exists: i64,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub enum TrashMode {
     #[default]

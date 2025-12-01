@@ -234,7 +234,7 @@ impl @{ name|to_pascal_name }@ {
 
 @% endfor -%@
 
-pub trait @{ pascal_name }@Common: std::fmt::Debug@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common@% endfor %@ + 'static {
+pub trait @{ pascal_name }@Common: std::fmt::Debug + crate::models::FilterFlag@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common@% endfor %@ + 'static {
 @{- def.primaries()|fmt_join("
 {label}{comment}    fn {var}(&self) -> {outer};", "") }@
 @{- def.only_version()|fmt_join("
@@ -327,6 +327,8 @@ pub struct @{ pascal_name }@Entity {
     pub {rel_name}: Option<Box<_{db_snake}_model_::{class_mod_path}::{class}Entity>>,", "") }@
     #[serde(skip)]
     pub _delete: bool,
+    #[serde(skip)]
+    pub _filter_flag: std::collections::BTreeMap<&'static str, bool>,
 }
 
 @%- for parent in def.parents() %@
@@ -444,6 +446,12 @@ impl @{ pascal_name }@Common for @{ pascal_name }@Entity {
     fn {var}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{var}{clone_for_outer}{convert_domain_outer}
     }", "") }@
+}
+#[cfg(any(feature = "mock", test))]
+impl crate::models::FilterFlag for @{ pascal_name }@Entity {
+    fn get_flag(&self, name: &'static str) -> Option<bool> {
+        self._filter_flag.get(name).copied()
+    }
 }
 
 #[cfg(any(feature = "mock", test))]

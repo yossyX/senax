@@ -46,7 +46,7 @@ use ::db::cache::Cache;
 use ::db::connection::{DbArguments, DbConn, DbRow, DbType};
 use crate::misc::{BindArrayTr, BindTr, ColRelTr, ColTr, FilterTr, ToBindableJson as _, OrderTr};
 use crate::repositories::{CacheOpTr, IdFetcher, IdFetcherWithCache};
-use ::db::misc::{BindValue, Count, Updater, Size, TrashMode, UpdaterForInner as _};
+use ::db::misc::{BindValue, Count, Exists, Updater, Size, TrashMode, UpdaterForInner as _};
 use ::db::models::USE_FAST_CACHE;
 use ::db::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
 pub use ::db::models::@{ group_name|snake|ident }@::@{ mod_name|ident }@::*;
@@ -70,7 +70,7 @@ use crate::repositories::@{ mod_name[0]|ident }@::_base::_@{ mod_name[1] }@ as r
 @%- if !config.exclude_from_domain %@
 use ::domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- else %@
-use crate::repository::@{ mod_name[0]|ident }@::_base::_@{ mod_name[1] }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use crate::repositories::@{ mod_name[0]|ident }@::_base::_@{ mod_name[1] }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- endif %@
 @%- endfor %@
 const USE_CACHE: bool = @{ def.use_cache() }@;
@@ -1177,6 +1177,7 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
                 let mut updater = __Updater__ {
                     _data: Data::default(),
                     _update: update.clone(),
+                    _filter_flag: Default::default(),
                     _is_new: false,
                     _do_delete: false,
                     _upsert: false,
@@ -1264,6 +1265,7 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
                 let mut updater = __Updater__ {
                     _data: list[0].clone(),
                     _update: update.clone(),
+                    _filter_flag: Default::default(),
                     _is_new: false,
                     _do_delete: false,
                     _upsert: false,
@@ -1801,7 +1803,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None, None).await?;
             if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
@@ -1818,7 +1820,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None, None).await?;
             if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
@@ -1871,7 +1873,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None, None).await?;
             if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
@@ -1888,7 +1890,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None, None).await?;
             if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
@@ -1999,7 +2001,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None, None).await?;
             if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
@@ -2016,7 +2018,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
             return Ok(());
         }
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
-            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None).await?;
+            let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None, None).await?;
             if let Some(obj) = obj {
                 self.{rel_name} = Some(Some(Box::new(obj)));
             } else {
@@ -2099,7 +2101,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), joiner, None).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), joiner, None, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2114,7 +2116,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{db_snake}_db, ids.iter(), joiner, None).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{db_snake}_db, ids.iter(), joiner, None, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2196,7 +2198,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), joiner, None).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), joiner, None, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2211,7 +2213,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{db_snake}_db, ids.iter(), joiner, None).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{db_snake}_db, ids.iter(), joiner, None, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2483,7 +2485,22 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
-        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), joiner, None).await?;
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(conn, ids.iter(), joiner, None, None).await?;
+        let map = repo_{class_mod}::{class}_::list_to_map(list);
+        for val in self.iter_mut() {
+            if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
+                val.{rel_name} = Some(map.get(&id).map(|v| Box::new(v.clone())));
+            } else {
+                val.{rel_name} = Some(None);
+            }
+        }
+        Ok(())
+    }", "") }@
+@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+    async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
+        let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
+        if ids.is_empty() { return Ok(()); }
+        let list = repo_{class_mod}::{class}_::find_many{with_trashed}(&mut conn._{db_snake}_db, ids.iter(), joiner, None, None).await?;
         let map = repo_{class_mod}::{class}_::list_to_map(list);
         for val in self.iter_mut() {
             if let Some(id) = RelPk{rel_name_pascal}::primary(val) {
@@ -2928,8 +2945,8 @@ impl BindTr for ColGeoDistance_ {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColRel_ {
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("\n    {rel_name}(Option<Box<rel_{class_mod}::Filter_>>),", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n    {rel_name}(Option<Box<rel_{class_mod}::Filter_>>),", "") }@
+@{- def.relations_one_and_belonging(false)|fmt_rel_join("\n    {rel_name}(Option<Box<repo_{class_mod}::Filter_>>),", "") }@
+@{- def.relations_many(false)|fmt_rel_join("\n    {rel_name}(Option<Box<repo_{class_mod}::Filter_>>),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -3156,6 +3173,10 @@ impl Default for Filter_ {
         Filter_::new_and()
     }
 }
+#[derive(Clone, Debug, Default)]
+pub struct WithFilterFlag {
+    pub filters: BTreeMap<&'static str, Filter_>,
+}
 impl std::fmt::Display for Filter_ {
     #[allow(bindings_with_variant_name)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -3341,11 +3362,11 @@ pub use @{ filter_macro_name }@_geo_distance as filter_geo_distance;
 macro_rules! @{ filter_macro_name }@_rel {
 @%- for (model_def, col_name, rel_def) in def.relations_one_and_belonging(false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
-    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::models::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
+    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::repositories::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
 @%- for (model_def, col_name, rel_def) in def.relations_many(false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
-    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::models::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
+    (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::repositories::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
     () => ();
 }
@@ -3489,7 +3510,7 @@ impl Joiner_ {
             if let Some(rhs) = rhs {
                 Some(Box::new(Joiner_{
                     @{- def.relations()|fmt_rel_join("
-                    {rel_name}: _model_::{class_mod_path}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
+                    {rel_name}: join_{class_mod}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
                     ..Default::default()
                 }))
             } else {
@@ -3523,6 +3544,7 @@ pub use join_@{ fetch_macro_name }@ as join;
 #[derive(Debug, Clone, Default)]
 pub struct QueryBuilder {
     filter: Option<Filter_>,
+    with_filter_flag: BTreeMap<&'static str, Filter_>,
     order: Option<Vec<Order_>>,
     raw_order: Option<String>,
     limit: Option<usize>,
@@ -3537,6 +3559,10 @@ pub struct QueryBuilder {
 impl QueryBuilder {
     pub fn filter(mut self, filter: Filter_) -> Self {
         self.filter = Some(filter);
+        self
+    }
+    pub fn with_filter_flag(mut self, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Self {
+        self.with_filter_flag = with_filter_flag;
         self
     }
     pub fn order_by(mut self, order: Vec<Order_>) -> Self {
@@ -3610,34 +3636,55 @@ impl QueryBuilder {
         self.joiner = Joiner_::merge(self.joiner, joiner);
         self
     }
-    async fn _select<T>(self, conn: &mut DbConn) -> Result<Vec<T>>
+    async fn _select<T>(self, conn: &mut DbConn) -> Result<Vec<(T, BTreeMap<&'static str, bool>)>>
     where
-        T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
+        T: for<'r> sqlx::FromRow<'r, DbRow> + SqlColumns + Send + Sync + Unpin,
     {
-        let result: sqlx::Result<Vec<_>> = self.__select(T::_sql_cols(@{ is_mysql_str }@), conn).await?.iter().map(T::from_row).collect();
+        let result: sqlx::Result<Vec<_>> = self.__select(T::_sql_cols(@{ is_mysql_str }@), conn).await?.into_iter().map(|(v, f)| T::from_row(&v).map(|v| (v, f))).collect();
         Ok(result?)
     }
-    async fn __select(self, sql_cols: &str, conn: &mut DbConn) -> Result<Vec<DbRow>> {
+    async fn __select(self, sql_cols: &str, conn: &mut DbConn) -> Result<Vec<(DbRow, BTreeMap<&'static str, bool>)>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
+        let filter_flag_names: Vec<_> = self.with_filter_flag.keys().cloned().collect();
         let sql = self._sql(sql_cols, false, conn.shard_id(), &filter_digest);
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        query = self._bind(query);
+        query = self._bind(query, true);
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
-        Ok(result)
+        Ok(result
+            .into_iter()
+            .map(|row| {
+                use sqlx::Row;
+                let mut flags = BTreeMap::new();
+                for name in filter_flag_names.clone() {
+                    flags.insert(name, row.get(name));
+                }
+                (row, flags)
+            })
+            .collect())
     }
 
     #[allow(clippy::if_same_then_else)]
     fn _sql(&self, sql_cols: &str, for_update: bool, shard_id: ShardId, filter_digest: &str) -> String {
         let force_indexes = make_force_indexes(filter_digest);
+        let mut sql_cols = sql_cols.to_string();
+        sql_cols.reserve(1000);
+        for (name, filter) in &self.with_filter_flag {
+            let mut trash_mode: TrashMode = Default::default();
+            sql_cols.push_str(",(");
+            filter.write(&mut sql_cols, 1, &mut trash_mode, shard_id, false);
+            sql_cols.truncate(sql_cols.len() - " AND ".len());
+            sql_cols.push_str(") as ");
+            sql_cols.push_str(name);
+        }
         let mut sql = format!(
             r#"SELECT {}{} FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             if !force_indexes.is_empty() {
@@ -3673,7 +3720,12 @@ impl QueryBuilder {
         sql
     }
 
-    fn _bind(self, mut query: Query<DbType, DbArguments>) -> Query<DbType, DbArguments> {
+    fn _bind(self, mut query: Query<DbType, DbArguments>, with_filter_flag: bool) -> Query<DbType, DbArguments> {
+        if with_filter_flag {
+            for (_name, filter) in self.with_filter_flag {
+                query = filter.bind_to_query(query);
+            }
+        }
         if let Some(c) = self.filter {
             debug!("filter: {:?}", &c);
             query = c.bind_to_query(query);
@@ -3684,9 +3736,10 @@ impl QueryBuilder {
         query
     }
 
-    async fn _select_stream(self, sql_cols: &str, conn: &mut DbConn) -> Result<mpsc::Receiver<DbRow>> {
+    async fn _select_stream(self, sql_cols: &str, conn: &mut DbConn) -> Result<mpsc::Receiver<(DbRow, BTreeMap<&'static str, bool>)>> {
         let ctx_no = conn.ctx_no();
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
+        let filter_flag_names: Vec<_> = self.with_filter_flag.keys().cloned().collect();
         debug!(ctx = ctx_no; "filter digest:{}", filter_digest);
         let sql = self._sql(sql_cols, false, conn.shard_id(), &filter_digest);
         @%- if !config.is_mysql() %@
@@ -3697,7 +3750,7 @@ impl QueryBuilder {
         tokio::spawn(async move {
             let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = ctx_no);
-            query = self._bind(query);
+            query = self._bind(query, true);
             let now = std::time::Instant::now();
             let mut result = query.fetch(executor.as_mut());
             if now.elapsed() > std::time::Duration::from_secs(1) {
@@ -3707,7 +3760,12 @@ impl QueryBuilder {
                 warn!("{}", e);
                 None
             }) {
-                if let Err(e) = tx.send(v).await {
+                use sqlx::Row;
+                let mut flags = BTreeMap::new();
+                for name in filter_flag_names.clone() {
+                    flags.insert(name, v.get(name));
+                }
+                if let Err(e) = tx.send((v, flags)).await {
                     warn!("{}", e);
                     break;
                 }
@@ -3723,8 +3781,19 @@ impl QueryBuilder {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
+        let filter_flag_names: Vec<_> = self.with_filter_flag.keys().cloned().collect();
+        let mut sql_cols = r#"@{ def.primaries()|fmt_join("{col_query}", ", ") }@"#.to_string();
+        sql_cols.reserve(1000);
+        for (name, filter) in &self.with_filter_flag {
+            let mut trash_mode: TrashMode = Default::default();
+            sql_cols.push_str(",(");
+            filter.write(&mut sql_cols, 1, &mut trash_mode, conn.shard_id(), false);
+            sql_cols.truncate(sql_cols.len() - " AND ".len());
+            sql_cols.push_str(") as ");
+            sql_cols.push_str(name);
+        }
         let mut sql = format!(
-            r#"SELECT {}@{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
+            r#"SELECT {}{sql_cols} FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             if !force_indexes.is_empty() {
                 format!("/*+ INDEX(_t1 {}) */ ", force_indexes.join(","))
             } else {
@@ -3746,21 +3815,31 @@ impl QueryBuilder {
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let joiner = self.joiner.take();
-        query = self._bind(query);
+        query = self._bind(query, true);
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
-        let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
+        let result: sqlx::Result<Vec<_>> = result
+            .iter()
+            .map(|row| {
+                use sqlx::Row;
+                let mut flags: BTreeMap<&str, bool> = BTreeMap::new();
+                for name in filter_flag_names.clone() {
+                    flags.insert(name, row.get(name));
+                }
+                InnerPrimary::from_row(row).map(|v| (v, flags))
+            })
+            .collect();
         let result = result?;
-        let ids: Vec<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> = result.iter().map(|id| id.into()).collect();
+        let ids: Vec<(@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@, _)> = result.iter().map(|(id, flags)| (id.into(), flags)).collect();
         conn.release_cache_tx();
-        let list = _@{ pascal_name }@_::find_many_from_cache(conn, ids, joiner).await?;
+        let list = _@{ pascal_name }@_::find_many_from_cache(conn, ids.iter().map(|v| v.0.clone()), joiner).await?;
         let mut map = _@{ pascal_name }@_::cache_list_to_map(list);
         let list: Vec<_@{ pascal_name }@Cache> = result
-            .iter()
-            .flat_map(|id| map.remove(&id.into()))
+            .into_iter()
+            .flat_map(|(ref id, flags)| map.remove(&id.into()).map(|mut v| {v._filter_flag = flags; v}))
             .collect();
         Ok(list)
     }
@@ -3770,6 +3849,7 @@ impl QueryBuilder {
     pub async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
+        let filter_flag_names: Vec<_> = self.with_filter_flag.keys().cloned().collect();
         let sql = self._sql(Data::_sql_cols(@{ is_mysql_str }@), !conn.wo_tx(), conn.shard_id(), &filter_digest);
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
@@ -3777,7 +3857,7 @@ impl QueryBuilder {
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         let joiner = self.joiner.take();
-        query = self._bind(query);
+        query = self._bind(query, true);
         let now = std::time::Instant::now();
         let result = if conn.wo_tx() {
             query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
@@ -3787,7 +3867,13 @@ impl QueryBuilder {
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
-        let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
+        let result: sqlx::Result<Vec<_>> = result.into_iter().map(|row| {
+            use sqlx::Row;
+            let mut flags = BTreeMap::new();
+            for name in filter_flag_names.clone() {
+                flags.insert(name, row.get(name));
+            }            
+            Data::from_row(&row).map(|v| (v, flags))}).collect();
         let mut list: Vec<__Updater__> = result?
             .into_iter()
             .map(__Updater__::from)
@@ -3799,7 +3885,7 @@ impl QueryBuilder {
 
     pub async fn select(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@>> {
         let joiner = self.joiner.take();
-        let result: Vec<Data> = self._select(conn).await?;
+        let result: Vec<(Data, _)> = self._select(conn).await?;
         #[allow(unused_mut)]
         let mut list: Vec<_@{ pascal_name }@> = result.into_iter().map(_@{ pascal_name }@::from).collect();
         list.join(conn, joiner).await?;
@@ -3814,14 +3900,14 @@ impl QueryBuilder {
 
     pub async fn select_for<T>(self, conn: &mut DbConn) -> Result<Vec<T>>
     where
-        T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
+        T: for<'r> sqlx::FromRow<'r, DbRow> + SqlColumns + Send + Sync + Unpin,
     {
-        self._select(conn).await
+        self._select(conn).await.map(|v| v.into_iter().map(|v| v.0).collect())
     }
 
     pub async fn select_one_for<T>(mut self, conn: &mut DbConn) -> Result<Option<T>>
     where
-        T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin,
+        T: for<'r> sqlx::FromRow<'r, DbRow> + SqlColumns + Send + Sync + Unpin,
     {
         self.limit = Some(1);
         let mut list = Self::select_for(self, conn).await?;
@@ -3831,9 +3917,9 @@ impl QueryBuilder {
 
     #[cfg(not(feature="cache_update_only"))]
     pub(crate) async fn __select_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
-        let result: Vec<CacheData> = self._select(conn).await?;
+        let result: Vec<(CacheData, _)> = self._select(conn).await?;
         let time = MSec::now();
-        let list = result.into_iter().map(|v| Arc::new(CacheWrapper::from_inner(v, conn.shard_id(), time)).into()).collect();
+        let list = result.into_iter().map(|(v, f)| (Arc::new(CacheWrapper::from_inner(v, conn.shard_id(), time)), f).into()).collect();
         Ok(list)
     }
     @%- endif %@
@@ -3858,10 +3944,10 @@ impl QueryBuilder {
     pub async fn select_stream(self, conn: &mut DbConn) -> Result<impl Stream<Item = _@{ pascal_name }@>> {
         let mut rx = self._select_stream(Data::_sql_cols(@{ is_mysql_str }@), conn).await?;
         Ok(async_stream::stream! {
-            while let Some(v) = rx.recv().await {
+            while let Some((v, flags)) = rx.recv().await {
                 match Data::from_row(&v) {
                     Ok(v) => {
-                        yield _@{ pascal_name }@::from(v);
+                        yield _@{ pascal_name }@::from((v, flags));
                     }
                     Err(e) => {
                         error!("{}", e);
@@ -3874,11 +3960,11 @@ impl QueryBuilder {
 
     pub async fn select_stream_for<T>(self, conn: &mut DbConn) -> Result<impl Stream<Item = T>>
     where
-        T: for<'r> sqlx::FromRow<'r, <DbType as sqlx::Database>::Row> + SqlColumns + Send + Sync + Unpin + 'static,
+        T: for<'r> sqlx::FromRow<'r, DbRow> + SqlColumns + Send + Sync + Unpin + 'static,
     {
         let mut rx = self._select_stream(T::_sql_cols(@{ is_mysql_str }@), conn).await?;
         Ok(async_stream::stream! {
-            while let Some(v) = rx.recv().await {
+            while let Some((v, flags)) = rx.recv().await {
                 match T::from_row(&v) {
                     Ok(v) => {
                         yield v;
@@ -4065,7 +4151,7 @@ impl QueryBuilder {
         @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        query = self._bind(query);
+        query = self._bind(query, false);
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
@@ -4105,7 +4191,7 @@ async fn _union(
     limit: Option<usize>,
     offset: Option<usize>,
     for_update: bool,
-) -> Result<Vec<<DbType as sqlx::Database>::Row>>
+) -> Result<Vec<DbRow>>
 {
     if order.is_none() && limit.is_none() && offset.is_none() {
         let mut result = Vec::new();
@@ -4128,7 +4214,7 @@ async fn _union(
             let mut query = sqlx::query(&sql);
             let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
             for builder in chunk {
-                query = builder._bind(query);
+                query = builder._bind(query, true);
             }
             result.append(&mut crate::misc::fetch!(conn, query, fetch_all));
         }
@@ -4155,7 +4241,7 @@ async fn _union(
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for builder in list {
-            query = builder._bind(query);
+            query = builder._bind(query, true);
         }
         Ok(crate::misc::fetch!(conn, query, fetch_all))
     }
@@ -4169,7 +4255,7 @@ impl UnionBuilder for Vec<QueryBuilder> {
         }
         let result = _union(self, conn, Data::_sql_cols(@{ is_mysql_str }@), order, limit, offset, false).await?;
         let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
-        Ok(result?.into_iter().map(_@{ pascal_name }@::from).collect())
+        Ok(result?.into_iter().map(|v| (v, BTreeMap::default()).into()).collect())
     }
     async fn select_union_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
         if self.is_empty() {
@@ -4177,7 +4263,7 @@ impl UnionBuilder for Vec<QueryBuilder> {
         }
         let result = _union(self, conn, Data::_sql_cols(@{ is_mysql_str }@), None, None, None, true).await?;
         let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
-        Ok(result?.into_iter().map(_@{ pascal_name }@Updater::from).collect())
+        Ok(result?.into_iter().map(|v| (v, BTreeMap::default()).into()).collect())
     }
 }
 @%- if !config.force_disable_cache %@
@@ -4189,7 +4275,7 @@ impl _UnionBuilder for Vec<QueryBuilder> {
         let result = _union(self, conn, CacheData::_sql_cols(@{ is_mysql_str }@), None, None, None, false).await?;
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
-        let list = result?.into_iter().map(|v| Arc::new(CacheWrapper::from_inner(v, conn.shard_id(), time)).into()).collect();
+        let list = result?.into_iter().map(|v| (Arc::new(CacheWrapper::from_inner(v, conn.shard_id(), time)), BTreeMap::default()).into()).collect();
         Ok(list)
     }
 }
@@ -4199,11 +4285,11 @@ impl _UnionBuilder for Vec<QueryBuilder> {
 @%- if def.primaries().len() == 1 %@
 impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% if def.use_cache() %@_@{pascal_name}@Cache,@% endif %@ _@{pascal_name}@Updater, Joiner_> for @{ id_name }@ {
     async fn fetch(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@>> {
-        _@{ pascal_name }@_::find_optional(conn, self, joiner, None).await
+        _@{ pascal_name }@_::find_optional(conn, self, joiner, None, None).await
     }
 @%- if def.is_soft_delete() %@
     async fn fetch_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@>> {
-        _@{ pascal_name }@_::find_optional_with_trashed(conn, self, joiner, None).await
+        _@{ pascal_name }@_::find_optional_with_trashed(conn, self, joiner, None, None).await
     }
 @%- endif %@
 @%- if def.use_cache() %@
@@ -4220,11 +4306,11 @@ impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% i
 @%- endif %@
 @%- if !def.disable_update() %@
     async fn fetch_for_update(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Updater> {
-        _@{ pascal_name }@_::find_for_update(conn, self, joiner, None).await
+        _@{ pascal_name }@_::find_for_update(conn, self, joiner, None, None).await
     }
 @%- if def.is_soft_delete() %@
     async fn fetch_for_update_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Updater> {
-        _@{ pascal_name }@_::find_for_update_with_trashed(conn, self, joiner, None).await
+        _@{ pascal_name }@_::find_for_update_with_trashed(conn, self, joiner, None, None).await
     }
 @%- endif %@
 @%- endif %@
@@ -4233,7 +4319,7 @@ impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% i
 impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% if def.use_cache() %@_@{pascal_name}@Cache,@% endif %@ _@{pascal_name}@Updater, Joiner_> for Option<@{ id_name }@> {
     async fn fetch(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@>> {
         if let Some(id) = self {
-            _@{ pascal_name }@_::find_optional(conn, id, joiner, None).await
+            _@{ pascal_name }@_::find_optional(conn, id, joiner, None, None).await
         } else {
             Ok(None)
         }
@@ -4374,6 +4460,7 @@ impl _@{ pascal_name }@_ {
         _@{ pascal_name }@Updater {
             _data: Data::default(),
             _update: Data::default(),
+            _filter_flag: Default::default(),
             _is_new: false,
             _do_delete: false,
             _upsert: false,
@@ -4398,6 +4485,7 @@ impl _@{ pascal_name }@_ {
                 ..Data::default()
             },
             _update: Data::default(),
+            _filter_flag: Default::default(),
             _is_new: false,
             _do_delete: false,
             _upsert: false,
@@ -4452,6 +4540,7 @@ impl _@{ pascal_name }@_ {
     pub async fn find_all_from_cache(
         conn: &DbConn,
         filter: Option<Filter_>,
+        with_filter_flag: BTreeMap<&'static str, Filter_>,
         order: Option<Vec<Order_>>,
         limit: Option<usize>,
     ) -> Result<Arc<Vec<_@{ pascal_name }@Cache>>> {
@@ -4592,23 +4681,23 @@ impl _@{ pascal_name }@_ {
     }
     @%- endif %@
 
-    pub async fn find<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<_@{ pascal_name }@>
+    pub async fn find<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@>
     where
         T: Into<Primary>,
     {
         let id: Primary = id.into();
-        Self::find_optional(conn, id.clone(), joiner, filter)
+        Self::find_optional(conn, id.clone(), joiner, filter, with_filter_flag)
             .await?
             .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&(&id).into())))
     }
     @%- if def.is_soft_delete() %@
 
-    pub async fn find_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<_@{ pascal_name }@>
+    pub async fn find_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@>
     where
         T: Into<Primary>,
     {
         let id: Primary = id.into();
-        Self::find_optional_with_trashed(conn, id.clone(), joiner, filter)
+        Self::find_optional_with_trashed(conn, id.clone(), joiner, filter, with_filter_flag)
             .await?
             .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&(&id).into())))
     }
@@ -4669,25 +4758,25 @@ impl _@{ pascal_name }@_ {
         map
     }
 
-    pub async fn find_many<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@>>
+    pub async fn find_many<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        let mut list = __find_many(conn, &ids, TrashMode::Not, filter).await?.into_iter().map(|v| v.into()).collect();
+        let mut list = __find_many(conn, &ids, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?.into_iter().map(|v| v.into()).collect();
         _@{ pascal_name }@Joiner::join(&mut list, conn, joiner).await?;
         Ok(list)
     }
     @%- if def.is_soft_delete() %@
 
-    pub async fn find_many_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@>>
+    pub async fn find_many_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        let mut list = __find_many(conn, &ids, TrashMode::With, filter).await?.into_iter().map(|v| v.into()).collect();
+        let mut list = __find_many(conn, &ids, TrashMode::With, filter, with_filter_flag.unwrap_or_default()).await?.into_iter().map(|v| v.into()).collect();
         _@{ pascal_name }@Joiner::join(&mut list, conn, joiner).await?;
         Ok(list)
     }
@@ -4717,7 +4806,7 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- endif %@
 
-    pub async fn find_optional<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@>>
+    pub async fn find_optional<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<_@{ pascal_name }@>>
     where
         T: Into<Primary>,
     {
@@ -4729,7 +4818,7 @@ impl _@{ pascal_name }@_ {
             ..Default::default()
         });
         @%- else %@
-        let data: Option<Data> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter).await?.map(|v| Data::from_row(&v)).transpose()?;
+        let data: Option<_> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?.map(|(v, f)| Data::from_row(&v).map(|v| (v, f))).transpose()?;
         @%- endif %@
         let mut obj = data.map(_@{ pascal_name }@::from);
         if let Some(obj) = obj.as_mut() {
@@ -4738,26 +4827,26 @@ impl _@{ pascal_name }@_ {
         Ok(obj)
     }
 
-    pub async fn exists<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<bool>
+    pub async fn exists<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<BTreeMap<&'static str, bool>>>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
         @%- if def.dummy_always_present() %@
-        Ok(true)
+        Ok(Default::default())
         @%- else %@
-        let data: Option<Count> = __find_optional(conn, Count::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter).await?.map(|v| Count::from_row(&v)).transpose()?;
-        Ok(data.unwrap_or_default().c > 0)
+        let data: Option<_> = __find_optional(conn, Exists::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?.map(|(_, f)| f);
+        Ok(data)
         @%- endif %@
     }
     @%- if !def.disable_update() %@
 
-    pub async fn find_optional_for_update<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@Updater>>
+    pub async fn find_optional_for_update<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<_@{ pascal_name }@Updater>>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        let result = __find_for_update(conn, &id, TrashMode::Not, filter).await?;
+        let result = __find_for_update(conn, &id, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?;
         let mut obj = result.map(__Updater__::from);
         if let Some(obj) = obj.as_mut() {
             _@{ pascal_name }@Joiner::join(obj, conn, joiner).await?;
@@ -4767,7 +4856,7 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- if def.is_soft_delete() %@
 
-    pub async fn find_optional_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Option<_@{ pascal_name }@>>
+    pub async fn find_optional_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<_@{ pascal_name }@>>
     where
         T: Into<Primary>,
     {
@@ -4779,7 +4868,7 @@ impl _@{ pascal_name }@_ {
             ..Default::default()
         });
         @%- else %@
-        let data: Option<Data> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter).await?.map(|v| Data::from_row(&v)).transpose()?;
+        let data: Option<_> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter, with_filter_flag.unwrap_or_default()).await?.map(|(v, f)| Data::from_row(&v).map(|v| (v, f))).transpose()?;
         @%- endif %@
         let mut obj = data.map(_@{ pascal_name }@::from);
         if let Some(obj) = obj.as_mut() {
@@ -4788,16 +4877,16 @@ impl _@{ pascal_name }@_ {
         Ok(obj)
     }
 
-    pub async fn exists_with_trashed<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>) -> Result<bool>
+    pub async fn exists_with_trashed<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<BTreeMap<&'static str, bool>>>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
         @%- if def.dummy_always_present() %@
-        Ok(true)
+        Ok(Default::default())
         @%- else %@
-        let data: Option<Count> = __find_optional(conn, Count::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter).await?.map(|v| Count::from_row(&v)).transpose()?;
-        Ok(data.unwrap_or_default().c > 0)
+        let data: Option<_> = __find_optional(conn, Exists::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter, with_filter_flag.unwrap_or_default()).await?.map(|(_, f)| f);
+        Ok(data)
         @%- endif %@
     }
     @%- endif %@
@@ -4826,12 +4915,12 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- if !def.disable_update() %@
 
-    pub async fn find_for_update<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<_@{ pascal_name }@Updater>
+    pub async fn find_for_update<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@Updater>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        let result = __find_for_update(conn, &id, TrashMode::Not, filter).await?@{ def.soft_delete_tpl("",".filter(|data| data.deleted_at.is_none())",".filter(|data| data.deleted == 0)")}@;
+        let result = __find_for_update(conn, &id, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?@{ def.soft_delete_tpl("",".filter(|(data, _)| data.deleted_at.is_none())",".filter(|(data, _)| data.deleted == 0)")}@;
         let data = result.with_context(|| err::RowNotFound::new("@{ table_name }@", id.to_string()))?;
         let mut obj = __Updater__::from(data);
         _@{ pascal_name }@Joiner::join(&mut obj, conn, joiner).await?;
@@ -4840,12 +4929,12 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- if !def.disable_update() && def.is_soft_delete() %@
 
-    pub async fn find_for_update_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<_@{ pascal_name }@Updater>
+    pub async fn find_for_update_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@Updater>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        let result = __find_for_update(conn, &id, TrashMode::With, filter).await?;
+        let result = __find_for_update(conn, &id, TrashMode::With, filter, with_filter_flag.unwrap_or_default()).await?;
         let data = result.with_context(|| err::RowNotFound::new("@{ table_name }@", id.to_string()))?;
         let mut obj = __Updater__::from(data);
         _@{ pascal_name }@Joiner::join(&mut obj, conn, joiner).await?;
@@ -4854,22 +4943,22 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
 @%- if !def.disable_update() %@
 
-    pub async fn find_many_for_update<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
+    pub async fn find_many_for_update<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@Updater>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        __find_many_for_update(conn, &ids, TrashMode::Not, joiner, filter).await
+        __find_many_for_update(conn, &ids, TrashMode::Not, joiner, filter, with_filter_flag.unwrap_or_default()).await
     }
 
-    pub async fn find_many_for_update_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
+    pub async fn find_many_for_update_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@Updater>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        __find_many_for_update(conn, &ids, TrashMode::With, joiner, filter).await
+        __find_many_for_update(conn, &ids, TrashMode::With, joiner, filter, with_filter_flag.unwrap_or_default()).await
     }
 @%- endif %@
 @%- for (index_name, index) in def.unique_index() %@
@@ -5560,7 +5649,7 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
+            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as_not_null})", "") }@;
         }
         let result = if conn.wo_tx() {
             query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
@@ -5594,7 +5683,7 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
+            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as_not_null})", "") }@;
         }
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await?
@@ -5633,7 +5722,7 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
+            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as_not_null})", "") }@;
         }
         let result = if conn.wo_tx() {
             Count::from_row(&query.fetch_one(conn.acquire_writer().await?.as_mut()).await?)?
@@ -5672,7 +5761,7 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
+            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as_not_null})", "") }@;
         }
         let result = if conn.wo_tx() {
             query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
@@ -5703,7 +5792,7 @@ async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as})", "") }@;
+            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as_not_null})", "") }@;
         }
         let result = if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await?
@@ -5724,7 +5813,8 @@ async fn __find_many(
     ids: &[InnerPrimary],
     trash_mode: TrashMode,
     filter: Option<Filter_>,
-) -> Result<Vec<Data>> {
+    with_filter_flag: BTreeMap<&'static str, Filter_>,
+) -> Result<Vec<(Data, BTreeMap<&'static str, bool>)>> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -5745,18 +5835,29 @@ async fn __find_many(
             .collect();
         list.append(&mut v);
         @%- else %@
-        let v = ___find_many(conn, Data::_sql_cols(@{ is_mysql_str }@), ids, trash_mode, filter.clone()).await?;
-        let mut v: sqlx::Result<Vec<_>> = v.iter().map(Data::from_row).collect();
+        let v = ___find_many(conn, Data::_sql_cols(@{ is_mysql_str }@), ids, trash_mode, filter.clone(), with_filter_flag.clone()).await?;
+        let mut v: sqlx::Result<Vec<_>> = v.into_iter().map(|(v, f)| Data::from_row(&v).map(|v| (v, f))).collect();
         list.append(&mut v?);
         @%- endif %@
     }
     Ok(list)
 }
 #[allow(clippy::needless_borrow)]
-async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Vec<<DbType as sqlx::Database>::Row>>
+async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], trash_mode: TrashMode, filter: Option<Filter_>, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Vec<(DbRow, BTreeMap<&'static str, bool>)>>
 {
     if ids.is_empty() {
         return Ok(Vec::new());
+    }
+    let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
+    let mut sql_cols = sql_cols.to_string();
+    sql_cols.reserve(1000);
+    for (name, filter) in &with_filter_flag {
+        let mut trash_mode: TrashMode = Default::default();
+        sql_cols.push_str(",(");
+        filter.write(&mut sql_cols, 1, &mut trash_mode, conn.shard_id(), false);
+        sql_cols.truncate(sql_cols.len() - " AND ".len());
+        sql_cols.push_str(") as ");
+        sql_cols.push_str(name);
     }
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {
@@ -5775,6 +5876,9 @@ async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], t
     @%- endif %@
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+    for (_name, filter) in with_filter_flag {
+        query = filter.bind_to_query(query);
+    }
     if let Some(c) = filter {
         query = c.bind_to_query(query);
     }
@@ -5782,7 +5886,17 @@ async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], t
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
     }
-    Ok(crate::misc::fetch!(conn, query, fetch_all))
+    Ok(crate::misc::fetch!(conn, query, fetch_all)
+        .into_iter()
+        .map(|row| {
+            use sqlx::Row;
+            let mut flags = BTreeMap::new();
+            for name in filter_flag_names.clone() {
+                flags.insert(name, row.get(name));
+            }
+            (row, flags)
+        })
+        .collect())
 }
 @%- if def.use_cache() %@
 
@@ -5811,8 +5925,8 @@ async fn ___find_many_for_cache(
             .collect();
         result.append(&mut v);
         @%- else %@
-        let v = ___find_many(conn, CacheData::_sql_cols(@{ is_mysql_str }@), ids, TrashMode::With, None).await?;
-        let mut v: sqlx::Result<Vec<_>> = v.iter().map(CacheData::from_row).collect();
+        let v = ___find_many(conn, CacheData::_sql_cols(@{ is_mysql_str }@), ids, TrashMode::With, None, Default::default()).await?;
+        let mut v: sqlx::Result<Vec<_>> = v.iter().map(|(v, _)|CacheData::from_row(v)).collect();
         result.append(&mut v?);
         @%- endif %@
     }
@@ -5843,7 +5957,7 @@ async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joi
     for (hash, id) in hash_and_id {
         if let Some(obj) = cache_map.get(&hash).filter(|o| InnerPrimary::from(*o) == id.0) {
             if obj._has_join(&joiner) {
-                list.push(obj.clone().into());
+                list.push((obj.clone(), Default::default()).into());
             } else {
                 rest_ids.push(id);
             }
@@ -5863,7 +5977,7 @@ async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joi
         for id in rest_ids.into_iter() {
             if let Some(obj) = Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
                 if obj._has_join(&joiner) {
-                    list.push(obj.into());
+                    list.push((obj, Default::default()).into());
                 } else {
                     rest_ids2.insert(id);
                 }
@@ -5949,7 +6063,7 @@ async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joi
                     }
                 }
                 if rest_ids2.contains(&id) {
-                    list.push(arc.into());
+                    list.push((arc, Default::default()).into());
                 }
             }
         }
@@ -5961,8 +6075,19 @@ async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joi
 @%- endif %@
 
 #[allow(clippy::needless_borrow)]
-async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Option<<DbType as sqlx::Database>::Row>>
+async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Option<(DbRow, BTreeMap<&'static str, bool>)>>
 {
+    let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
+    let mut sql_cols = sql_cols.to_string();
+    sql_cols.reserve(1000);
+    for (name, filter) in &with_filter_flag {
+        let mut trash_mode: TrashMode = Default::default();
+        sql_cols.push_str(",(");
+        filter.write(&mut sql_cols, 1, &mut trash_mode, conn.shard_id(), false);
+        sql_cols.truncate(sql_cols.len() - " AND ".len());
+        sql_cols.push_str(") as ");
+        sql_cols.push_str(name);
+    }
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {
         filter_str = "WHERE".to_string();
@@ -5975,12 +6100,23 @@ async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, tr
     @%- endif %@
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+    for (_name, filter) in with_filter_flag {
+        query = filter.bind_to_query(query);
+    }
     if let Some(c) = filter {
         query = c.bind_to_query(query);
     }
     @{- def.primaries()|fmt_join("
     query = query.bind(id.{index}{bind_as});", "") }@
-    Ok(crate::misc::fetch!(conn, query, fetch_optional))
+    Ok(crate::misc::fetch!(conn, query, fetch_optional)
+        .map(|row| {
+            use sqlx::Row;
+            let mut flags = BTreeMap::new();
+            for name in filter_flag_names.clone() {
+                flags.insert(name, row.get(name));
+            }
+            (row, flags)
+        }))
 }
 @%- if def.use_cache() %@
 
@@ -5997,36 +6133,69 @@ where
 @%- if !def.disable_update() %@
 
 #[allow(clippy::needless_borrow)]
-async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>) -> Result<Option<Data>> {
+async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Option<(Data, BTreeMap<&'static str, bool>)>> {
+    let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
+    let mut sql_cols = Data::_sql_cols(@{ is_mysql_str }@).to_string();
+    sql_cols.reserve(1000);
+    for (name, filter) in &with_filter_flag {
+        let mut trash_mode: TrashMode = Default::default();
+        sql_cols.push_str(",(");
+        filter.write(&mut sql_cols, 1, &mut trash_mode, conn.shard_id(), false);
+        sql_cols.truncate(sql_cols.len() - " AND ".len());
+        sql_cols.push_str(") as ");
+        sql_cols.push_str(name);
+    }
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {
         filter_str = "WHERE".to_string();
     } else {
         filter_str.push_str(" AND ");
     }
-    let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ FOR UPDATE"#, Data::_sql_cols(@{ is_mysql_str }@));
+    let sql = format!(r#"SELECT {} FROM @{ table_name|db_esc }@ as _t1 {filter_str} @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ FOR UPDATE"#, sql_cols);
     @%- if !config.is_mysql() %@
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+    for (_name, filter) in with_filter_flag {
+        query = filter.bind_to_query(query);
+    }
     if let Some(c) = filter {
         query = c.bind_to_query(query);
     }
     @{- def.primaries()|fmt_join("
     query = query.bind(id.{index}{bind_as});", "") }@
-    if conn.wo_tx() {
-        Ok(query.fetch_optional(conn.acquire_writer().await?.as_mut()).await?.map(|v| Data::from_row(&v)).transpose()?)
+    let result = if conn.wo_tx() {
+        query.fetch_optional(conn.acquire_writer().await?.as_mut()).await?
     } else {
-        Ok(query.fetch_optional(conn.get_tx().await?.as_mut()).await?.map(|v| Data::from_row(&v)).transpose()?)
-    }
+        query.fetch_optional(conn.get_tx().await?.as_mut()).await?
+    };
+    Ok(result.map(|row| {
+        use sqlx::Row;
+        let mut flags = BTreeMap::new();
+        for name in filter_flag_names.clone() {
+            flags.insert(name, row.get(name));
+        }
+        Data::from_row(&row).map(|v| (v, flags))
+    }).transpose()?)
 }
 
 #[allow(clippy::needless_borrow)]
-async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_mode: TrashMode, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
+async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_mode: TrashMode, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
 {
     if ids.is_empty() {
         return Ok(Vec::new());
+    }
+    let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
+    let mut sql_cols = Data::_sql_cols(@{ is_mysql_str }@).to_string();
+    sql_cols.reserve(1000);
+    for (name, filter) in &with_filter_flag {
+        let mut trash_mode: TrashMode = Default::default();
+        sql_cols.push_str(",(");
+        filter.write(&mut sql_cols, 1, &mut trash_mode, conn.shard_id(), false);
+        sql_cols.truncate(sql_cols.len() - " AND ".len());
+        sql_cols.push_str(") as ");
+        sql_cols.push_str(name);
     }
     let mut list: Vec<__Updater__> = Vec::with_capacity(ids.len());
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
@@ -6040,7 +6209,7 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
         let q = "@{ def.primaries()|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
         let sql = format!(
             r#"SELECT {} FROM @{ table_name|db_esc }@ {filter_str} @{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({}) FOR UPDATE;"#,
-            Data::_sql_cols(@{ is_mysql_str }@),
+            sql_cols,
             &q[0..q.len() - 1],
         );
         @%- if !config.is_mysql() %@
@@ -6048,6 +6217,9 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
         @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        for (_name, filter) in with_filter_flag.clone() {
+            query = filter.bind_to_query(query);
+        }
         if let Some(c) = filter.clone() {
             query = c.bind_to_query(query);
         }
@@ -6060,7 +6232,13 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
         } else {
             query.fetch_all(conn.get_tx().await?.as_mut()).await?
         };
-        let result: sqlx::Result<Vec<_>> = result.iter().map(Data::from_row).collect();
+        let result: sqlx::Result<Vec<_>> = result.into_iter().map(|row| {
+            use sqlx::Row;
+            let mut flags = BTreeMap::new();
+            for name in filter_flag_names.clone() {
+                flags.insert(name, row.get(name));
+            }            
+            Data::from_row(&row).map(|v| (v, flags))}).collect();
         result?
             .into_iter()
             .map(__Updater__::from)
@@ -6178,7 +6356,7 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, ov
     }", "") }@
     info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "insert", ctx = conn.ctx_no(); "{}", &obj);
     debug!("{:?}", &obj);
-    let mut obj2: _@{ pascal_name }@ = obj._data.clone().into();
+    let mut obj2: _@{ pascal_name }@ = (obj._data.clone(), BTreeMap::default()).into();
     let mut update_cache = true;
 
     @{- def.non_primaries()|fmt_join_cache_or_not("", "
@@ -6267,7 +6445,7 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         }
         @%- endif %@
     }
-    let mut obj2: _@{ pascal_name }@ = obj._data.into();
+    let mut obj2: _@{ pascal_name }@ = (obj._data, BTreeMap::default()).into();
     @{- def.non_primaries()|fmt_join_cache_or_not("", "
     obj._op.{var} = Op::None;
     obj._update.{var} = Default::default();", "") }@
@@ -6345,7 +6523,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         if obj._data.{var} == 0 {
             obj._data.{var} = _last_insert_id as {inner};
         }", "") }@
-        let mut obj2: _@{ pascal_name }@ = obj._data.clone().into();
+        let mut obj2: _@{ pascal_name }@ = (obj._data.clone(), BTreeMap::default()).into();
         @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
         let cache_msg = Some(CacheOp::Insert {
             overwrite: false,
@@ -6371,7 +6549,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         }
         @%- endif %@
         let id = InnerPrimary::from(&obj);
-        let mut obj2: _@{ pascal_name }@ = obj._data.into();
+        let mut obj2: _@{ pascal_name }@ = (obj._data, BTreeMap::default()).into();
         @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
         let mut cache_msg = Some(CacheOp::Update {
             id,
@@ -6386,7 +6564,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @%- endif %@
         Ok((obj2, cache_msg))
     } else {
-        let mut obj2: _@{ pascal_name }@ = obj._data.into();
+        let mut obj2: _@{ pascal_name }@ = (obj._data, BTreeMap::default()).into();
         Ok((obj2, None))
     }
 }
@@ -6422,7 +6600,7 @@ async fn __update_many(conn: &mut DbConn, ids: Vec<InnerPrimary>, mut obj: __Upd
             || obj._op.{var} == Op::Add || obj._op.{var} == Op::Sub", "", "") }@;
         if has_add {
             for ids in ids.chunks(IN_CONDITION_LIMIT) {
-                _@{ pascal_name }@_::find_many_for_update(conn, ids.iter(), None, None).await?.into_iter()
+                _@{ pascal_name }@_::find_many_for_update(conn, ids.iter(), None, None, None).await?.into_iter()
                     .for_each(|v| {
                         let mut data = v._data;
                         @{- def.non_primaries_addable()|fmt_join_cache_or_not("

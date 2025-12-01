@@ -224,6 +224,11 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@ {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
 }
+impl domain::models::FilterFlag for _@{ pascal_name }@ {
+    fn get_flag(&self, name: &'static str) -> Option<bool> {
+        self._filter_flag.get(name).copied()
+    }
+}
 @%- if !config.force_disable_cache %@
 
 impl @{ pascal_name }@Common for _@{ pascal_name }@Cache {
@@ -240,6 +245,11 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@Cache {
         __Cache__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
 }
+impl domain::models::FilterFlag for _@{ pascal_name }@Cache {
+    fn get_flag(&self, name: &'static str) -> Option<bool> {
+        self._filter_flag.get(name).copied()
+    }
+}
 @%- endif %@
 
 impl @{ pascal_name }@Common for _@{ pascal_name }@Updater {
@@ -255,6 +265,11 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@Updater {
     fn {var}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
+}
+impl domain::models::FilterFlag for _@{ pascal_name }@Updater {
+    fn get_flag(&self, name: &'static str) -> Option<bool> {
+        self._filter_flag.get(name).copied()
+    }
 }
 @%- if !config.force_disable_cache %@
 

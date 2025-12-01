@@ -524,7 +524,7 @@ macro_rules! filter {
             only_trashed_sql: &str,
             shard_id: ShardId,
         ) -> String {
-            let mut s = String::with_capacity(100);
+            let mut s = String::with_capacity(1000);
             s.push_str("WHERE ");
             if let Some(c) = filter {
                 c.write(&mut s, 1, &mut trash_mode, shard_id, false);

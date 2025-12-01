@@ -51,6 +51,8 @@ pub fn write_group_files(
     };
     let reg = Regex::new(r"(?m)^_repo_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
+    let reg = Regex::new(r"(?m)^db_\w+\s*=.+\n")?;
+    content = reg.replace_all(&content, "").into_owned();
     let mut db_chk = HashSet::new();
     for (db, group) in ref_db {
         let db = &db.to_snake();

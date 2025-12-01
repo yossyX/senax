@@ -54,6 +54,7 @@ pub fn generate(db_type: DbType, db: &str, exclude_from_domain: bool) -> Result<
             exclude_from_domain,
         };
         fs_write(file_path, tpl.render()?)?;
+        fs::create_dir_all(schema_path.join(db))?;
     }
 
     let file_path = Path::new("./.env");

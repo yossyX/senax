@@ -17,6 +17,10 @@ pub trait UpdateIterator<T: ?Sized + Send + Sync>: Send + Sync {
     fn iter_mut(&mut self) -> Box<dyn Iterator<Item = &mut T> + '_>;
 }
 
+pub trait FilterFlag {
+    fn get_flag(&self, name: &'static str) -> Option<bool>;
+}
+
 pub trait MarkForDelete {
     fn mark_for_delete(&mut self);
     fn unmark_for_delete(&mut self);

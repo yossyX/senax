@@ -1,10 +1,13 @@
 #[macro_export]
 macro_rules! gql_find {
-    ( $f:ident $p:tt, $repo:expr, $auth:expr, $gql_ctx:expr ) => {
+    ( $f:ident $p:tt, $repo:expr, $gql_ctx:expr ) => {
         match $f$p.await {
             Ok(obj) => {
                 let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
-                Ok(ResObj::try_from_(&*obj, $auth, None)?)
+                if !obj.get_flag("_readable").unwrap_or_default() {
+                    return Err(GqlError::Forbidden.extend());
+                }
+                Ok(ResObj::try_from_(&*obj, None)?)
             }
             Err(e) => {
                 if $repo.@{ db|snake }@_query().should_retry(&e) {
@@ -13,7 +16,10 @@ macro_rules! gql_find {
                         .await
                         .map_err(|e| GqlError::server_error($gql_ctx, e))?;
                     let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
-                    Ok(ResObj::try_from_(&*obj, $auth, None)?)
+                    if !obj.get_flag("_readable").unwrap_or_default() {
+                        return Err(GqlError::Forbidden.extend());
+                    }
+                    Ok(ResObj::try_from_(&*obj, None)?)
                 } else {
                     Err(GqlError::server_error($gql_ctx, e))
                 }

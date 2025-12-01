@@ -92,6 +92,21 @@ pub fn fmt_join(v: Vec<(&String, &FieldDef)>, f: &str, sep: &str) -> ::askama::R
         .join(sep))
 }
 
+pub fn fmt_join_auto_or_not(v: Vec<(&String, &FieldDef)>, auto: &str, not_auto: &str, sep: &str) -> ::askama::Result<String> {
+    let mut index = -1;
+    Ok(v.iter()
+        .map(|(name, col)| {
+            index += 1;
+            if col.auto.is_some() {
+                _fmt_join(auto, name, col, index, &Vec::new())
+            } else {
+                _fmt_join(not_auto, name, col, index, &Vec::new())
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(sep))
+}
+
 pub fn fmt_join_not_null_or_null(
     v: Vec<(&String, &FieldDef)>,
     not_null_case: &str,
@@ -303,6 +318,7 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
         .replace("{filter_like}", col.get_filter_like())
         .replace("{bind_as_for_filter}", col.get_bind_as_for_filter())
         .replace("{bind_as}", col.get_bind_as())
+        .replace("{bind_as_not_null}", col.get_bind_as_not_null())
         .replace("{from_row}", &col.get_from_row(name, index))
         .replace("{index}", &index.to_string())
         .replace("{clone}", col.clone_str())
