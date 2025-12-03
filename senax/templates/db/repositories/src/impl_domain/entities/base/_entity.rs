@@ -30,7 +30,7 @@ pub struct @{ pascal_name }@RepositoryImpl {
 fn updater_from_factory(_v: domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Factory) -> _@{ pascal_name }@Updater {
     _@{ pascal_name }@Updater {
         _data: ::db::models::@{ group_name|snake|ident }@::@{ mod_name|ident }@::Data {
-@{ def.for_factory()|fmt_join("            {var}: _v.{var}{convert_domain_factory}{convert_from_entity},", "\n") }@
+@{ def.for_factory()|fmt_join("            {ident}: _v.{ident}{convert_domain_factory}{convert_from_entity},", "\n") }@
             ..Default::default()
         },
         _update: Default::default(),

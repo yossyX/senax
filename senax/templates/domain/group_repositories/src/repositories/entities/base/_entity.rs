@@ -25,7 +25,7 @@ use ::base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@
 #[serde(deny_unknown_fields)]
 pub struct @{ pascal_name }@Factory {
 @{- def.non_auto_primary_for_factory()|fmt_join("
-{label}{comment}    pub {var}: {domain_factory},", "") }@
+{label}{comment}    pub {ident}: {domain_factory},", "") }@
 }
 
 impl @{ pascal_name }@Factory {
@@ -422,7 +422,7 @@ where@{ index.join_fields(def, "
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum Col_ {
-@{ def.all_fields()|fmt_join("    {var},", "\n") }@
+@{ def.all_fields()|fmt_join("    {ident},", "\n") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -430,16 +430,16 @@ impl Col_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields()|fmt_join("
-            Col_::{var} => \"`{col}`\",", "") }@
+            Col_::{ident} => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
     pub fn check_null<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
         match self {
             @{- def.primaries()|fmt_join("
-            Col_::{var} => {filter_check_null},", "") }@
+            Col_::{ident} => {filter_check_null},", "") }@
             @{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-            Col_::{var} => {filter_check_null},", "") }@
+            Col_::{ident} => {filter_check_null},", "") }@
             _ => unimplemented!(),
         }
     }
@@ -448,7 +448,7 @@ impl Col_ {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColOne_ {
-@{ def.all_fields_except_json()|fmt_join("    {var}({filter_type}),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("    {ident}({filter_type}),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@),
 @%- endfor %@
@@ -459,7 +459,7 @@ impl ColOne_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_except_json()|fmt_join("
-            ColOne_::{var}(_) => \"`{col}`\",", "") }@
+            ColOne_::{ident}(_) => \"`{col}`\",", "") }@
             @%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "`{name}`", ", ") }@>",
             @%- endfor %@
@@ -469,9 +469,9 @@ impl ColOne_ {
     pub fn check_eq<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
         match self {
             @{- def.equivalence_cache_fields_except_json()|fmt_join("
-            ColOne_::{var}(c) => _obj.{var}(){filter_check_eq},", "") }@
+            ColOne_::{ident}(c) => _obj.{ident}(){filter_check_eq},", "") }@
             @%- for (index_name, index) in def.multi_index(true) %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{var}(){filter_check_eq})", " && ") }@,
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{ident}(){filter_check_eq})", " && ") }@,
             @%- endfor %@
             _ => unimplemented!(),
         }
@@ -479,9 +479,9 @@ impl ColOne_ {
     pub fn check_cmp<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T, order: std::cmp::Ordering, eq: bool) -> Result<bool, bool> {
         let o = match self {
             @{- def.comparable_cache_fields_except_json()|fmt_join("
-            ColOne_::{var}(c) => _obj.{var}(){filter_check_cmp},", "") }@
+            ColOne_::{ident}(c) => _obj.{ident}(){filter_check_cmp},", "") }@
             @%- for (index_name, index) in def.multi_index(true) %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{var}(){filter_check_cmp})", ".then") }@,
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{ident}(){filter_check_cmp})", ".then") }@,
             @%- endfor %@
             _ => unimplemented!(),
         };
@@ -492,7 +492,7 @@ impl ColOne_ {
         use models::Like as _;
         match self {
             @{- def.string_cache_fields()|fmt_join("
-            ColOne_::{var}(c) => _obj.{var}(){filter_like},", "") }@
+            ColOne_::{ident}(c) => _obj.{ident}(){filter_like},", "") }@
             _ => unimplemented!(),
         }
     }
@@ -502,7 +502,7 @@ impl ColOne_ {
 #[derive(Clone, Debug, Hash, serde::Serialize)]
 pub enum ColKey_ {
     @{- def.unique_key()|fmt_index_col("
-    {var}({filter_type}),", "") }@
+    {ident}({filter_type}),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -510,7 +510,7 @@ impl ColKey_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.unique_key()|fmt_join("
-            ColKey_::{var}(_) => \"`{col}`\",", "") }@
+            ColKey_::{ident}(_) => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -519,7 +519,7 @@ impl ColKey_ {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColMany_ {
-@{ def.all_fields_except_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("    {ident}(Vec<{filter_type}>),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(Vec<@{ pascal_name }@Index_@{ index_name }@>),
 @%- endfor %@
@@ -530,7 +530,7 @@ impl ColMany_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_except_json()|fmt_join("
-            ColMany_::{var}(_) => \"`{col}`\",", "") }@
+            ColMany_::{ident}(_) => \"`{col}`\",", "") }@
             @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "`{name}`", ", ") }@>",
             @%- endfor %@
@@ -541,9 +541,9 @@ impl ColMany_ {
     pub fn check_in<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
         match self {
             @{- def.equivalence_cache_fields_except_json()|fmt_join("
-            ColMany_::{var}(list) => list.iter().any(|c| _obj.{var}(){filter_check_eq}),", "") }@
+            ColMany_::{ident}(list) => list.iter().any(|c| _obj.{ident}(){filter_check_eq}),", "") }@
             @%- for (index_name, index) in def.multi_index(true) %@
-            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(list) => list.iter().any(|@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)| @{ index.join_fields(def, "(_obj.{var}(){filter_check_eq})", " && ") }@),
+            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(list) => list.iter().any(|@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)| @{ index.join_fields(def, "(_obj.{ident}(){filter_check_eq})", " && ") }@),
             @%- endfor %@
             _ => unimplemented!(),
         }
@@ -554,7 +554,7 @@ impl ColMany_ {
 #[derive(Clone, Debug)]
 pub enum ColJson_ {
 @{- def.all_fields_only_json()|fmt_join("
-    {var}(::serde_json::Value),", "") }@
+    {ident}(::serde_json::Value),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -562,7 +562,7 @@ impl ColJson_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_json()|fmt_join("
-            ColJson_::{var}(_) => \"`{col}`\",", "") }@
+            ColJson_::{ident}(_) => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -572,7 +572,7 @@ impl ColJson_ {
 #[derive(Clone, Debug)]
 pub enum ColJsonArray_ {
 @{- def.all_fields_only_json()|fmt_join("
-    {var}(Vec<::serde_json::Value>),", "") }@
+    {ident}(Vec<::serde_json::Value>),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -580,7 +580,7 @@ impl ColJsonArray_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_json()|fmt_join("
-            ColJsonArray_::{var}(_) => \"`{col}`\",", "") }@
+            ColJsonArray_::{ident}(_) => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -590,7 +590,7 @@ impl ColJsonArray_ {
 #[derive(Clone, Debug)]
 pub enum ColGeo_ {
 @{- def.all_fields_only_geo()|fmt_join("
-    {var}(::serde_json::Value, i32),", "") }@
+    {ident}(::serde_json::Value, i32),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -598,7 +598,7 @@ impl ColGeo_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_geo()|fmt_join("
-            ColGeo_::{var}(_, _) => \"`{col}`\",", "") }@
+            ColGeo_::{ident}(_, _) => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -608,7 +608,7 @@ impl ColGeo_ {
 #[derive(Clone, Debug)]
 pub enum ColGeoDistance_ {
 @{- def.all_fields_only_geo()|fmt_join("
-    {var}(::serde_json::Value, f64, i32),", "") }@
+    {ident}(::serde_json::Value, f64, i32),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -616,7 +616,7 @@ impl ColGeoDistance_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_geo()|fmt_join("
-            ColGeoDistance_::{var}(_, _, _) => \"`{col}`\",", "") }@
+            ColGeoDistance_::{ident}(_, _, _) => \"`{col}`\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -1189,7 +1189,7 @@ impl Emu@{ pascal_name }@Repository {
     pub fn _load(&self, data: &Vec<@{ pascal_name }@Entity>) {
         let mut map = self._data.lock().unwrap();
         for v in data {
-            map.insert(@{- def.primaries()|fmt_join_with_paren("v.{var}{clone}", ", ") }@, v.clone());
+            map.insert(@{- def.primaries()|fmt_join_with_paren("v.{ident}{clone}", ", ") }@, v.clone());
         }
     }
 }
@@ -1238,7 +1238,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
         use base_domain::models::ToRawValue as _;
         Box::new(@{ pascal_name }@Entity {
 @{- def.non_auto_primary_for_factory()|fmt_join("
-            {var}: _factory.{var}{convert_domain_factory},", "") }@
+            {ident}: _factory.{ident}{convert_domain_factory},", "") }@
             ..Default::default()
         })
     }
@@ -1265,7 +1265,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
                 obj.@{ name|ident }@ = uuid::Uuid::new_v4().into();
             }
             @%- endfor %@
-            map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{var}{clone}", ", ") }@, *obj.clone());
+            map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{ident}{clone}", ", ") }@, *obj.clone());
             Ok(Some(obj as Box<dyn @{ pascal_name }@>))
         }
     }
@@ -1293,7 +1293,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
                     obj.@{ name|ident }@ = uuid::Uuid::new_v4().into();
                 }
                 @%- endfor %@
-                map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{var}{clone}", ", ") }@, *obj.clone());
+                map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{ident}{clone}", ", ") }@, *obj.clone());
             }
         }
         Ok(())
@@ -1316,14 +1316,14 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
             obj.@{ name|ident }@ = uuid::Uuid::new_v4().into();
         }
         @%- endfor %@
-        map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{var}{clone}", ", ") }@, *obj.clone());
+        map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{ident}{clone}", ", ") }@, *obj.clone());
         Ok(())
     }
     @%- endif %@
     @%- if !def.disable_delete() %@
     async fn delete(&self, obj: Box<dyn _Updater>) -> anyhow::Result<()> {
         let mut map = self._data.lock().unwrap();
-        map.remove(&@{- def.primaries()|fmt_join_with_paren("obj.{var}(){clone}", ", ") }@);
+        map.remove(&@{- def.primaries()|fmt_join_with_paren("obj.{ident}(){clone}", ", ") }@);
         Ok(())
     }
     @%- if def.primaries().len() == 1 %@

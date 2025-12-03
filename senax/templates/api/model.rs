@@ -167,15 +167,15 @@ impl GqlQuery@{ graphql_name }@ {
         gql_ctx: &async_graphql::Context<'_>,
         @%- if camel_case %@
         @{- def.primaries()|fmt_join("
-        {var}: {inner},", "") }@
+        {ident}: {inner},", "") }@
         @%- else %@
         @{- def.primaries()|fmt_join("
-        #[graphql(name = \"{raw_name}\")] {var}: {inner},", "") }@
+        #[graphql(name = \"{raw_name}\")] {ident}: {inner},", "") }@
         @%- endif %@
     ) -> async_graphql::Result<ResObj> {
         let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
-        let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
+        let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{ident}", ", ") }@.into();
         crate::gql_find!(find(gql_ctx, repo.@{ db|snake }@_query(), auth, &primary), repo, gql_ctx)
     }
     @%- endif %@
@@ -433,15 +433,15 @@ impl GqlMutation@{ graphql_name }@ {
         gql_ctx: &async_graphql::Context<'_>,
         @%- if camel_case %@
         @{- def.primaries()|fmt_join("
-        {var}: {inner},", "") }@
+        {ident}: {inner},", "") }@
         @%- else %@
         @{- def.primaries()|fmt_join("
-        #[graphql(name = \"{raw_name}\")] {var}: {inner},", "") }@
+        #[graphql(name = \"{raw_name}\")] {ident}: {inner},", "") }@
         @%- endif %@
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
+        let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{ident}", ", ") }@.into();
         crate::gql_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, &primary), repo, gql_ctx)
     }
     @%- endif %@
@@ -504,8 +504,8 @@ impl GqlMutation@{ graphql_name }@ {
         for (idx, data) in list.into_iter().enumerate() {
             let primary: Option<_domain_::@{ pascal_name }@Primary> = if let Some(_id) = &data._id {
                 Some(_id.try_into()?)
-            } else if @{ def.primaries()|fmt_join_auto_or_not("let Some({var}) = data.{var}{clone}", "let {var} = data.{var}{clone}", " && ") }@ {
-                Some(@{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into())
+            } else if @{ def.primaries()|fmt_join_auto_or_not("let Some({ident}) = data.{ident}{clone}", "let {ident} = data.{ident}{clone}", " && ") }@ {
+                Some(@{ def.primaries()|fmt_join_with_paren("{ident}", ", ") }@.into())
             } else {
                 None
             };
@@ -566,8 +566,8 @@ impl GqlMutation@{ graphql_name }@ {
         #[allow(irrefutable_let_patterns)]
         let primary: _domain_::@{ pascal_name }@Primary = if let Some(_id) = &data._id {
             _id.try_into()?
-        } else if @{ def.primaries()|fmt_join_auto_or_not("let Some({var}) = data.{var}{clone}", "let {var} = data.{var}{clone}", " && ") }@ {
-            @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into()
+        } else if @{ def.primaries()|fmt_join_auto_or_not("let Some({ident}) = data.{ident}{clone}", "let {ident} = data.{ident}{clone}", " && ") }@ {
+            @{ def.primaries()|fmt_join_with_paren("{ident}", ", ") }@.into()
         } else {
             let mut e = validator::ValidationErrors::new();
             e.add("_id", validator::ValidationError::new("required"));
@@ -806,15 +806,15 @@ impl GqlMutation@{ graphql_name }@ {
         gql_ctx: &async_graphql::Context<'_>,
         @%- if camel_case %@
         @{- def.primaries()|fmt_join("
-        {var}: {inner},", "") }@
+        {ident}: {inner},", "") }@
         @%- else %@
         @{- def.primaries()|fmt_join("
-        #[graphql(name = \"{raw_name}\")] {var}: {inner},", "") }@
+        #[graphql(name = \"{raw_name}\")] {ident}: {inner},", "") }@
         @%- endif %@
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        delete(repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into())
+        delete(repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, @{ def.primaries()|fmt_join_with_paren("{ident}", ", ") }@.into())
             .await
             .map_err(|e| {
                 if let Some(e) = e.downcast_ref::<GqlError>() {

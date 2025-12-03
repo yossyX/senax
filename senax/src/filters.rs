@@ -216,7 +216,7 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
     f.replace("{col}", &_to_db_col(name, false))
         .replace("{col_esc}", &_to_db_col(&col.get_col_name(name), true))
         .replace("{col_query}", &col.get_col_query(&col.get_col_name(name)))
-        .replace("{var}", &_to_ident_name(name))
+        .replace("{ident}", &_to_ident_name(name))
         .replace("{raw_name}", &_raw_ident_name(name))
         .replace("{var_pascal}", &name.to_pascal())
         .replace("{upper}", &name.to_upper_snake())
@@ -405,9 +405,9 @@ fn _fmt_rel(f: &str, rel: &&RelDef, name: &&String, model: &&ModelDef, index: i3
             format!("rel.sort_by(|v1, v2| v1._inner.{col}.cmp(&v2._inner.{col}){list_order});"),
         )
     } else {
-        let tmpl1 = format!("repo_{class_mod}::Order_::{asc}(repo_{class_mod}::Col_::{{var}})");
-        let tmpl2 = "(v1._inner.{var}.cmp(&v2._inner.{var}))".to_string();
-        let tmpl3 = "(v1._data.{var}.cmp(&v2._data.{var}))".to_string();
+        let tmpl1 = format!("repo_{class_mod}::Order_::{asc}(repo_{class_mod}::Col_::{{ident}})");
+        let tmpl2 = "(v1._inner.{ident}.cmp(&v2._inner.{ident}))".to_string();
+        let tmpl3 = "(v1._data.{ident}.cmp(&v2._data.{ident}))".to_string();
         (
             fmt_join(foreign_model.primaries(), &tmpl1, ",").unwrap(),
             format!(
@@ -620,7 +620,7 @@ fn _fmt_index_col(name: &&String, col: &&FieldDef, f: &str, index: usize) -> Str
         .replace("{col_name}", &col.get_col_name(name))
         .replace("{col_esc}", &_to_db_col(&col.get_col_name(name), true))
         .replace("{col_pascal}", &name.to_pascal())
-        .replace("{var}", &_to_ident_name(name))
+        .replace("{ident}", &_to_ident_name(name))
         .replace("{raw_name}", name)
         .replace("{bind_as_for_filter}", col.get_bind_as_for_filter())
         .replace("{filter_type}", &col.get_filter_type(domain_mode()))

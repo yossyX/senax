@@ -82,9 +82,9 @@ pub trait @{ pascal_name }@Common: std::fmt::Debug@% if !def.parents().is_empty(
 @{- def.primaries()|fmt_join("
 {label}{comment}    fn _{raw_name}(&self) -> {inner};", "") }@
 @{- def.only_version()|fmt_join("
-{label}{comment}    fn {var}(&self) -> {outer};", "") }@
+{label}{comment}    fn {ident}(&self) -> {outer};", "") }@
 @{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-{label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
+{label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
 }
 
 @{ def.label|label0 -}@
@@ -106,7 +106,7 @@ pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common@% if !def.parents().is
 @{ def.comment|comment0 -}@
 pub trait @{ pascal_name }@: @{ pascal_name }@Common@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@@% endfor %@@% endif %@ {
 @{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
-{label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
+{label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
 @{- def.relations_belonging(true)|fmt_rel_join("
     fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
         Some({local_keys}.into())
@@ -121,7 +121,7 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common@% if !def.parents().is_empt
 @{ def.comment|comment0 -}@
 pub trait @{ pascal_name }@Updater: @{ pascal_name }@Common + crate::models::MarkForDelete@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@@% endif %@ {
 @{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
-{label}{comment}    fn {var}(&self) -> {domain_outer};", "") }@
+{label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_name}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("

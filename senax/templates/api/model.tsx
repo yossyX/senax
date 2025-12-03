@@ -13,7 +13,7 @@ export const All@{ model_route|pascal }@Query = graphql(`query all_@{ path }@{@{
 @%- endif %@
 @%- if api_def.use_find_by_pk %@
 
-export const FindByPk@{ model_route|pascal }@Query = graphql(`query find_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${var}:{gql_type}", ",") }@){@{ curly_begin }@{findByPk(@{ def.primaries()|fmt_join("{var}: ${var}", ",") }@){...@{ graphql_name }@}}@{ curly_end }@}`);
+export const FindByPk@{ model_route|pascal }@Query = graphql(`query find_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${ident}:{gql_type}", ",") }@){@{ curly_begin }@{findByPk(@{ def.primaries()|fmt_join("{ident}: ${ident}", ",") }@){...@{ graphql_name }@}}@{ curly_end }@}`);
 @%- endif %@
 
 export const Find@{ model_route|pascal }@Query = graphql(`query find_@{ path }@($_id:ID!){@{ curly_begin }@{find(_id: $_id){...@{ graphql_name }@}}@{ curly_end }@}`);
@@ -30,7 +30,7 @@ export const Count@{ selector|pascal }@@{ model_route|pascal }@Query = graphql(`
 @%- if !def.disable_update() %@
 @%- if api_def.use_find_by_pk %@
 
-export const FindForUpdateByPk@{ model_route|pascal }@Query = graphql(`mutation find_for_update_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${var}:{gql_type}", ",") }@){@{ curly_begin }@{findForUpdateByPk(@{ def.primaries()|fmt_join("{var}: ${var}", ",") }@){...@{ graphql_name }@}}@{ curly_end }@}`);
+export const FindForUpdateByPk@{ model_route|pascal }@Query = graphql(`mutation find_for_update_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${ident}:{gql_type}", ",") }@){@{ curly_begin }@{findForUpdateByPk(@{ def.primaries()|fmt_join("{ident}: ${ident}", ",") }@){...@{ graphql_name }@}}@{ curly_end }@}`);
 @%- endif %@
 
 export const FindForUpdate@{ model_route|pascal }@Query = graphql(`mutation find_for_update_@{ path }@($_id:ID!){@{ curly_begin }@{findForUpdate(_id: $_id){...@{ graphql_name }@}}@{ curly_end }@}`);
@@ -49,7 +49,7 @@ export const Update@{ model_route|pascal }@Query = graphql(`mutation update_@{ p
 export const Delete@{ model_route|pascal }@Query = graphql(`mutation delete_@{ path }@($_id:ID!){@{ curly_begin }@{delete(_id:$_id)}@{ curly_end }@}`);
 @%- if api_def.use_delete_by_pk %@
 
-export const DeleteByPk@{ model_route|pascal }@Query = graphql(`query delete_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${var}:{gql_type}", ",") }@){@{ curly_begin }@{deleteByPk(@{ def.primaries()|fmt_join("{var}: ${var}", ",") }@)}@{ curly_end }@}`);
+export const DeleteByPk@{ model_route|pascal }@Query = graphql(`query delete_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${ident}:{gql_type}", ",") }@){@{ curly_begin }@{deleteByPk(@{ def.primaries()|fmt_join("{ident}: ${ident}", ",") }@)}@{ curly_end }@}`);
 @%- endif %@
 @%- for (selector, selector_def) in def.selectors %@
 @%- for api_selector_def in api_def.selector(selector) %@

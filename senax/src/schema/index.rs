@@ -289,7 +289,7 @@ impl IndexDef {
             });
             v.push(
                 tpl.replace("{name}", name)
-                    .replace("{var}", &_to_ident_name(name))
+                    .replace("{ident}", &_to_ident_name(name))
                     .replace("{filter_type}", &col.get_filter_type(super::domain_mode()))
                     .replace("{col_esc}", &_to_db_col(name, true))
                     .replace("{index}", &index.to_string())

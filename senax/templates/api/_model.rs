@@ -88,7 +88,7 @@ pub struct ResObj {
     pub _id: async_graphql::ID,
 @%- if camel_case %@
 @{- def.for_api_response()|fmt_join("
-{label_wo_hash}{res_api_schema_type}    pub {var}: {res_api_type},", "") }@
+{label_wo_hash}{res_api_schema_type}    pub {ident}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @{- def.relations_many_for_api_response()|fmt_rel_join("
@@ -101,7 +101,7 @@ pub struct ResObj {
 @%- else %@
 @{- def.for_api_response()|fmt_join("
 {label_wo_hash}{res_api_schema_type}    #[graphql(name = \"{raw_name}\")]
-    pub {var}: {res_api_type},", "") }@
+    pub {ident}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]
     pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
@@ -137,7 +137,7 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@> for ResObj {
         Ok(Self {
             _id: v.into(),
             @{- def.for_api_response()|fmt_join("
-            {var}: v.{var}(){to_res_api_type},", "") }@
+            {ident}: v.{ident}(){to_res_api_type},", "") }@
             @{- def.relations_one_for_api_response()|fmt_rel_join("
             {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| v.into()),", "") }@
             @{- def.relations_many_for_api_response()|fmt_rel_join("
@@ -160,7 +160,7 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@Cache> for ResObj {
         Ok(Self {
             _id: v.into(),
             @{- def.for_api_response()|fmt_join("
-            {var}: v.{var}(){to_res_api_type},", "") }@
+            {ident}: v.{ident}(){to_res_api_type},", "") }@
             @{- def.relations_one_for_api_response()|fmt_rel_join("
             {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| (&*v).into()),", "") }@
             @{- def.relations_many_for_api_response()|fmt_rel_join("
@@ -252,13 +252,13 @@ pub struct ReqObj {
     pub _id: Option<async_graphql::ID>,
 @%- if camel_case %@
 @{- def.auto_primary()|fmt_join("
-{label_wo_hash}{graphql_secret}{api_validate}{api_default_attribute}    pub {var}: {req_api_option_type},", "") }@
+{label_wo_hash}{graphql_secret}{api_validate}{api_default_attribute}    pub {ident}: {req_api_option_type},", "") }@
 @{- def.for_api_request()|fmt_join("
-{label_wo_hash}{graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {var}: {req_api_type},", "") }@
+{label_wo_hash}{graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {ident}: {req_api_type},", "") }@
 @{- def.for_api_response_not_in_request()|fmt_join("
     #[graphql(visible = false)]
     #[serde(skip)]
-    pub {var}: {req_api_option_type},", "") }@
+    pub {ident}: {req_api_option_type},", "") }@
 @{- def.relations_one_for_api_request()|fmt_rel_join("
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ReqObj{rel_name_pascal}>,", "") }@
 @{- def.relations_many_for_api_request()|fmt_rel_join("
@@ -266,14 +266,14 @@ pub struct ReqObj {
 @%- else %@
 @{- def.auto_primary()|fmt_join("
     #[graphql(name = \"{raw_name}\")]
-{graphql_secret}{api_validate}{api_default_attribute}    pub {var}: {req_api_option_type},", "") }@
+{graphql_secret}{api_validate}{api_default_attribute}    pub {ident}: {req_api_option_type},", "") }@
 @{- def.for_api_request()|fmt_join("
 {label_wo_hash}    #[graphql(name = \"{raw_name}\")]
-{graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {var}: {req_api_type},", "") }@
+{graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {ident}: {req_api_type},", "") }@
 @{- def.for_api_response_not_in_request()|fmt_join("
     #[graphql(name = \"{raw_name}\", visible = false)]
     #[serde(skip)]
-    pub {var}: {req_api_option_type},", "") }@
+    pub {ident}: {req_api_option_type},", "") }@
 @{- def.relations_one_for_api_request()|fmt_rel_join("
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]
     pub {rel_name}: Option<_{raw_rel_name}::ReqObj{rel_name_pascal}>,", "") }@
@@ -304,12 +304,12 @@ impl From<&mut dyn _domain_::@{ pascal_name }@Updater> for ReqObj {
         Self {
             _id: Some((&*v).into()),
             @{- def.auto_primary()|fmt_join("
-            {var}: Some(v.{var}(){to_req_api_type}),", "") }@
+            {ident}: Some(v.{ident}(){to_req_api_type}),", "") }@
             @{- def.for_api_request()|fmt_join_not_null_or_null("
-            {var}: v.{var}(){to_req_api_type},", "
-            {var}: Some(v.{var}(){to_req_api_type}).into(),", "") }@
+            {ident}: v.{ident}(){to_req_api_type},", "
+            {ident}: Some(v.{ident}(){to_req_api_type}).into(),", "") }@
             @{- def.for_api_response_not_in_request()|fmt_join("
-            {var}: None,", "") }@
+            {ident}: None,", "") }@
             @{- def.relations_one_for_api_request()|fmt_rel_join("
             {rel_name}: (|| v.{rel_name}().unwrap().map(|v| v.into()))(),", "") }@
             @{- def.relations_many_for_api_request()|fmt_rel_join("
@@ -329,7 +329,7 @@ impl From<&mut dyn _domain_::@{ pascal_name }@Updater> for ReqObj {
 fn create_entity(input: ReqObj, repo: &dyn _Repository, auth: &AuthInfo) -> Box<dyn _domain_::@{ pascal_name }@Updater> {
     let mut obj = _repository_::@{ pascal_name }@Factory {
 @{- def.non_auto_primary_for_factory()|fmt_join("
-        {var}: {from_api_type},", "") }@
+        {ident}: {from_api_type},", "") }@
     }
     .create(repo.into());
     @{- def.relations_one_for_api_request()|fmt_rel_join("
@@ -360,7 +360,7 @@ pub fn create_list(
 fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: ReqObj, repo: &dyn _Repository, auth: &AuthInfo) -> anyhow::Result<()> {
 @{- def.for_api_update_updater()|fmt_join_not_null_or_null("
     updater.set_{raw_name}({from_api_type_for_update});", "
-    if !input.{var}.is_undefined() {
+    if !input.{ident}.is_undefined() {
         updater.set_{raw_name}({from_api_type_for_update});
     }", "") }@
 @{- def.relations_one_for_api_request_with_replace_type(true)|fmt_rel_join("

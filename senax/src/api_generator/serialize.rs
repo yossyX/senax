@@ -301,7 +301,7 @@ fn make_model(
         },
         gql_name,
         label: def.label.clone(),
-        pk: crate::filters::fmt_join(def.primaries(), "{var}: {gql_type}", ",")?,
+        pk: crate::filters::fmt_join(def.primaries(), "{ident}: {gql_type}", ",")?,
         has_all_query: def.use_all_rows_cache() && !def.use_filtered_row_cache(),
         use_find_by_pk: api_def.use_find_by_pk,
         use_delete_by_pk: api_def.use_delete_by_pk,

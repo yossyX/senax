@@ -241,15 +241,15 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
     #[allow(clippy::let_and_return)]
     async fn update_with_unique_cache(id: &PrimaryHasher, obj: CacheData, update: &Data, op: &OpData, time: MSec) -> CacheData {
 @%- for (index_name, index) in def.unique_index() %@
-        if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("op.{var} != Op::None", "op.{var} != Op::None && obj.{var}.is_some()", " && ") }@ {
-            let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{var}(obj.{var}.clone(){inner_to_raw}.into())", "ColKey_::{var}(obj.{var}.as_ref().unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
+        if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("op.{ident} != Op::None", "op.{ident} != Op::None && obj.{ident}.is_some()", " && ") }@ {
+            let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{ident}(obj.{ident}.clone(){inner_to_raw}.into())", "ColKey_::{ident}(obj.{ident}.as_ref().unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
             Cache::invalidate(&key, id._shard_id()).await;
         }
 @%- endfor %@
         let obj = CacheOp::update(obj, update, op);
 @%- for (index_name, index) in def.unique_index() %@
-        if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("op.{var} != Op::None", "op.{var} != Op::None && obj.{var}.is_some()", " && ") }@ {
-            let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{var}(obj.{var}.clone(){inner_to_raw}.into())", "ColKey_::{var}(obj.{var}.as_ref().unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
+        if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("op.{ident} != Op::None", "op.{ident} != Op::None && obj.{ident}.is_some()", " && ") }@ {
+            let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{ident}(obj.{ident}.clone(){inner_to_raw}.into())", "ColKey_::{ident}(obj.{ident}.as_ref().unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
             Cache::invalidate(&key, id._shard_id()).await;
         }
 @%- endfor %@
@@ -318,8 +318,8 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         Cache::invalidate(&id, shard_id).await;
                     }
                     @%- for (index_name, index) in def.unique_index() %@
-                    if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("true", " data.{var}.is_some()", " && ") }@ {
-                        let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{var}(data.{var}.clone(){inner_to_raw}.into())", "ColKey_::{var}(data.{var}.unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
+                    if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("true", " data.{ident}.is_some()", " && ") }@ {
+                        let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{ident}(data.{ident}.clone(){inner_to_raw}.into())", "ColKey_::{ident}(data.{ident}.unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
                         Cache::invalidate(&key, shard_id).await;
                     }
                     @%- endfor %@
@@ -383,8 +383,8 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                             }.handle_cache_msg(Arc::clone(&sync_map)).await;
                         }", "")|replace1("_data") }@
                         @%- for (index_name, index) in def.unique_index() %@
-                        if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("true", " row._data.{var}.is_some()", " && ") }@ {
-                            let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{var}(row._data.{var}.clone(){inner_to_raw}.into())", "ColKey_::{var}(row._data.{var}.unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
+                        if @{ index.fields(index_name, def)|fmt_index_col_not_null_or_null("true", " row._data.{ident}.is_some()", " && ") }@ {
+                            let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col_not_null_or_null("ColKey_::{ident}(row._data.{ident}.clone(){inner_to_raw}.into())", "ColKey_::{ident}(row._data.{ident}.unwrap().clone(){inner_to_raw}.into())", ", ") }@]);
                             Cache::invalidate(&key, shard_id).await;
                         }
                         @%- endfor %@
@@ -1120,7 +1120,7 @@ async fn _handle_delayed_msg_save(shard_id: ShardId) {
 
 fn aggregate_update(x: &_@{ pascal_name }@Updater, old: &mut _@{ pascal_name }@Updater) {
     @{- def.non_primaries_except_read_only()|fmt_join("
-    Accessor{accessor_with_sep_type}::_set(x._op.{var}, &mut old._update.{var}, &x._update.{var});", "") }@
+    Accessor{accessor_with_sep_type}::_set(x._op.{ident}, &mut old._update.{ident}, &x._update.{ident});", "") }@
 }
 @%- endif %@
 @%- if def.use_update_delayed() %@
@@ -1376,7 +1376,7 @@ impl RelCol@{ rel_name|pascal }@ {
     }
     fn set_op_none(op: &mut rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::OpData) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-        op.{var} = Op::None;", "") }@
+        op.{ident} = Op::None;", "") }@
     }
 }
 
@@ -1390,7 +1390,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
         let pk: Primary = self.into();
         repo::Filter_::new_and()
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@
+            .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
     }
     fn in_filter(list: &[Self]) -> repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
         use repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as repo;
@@ -1400,14 +1400,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
             let pk: Primary = row.into();
             vec.push(pk.0.inner().into());
         }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{var}(vec))", "") }@
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{ident}(vec))", "") }@
         @%- else %@
         let mut filter = repo::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
             filter = filter.or(repo::Filter_::new_and()
             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
+                .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
         }
         filter
         @%- endif %@
@@ -1419,7 +1419,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
         let pk: Primary = self.into();
         repo::Filter_::new_and()
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@
+            .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
     }
     fn in_filter(list: &[Self]) -> repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
         use repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as repo;
@@ -1429,14 +1429,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
             let pk: Primary = row.into();
             vec.push(pk.0.inner().into());
         }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{var}(vec))", "") }@
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{ident}(vec))", "") }@
         @%- else %@
         let mut filter = repo::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
             filter = filter.or(repo::Filter_::new_and()
             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
+                .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
         }
         filter
         @%- endif %@
@@ -1448,7 +1448,7 @@ impl RelFil@{ rel_name|pascal }@ for &ForInsert {
         let pk: Primary = (&self._data).into();
         repo::Filter_::new_and()
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@
+            .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
     }
     fn in_filter(list: &[Self]) -> repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
         use repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as repo;
@@ -1458,14 +1458,14 @@ impl RelFil@{ rel_name|pascal }@ for &ForInsert {
             let pk: Primary = (&row._data).into();
             vec.push(pk.0.inner().into());
         }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{var}(vec))", "") }@
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{ident}(vec))", "") }@
         @%- else %@
         let mut filter = repo::Filter_::new_or();
         for row in list {
             let pk: Primary = (&row._data).into();
             filter = filter.or(repo::Filter_::new_and()
             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
+                .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
         }
         filter
         @%- endif %@
@@ -1478,7 +1478,7 @@ impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
         let pk: Primary = self.into();
         repo::Filter_::new_and()
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@
+            .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
     }
     fn in_filter(list: &[Self]) -> repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
         use repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as repo;
@@ -1488,14 +1488,14 @@ impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
             let pk: Primary = row.into();
             vec.push(pk.0.inner().into());
         }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{var}(vec))", "") }@
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{ident}(vec))", "") }@
         @%- else %@
         let mut filter = repo::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
             filter = filter.or(repo::Filter_::new_and()
             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
+                .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
         }
         filter
         @%- endif %@
@@ -1507,7 +1507,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
         let pk: Primary = self.into();
         repo::Filter_::new_and()
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@
+            .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
     }
     fn in_filter(list: &[Self]) -> repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
         use repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as repo;
@@ -1517,14 +1517,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
             let pk: Primary = row.into();
             vec.push(pk.0.inner().into());
         }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{var}(vec))", "") }@
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{ident}(vec))", "") }@
         @%- else %@
         let mut filter = repo::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
             filter = filter.or(repo::Filter_::new_and()
             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
+                .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
         }
         filter
         @%- endif %@
@@ -1579,7 +1579,7 @@ impl RelCol@{ rel_name|pascal }@ {
     }
     fn set_op_none(op: &mut rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::OpData) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-        op.{var} = Op::None;", "") }@
+        op.{ident} = Op::None;", "") }@
     }
 }
 
@@ -1593,7 +1593,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
         let pk: Primary = self.into();
         repo::Filter_::new_and()
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@
+            .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
     }
     fn in_filter(list: &[Self]) -> repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
         use repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as repo;
@@ -1603,14 +1603,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
             let pk: Primary = row.into();
             vec.push(pk.0.inner().into());
         }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{var}(vec))", "") }@
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{ident}(vec))", "") }@
         @%- else %@
         let mut filter = repo::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
             filter = filter.or(repo::Filter_::new_and()
             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
+                .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
         }
         filter
         @%- endif %@
@@ -1622,7 +1622,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
         let pk: Primary = self.into();
         repo::Filter_::new_and()
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@
+            .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
     }
     fn in_filter(list: &[Self]) -> repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
         use repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as repo;
@@ -1632,14 +1632,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
             let pk: Primary = row.into();
             vec.push(pk.0.inner().into());
         }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{var}(vec))", "") }@
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{ident}(vec))", "") }@
         @%- else %@
         let mut filter = repo::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
             filter = filter.or(repo::Filter_::new_and()
             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
+                .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
         }
         filter
         @%- endif %@
@@ -1651,7 +1651,7 @@ impl RelFil@{ rel_name|pascal }@ for &ForInsert {
         let pk: Primary = (&self._data).into();
         repo::Filter_::new_and()
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@
+            .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
     }
     fn in_filter(list: &[Self]) -> repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
         use repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as repo;
@@ -1661,14 +1661,14 @@ impl RelFil@{ rel_name|pascal }@ for &ForInsert {
             let pk: Primary = (&row._data).into();
             vec.push(pk.0.inner().into());
         }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{var}(vec))", "") }@
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{ident}(vec))", "") }@
         @%- else %@
         let mut filter = repo::Filter_::new_or();
         for row in list {
             let pk: Primary = (&row._data).into();
             filter = filter.or(repo::Filter_::new_and()
             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
+                .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
         }
         filter
         @%- endif %@
@@ -1681,7 +1681,7 @@ impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
         let pk: Primary = self.into();
         repo::Filter_::new_and()
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@
+            .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
     }
     fn in_filter(list: &[Self]) -> repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
         use repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as repo;
@@ -1691,14 +1691,14 @@ impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
             let pk: Primary = row.into();
             vec.push(pk.0.inner().into());
         }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{var}(vec))", "") }@
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{ident}(vec))", "") }@
         @%- else %@
         let mut filter = repo::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
             filter = filter.or(repo::Filter_::new_and()
             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
+                .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
         }
         filter
         @%- endif %@
@@ -1710,7 +1710,7 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
         let pk: Primary = self.into();
         repo::Filter_::new_and()
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@
+            .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
     }
     fn in_filter(list: &[Self]) -> repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
         use repo_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as repo;
@@ -1720,14 +1720,14 @@ impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
             let pk: Primary = row.into();
             vec.push(pk.0.inner().into());
         }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{var}(vec))", "") }@
+        @{ rel.get_foreign_cols(def)|fmt_join_foreign("repo::Filter_::In(repo::ColMany_::{ident}(vec))", "") }@
         @%- else %@
         let mut filter = repo::Filter_::new_or();
         for row in list {
             let pk: Primary = row.into();
             filter = filter.or(repo::Filter_::new_and()
             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(repo::Filter_::Eq(repo::ColOne_::{var}(pk.{index}.inner().into())))", "") }@);
+                .and(repo::Filter_::Eq(repo::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
         }
         filter
         @%- endif %@
@@ -2535,7 +2535,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum Col_ {
-@{ def.all_fields()|fmt_join("    {var},", "\n") }@
+@{ def.all_fields()|fmt_join("    {ident},", "\n") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -2543,7 +2543,7 @@ impl Col_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields()|fmt_join("
-            Col_::{var} => \"{col}\",", "") }@
+            Col_::{ident} => \"{col}\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -2554,7 +2554,7 @@ pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snak
 impl ColTr for Col_ {
     fn name(&self) -> &'static str {
         match self {
-@{ def.all_fields()|fmt_join("            Col_::{var} => r#\"{col_esc}\"#,", "\n") }@
+@{ def.all_fields()|fmt_join("            Col_::{ident} => r#\"{col_esc}\"#,", "\n") }@
         }
     }
 }
@@ -2563,7 +2563,7 @@ impl ColTr for Col_ {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColOne_ {
-@{ def.all_fields_except_json()|fmt_join("    {var}({filter_type}),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("    {ident}({filter_type}),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(_@{ pascal_name }@Index_@{ index_name }@),
 @%- endfor %@
@@ -2574,7 +2574,7 @@ impl ColOne_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_except_json()|fmt_join("
-            ColOne_::{var}(_) => \"{col}\",", "") }@
+            ColOne_::{ident}(_) => \"{col}\",", "") }@
             @%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "{name}", ", ") }@>",
             @%- endfor %@
@@ -2589,7 +2589,7 @@ pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snak
 impl BindTr for ColOne_ {
     fn name(&self) -> &'static str {
         match self {
-@{ def.all_fields_except_json()|fmt_join("            ColOne_::{var}(_) => r#\"{col_esc}\"#,", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColOne_::{ident}(_) => r#\"{col_esc}\"#,", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => r#"(@{ index.join_fields(def, "{col_esc}", ", ") }@)"#,
 @%- endfor %@
@@ -2598,7 +2598,7 @@ impl BindTr for ColOne_ {
     }
     fn placeholder(&self) -> &'static str {
         match self {
-@{ def.all_fields_except_json()|fmt_join("            ColOne_::{var}(_) => \"{placeholder}\",", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColOne_::{ident}(_) => \"{placeholder}\",", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(_) => "(@{ index.join_fields(def, "{placeholder}", ", ") }@)",
 @%- endfor %@
@@ -2611,7 +2611,7 @@ impl BindTr for ColOne_ {
     ) -> Query<'_, DbType, DbArguments> {
         debug!("bind: {:?}", &self);
         match self {
-@{ def.all_fields_except_json()|fmt_join("            ColOne_::{var}(v) => query.bind(v{bind_as_for_filter}),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColOne_::{ident}(v) => query.bind(v{bind_as_for_filter}),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColOne_::@{ index.join_fields(def, "{name}", "_") }@(v) => query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@,
 @%- endfor %@
@@ -2625,7 +2625,7 @@ impl BindTr for ColOne_ {
 #[derive(Clone, Debug, Hash, Serialize)]
 pub enum ColKey_ {
     @{- def.unique_key()|fmt_index_col("
-    {var}({filter_type}),", "") }@
+    {ident}({filter_type}),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -2633,7 +2633,7 @@ impl ColKey_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.unique_key()|fmt_join("
-            ColKey_::{var}(_) => \"{col}\",", "") }@
+            ColKey_::{ident}(_) => \"{col}\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -2646,7 +2646,7 @@ impl BindTr for ColKey_ {
     fn name(&self) -> &'static str {
         match self {
             @{- def.unique_key()|fmt_index_col("
-            ColKey_::{var}(_v) => r#\"{col_esc}\"#,", "") }@
+            ColKey_::{ident}(_v) => r#\"{col_esc}\"#,", "") }@
             _ => unreachable!(),
         }
     }
@@ -2657,7 +2657,7 @@ impl BindTr for ColKey_ {
         debug!("bind: {:?}", &self);
         match self {
             @{- def.unique_key()|fmt_index_col("
-            ColKey_::{var}(v) => query.bind(v{bind_as_for_filter}),", "") }@
+            ColKey_::{ident}(v) => query.bind(v{bind_as_for_filter}),", "") }@
             _ => unreachable!(),
         }
     }
@@ -2685,7 +2685,7 @@ impl HashVal for VecColKey {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColMany_ {
-@{ def.all_fields_except_json()|fmt_join("    {var}(Vec<{filter_type}>),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("    {ident}(Vec<{filter_type}>),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
     @{ index.join_fields(def, "{name}", "_") }@(Vec<_@{ pascal_name }@Index_@{ index_name }@>),
 @%- endfor %@
@@ -2696,7 +2696,7 @@ impl ColMany_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_except_json()|fmt_join("
-            ColMany_::{var}(_) => \"{col}\",", "") }@
+            ColMany_::{ident}(_) => \"{col}\",", "") }@
             @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_) => "<@{ index.join_fields(def, "{name}", ", ") }@>",
             @%- endfor %@
@@ -2711,7 +2711,7 @@ pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snak
 impl BindTr for ColMany_ {
     fn name(&self) -> &'static str {
         match self {
-@{ def.all_fields_except_json()|fmt_join("            ColMany_::{var}(_) => r#\"{col_esc}\"#,", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColMany_::{ident}(_) => r#\"{col_esc}\"#,", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_v) => r#"(@{ index.join_fields(def, "{col_esc}", ", ") }@)"#,
 @%- endfor %@
@@ -2720,7 +2720,7 @@ impl BindTr for ColMany_ {
     }
     fn placeholder(&self) -> &'static str {
         match self {
-@{ def.all_fields_except_json()|fmt_join("            ColMany_::{var}(_) => \"{placeholder}\",", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColMany_::{ident}(_) => \"{placeholder}\",", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(_v) => "(@{ index.join_fields(def, "{placeholder}", ", ") }@)",
 @%- endfor %@
@@ -2729,7 +2729,7 @@ impl BindTr for ColMany_ {
     }
     fn len(&self) -> usize {
         match self {
-@{ def.all_fields_except_json()|fmt_join("            ColMany_::{var}(v) => v.len(),", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColMany_::{ident}(v) => v.len(),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(v) => v.len(),
 @%- endfor %@
@@ -2742,7 +2742,7 @@ impl BindTr for ColMany_ {
     ) -> Query<'_, DbType, DbArguments> {
         debug!("bind: {:?}", &self);
         match self {
-@{ def.all_fields_except_json()|fmt_join("            ColMany_::{var}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "\n") }@
+@{ def.all_fields_except_json()|fmt_join("            ColMany_::{ident}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
             ColMany_::@{ index.join_fields(def, "{name}", "_") }@(v) => {for v in v { query = query@{ index.join_fields(def, ".bind(v.{index}{bind_as_for_filter})", "") }@; } query},
 @%- endfor %@
@@ -2756,7 +2756,7 @@ impl BindTr for ColMany_ {
 #[derive(Clone, Debug)]
 pub enum ColJson_ {
 @{- def.all_fields_only_json()|fmt_join("
-    {var}(Value),", "") }@
+    {ident}(Value),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -2764,7 +2764,7 @@ impl ColJson_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_json()|fmt_join("
-            ColJson_::{var}(_) => \"{col}\",", "") }@
+            ColJson_::{ident}(_) => \"{col}\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -2777,7 +2777,7 @@ impl BindTr for ColJson_ {
     fn name(&self) -> &'static str {
         match self {
 @{- def.all_fields_only_json()|fmt_join("
-            ColJson_::{var}(_v) => r#\"{col_esc}\"#,", "") }@
+            ColJson_::{ident}(_v) => r#\"{col_esc}\"#,", "") }@
             _ => unreachable!(),
         }
     }
@@ -2788,7 +2788,7 @@ impl BindTr for ColJson_ {
         debug!("bind: {:?}", &self);
         match self {
 @{- def.all_fields_only_json()|fmt_join("
-            ColJson_::{var}(v) => query.bind(v{bind_as_for_filter}),", "") }@
+            ColJson_::{ident}(v) => query.bind(v{bind_as_for_filter}),", "") }@
             _ => unreachable!(),
         }
     }
@@ -2799,7 +2799,7 @@ impl BindTr for ColJson_ {
 #[derive(Clone, Debug)]
 pub enum ColJsonArray_ {
 @{- def.all_fields_only_json()|fmt_join("
-    {var}(Vec<Value>),", "") }@
+    {ident}(Vec<Value>),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -2807,7 +2807,7 @@ impl ColJsonArray_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_json()|fmt_join("
-            ColJsonArray_::{var}(_) => \"{col}\",", "") }@
+            ColJsonArray_::{ident}(_) => \"{col}\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -2820,7 +2820,7 @@ impl BindTr for ColJsonArray_ {
     fn name(&self) -> &'static str {
         match self {
 @{- def.all_fields_only_json()|fmt_join("
-            ColJsonArray_::{var}(_v) => r#\"{col_esc}\"#,", "") }@
+            ColJsonArray_::{ident}(_v) => r#\"{col_esc}\"#,", "") }@
             _ => unreachable!(),
         }
     }
@@ -2831,7 +2831,7 @@ impl BindTr for ColJsonArray_ {
         debug!("bind: {:?}", &self);
         match self {
 @{- def.all_fields_only_json()|fmt_join("
-            ColJsonArray_::{var}(v) => query.bind(sqlx::types::Json(v{bind_as_for_filter})),", "") }@
+            ColJsonArray_::{ident}(v) => query.bind(sqlx::types::Json(v{bind_as_for_filter})),", "") }@
             _ => unreachable!(),
         }
     }
@@ -2844,7 +2844,7 @@ impl BindArrayTr for ColJsonArray_ {
         debug!("bind: {:?}", &self);
         match self {
 @{- def.all_fields_only_json()|fmt_join("
-            ColJsonArray_::{var}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "") }@
+            ColJsonArray_::{ident}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "") }@
             _ => unreachable!(),
         }
     }
@@ -2855,7 +2855,7 @@ impl BindArrayTr for ColJsonArray_ {
 #[derive(Clone, Debug)]
 pub enum ColGeo_ {
 @{- def.all_fields_only_geo()|fmt_join("
-    {var}(Value, i32),", "") }@
+    {ident}(Value, i32),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -2863,7 +2863,7 @@ impl ColGeo_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_geo()|fmt_join("
-            ColGeo_::{var}(_, _) => \"{col}\",", "") }@
+            ColGeo_::{ident}(_, _) => \"{col}\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -2876,7 +2876,7 @@ impl BindTr for ColGeo_ {
     fn name(&self) -> &'static str {
         match self {
 @{- def.all_fields_only_geo()|fmt_join("
-            ColGeo_::{var}(_, _) => r#\"{col_esc}\"#,", "") }@
+            ColGeo_::{ident}(_, _) => r#\"{col_esc}\"#,", "") }@
             _ => unreachable!(),
         }
     }
@@ -2887,7 +2887,7 @@ impl BindTr for ColGeo_ {
         debug!("bind: {:?}", &self);
         match self {
 @{- def.all_fields_only_geo()|fmt_join("
-            ColGeo_::{var}(v, srid) => query.bind(v{bind_as_for_filter}).bind(srid),", "") }@
+            ColGeo_::{ident}(v, srid) => query.bind(v{bind_as_for_filter}).bind(srid),", "") }@
             _ => unreachable!(),
         }
     }
@@ -2898,7 +2898,7 @@ impl BindTr for ColGeo_ {
 #[derive(Clone, Debug)]
 pub enum ColGeoDistance_ {
 @{- def.all_fields_only_geo()|fmt_join("
-    {var}(Value, f64, i32),", "") }@
+    {ident}(Value, f64, i32),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
@@ -2906,7 +2906,7 @@ impl ColGeoDistance_ {
     fn _name(&self) -> &'static str {
         match self {
             @{- def.all_fields_only_geo()|fmt_join("
-            ColGeoDistance_::{var}(_, _, _) => \"{col}\",", "") }@
+            ColGeoDistance_::{ident}(_, _, _) => \"{col}\",", "") }@
             _ => unimplemented!(),
         }
     }
@@ -2919,7 +2919,7 @@ impl BindTr for ColGeoDistance_ {
     fn name(&self) -> &'static str {
         match self {
 @{- def.all_fields_only_geo()|fmt_join("
-            ColGeoDistance_::{var}(_, _, _) => r#\"{col_esc}\"#,", "") }@
+            ColGeoDistance_::{ident}(_, _, _) => r#\"{col_esc}\"#,", "") }@
             _ => unreachable!(),
         }
     }
@@ -2931,10 +2931,10 @@ impl BindTr for ColGeoDistance_ {
         match self {
 @%- if !config.is_mysql() %@
 @{- def.all_fields_only_geo()|fmt_join("
-            ColGeoDistance_::{var}(v, d, srid) => query.bind(v.clone(){bind_as_for_filter}).bind(srid).bind(d).bind(v{bind_as_for_filter}).bind(srid).bind(d),", "") }@
+            ColGeoDistance_::{ident}(v, d, srid) => query.bind(v.clone(){bind_as_for_filter}).bind(srid).bind(d).bind(v{bind_as_for_filter}).bind(srid).bind(d),", "") }@
 @%- else %@
 @{- def.all_fields_only_geo()|fmt_join("
-            ColGeoDistance_::{var}(v, d, srid) => query.bind(v.clone(){bind_as_for_filter}).bind(srid).bind(d),", "") }@
+            ColGeoDistance_::{ident}(v, d, srid) => query.bind(v.clone(){bind_as_for_filter}).bind(srid).bind(d),", "") }@
 @%- endif %@
             _ => unreachable!(),
         }
@@ -3993,8 +3993,8 @@ impl QueryBuilder {
         @%- endif %@
         let mut vec: Vec<String> = Vec::new();
         @{- def.non_primaries_except_read_only()|fmt_join_cache_or_not("
-        crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "
-        crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
+        crate::misc::assign_sql_no_cache_update!(obj, vec, {ident}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "
+        crate::misc::assign_sql_no_cache_update!(obj, vec, {ident}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         let mut sql = format!(
             r#"UPDATE {}@{ table_name|db_esc }@ as _t1 SET {} {} {} {}"#,
             if !force_indexes.is_empty() {
@@ -4023,8 +4023,8 @@ impl QueryBuilder {
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         @{- def.non_primaries_except_read_only()|fmt_join("
-        for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
-            query = query.bind(obj._update.{var}{bind_as});
+        for _n in 0..obj._op.{ident}.get_bind_num({may_null}) {
+            query = query.bind(obj._update.{ident}{bind_as});
         }","") }@
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "update_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "{}", &obj);
         debug!("{:?}", &obj);
@@ -4481,7 +4481,7 @@ impl _@{ pascal_name }@_ {
         _@{ pascal_name }@Updater {
             _data: Data {
                 @{- def.primaries()|fmt_join("
-                {var}: id.{index}{raw_to_inner},", "") }@
+                {ident}: id.{index}{raw_to_inner},", "") }@
                 ..Data::default()
             },
             _update: Data::default(),
@@ -4505,7 +4505,7 @@ impl _@{ pascal_name }@_ {
             Some(_@{ pascal_name }@ {
                 _inner: Data {
                     @{- def.all_fields()|fmt_join("
-                    {var}: clone.{var},", "") }@
+                    {ident}: clone.{ident},", "") }@
                 },
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("\n                {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n                {rel_name}: None,", "") }@
@@ -4523,7 +4523,7 @@ impl _@{ pascal_name }@_ {
         _@{ pascal_name }@ {
             _inner: Data {
                 @{- def.all_fields()|fmt_join("
-                {var}: clone.{var},", "") }@
+                {ident}: clone.{ident},", "") }@
             },
 @{- def.relations_one_and_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
 @{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
@@ -4814,7 +4814,7 @@ impl _@{ pascal_name }@_ {
         @%- if def.dummy_always_present() %@
         let data: Option<Data> = Some(Data {
             @{- def.primaries()|fmt_join("
-            {var}: id.{index}{raw_to_inner},", "") }@
+            {ident}: id.{index}{raw_to_inner},", "") }@
             ..Default::default()
         });
         @%- else %@
@@ -4864,7 +4864,7 @@ impl _@{ pascal_name }@_ {
         @%- if def.dummy_always_present() %@
         let data: Option<Data> = Some(Data {
             @{- def.primaries()|fmt_join("
-            {var}: id.{index}{raw_to_inner},", "") }@
+            {ident}: id.{index}{raw_to_inner},", "") }@
             ..Default::default()
         });
         @%- else %@
@@ -4969,7 +4969,7 @@ impl _@{ pascal_name }@_ {
     {
         @{- index.fields(index_name, def)|fmt_index_col("
         let val{index}: {filter_type} = _{name}.into();", "") }@
-        let filter = Filter_::And(vec![@{- index.fields(index_name, def)|fmt_index_col("Filter_::EqKey(ColKey_::{var}(val{index}.clone().into()))", ", ") }@]);
+        let filter = Filter_::And(vec![@{- index.fields(index_name, def)|fmt_index_col("Filter_::EqKey(ColKey_::{ident}(val{index}.clone().into()))", ", ") }@]);
         Self::query().filter(filter).join(joiner).select(conn).await?.pop()
             .with_context(|| err::RowNotFound::new("@{ table_name }@", format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("val{index}", ", ") }@)))
     }
@@ -4992,7 +4992,7 @@ impl _@{ pascal_name }@_ {
     {
         @{- index.fields(index_name, def)|fmt_index_col("
         let c{index}: {filter_type} = _{name}.into();", "") }@
-        let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col("ColKey_::{var}(c{index}.clone().into())", ", ") }@]);
+        let key = VecColKey(vec![@{- index.fields(index_name, def)|fmt_index_col("ColKey_::{ident}(c{index}.clone().into())", ", ") }@]);
         if let Some(id) = Cache::get::<PrimaryWrapper>(&key, conn.shard_id(), true).await {
             if let Some(obj) = Self::find_optional_from_cache(conn, &id.0, joiner.clone()).await? {
                 if @{ index.fields(index_name, def)|fmt_index_col("obj._{raw_name}(){filter_check_eq}", " && ") }@ {
@@ -5000,7 +5000,7 @@ impl _@{ pascal_name }@_ {
                 }
             }
         }
-        let filter = Filter_::And(vec![@{- index.fields(index_name, def)|fmt_index_col("Filter_::EqKey(ColKey_::{var}(c{index}.clone().into()))", ", ") }@]);
+        let filter = Filter_::And(vec![@{- index.fields(index_name, def)|fmt_index_col("Filter_::EqKey(ColKey_::{ident}(c{index}.clone().into()))", ", ") }@]);
         let mut conn = DbConn::_new_with_ctx(conn.ctx_no(), conn.shard_id());
         conn.begin_cache_tx().await?;
         let obj = Self::query().filter(filter).join(joiner).select_from_cache(&mut conn).await?.pop()
@@ -5079,8 +5079,8 @@ impl _@{ pascal_name }@_ {
             return Ok(None);
         }
 @{- def.auto_inc()|fmt_join("
-        if obj._data.{var} == 0 {
-            obj._data.{var} = _last_insert_id as {inner};
+        if obj._data.{ident} == 0 {
+            obj._data.{ident} = _last_insert_id as {inner};
         }", "") }@
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "insert_ignore", ctx = conn.ctx_no(); "{}", &obj);
         debug!("{:?}", &obj);
@@ -5341,8 +5341,8 @@ impl _@{ pascal_name }@_ {
                 updater.mut_@{ ConfigDef::updated_at() }@().set(updated_at);
     @%- endif %@
                 @{- def.non_primaries()|fmt_join_cache_or_not("", "
-                updater._op.{var} = Op::None;
-                updater._update.{var} = Default::default();", "") }@
+                updater._op.{ident} = Op::None;
+                updater._update.{ident} = Default::default();", "") }@
                 let cache_msg = CacheOp::UpdateMany {
                     ids,
                     shard_id: conn.shard_id(),
@@ -5828,7 +5828,7 @@ async fn __find_many(
                 let id = id.clone();
                 Data {
                     @{- def.primaries()|fmt_join("
-                    {var}: id.{index}{raw_to_inner},", "") }@
+                    {ident}: id.{index}{raw_to_inner},", "") }@
                     ..Default::default()
                 }
             })
@@ -5918,7 +5918,7 @@ async fn ___find_many_for_cache(
                 let id = id.clone();
                 CacheData {
                     @{- def.primaries()|fmt_join("
-                    {var}: id.{index}{raw_to_inner},", "") }@
+                    {ident}: id.{index}{raw_to_inner},", "") }@
                     ..Default::default()
                 }
             })
@@ -6351,8 +6351,8 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, ov
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     let (_, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
 @{- def.auto_inc()|fmt_join("
-    if obj._data.{var} == 0 {
-        obj._data.{var} = _last_insert_id as {inner};
+    if obj._data.{ident} == 0 {
+        obj._data.{ident} = _last_insert_id as {inner};
     }", "") }@
     info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "insert", ctx = conn.ctx_no(); "{}", &obj);
     debug!("{:?}", &obj);
@@ -6360,7 +6360,7 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, ov
     let mut update_cache = true;
 
     @{- def.non_primaries()|fmt_join_cache_or_not("", "
-    obj._data.{var} = Default::default();", "") }@
+    obj._data.{ident} = Default::default();", "") }@
     @%- if def.act_as_job_queue() %@
     let cache_msg = CacheOp::Queued;
     @{- def.relations_one(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
@@ -6395,8 +6395,8 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     if obj.is_updated() {
         let mut vec: Vec<String> = Vec::new();
         @{- def.non_primaries_except_invisible_and_read_only(false)|fmt_join_cache_or_not("
-        crate::misc::assign_sql!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, update_cache, \"{placeholder}\");", "
-        crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
+        crate::misc::assign_sql!(obj, vec, {ident}, r#\"{col_esc}\"#, {may_null}, update_cache, \"{placeholder}\");", "
+        crate::misc::assign_sql_no_cache_update!(obj, vec, {ident}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
         @%- if config.is_mysql() %@
         @%- if def.versioned %@
         vec.push(r#"@{ version_col|db_esc }@ = LAST_INSERT_ID(IF(@{ version_col|db_esc }@ < 4294967295, @{ version_col|db_esc }@ + 1, 0))"#.to_string());
@@ -6420,8 +6420,8 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
         @{- def.non_primaries_except_invisible_and_read_only(false)|fmt_join("
-        for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
-            query = query.bind(obj._update.{var}{bind_as});
+        for _n in 0..obj._op.{ident}.get_bind_num({may_null}) {
+            query = query.bind(obj._update.{ident}{bind_as});
         }","") }@
         query = query@{ def.primaries()|fmt_join(".bind(id.{index}{bind_as})", "") }@;
         @%- if def.versioned %@
@@ -6447,8 +6447,8 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     }
     let mut obj2: _@{ pascal_name }@ = (obj._data, BTreeMap::default()).into();
     @{- def.non_primaries()|fmt_join_cache_or_not("", "
-    obj._op.{var} = Op::None;
-    obj._update.{var} = Default::default();", "") }@
+    obj._op.{ident} = Op::None;
+    obj._update.{ident} = Default::default();", "") }@
     @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
     let mut cache_msg = Some(CacheOp::Update {
         id,
@@ -6477,15 +6477,15 @@ fn assign_non_primaries(obj: &_@{ pascal_name }@Updater) -> (Vec<String>, bool) 
     let mut update_cache = false;
     let mut vec: Vec<String> = Vec::new();
     @{- def.non_primaries_except_read_only()|fmt_join_cache_or_not("
-    crate::misc::assign_sql!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, update_cache, \"{placeholder}\");", "
-    crate::misc::assign_sql_no_cache_update!(obj, vec, {var}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
+    crate::misc::assign_sql!(obj, vec, {ident}, r#\"{col_esc}\"#, {may_null}, update_cache, \"{placeholder}\");", "
+    crate::misc::assign_sql_no_cache_update!(obj, vec, {ident}, r#\"{col_esc}\"#, {may_null}, \"{placeholder}\");", "") }@
     (vec, update_cache)
 }
 
 fn bind_non_primaries<'a>(obj: &'a _@{ pascal_name }@Updater, mut query: Query<'a, DbType, DbArguments>, _sql: &'a str) -> Query<'a, DbType, DbArguments> {
     @{- def.non_primaries_except_read_only()|fmt_join("
-    for _n in 0..obj._op.{var}.get_bind_num({may_null}) {
-        query = query.bind(obj._update.{var}{bind_as});
+    for _n in 0..obj._op.{ident}.get_bind_num({may_null}) {
+        query = query.bind(obj._update.{ident}{bind_as});
     }","") }@
     query
 }
@@ -6520,8 +6520,8 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     debug!("{:?}", &obj);
     if rows_affected == 1 {
         @{- def.auto_inc()|fmt_join("
-        if obj._data.{var} == 0 {
-            obj._data.{var} = _last_insert_id as {inner};
+        if obj._data.{ident} == 0 {
+            obj._data.{ident} = _last_insert_id as {inner};
         }", "") }@
         let mut obj2: _@{ pascal_name }@ = (obj._data.clone(), BTreeMap::default()).into();
         @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
@@ -6592,36 +6592,36 @@ async fn __update_many(conn: &mut DbConn, ids: Vec<InnerPrimary>, mut obj: __Upd
     @%- else %@
     if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
         @{- def.non_primaries()|fmt_join_cache_or_not("", "
-        obj._op.{var} = Op::None;", "") }@
+        obj._op.{ident} = Op::None;", "") }@
         let mut data_list = Vec::new();
         @%- if def.non_primaries_addable().len() > 0 %@
         let has_add = false
             @{- def.non_primaries_addable()|fmt_join_cache_or_not("
-            || obj._op.{var} == Op::Add || obj._op.{var} == Op::Sub", "", "") }@;
+            || obj._op.{ident} == Op::Add || obj._op.{ident} == Op::Sub", "", "") }@;
         if has_add {
             for ids in ids.chunks(IN_CONDITION_LIMIT) {
                 _@{ pascal_name }@_::find_many_for_update(conn, ids.iter(), None, None, None).await?.into_iter()
                     .for_each(|v| {
                         let mut data = v._data;
                         @{- def.non_primaries_addable()|fmt_join_cache_or_not("
-                        if obj._op.{var} != Op::Add && obj._op.{var} != Op::Sub {
-                            data.{var} = obj._update.{var}.clone();
+                        if obj._op.{ident} != Op::Add && obj._op.{ident} != Op::Sub {
+                            data.{ident} = obj._update.{ident}.clone();
                         }", "", "") }@;
                         @{- def.non_primaries()|fmt_join_cache_or_not("", "
-                        data.{var} = Default::default();", "") }@
+                        data.{ident} = Default::default();", "") }@
                         data_list.push(data);
                     });
             }
         }
         @%- endif %@
         @{- def.non_primaries_addable()|fmt_join_cache_or_not("
-        if obj._op.{var} == Op::Add {
-            obj._op.{var} = Op::Max;
-        } else if obj._op.{var} == Op::Sub {
-            obj._op.{var} = Op::Min;
+        if obj._op.{ident} == Op::Add {
+            obj._op.{ident} = Op::Max;
+        } else if obj._op.{ident} == Op::Sub {
+            obj._op.{ident} = Op::Min;
         }", "", "") }@
         @{- def.non_primaries()|fmt_join_cache_or_not("", "
-        obj._update.{var} = Default::default();", "") }@
+        obj._update.{ident} = Default::default();", "") }@
         let cache_msg = CacheOp::UpdateMany {
             ids,
             shard_id: conn.shard_id(),
@@ -6832,14 +6832,14 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
             let mut obj = row.clone();
     @%- if config.is_mysql() %@
             @{- def.auto_inc()|fmt_join("
-            if obj._data.{var} == 0 {
-                obj._data.{var} = id;
+            if obj._data.{ident} == 0 {
+                obj._data.{ident} = id;
                 // innodb_autoinc_lock_mode must be 0 or 1
                 id += 1;
             }", "") }@
     @%- else %@
             @{- def.auto_inc()|fmt_join("
-            obj._data.{var} = *ids_iter.next().unwrap();", "") }@
+            obj._data.{ident} = *ids_iter.next().unwrap();", "") }@
     @%- endif %@
             @{- def.relations_one(false)|fmt_rel_join("
             obj.{rel_name}.map(|v| v.map(|v| {
@@ -7014,7 +7014,7 @@ fn make_force_indexes(filter_digest: &str) -> Vec<&'static str> {
 #[allow(clippy::needless_borrow)]
 fn bind_to_query<'a>(mut query: Query<'a, DbType, DbArguments>, data: &'a Data) -> Query<'a, DbType, DbArguments> {
     @{- def.all_fields_except_read_only_and_auto_inc()|fmt_join("
-    query = query.bind(data.{var}{bind_as});", "") }@
+    query = query.bind(data.{ident}{bind_as});", "") }@
     query
 }
 

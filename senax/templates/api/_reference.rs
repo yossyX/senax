@@ -22,7 +22,7 @@ pub struct ResObj@{ rel_name|pascal }@ {
     pub _id: async_graphql::ID,
 @%- if camel_case %@
 @{- def.for_api_response()|fmt_join("
-{label_wo_hash}{res_api_schema_type}    pub {var}: {res_api_type},", "") }@
+{label_wo_hash}{res_api_schema_type}    pub {ident}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
 @{- def.relations_many_for_api_response()|fmt_rel_join("
@@ -35,7 +35,7 @@ pub struct ResObj@{ rel_name|pascal }@ {
 @%- else %@
 @{- def.for_api_response()|fmt_join("
 {label_wo_hash}{res_api_schema_type}    #[graphql(name = \"{raw_name}\")]
-    pub {var}: {res_api_type},", "") }@
+    pub {ident}: {res_api_type},", "") }@
 @{- def.relations_one_for_api_response()|fmt_rel_join("
 {label_wo_hash}    #[graphql(name = \"{raw_rel_name}\")]
     pub {rel_name}: Option<_{raw_rel_name}::ResObj{rel_name_pascal}>,", "") }@
@@ -56,7 +56,7 @@ impl From<&dyn _domain_::@{ pascal_name }@> for ResObj@{ rel_name|pascal }@ {
         Self {
             _id: v.into(),
             @{- def.for_api_response()|fmt_join("
-            {var}: v.{var}(){to_res_api_type},", "") }@
+            {ident}: v.{ident}(){to_res_api_type},", "") }@
             @{- def.relations_one_for_api_response()|fmt_rel_join("
             {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| v.into()),", "") }@
             @{- def.relations_many_for_api_response()|fmt_rel_join("
@@ -73,7 +73,7 @@ impl From<&dyn _domain_::@{ pascal_name }@Cache> for ResObj@{ rel_name|pascal }@
         Self {
             _id: v.into(),
             @{- def.for_api_response()|fmt_join("
-            {var}: v.{var}(){to_res_api_type},", "") }@
+            {ident}: v.{ident}(){to_res_api_type},", "") }@
             @{- def.relations_one_for_api_response()|fmt_rel_join("
             {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| (&*v).into()),", "") }@
             @{- def.relations_many_for_api_response()|fmt_rel_join("

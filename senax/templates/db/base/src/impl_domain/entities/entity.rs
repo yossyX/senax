@@ -60,11 +60,11 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
         __Getter__::_{raw_name}(self){clone}{convert_impl_domain_inner}
     }", "") }@
 @{- parent.only_version()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self)
     }", "") }@
 @{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
 }
@@ -75,11 +75,11 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
         __Cache__::_{raw_name}(self){clone}{convert_impl_domain_inner}
     }", "") }@
 @{- parent.only_version()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Cache__::_{raw_name}(self)
     }", "") }@
 @{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Cache__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
 }
@@ -87,14 +87,14 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
 impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common for _@{ pascal_name }@Updater {
 @{- parent.primaries()|fmt_join("
     fn _{raw_name}(&self) -> {inner} {
-        self._data.{var}{clone}
+        self._data.{ident}{clone}
     }", "") }@
 @{- parent.only_version()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
-        self._data.{var}
+    fn {ident}(&self) -> {domain_outer} {
+        self._data.{ident}
     }", "") }@
 @{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
 }
@@ -134,7 +134,7 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
 @%- endif %@
 impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@ for _@{ pascal_name }@ {
 @{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
 @{- parent.relations_one_and_belonging(true)|fmt_rel_join("
@@ -156,7 +156,7 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
 #[allow(clippy::useless_conversion)]
 impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater for _@{ pascal_name }@Updater {
 @{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
 @{- parent.non_primaries_except_invisible_and_read_only(true)|fmt_join("
@@ -212,15 +212,15 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
 
 impl @{ pascal_name }@Common for _@{ pascal_name }@ {
 @{- def.primaries()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
 @{- def.only_version()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self)
     }", "") }@
 @{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
 }
@@ -233,15 +233,15 @@ impl domain::models::FilterFlag for _@{ pascal_name }@ {
 
 impl @{ pascal_name }@Common for _@{ pascal_name }@Cache {
 @{- def.primaries()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Cache__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
 @{- def.only_version()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Cache__::_{raw_name}(self)
     }", "") }@
 @{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Cache__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
 }
@@ -254,15 +254,15 @@ impl domain::models::FilterFlag for _@{ pascal_name }@Cache {
 
 impl @{ pascal_name }@Common for _@{ pascal_name }@Updater {
 @{- def.primaries()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
 @{- def.only_version()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
-        self._data.{var}
+    fn {ident}(&self) -> {domain_outer} {
+        self._data.{ident}
     }", "") }@
 @{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
 }
@@ -310,7 +310,7 @@ impl @{ pascal_name }@Cache for _@{ pascal_name }@Cache {
 
 impl @{ pascal_name }@ for _@{ pascal_name }@ {
 @{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
 @{- def.relations_one_and_belonging(true)|fmt_rel_join("
@@ -333,7 +333,7 @@ impl @{ pascal_name }@ for _@{ pascal_name }@ {
 #[allow(clippy::useless_conversion)]
 impl @{ pascal_name }@Updater for _@{ pascal_name }@Updater {
 @{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {var}(&self) -> {domain_outer} {
+    fn {ident}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("

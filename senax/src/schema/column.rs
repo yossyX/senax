@@ -2506,10 +2506,10 @@ impl FieldDef {
         } else if let Some(value) = ApiFieldDef::on_insert_formula(name) {
             return value;
         }
-        let var = super::_to_ident_name(name);
+        let ident = super::_to_ident_name(name);
         if self.auto.is_some() {
             if rel {
-                return format!("input.{var}.unwrap_or_default()");
+                return format!("input.{ident}.unwrap_or_default()");
             } else {
                 return "0".to_owned();
             }
@@ -2532,34 +2532,34 @@ impl FieldDef {
         }
         if self.enum_class.is_some() {
             if !self.not_null {
-                return format!("input.{var}.take()");
+                return format!("input.{ident}.take()");
             } else {
-                return format!("input.{var}");
+                return format!("input.{ident}");
             }
         }
         if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
             if !self.not_null {
-                return format!("input.{var}.take().map(|v| v.into())");
+                return format!("input.{ident}.take().map(|v| v.into())");
             } else {
-                return format!("input.{var}.into()");
+                return format!("input.{ident}.into()");
             }
         }
         if self.value_object.is_some() {
             if !self.not_null {
-                return format!("input.{var}.take().map(|v| v.into())");
+                return format!("input.{ident}.take().map(|v| v.into())");
             } else {
-                return format!("input.{var}.into()");
+                return format!("input.{ident}.into()");
             }
         }
         match self.data_type {
             DataType::Binary | DataType::Varbinary | DataType::Blob if !self.not_null => {
-                format!("input.{var}.take().map(|v| v.to_vec())")
+                format!("input.{ident}.take().map(|v| v.to_vec())")
             }
             DataType::Binary | DataType::Varbinary | DataType::Blob => {
-                format!("input.{var}.to_vec()")
+                format!("input.{ident}.to_vec()")
             }
-            _ if !self.not_null => format!("input.{var}.take()"),
-            _ => format!("input.{var}"),
+            _ if !self.not_null => format!("input.{ident}.take()"),
+            _ => format!("input.{ident}"),
         }
     }
 
@@ -3103,14 +3103,14 @@ impl FieldDef {
         }
     }
     pub fn convert_impl_domain_outer_for_updater(&self, name: &str) -> String {
-        let var = format!("self._data.{}", _to_ident_name(name));
+        let ident = format!("self._data.{}", _to_ident_name(name));
         let clone = self.clone_for_outer_str();
-        let var_clone = format!("{var}{clone}");
+        let var_clone = format!("{ident}{clone}");
         if self.enum_class.is_some() {
             return if self.not_null {
-                format!("{var}{clone}.into()")
+                format!("{ident}{clone}.into()")
             } else {
-                format!("{var}{clone}.map(|v| v.into())")
+                format!("{ident}{clone}.map(|v| v.into())")
             };
         }
         if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
@@ -3118,13 +3118,13 @@ impl FieldDef {
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text
                     if !self.not_null =>
                 {
-                    format!("{var}.as_ref().map(|v| v.clone().into())")
+                    format!("{ident}.as_ref().map(|v| v.clone().into())")
                 }
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
-                    format!("{var}.clone().into()")
+                    format!("{ident}.clone().into()")
                 }
-                _ if !self.not_null => format!("{var}{clone}.map(|v| v.into())"),
-                _ => format!("{var}{clone}.into()"),
+                _ if !self.not_null => format!("{ident}{clone}.map(|v| v.into())"),
+                _ => format!("{ident}{clone}.into()"),
             };
         }
         if self.value_object.is_some() {
@@ -3132,13 +3132,13 @@ impl FieldDef {
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text
                     if !self.not_null =>
                 {
-                    format!("{var}.as_ref().map(|v| v.clone().into())")
+                    format!("{ident}.as_ref().map(|v| v.clone().into())")
                 }
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar | DataType::Text => {
-                    format!("{var}.clone().into()")
+                    format!("{ident}.clone().into()")
                 }
-                _ if !self.not_null => format!("{var}{clone}.map(|v| v.into())"),
-                _ => format!("{var}{clone}.into()"),
+                _ if !self.not_null => format!("{ident}{clone}.map(|v| v.into())"),
+                _ => format!("{ident}{clone}.into()"),
             };
         }
         match self.data_type {
@@ -3149,20 +3149,20 @@ impl FieldDef {
             DataType::Float => var_clone,
             DataType::Double => var_clone,
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar if !self.not_null => {
-                format!("{var}{clone}.as_ref()")
+                format!("{ident}{clone}.as_ref()")
             }
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
-                format!("&{var}{clone}")
+                format!("&{ident}{clone}")
             }
             DataType::Boolean => var_clone,
-            DataType::Text if !self.not_null => format!("{var}{clone}.as_ref()"),
-            DataType::Text => format!("&{var}{clone}"),
+            DataType::Text if !self.not_null => format!("{ident}{clone}.as_ref()"),
+            DataType::Text => format!("&{ident}{clone}"),
             DataType::Uuid => var_clone,
             DataType::BinaryUuid => var_clone,
             DataType::Binary | DataType::Varbinary | DataType::Blob if !self.not_null => {
-                format!("{var}{clone}.as_ref()")
+                format!("{ident}{clone}.as_ref()")
             }
-            DataType::Binary | DataType::Varbinary | DataType::Blob => format!("&{var}{clone}"),
+            DataType::Binary | DataType::Varbinary | DataType::Blob => format!("&{ident}{clone}"),
             DataType::NaiveDateTime => var_clone,
             DataType::UtcDateTime => var_clone,
             DataType::TimestampWithTimeZone => var_clone,
@@ -3170,32 +3170,32 @@ impl FieldDef {
             DataType::Time => var_clone,
             DataType::Decimal => var_clone,
             DataType::ArrayInt if !self.not_null => {
-                format!("{var}{clone}.as_ref()")
+                format!("{ident}{clone}.as_ref()")
             }
-            DataType::ArrayInt => format!("&{var}{clone}"),
+            DataType::ArrayInt => format!("&{ident}{clone}"),
             DataType::ArrayString if !self.not_null => {
-                format!("{var}{clone}.as_ref()")
+                format!("{ident}{clone}.as_ref()")
             }
-            DataType::ArrayString => format!("&{var}{clone}"),
+            DataType::ArrayString => format!("&{ident}{clone}"),
             DataType::Json | DataType::Jsonb if !self.not_null => {
-                format!("{var}.as_ref().map(|v| v.to_raw_value())")
+                format!("{ident}.as_ref().map(|v| v.to_raw_value())")
             }
-            DataType::Json | DataType::Jsonb => format!("{var}.to_raw_value()"),
+            DataType::Json | DataType::Jsonb => format!("{ident}.to_raw_value()"),
             DataType::DbEnum => unimplemented!(),
-            DataType::DbSet if !self.not_null => format!("{var}{clone}.as_deref()"),
-            DataType::DbSet => format!("{var}{clone}.as_ref()"),
-            DataType::Point if self.not_null => format!("{var}{clone}.to_tuple().point()"),
-            DataType::Point => format!("{var}{clone}.as_ref().map(|v| v.to_tuple().point())"),
+            DataType::DbSet if !self.not_null => format!("{ident}{clone}.as_deref()"),
+            DataType::DbSet => format!("{ident}{clone}.as_ref()"),
+            DataType::Point if self.not_null => format!("{ident}{clone}.to_tuple().point()"),
+            DataType::Point => format!("{ident}{clone}.as_ref().map(|v| v.to_tuple().point())"),
             DataType::GeoPoint if self.not_null => {
-                format!("{var}{clone}.to_tuple().geo_point()")
+                format!("{ident}{clone}.to_tuple().geo_point()")
             }
             DataType::GeoPoint => {
-                format!("{var}{clone}.as_ref().map(|v| v.to_tuple().geo_point())")
+                format!("{ident}{clone}.as_ref().map(|v| v.to_tuple().geo_point())")
             }
             DataType::Geometry if !self.not_null => {
-                format!("{var}.as_ref().map(|v| v.to_raw_value())")
+                format!("{ident}.as_ref().map(|v| v.to_raw_value())")
             }
-            DataType::Geometry => format!("{var}.to_raw_value()"),
+            DataType::Geometry => format!("{ident}.to_raw_value()"),
             DataType::ValueObject => unimplemented!(),
             DataType::AutoFk => unimplemented!(),
             DataType::UnSupported => unimplemented!(),
