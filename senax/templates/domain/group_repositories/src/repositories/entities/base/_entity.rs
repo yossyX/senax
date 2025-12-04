@@ -4,7 +4,7 @@ use ::validator::Validate as _;
 
 #[allow(unused_imports)]
 use ::base_domain as domain;
-use ::base_domain::models::{@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{@{ pascal_name }@, @{ pascal_name }@Cache, @{ pascal_name }@Common, @{ pascal_name }@Updater as _Updater}, Check_};
+use ::base_domain::models::{@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{@{ pascal_name }@, @{ pascal_name }@Updater as _Updater}, Check_};
 #[allow(unused_imports)]
 use ::base_domain::models::{self, ToGeoPoint as _, ToPoint as _};
 #[allow(unused_imports)]
@@ -312,7 +312,7 @@ pub enum @{ pascal_name }@Query@{ selector|pascal }@Order {
 #[allow(unused_parens)]
 impl @{ pascal_name }@Query@{ selector|pascal }@Order {
     #[allow(clippy::borrowed_box)]
-    pub fn to_cursor<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &Box<T>) -> Option<String> {
+    pub fn to_cursor<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &Box<T>) -> Option<String> {
         match self {
             @%- for (order, order_def) in selector_def.orders %@
             @{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
@@ -355,8 +355,8 @@ impl @{ pascal_name }@Query@{ selector|pascal }@Cursor {
 
 #[async_trait]
 pub trait @{ pascal_name }@Query@{ selector|pascal }@Builder: Send + Sync {
-    async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>>;
-    async fn stream(self: Box<Self>, single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> + Send>>>;
+    async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>>;
+    async fn stream(self: Box<Self>, single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@>>> + Send>>>;
     async fn count(self: Box<Self>) -> anyhow::Result<i64>;
     fn selector_filter(self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder>;
     fn selector_filter_in_json(self: Box<Self>, filter: ::serde_json::Value) -> anyhow::Result<Box<dyn _Query@{ selector|pascal }@Builder>> {
@@ -382,7 +382,7 @@ use _@{ pascal_name }@QueryFindBuilder as _QueryFindBuilder;
 
 #[async_trait]
 pub trait _@{ pascal_name }@QueryFindBuilder: Send + Sync {
-    async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>>;
+    async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>>;
     fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder>;
     fn with_filter_flag(self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _QueryFindBuilder>;
     fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _QueryFindBuilder>;
@@ -395,7 +395,7 @@ pub trait _@{ pascal_name }@QueryFindBuilder: Send + Sync {
 #[async_trait]
 pub trait _@{ pascal_name }@QueryService: Send + Sync {
     @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
-    async fn all(&self) -> anyhow::Result<Box<dyn base_domain::models::EntityIterator<dyn @{ pascal_name }@Cache>>>;
+    async fn all(&self) -> anyhow::Result<Box<dyn base_domain::models::EntityIterator<dyn @{ pascal_name }@>>>;
     @%- endif %@
     @%- for (selector, selector_def) in def.selectors %@
     fn @{ selector|ident }@(&self) -> Box<dyn @{ pascal_name }@Query@{ selector|pascal }@Builder>;
@@ -434,13 +434,13 @@ impl Col_ {
             _ => unimplemented!(),
         }
     }
-    pub fn check_null<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
+    pub fn check_null<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &T) -> anyhow::Result<bool> {
         match self {
             @{- def.primaries()|fmt_join("
-            Col_::{ident} => {filter_check_null},", "") }@
+            Col_::{ident} => Ok({filter_check_null}),", "") }@
             @{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-            Col_::{ident} => {filter_check_null},", "") }@
-            _ => unimplemented!(),
+            Col_::{ident} => Ok({filter_check_null}),", "") }@
+            _ => anyhow::bail!(""),
         }
     }
 }
@@ -466,17 +466,17 @@ impl ColOne_ {
             _ => unimplemented!(),
         }
     }
-    pub fn check_eq<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
+    pub fn check_eq<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &T) -> anyhow::Result<bool> {
         match self {
             @{- def.equivalence_cache_fields_except_json()|fmt_join("
-            ColOne_::{ident}(c) => _obj.{ident}(){filter_check_eq},", "") }@
+            ColOne_::{ident}(c) => Ok(_obj.{ident}(){filter_check_eq}),", "") }@
             @%- for (index_name, index) in def.multi_index(true) %@
-            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => @{ index.join_fields(def, "(_obj.{ident}(){filter_check_eq})", " && ") }@,
+            ColOne_::@{ index.join_fields(def, "{name}", "_") }@(@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)) => Ok(@{ index.join_fields(def, "(_obj.{ident}(){filter_check_eq})", " && ") }@),
             @%- endfor %@
-            _ => unimplemented!(),
+            _ => anyhow::bail!(""),
         }
     }
-    pub fn check_cmp<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T, order: std::cmp::Ordering, eq: bool) -> Result<bool, bool> {
+    fn _check_cmp<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &T, order: std::cmp::Ordering, eq: bool) -> Result<bool, bool> {
         let o = match self {
             @{- def.comparable_cache_fields_except_json()|fmt_join("
             ColOne_::{ident}(c) => _obj.{ident}(){filter_check_cmp},", "") }@
@@ -487,13 +487,19 @@ impl ColOne_ {
         };
         Ok(o == order || eq && o == std::cmp::Ordering::Equal)
     }
-    pub fn check_like<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
+    pub fn check_cmp<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &T, order: std::cmp::Ordering, eq: bool) -> anyhow::Result<Result<bool, bool>> {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self._check_cmp(_obj, order, eq))) {
+            Ok(v) => Ok(v),
+            Err(_) => anyhow::bail!(""),
+        }
+    }
+    pub fn check_like<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &T) -> anyhow::Result<bool> {
         #[allow(unused_imports)]
         use models::Like as _;
         match self {
             @{- def.string_cache_fields()|fmt_join("
-            ColOne_::{ident}(c) => _obj.{ident}(){filter_like},", "") }@
-            _ => unimplemented!(),
+            ColOne_::{ident}(c) => Ok(_obj.{ident}(){filter_like}),", "") }@
+            _ => anyhow::bail!(""),
         }
     }
 }
@@ -538,14 +544,14 @@ impl ColMany_ {
         }
     }
     #[allow(bindings_with_variant_name)]
-    pub fn check_in<T: @{ pascal_name }@Common + ?Sized>(&self, _obj: &T) -> bool {
+    pub fn check_in<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &T) -> anyhow::Result<bool> {
         match self {
             @{- def.equivalence_cache_fields_except_json()|fmt_join("
-            ColMany_::{ident}(list) => list.iter().any(|c| _obj.{ident}(){filter_check_eq}),", "") }@
+            ColMany_::{ident}(list) => Ok(list.iter().any(|c| _obj.{ident}(){filter_check_eq})),", "") }@
             @%- for (index_name, index) in def.multi_index(true) %@
-            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(list) => list.iter().any(|@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)| @{ index.join_fields(def, "(_obj.{ident}(){filter_check_eq})", " && ") }@),
+            ColMany_::@{ index.join_fields(def, "{name}", "_") }@(list) => Ok(list.iter().any(|@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "c{index}", ", ") }@)| @{ index.join_fields(def, "(_obj.{ident}(){filter_check_eq})", " && ") }@)),
             @%- endfor %@
-            _ => unimplemented!(),
+            _ => anyhow::bail!(""),
         }
     }
 }
@@ -705,25 +711,6 @@ impl ColRel_ {
             })),", "") }@
             _ => None
         }
-    }
-}
-impl Check_<dyn @{ pascal_name }@Cache> for ColRel_ {
-    #[allow(unreachable_patterns)]
-    #[allow(unreachable_code)]
-    #[allow(clippy::match_single_binding)]
-    fn check(&self, _obj: &dyn @{ pascal_name }@Cache) -> anyhow::Result<bool> {
-        Ok(match self {
-            @{- def.relations_one_and_belonging(false)|fmt_rel_join("
-            ColRel_::{rel_name}(None) => _obj.{rel_name}()?.is_some(),
-            ColRel_::{rel_name}(Some(f)) => _obj.{rel_name}()?.map(|v| f.check(&*v)).unwrap_or(Ok(false))?,", "") }@
-            @{- def.relations_many(false)|fmt_rel_join("
-            ColRel_::{rel_name}(None) => !_obj.{rel_name}()?.is_empty(),
-            ColRel_::{rel_name}(Some(f)) => _obj.{rel_name}()?.iter().try_fold(false, |acc, v| Ok::<bool, anyhow::Error>(acc || f.check(v.as_ref())?))?,", "") }@
-            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-            ColRel_::{rel_name}(None) => _obj.{rel_name}()?.is_some(),
-            ColRel_::{rel_name}(Some(f)) => _obj.{rel_name}()?.map(|v| f.check(&*v)).unwrap_or(Ok(false))?,", "") }@
-            _ => unreachable!()
-        })
     }
 }
 impl Check_<dyn @{ pascal_name }@> for ColRel_ {
@@ -924,46 +911,20 @@ impl Filter_ {
         }
     }
 }
-impl Check_<dyn @{ pascal_name }@Cache> for Filter_ {
-    fn check(&self, obj: &dyn @{ pascal_name }@Cache) -> anyhow::Result<bool> {
-        Ok(match self {
-            Filter_::IsNull(c) => c.check_null(obj),
-            Filter_::IsNotNull(c) => !c.check_null(obj),
-            Filter_::Eq(c) => c.check_eq(obj),
-            Filter_::NotEq(c) => !c.check_eq(obj),
-            Filter_::Gt(c) => c.check_cmp(obj, std::cmp::Ordering::Greater, false).unwrap_or_else(|x| x),
-            Filter_::Gte(c) => c.check_cmp(obj, std::cmp::Ordering::Greater, true).unwrap_or_else(|x| x),
-            Filter_::Lt(c) => c.check_cmp(obj, std::cmp::Ordering::Less, false).unwrap_or_else(|x| x),
-            Filter_::Lte(c) => c.check_cmp(obj, std::cmp::Ordering::Less, true).unwrap_or_else(|x| x),
-            Filter_::Like(c) => c.check_like(obj),
-            Filter_::In(c) => c.check_in(obj),
-            Filter_::NotIn(c) => !c.check_in(obj),
-            Filter_::Not(c) => !c.check(obj)?,
-            Filter_::And(list) => list.iter().try_fold(true, |acc, c| Ok::<bool, anyhow::Error>(acc && c.check(obj)?))?,
-            Filter_::Or(list) => list.iter().try_fold(false, |acc, c| Ok::<bool, anyhow::Error>(acc || c.check(obj)?))?,
-            Filter_::Exists(c) => c.check(obj)?,
-            Filter_::NotExists(c) => !c.check(obj)?,
-            Filter_::EqAny(c) => c.check(obj)?,
-            Filter_::NotAll(c) => !c.check(obj)?,
-            Filter_::Boolean(c) => *c,
-            _ => anyhow::bail!("unsupported check operation!"),
-        })
-    }
-}
 impl Check_<dyn @{ pascal_name }@> for Filter_ {
     fn check(&self, obj: &dyn @{ pascal_name }@) -> anyhow::Result<bool> {
         Ok(match self {
-            Filter_::IsNull(c) => c.check_null(obj),
-            Filter_::IsNotNull(c) => !c.check_null(obj),
-            Filter_::Eq(c) => c.check_eq(obj),
-            Filter_::NotEq(c) => !c.check_eq(obj),
-            Filter_::Gt(c) => c.check_cmp(obj, std::cmp::Ordering::Greater, false).unwrap_or_else(|x| x),
-            Filter_::Gte(c) => c.check_cmp(obj, std::cmp::Ordering::Greater, true).unwrap_or_else(|x| x),
-            Filter_::Lt(c) => c.check_cmp(obj, std::cmp::Ordering::Less, false).unwrap_or_else(|x| x),
-            Filter_::Lte(c) => c.check_cmp(obj, std::cmp::Ordering::Less, true).unwrap_or_else(|x| x),
-            Filter_::Like(c) => c.check_like(obj),
-            Filter_::In(c) => c.check_in(obj),
-            Filter_::NotIn(c) => !c.check_in(obj),
+            Filter_::IsNull(c) => c.check_null(obj)?,
+            Filter_::IsNotNull(c) => !c.check_null(obj)?,
+            Filter_::Eq(c) => c.check_eq(obj)?,
+            Filter_::NotEq(c) => !c.check_eq(obj)?,
+            Filter_::Gt(c) => c.check_cmp(obj, std::cmp::Ordering::Greater, false)?.unwrap_or_else(|x| x),
+            Filter_::Gte(c) => c.check_cmp(obj, std::cmp::Ordering::Greater, true)?.unwrap_or_else(|x| x),
+            Filter_::Lt(c) => c.check_cmp(obj, std::cmp::Ordering::Less, false)?.unwrap_or_else(|x| x),
+            Filter_::Lte(c) => c.check_cmp(obj, std::cmp::Ordering::Less, true)?.unwrap_or_else(|x| x),
+            Filter_::Like(c) => c.check_like(obj)?,
+            Filter_::In(c) => c.check_in(obj)?,
+            Filter_::NotIn(c) => !c.check_in(obj)?,
             Filter_::Not(c) => !c.check(obj)?,
             Filter_::And(list) => list.iter().try_fold(true, |acc, c| Ok::<bool, anyhow::Error>(acc && c.check(obj)?))?,
             Filter_::Or(list) => list.iter().try_fold(false, |acc, c| Ok::<bool, anyhow::Error>(acc || c.check(obj)?))?,
@@ -1415,7 +1376,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
                         }
                         @{ def.soft_delete_tpl2("true","self.with_trashed || v.deleted_at.is_none()","self.with_trashed || !v.deleted","self.with_trashed || v.deleted == 0")}@
                     })
-                    .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>).collect();
+                    .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>).collect();
                 Ok(list.len() as i64)
             }
             fn selector_filter(mut self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.selector_filter = Some(filter); self }
@@ -1466,14 +1427,14 @@ fn _filter@{ filter_map.suffix }@(v: &impl super::super::super::@{ filter_map.mo
 #[async_trait]
 impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
     @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
-    async fn all(&self) -> anyhow::Result<Box<dyn base_domain::models::EntityIterator<dyn @{ pascal_name }@Cache>>> {
+    async fn all(&self) -> anyhow::Result<Box<dyn base_domain::models::EntityIterator<dyn @{ pascal_name }@>>> {
         struct V(std::collections::BTreeMap<@{- def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@, @{ pascal_name }@Entity>);
-        impl base_domain::models::EntityIterator<dyn @{ pascal_name }@Cache> for V {
-            fn iter(&self) -> Box<dyn Iterator<Item = &(dyn @{ pascal_name }@Cache + 'static)> + '_> {
-                Box::new(self.0.iter().map(|(_, v)| v as &dyn @{ pascal_name }@Cache))
+        impl base_domain::models::EntityIterator<dyn @{ pascal_name }@> for V {
+            fn iter(&self) -> Box<dyn Iterator<Item = &(dyn @{ pascal_name }@ + 'static)> + '_> {
+                Box::new(self.0.iter().map(|(_, v)| v as &dyn @{ pascal_name }@))
             }
-            fn into_iter(self) -> Box<dyn Iterator<Item = Box<dyn @{ pascal_name }@Cache>>> {
-                Box::new(self.0.into_iter().map(|(_, v)| Box::new(v) as Box<dyn @{ pascal_name }@Cache>))
+            fn into_iter(self) -> Box<dyn Iterator<Item = Box<dyn @{ pascal_name }@>>> {
+                Box::new(self.0.into_iter().map(|(_, v)| Box::new(v) as Box<dyn @{ pascal_name }@>))
             }
         }
         Ok(Box::new(V(self._data.lock().unwrap().clone())))
@@ -1514,7 +1475,7 @@ impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
         }
         #[async_trait]
         impl @{ pascal_name }@Query@{ selector|pascal }@Builder for V {
-            async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
+            async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>> {
                 let mut list: Vec<_> = self._list.into_iter()
                     .filter(|v| {
                         if let Some(filter) = &self.selector_filter {
@@ -1534,7 +1495,7 @@ impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
                         }
                         @{ def.soft_delete_tpl2("true","self.with_trashed || v.deleted_at.is_none()","self.with_trashed || !v.deleted","self.with_trashed || v.deleted == 0")}@
                     })
-                    .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>).collect();
+                    .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>).collect();
                 match self.order.unwrap_or_default() {
                     @%- for (order, fields) in selector_def.orders %@
                     @{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => @{ selector_def.emu_order(order) }@,
@@ -1552,7 +1513,7 @@ impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
                 }
                 Ok(list)
             }
-            async fn stream(self: Box<Self>, _single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> + Send>>> {
+            async fn stream(self: Box<Self>, _single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@>>> + Send>>> {
                 use futures::StreamExt;
                 let list = self.query().await?;
                 Ok(async_stream::stream! {
@@ -1581,7 +1542,7 @@ impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
                         }
                         @{ def.soft_delete_tpl2("true","self.with_trashed || v.deleted_at.is_none()","self.with_trashed || !v.deleted","self.with_trashed || v.deleted == 0")}@
                     })
-                    .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>).collect();
+                    .map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>).collect();
                 Ok(list.len() as i64)
             }
             fn selector_filter(mut self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.selector_filter = Some(filter); self }
@@ -1612,9 +1573,9 @@ impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
         struct V(Option<@{ pascal_name }@Entity>, Option<Filter_>, std::collections::BTreeMap<&'static str, Filter_>@% if def.is_soft_delete() %@, bool@% endif %@);
         #[async_trait]
         impl _@{ pascal_name }@QueryFindBuilder for V {
-            async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
+            async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
                 let filter = self.1;
-                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(Ok(true)).unwrap())@{- def.soft_delete_tpl2("",".filter(|v| self.3 || v.deleted_at.is_none())",".filter(|v| self.3 || !v.deleted)",".filter(|v| self.3 || v.deleted == 0)")}@.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>))
+                Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(Ok(true)).unwrap())@{- def.soft_delete_tpl2("",".filter(|v| self.3 || v.deleted_at.is_none())",".filter(|v| self.3 || !v.deleted)",".filter(|v| self.3 || v.deleted == 0)")}@.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
             }
             fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _QueryFindBuilder> { self.1 = Some(filter); self }
             fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _QueryFindBuilder> {

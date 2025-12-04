@@ -78,34 +78,12 @@ impl @{ name|to_pascal_name }@ {
 }
 @% endfor -%@
 
-pub trait @{ pascal_name }@Common: std::fmt::Debug@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common@% endfor %@@% endif %@ {
+pub trait @{ pascal_name }@: std::fmt::Debug@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@@% endfor %@@% endif %@ {
 @{- def.primaries()|fmt_join("
 {label}{comment}    fn _{raw_name}(&self) -> {inner};", "") }@
 @{- def.only_version()|fmt_join("
 {label}{comment}    fn {ident}(&self) -> {outer};", "") }@
-@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-{label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
-}
-
-@{ def.label|label0 -}@
-@{ def.comment|comment0 -}@
-pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Cache@% endfor %@@% endif %@ {
-@{- def.relations_one_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
-@{- def.relations_many_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
-@{- def.relations_belonging_cache(true)|fmt_rel_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
-        Some({local_keys}.into())
-    }", "") }@
-@{- def.relations_belonging_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
-}
-
-@{ def.label|label0 -}@
-@{ def.comment|comment0 -}@
-pub trait @{ pascal_name }@: @{ pascal_name }@Common@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@@% endfor %@@% endif %@ {
-@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
+@{- def.cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
 @{- def.relations_belonging(true)|fmt_rel_join("
     fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
@@ -119,9 +97,7 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common@% if !def.parents().is_empt
 
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
-pub trait @{ pascal_name }@Updater: @{ pascal_name }@Common + crate::models::MarkForDelete@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@@% endif %@ {
-@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
-{label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
+pub trait @{ pascal_name }@Updater: @{ pascal_name }@ + crate::models::MarkForDelete@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@@% endif %@ {
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_name}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("

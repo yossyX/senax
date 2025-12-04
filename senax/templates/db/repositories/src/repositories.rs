@@ -8,7 +8,7 @@ use ::futures::future::BoxFuture;
 use ::fxhash::FxHashMap;
 use ::senax_common::{cache::msec::MSec, ShardId};
 @% for (name, (_, defs)) in groups %@
-pub mod @{ name|snake|ident }@;
+pub@% if !name.eq(group) %@(crate)@% endif %@ mod @{ name|snake|ident }@;
 @%- endfor %@
 @%- for name in ref_groups %@
 pub use _repo_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|ident }@;

@@ -334,14 +334,14 @@ fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Que
 #[async_trait]
 impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
     @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
-    async fn all(&self) -> anyhow::Result<Box<dyn domain::models::EntityIterator<dyn @{ pascal_name }@Cache>>> {
+    async fn all(&self) -> anyhow::Result<Box<dyn domain::models::EntityIterator<dyn @{ pascal_name }@>>> {
         struct V(std::sync::Arc<Vec<_@{ pascal_name }@Cache>>);
-        impl domain::models::EntityIterator<dyn @{ pascal_name }@Cache> for V {
-            fn iter(&self) -> Box<dyn Iterator<Item = &(dyn @{ pascal_name }@Cache + 'static)> + '_> {
-                Box::new(self.0.iter().map(|v| v as &dyn @{ pascal_name }@Cache))
+        impl domain::models::EntityIterator<dyn @{ pascal_name }@> for V {
+            fn iter(&self) -> Box<dyn Iterator<Item = &(dyn @{ pascal_name }@ + 'static)> + '_> {
+                Box::new(self.0.iter().map(|v| v as &dyn @{ pascal_name }@))
             }
-            fn into_iter(self) -> Box<dyn Iterator<Item = Box<dyn @{ pascal_name }@Cache>>> {
-                Box::new(Vec::clone(&self.0).into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@Cache>))
+            fn into_iter(self) -> Box<dyn Iterator<Item = Box<dyn @{ pascal_name }@>>> {
+                Box::new(Vec::clone(&self.0).into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
             }
         }
         Ok(Box::new(V(_@{ pascal_name }@_::find_all_from_cache(self._conn.lock().await.deref(), None).await?)))
@@ -386,7 +386,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
         #[async_trait]
         #[allow(clippy::if_same_then_else)]
         impl @{ pascal_name }@Query@{ selector|pascal }@Builder for V {
-            async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
+            async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 let mut query = _@{ pascal_name }@_::query();
@@ -432,7 +432,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                     .await?
                     .into_iter()
                     .filter_map(|v| {
-                        let v = Box::new(v) as Box<dyn @{ pascal_name }@Cache>;
+                        let v = Box::new(v) as Box<dyn @{ pascal_name }@>;
                         if extra_filter.check(&*v).unwrap_or(true) {
                             Some(v)
                         } else {
@@ -452,7 +452,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             }
             /// Retrieve via stream
             /// Streams do not support with_filter_flag.
-            async fn stream(self: Box<Self>, single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> + Send>>> {
+            async fn stream(self: Box<Self>, single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@>>> + Send>>> {
                 let mut conn = self.conn.clone().lock_owned().await;
                 let conn = conn.deref_mut();
                 conn.begin_read_tx().await?;
@@ -534,7 +534,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                         });
                         if let Some(list) = ret.take() {
                             for v in list {
-                                let v = Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>;
+                                let v = Box::new(v) as Box<dyn @{ pascal_name }@>;
                                 if extra_filter.check(&*v).unwrap_or(true) {
                                     yield Ok(v);
                                 } else {
@@ -546,7 +546,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                     }
                     if let Some(list) = ret.take() {
                         for v in list {
-                            let v = Box::new(v) as Box<dyn @{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>;
+                            let v = Box::new(v) as Box<dyn @{ pascal_name }@>;
                             if extra_filter.check(&*v).unwrap_or(true) {
                                 yield Ok(v);
                             } else {
@@ -642,7 +642,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
         use _@{ pascal_name }@QueryFindBuilder as _QueryFindBuilder;
         #[async_trait]
         impl _@{ pascal_name }@QueryFindBuilder for V {
-            async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@Cache>>> {
+            async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
                 let joiner = if let Some(filter) = &self.filter {
@@ -663,17 +663,17 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                     let mut check = Ok(true);
                     use domain::models::Check_ as _;
                     if let Some(filter) = &self.filter {
-                        check = filter.check(&obj as &dyn @{ pascal_name }@Cache);
+                        check = filter.check(&obj as &dyn @{ pascal_name }@);
                     }
                     for (name, filter) in &self.with_filter_flag {
-                        if let Ok(r) = filter.check(&obj as &dyn @{ pascal_name }@Cache) {
+                        if let Ok(r) = filter.check(&obj as &dyn @{ pascal_name }@) {
                             obj._filter_flag.insert(name, r);
                         } else {
                             check = Err(anyhow::anyhow!(""));
                         }
                     }
                     match check {
-                        Ok(true) => Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@Cache>)),
+                        Ok(true) => Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@>)),
                         Ok(false) => {
                             log::warn!(ctx = conn.ctx_no(); "Forbidden: {:?}", @{ def.primaries()|fmt_join_with_paren2("self.id.clone()", "self.id.{index}.clone()", ", ") }@);
                             Ok(None)
@@ -690,7 +690,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                             @%- endif %@
                             if let Some(mut flags) = flags {
                                 obj._filter_flag.append(&mut flags);
-                                Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@Cache>))
+                                Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@>))
                             } else {
                                 log::warn!(ctx = conn.ctx_no(); "Forbidden: {:?}", @{ def.primaries()|fmt_join_with_paren2("self.id", "self.id.{index}", ", ") }@);
                                 Ok(None)

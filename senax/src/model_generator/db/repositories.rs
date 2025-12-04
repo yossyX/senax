@@ -112,6 +112,7 @@ pub fn write_group_files(
     #[template(path = "db/repositories/src/repositories.rs", escape = "none")]
     struct RepositoriesTemplate<'a> {
         pub db: &'a str,
+        pub group: &'a str,
         pub groups: &'a GroupsDef,
         pub ref_groups: &'a [String],
     }
@@ -120,6 +121,7 @@ pub fn write_group_files(
     remove_files.remove(file_path.as_os_str());
     let tpl = RepositoriesTemplate {
         db,
+        group,
         groups,
         ref_groups,
     };

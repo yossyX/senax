@@ -54,7 +54,7 @@ impl From<&_@{ pascal_name }@Id> for @{ pascal_name }@Id {
 @%- endfor %@
 @%- for parent in def.parents() %@
 
-impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common for _@{ pascal_name }@ {
+impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@ for _@{ pascal_name }@ {
 @{- parent.primaries()|fmt_join("
     fn _{raw_name}(&self) -> {inner} {
         __Getter__::_{raw_name}(self){clone}{convert_impl_domain_inner}
@@ -63,77 +63,7 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
     fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self)
     }", "") }@
-@{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        __Getter__::_{raw_name}(self){convert_impl_domain_outer}
-    }", "") }@
-}
-@%- if !config.force_disable_cache %@
-impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common for _@{ pascal_name }@Cache {
-@{- parent.primaries()|fmt_join("
-    fn _{raw_name}(&self) -> {inner} {
-        __Cache__::_{raw_name}(self){clone}{convert_impl_domain_inner}
-    }", "") }@
-@{- parent.only_version()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        __Cache__::_{raw_name}(self)
-    }", "") }@
-@{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        __Cache__::_{raw_name}(self){convert_impl_domain_outer}
-    }", "") }@
-}
-@%- endif %@
-impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common for _@{ pascal_name }@Updater {
-@{- parent.primaries()|fmt_join("
-    fn _{raw_name}(&self) -> {inner} {
-        self._data.{ident}{clone}
-    }", "") }@
-@{- parent.only_version()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        self._data.{ident}
-    }", "") }@
-@{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        {convert_impl_domain_outer_for_updater}
-    }", "") }@
-}
-@%- if !config.force_disable_cache %@
-impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Cache for _@{ pascal_name }@Cache {
-@{- parent.relations_one_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}Cache>))
-    }", "") }@
-@{- parent.relations_one_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}>))
-    }", "") }@
-@{- parent.relations_many_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.into_iter().map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}Cache>).collect())
-    }", "") }@
-@{- parent.relations_many_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.into_iter().map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}>).collect())
-    }", "") }@
-@{- parent.relations_belonging_cache(true)|fmt_rel_join("
-    #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}Cache>))
-    }", "") }@
-@{- parent.relations_belonging_uncached(true)|fmt_rel_join("
-    #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}>))
-    }", "") }@
-@{- parent.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_path}::{class}>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _{db_snake}_model_::{class_mod_path}::{class}>))
-    }", "") }@}
-@%- endif %@
-impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@ for _@{ pascal_name }@ {
-@{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
+@{- parent.cols_except_primaries_and_invisibles()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
@@ -153,12 +83,57 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
         Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
     }", "") }@
 }
-#[allow(clippy::useless_conversion)]
-impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater for _@{ pascal_name }@Updater {
+@%- if !config.force_disable_cache %@
+impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@ for _@{ pascal_name }@Cache {
+@{- parent.primaries()|fmt_join("
+    fn _{raw_name}(&self) -> {inner} {
+        __Cache__::_{raw_name}(self){clone}{convert_impl_domain_inner}
+    }", "") }@
+@{- parent.only_version()|fmt_join("
+    fn {ident}(&self) -> {domain_outer} {
+        __Cache__::_{raw_name}(self)
+    }", "") }@
+@{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
+    fn {ident}(&self) -> {domain_outer} {
+        __Cache__::_{raw_name}(self){convert_impl_domain_outer}
+    }", "") }@
 @{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
+    fn {ident}(&self) -> {domain_outer} {
+        panic!(\"Cannot be accessed due to being non-cacheable.: {raw_name}\")
+    }", "") }@
+@{- parent.relations_one_and_belonging(true)|fmt_rel_join("
+    #[allow(clippy::question_mark)]
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
+        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| v as &dyn _model_::{class_mod_path}::{class}))
+    }", "") }@
+@{- parent.relations_many(true)|fmt_rel_join("
+    #[allow(clippy::question_mark)]
+    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
+        Ok(Box::new(__Cache__::_{raw_rel_name}(self)?.iter().map(|v| v as &dyn _model_::{class_mod_path}::{class})))
+    }", "") }@
+@{- parent.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+    #[allow(clippy::question_mark)]
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
+        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
+    }", "") }@
+}
+@%- endif %@
+impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@ for _@{ pascal_name }@Updater {
+@{- parent.primaries()|fmt_join("
+    fn _{raw_name}(&self) -> {inner} {
+        self._data.{ident}{clone}
+    }", "") }@
+@{- parent.only_version()|fmt_join("
+    fn {ident}(&self) -> {domain_outer} {
+        self._data.{ident}
+    }", "") }@
+@{- parent.cols_except_primaries_and_invisibles()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
+}
+#[allow(clippy::useless_conversion)]
+impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater for _@{ pascal_name }@Updater {
 @{- parent.non_primaries_except_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_name}(&mut self, v: {domain_factory}) {
         __Updater__::mut_{raw_name}(self).set(v{convert_domain_inner_type})
@@ -210,7 +185,7 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
 }
 @%- endfor %@
 
-impl @{ pascal_name }@Common for _@{ pascal_name }@ {
+impl @{ pascal_name }@ for _@{ pascal_name }@ {
 @{- def.primaries()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
@@ -219,97 +194,7 @@ impl @{ pascal_name }@Common for _@{ pascal_name }@ {
     fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self)
     }", "") }@
-@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        __Getter__::_{raw_name}(self){convert_impl_domain_outer}
-    }", "") }@
-}
-impl domain::models::FilterFlag for _@{ pascal_name }@ {
-    fn get_flag(&self, name: &'static str) -> Option<bool> {
-        self._filter_flag.get(name).copied()
-    }
-}
-@%- if !config.force_disable_cache %@
-
-impl @{ pascal_name }@Common for _@{ pascal_name }@Cache {
-@{- def.primaries()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        __Cache__::_{raw_name}(self){convert_impl_domain_outer}
-    }", "") }@
-@{- def.only_version()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        __Cache__::_{raw_name}(self)
-    }", "") }@
-@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        __Cache__::_{raw_name}(self){convert_impl_domain_outer}
-    }", "") }@
-}
-impl domain::models::FilterFlag for _@{ pascal_name }@Cache {
-    fn get_flag(&self, name: &'static str) -> Option<bool> {
-        self._filter_flag.get(name).copied()
-    }
-}
-@%- endif %@
-
-impl @{ pascal_name }@Common for _@{ pascal_name }@Updater {
-@{- def.primaries()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        {convert_impl_domain_outer_for_updater}
-    }", "") }@
-@{- def.only_version()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        self._data.{ident}
-    }", "") }@
-@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        {convert_impl_domain_outer_for_updater}
-    }", "") }@
-}
-impl domain::models::FilterFlag for _@{ pascal_name }@Updater {
-    fn get_flag(&self, name: &'static str) -> Option<bool> {
-        self._filter_flag.get(name).copied()
-    }
-}
-@%- if !config.force_disable_cache %@
-
-impl @{ pascal_name }@Cache for _@{ pascal_name }@Cache {
-@{- def.relations_one_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}Cache>))
-    }", "") }@
-@{- def.relations_one_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}>))
-    }", "") }@
-@{- def.relations_many_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.into_iter().map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}Cache>).collect())
-    }", "") }@
-@{- def.relations_many_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.into_iter().map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}>).collect())
-    }", "") }@
-@{- def.relations_belonging_cache(true)|fmt_rel_join("
-    #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}Cache>))
-    }", "") }@
-@{- def.relations_belonging_uncached(true)|fmt_rel_join("
-    #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _model_::{class_mod_path}::{class}>))
-    }", "") }@
-@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    #[allow(clippy::question_mark)]
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_path}::{class}>>> {
-        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| Box::new(v) as Box<dyn _{db_snake}_model_::{class_mod_path}::{class}>))
-    }", "") }@
-}
-@%- endif %@
-
-impl @{ pascal_name }@ for _@{ pascal_name }@ {
-@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
+@{- def.cols_except_primaries_and_invisibles()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
@@ -330,12 +215,87 @@ impl @{ pascal_name }@ for _@{ pascal_name }@ {
     }", "") }@
 }
 
-#[allow(clippy::useless_conversion)]
-impl @{ pascal_name }@Updater for _@{ pascal_name }@Updater {
+impl domain::models::FilterFlag for _@{ pascal_name }@ {
+    fn get_flag(&self, name: &'static str) -> Option<bool> {
+        self._filter_flag.get(name).copied()
+    }
+}
+@%- if !config.force_disable_cache %@
+
+impl @{ pascal_name }@ for _@{ pascal_name }@Cache {
+@{- def.primaries()|fmt_join("
+    fn {ident}(&self) -> {domain_outer} {
+        __Cache__::_{raw_name}(self){convert_impl_domain_outer}
+    }", "") }@
+@{- def.only_version()|fmt_join("
+    fn {ident}(&self) -> {domain_outer} {
+        __Cache__::_{raw_name}(self)
+    }", "") }@
+@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
+    fn {ident}(&self) -> {domain_outer} {
+        __Cache__::_{raw_name}(self){convert_impl_domain_outer}
+    }", "") }@
 @{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
+    fn {ident}(&self) -> {domain_outer} {
+        panic!(\"Cannot be accessed due to being non-cacheable.: {raw_name}\")
+    }", "") }@
+@{- def.relations_one_and_belonging(true)|fmt_rel_join("
+    #[allow(clippy::question_mark)]
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
+        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| v as &dyn _model_::{class_mod_path}::{class}))
+    }", "") }@
+@{- def.relations_many(true)|fmt_rel_join("
+    #[allow(clippy::question_mark)]
+    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
+        Ok(Box::new(__Cache__::_{raw_rel_name}(self)?.iter().map(|v| v as &dyn _model_::{class_mod_path}::{class})))
+    }", "") }@
+@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+    #[allow(clippy::question_mark)]
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
+        Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
+    }", "") }@
+}
+impl domain::models::FilterFlag for _@{ pascal_name }@Cache {
+    fn get_flag(&self, name: &'static str) -> Option<bool> {
+        self._filter_flag.get(name).copied()
+    }
+}
+@%- endif %@
+
+impl @{ pascal_name }@ for _@{ pascal_name }@Updater {
+@{- def.primaries()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
+@{- def.only_version()|fmt_join("
+    fn {ident}(&self) -> {domain_outer} {
+        self._data.{ident}
+    }", "") }@
+@{- def.cols_except_primaries_and_invisibles()|fmt_join("
+    fn {ident}(&self) -> {domain_outer} {
+        {convert_impl_domain_outer_for_updater}
+    }", "") }@
+@{- def.relations_one_and_belonging(true)|fmt_rel_join("
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
+        unimplemented!()
+    }", "") }@
+@{- def.relations_many(true)|fmt_rel_join("
+    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
+        unimplemented!()
+    }", "") }@
+@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
+        unimplemented!()
+    }", "") }@
+}
+impl domain::models::FilterFlag for _@{ pascal_name }@Updater {
+    fn get_flag(&self, name: &'static str) -> Option<bool> {
+        self._filter_flag.get(name).copied()
+    }
+}
+
+#[allow(clippy::useless_conversion)]
+impl @{ pascal_name }@Updater for _@{ pascal_name }@Updater {
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_name}(&mut self, v: {domain_factory}) {
         __Updater__::mut_{raw_name}(self).set(v{convert_domain_inner_type})

@@ -711,7 +711,7 @@ use super::_base::_@{ mod_name }@::{_@{ pascal_name }@QueryService, _@{ pascal_n
 pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::consts;
 #[rustfmt::skip]
 pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{
-    @{ pascal_name }@, @{ pascal_name }@Cache, @{ pascal_name }@Common, @{ pascal_name }@Updater,
+    @{ pascal_name }@, @{ pascal_name }@Updater,
 };
 @%- for id in def.id() %@
 #[rustfmt::skip]

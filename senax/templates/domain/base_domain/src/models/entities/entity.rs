@@ -140,12 +140,6 @@ impl From<&dyn @{ pascal_name }@> for async_graphql::ID {
     }
 }
 #[allow(clippy::useless_conversion)]
-impl From<&dyn @{ pascal_name }@Cache> for async_graphql::ID {
-    fn from(obj: &dyn @{ pascal_name }@Cache) -> Self {
-        to_graphql_id(@{ def.primaries()|fmt_join_with_paren("obj.{ident}().to_owned().into()", ", ") }@)
-    }
-}
-#[allow(clippy::useless_conversion)]
 impl From<&dyn @{ pascal_name }@Updater> for async_graphql::ID {
     fn from(obj: &dyn @{ pascal_name }@Updater) -> Self {
         to_graphql_id(@{ def.primaries()|fmt_join_with_paren("obj.{ident}().to_owned().into()", ", ") }@)
@@ -234,46 +228,12 @@ impl @{ name|to_pascal_name }@ {
 
 @% endfor -%@
 
-pub trait @{ pascal_name }@Common: std::fmt::Debug + crate::models::FilterFlag@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common@% endfor %@ + 'static {
+pub trait @{ pascal_name }@: std::fmt::Debug + crate::models::FilterFlag + dyn_clone::DynClone + Send + Sync@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@@% endfor %@ + 'static {
 @{- def.primaries()|fmt_join("
 {label}{comment}    fn {ident}(&self) -> {outer};", "") }@
 @{- def.only_version()|fmt_join("
 {label}{comment}    fn {ident}(&self) -> {outer};", "") }@
-@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-{label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
-}
-
-@{ def.label|label0 -}@
-@{ def.comment|comment0 -}@
-pub trait @{ pascal_name }@Cache: @{ pascal_name }@Common + dyn_clone::DynClone + Send + Sync@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Cache@% endfor %@ + 'static {
-@{- def.relations_one_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
-@{- def.relations_one_uncached(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>>;", "") }@
-@{- def.relations_many_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
-@{- def.relations_many_uncached(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}>>>;", "") }@
-@{- def.relations_belonging(true)|fmt_rel_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
-        Some({local_keys}.into())
-    }", "") }@
-@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    fn _{raw_rel_name}_id(&self) -> Option<_{db_snake}_model_::{class_mod_path}::{class}Primary> {
-        Some({local_keys}.into())
-    }", "") }@
-@{- def.relations_belonging_cache(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>>;", "") }@
-@{- def.relations_belonging_uncached(true)|fmt_rel_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>>;", "") }@
-@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-{label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_path}::{class}>>>;", "") }@
-}
-
-@{ def.label|label0 -}@
-@{ def.comment|comment0 -}@
-pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@@% endfor %@ + 'static {
-@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
+@{- def.cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
 @{- def.relations_belonging(true)|fmt_rel_join("
     fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
@@ -291,10 +251,10 @@ pub trait @{ pascal_name }@: @{ pascal_name }@Common + Send + Sync@% for parent 
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>>;", "") }@
 }
 
+dyn_clone::clone_trait_object!(@{ pascal_name }@);
+
 @{ def.label|label0 -}@
-pub trait @{ pascal_name }@Updater: std::any::Any + Send + Sync + @{ pascal_name }@Common + crate::models::MarkForDelete@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@ + 'static {
-@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
-{label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
+pub trait @{ pascal_name }@Updater: std::any::Any + Send + Sync + @{ pascal_name }@ + crate::models::MarkForDelete@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@ + 'static {
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_name}(&mut self, v: {domain_factory});", "") }@
 @{- def.relations_one(true)|fmt_rel_join("
@@ -335,7 +295,7 @@ pub struct @{ pascal_name }@Entity {
 
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
-impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Common for @{ pascal_name }@Entity {
+impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@ for @{ pascal_name }@Entity {
 @{- parent.primaries()|fmt_join("
     fn _{raw_name}(&self) -> {inner} {
         self.{ident}.0{clone}
@@ -344,30 +304,7 @@ impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ pa
     fn {ident}(&self) -> {outer} {
         1
     }", "") }@
-@{- parent.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        {convert_domain_outer_prefix}self.{ident}{clone_for_outer}{convert_domain_outer}
-    }", "") }@
-}
-#[cfg(any(feature = "mock", test))]
-impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Cache for @{ pascal_name }@Entity {
-@{- parent.relations_one_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())))
-    }", "") }@
-@{- parent.relations_many_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(self.{rel_name}.iter().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())).collect())
-    }", "") }@
-@{- parent.relations_belonging_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())))
-    }", "") }@
-}
-#[cfg(any(feature = "mock", test))]
-#[allow(clippy::useless_conversion)]
-impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@ for @{ pascal_name }@Entity {
-@{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
+@{- parent.cols_except_primaries_and_invisibles()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{ident}{clone_for_outer}{convert_domain_outer}
     }", "") }@
@@ -383,10 +320,6 @@ impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ pa
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
 impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater for @{ pascal_name }@Entity {
-@{- parent.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        {convert_domain_outer_prefix}self.{ident}{clone_for_outer}{convert_domain_outer}
-    }", "") }@
 @{- parent.non_primaries_except_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_name}(&mut self, v: {domain_factory}) {
         self.{ident} = v{convert_domain_factory}
@@ -433,7 +366,7 @@ impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ pa
 
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
-impl @{ pascal_name }@Common for @{ pascal_name }@Entity {
+impl @{ pascal_name }@ for @{ pascal_name }@Entity {
 @{- def.primaries()|fmt_join("
     fn {ident}(&self) -> {outer} {
         {convert_domain_outer_prefix}self.{ident}{clone_for_outer}{convert_domain_outer}
@@ -442,54 +375,7 @@ impl @{ pascal_name }@Common for @{ pascal_name }@Entity {
     fn {ident}(&self) -> {outer} {
         1
     }", "") }@
-@{- def.cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        {convert_domain_outer_prefix}self.{ident}{clone_for_outer}{convert_domain_outer}
-    }", "") }@
-}
-#[cfg(any(feature = "mock", test))]
-impl crate::models::FilterFlag for @{ pascal_name }@Entity {
-    fn get_flag(&self, name: &'static str) -> Option<bool> {
-        self._filter_flag.get(name).copied()
-    }
-}
-
-#[cfg(any(feature = "mock", test))]
-impl @{ pascal_name }@Cache for @{ pascal_name }@Entity {
-@{- def.relations_one_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())))
-    }", "") }@
-@{- def.relations_one_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}>::from(v.clone())))
-    }", "") }@
-@{- def.relations_many_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(self.{rel_name}.iter().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())).collect())
-    }", "") }@
-@{- def.relations_many_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Vec<Box<dyn _model_::{class_mod_path}::{class}>>> {
-        Ok(self.{rel_name}.iter().map(|v| Box::<dyn _model_::{class_mod_path}::{class}>::from(v.clone())).collect())
-    }", "") }@
-@{- def.relations_belonging_cache(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}Cache>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}Cache>::from(v.clone())))
-    }", "") }@
-@{- def.relations_belonging_uncached(true)|fmt_rel_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _model_::{class_mod_path}::{class}>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _model_::{class_mod_path}::{class}>::from(v.clone())))
-    }", "") }@
-@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
-    fn {rel_name}(&self) -> anyhow::Result<Option<Box<dyn _{db_snake}_model_::{class_mod_path}::{class}>>> {
-        Ok(self.{rel_name}.as_ref().map(|v| Box::<dyn _{db_snake}_model_::{class_mod_path}::{class}>::from(v.clone())))
-    }", "") }@
-}
-
-#[cfg(any(feature = "mock", test))]
-#[allow(clippy::useless_conversion)]
-impl @{ pascal_name }@ for @{ pascal_name }@Entity {
-@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
+@{- def.cols_except_primaries_and_invisibles()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{ident}{clone_for_outer}{convert_domain_outer}
     }", "") }@
@@ -506,14 +392,16 @@ impl @{ pascal_name }@ for @{ pascal_name }@Entity {
         Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
     }", "") }@
 }
+#[cfg(any(feature = "mock", test))]
+impl crate::models::FilterFlag for @{ pascal_name }@Entity {
+    fn get_flag(&self, name: &'static str) -> Option<bool> {
+        self._filter_flag.get(name).copied()
+    }
+}
 
 #[cfg(any(feature = "mock", test))]
 #[allow(clippy::useless_conversion)]
 impl @{ pascal_name }@Updater for @{ pascal_name }@Entity {
-@{- def.non_cache_cols_except_primaries_and_invisibles()|fmt_join("
-    fn {ident}(&self) -> {domain_outer} {
-        {convert_domain_outer_prefix}self.{ident}{clone_for_outer}{convert_domain_outer}
-    }", "") }@
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
     fn set_{raw_name}(&mut self, v: {domain_factory}) {
         self.{ident} = v{convert_domain_factory}

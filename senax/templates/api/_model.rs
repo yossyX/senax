@@ -153,30 +153,6 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@> for ResObj {
         })
     }
 }
-@%- if def.use_all_rows_cache() || def.use_cache() %@
-
-impl TryFrom_<&dyn _domain_::@{ pascal_name }@Cache> for ResObj {
-    fn try_from_(v: &dyn _domain_::@{ pascal_name }@Cache, _cursor: Option<String>) -> anyhow::Result<Self> {
-        Ok(Self {
-            _id: v.into(),
-            @{- def.for_api_response()|fmt_join("
-            {ident}: v.{ident}(){to_res_api_type},", "") }@
-            @{- def.relations_one_for_api_response()|fmt_rel_join("
-            {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| (&*v).into()),", "") }@
-            @{- def.relations_many_for_api_response()|fmt_rel_join("
-            {rel_name}: v.{rel_name}().map(|l| l.iter().map(|v| (&**v).into()).collect()).unwrap_or_default(),", "") }@
-            @{- def.relations_belonging_for_api_response()|fmt_rel_join("
-            _{raw_rel_name}_id: v._{raw_rel_name}_id().map(|v| v.into()),
-            {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| (&*v).into()),", "") }@
-            _cursor,
-            @%- if !api_def.disable_mutation %@
-            _updatable: v.get_flag("_updatable"),
-            _deletable: v.get_flag("_deletable"),
-            @%- endif %@
-        })
-    }
-}
-@%- endif %@
 
 #[rustfmt::skip]
 #[allow(unused_mut)]

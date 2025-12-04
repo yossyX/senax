@@ -38,7 +38,7 @@ async fn find(
     repo: Box<dyn _QueryService>,
     auth: &AuthInfo,
     primary: &_domain_::@{ pascal_name }@Primary,
-) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> {
+) -> anyhow::Result<Option<Box<dyn _domain_::@{ pascal_name }@>>> {
     repo.begin_read_tx().await?;
     let @{ mod_name }@_repo = repo.@{ group|ident }@().@{ mod_name|ident }@();
     let look_ahead = gql_ctx.look_ahead();
@@ -240,7 +240,7 @@ impl GqlQuery@{ graphql_name }@ {
             @%- endif %@
             order: _repository_::@{ pascal_name }@Query@{ selector|pascal }@Order,
             offset: Option<usize>,
-        ) -> anyhow::Result<(Vec<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>, bool, Option<usize>)> {
+        ) -> anyhow::Result<(Vec<Box<dyn _domain_::@{ pascal_name }@>>, bool, Option<usize>)> {
             use domain::models::Cursor;
             let @{ db|snake }@_query = repo.@{ db|snake }@_query();
             @{ db|snake }@_query.begin_read_tx().await?;
@@ -910,7 +910,7 @@ async fn @{ selector }@_handler(
         repo: &RepositoryImpl,
         auth: &AuthInfo,
         data: &@{ selector|pascal }@Request,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<Box<dyn _domain_::@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>>> + Send>>>
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Box<dyn _domain_::@{ pascal_name }@>>> + Send>>>
     {
         let @{ db|snake }@_query = repo.@{ db|snake }@_query();
         let @{ mod_name }@_repo = @{ db|snake }@_query.@{ group|ident }@().@{ mod_name|ident }@();

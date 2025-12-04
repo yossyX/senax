@@ -68,23 +68,6 @@ impl From<&dyn _domain_::@{ pascal_name }@> for ResObj@{ rel_name|pascal }@ {
     }
 }
 
-impl From<&dyn _domain_::@{ pascal_name }@Cache> for ResObj@{ rel_name|pascal }@ {
-    fn from(v: &dyn _domain_::@{ pascal_name }@Cache) -> Self {
-        Self {
-            _id: v.into(),
-            @{- def.for_api_response()|fmt_join("
-            {ident}: v.{ident}(){to_res_api_type},", "") }@
-            @{- def.relations_one_for_api_response()|fmt_rel_join("
-            {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| (&*v).into()),", "") }@
-            @{- def.relations_many_for_api_response()|fmt_rel_join("
-            {rel_name}: v.{rel_name}().map(|l| l.iter().map(|v| (&**v).into()).collect()).unwrap_or_default(),", "") }@
-            @{- def.relations_belonging_for_api_response()|fmt_rel_join("
-            _{raw_rel_name}_id: v._{raw_rel_name}_id().map(|v| v.into()),
-            {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| (&*v).into()),", "") }@
-        }
-    }
-}
-
 #[allow(unused_mut)]
 #[allow(clippy::needless_update)]
 pub fn joiner(_look_ahead: async_graphql::Lookahead<'_>) -> Option<Box<_repository_::Joiner_>> {

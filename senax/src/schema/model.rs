@@ -1332,6 +1332,17 @@ impl ModelDef {
             .filter(|(_k, v)| !v.exclude_from_cache())
             .collect()
     }
+    pub fn cols_except_primaries_and_invisibles(&self) -> Vec<(&String, &FieldDef)> {
+        self.merged_fields
+            .iter()
+            .filter(|(k, v)| {
+                !v.in_abstract
+                    && !v.primary
+                    && !ConfigDef::version().eq(&**k)
+                    && !ConfigDef::aggregation_type().eq(&**k)
+            })
+            .collect()
+    }
     pub fn cache_cols_except_primaries_and_invisibles(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
@@ -1571,8 +1582,7 @@ impl ModelDef {
         self.merged_fields
             .iter()
             .filter(|(k, v)| {
-                !v.exclude_from_cache()
-                    && (!v.skip_factory() || v.is_version)
+                (!v.skip_factory() || v.is_version)
                     && v.auto.is_none()
                     && ApiFieldDef::has(k)
                     && ApiFieldDef::check(k, true)
@@ -1584,8 +1594,7 @@ impl ModelDef {
         self.merged_fields
             .iter()
             .filter(|(k, v)| {
-                !v.exclude_from_cache()
-                    && !v.skip_factory()
+                !v.skip_factory()
                     && v.auto.is_none()
                     && v.data_type != DataType::Binary
                     && v.data_type != DataType::Varbinary

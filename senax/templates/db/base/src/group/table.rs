@@ -1589,40 +1589,32 @@ impl _@{ pascal_name }@Cache {
         self._wrapper._{raw_name}()
     }", "") }@
     @{- def.relations_one_cache(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}Cache>> {
-        if let Some(v) = &self.{rel_name} {
-            Ok(v.as_ref().map(|v| (**v).clone()))
-        } else {
-            Ok(self._wrapper._{raw_rel_name}()?.map(|v| (v.clone(), Default::default()).into()))
-        }
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}Cache>> {
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
     @{- def.relations_one_uncached(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|v| (**v).clone()))
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
     @{- def.relations_many_cache(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Vec<rel_{class_mod}::{class}Cache>> {
-        if let Some(v) = &self.{rel_name} {
-            Ok(v.to_vec())
-        } else {
-            Ok(self._wrapper._{raw_rel_name}()?.iter().map(|v| (v.clone(), Default::default()).into()).collect())
-        }
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}Cache>> {
+        self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")
     }", "") }@
     @{- def.relations_many_uncached(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Vec<rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.to_vec())
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
+        self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")
     }", "") }@
     @{- def.relations_belonging_cache(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}Cache>> {
-        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}Cache>> {
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
     @{- def.relations_belonging_uncached(false)|fmt_rel_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
     @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<rel_{class_mod}::{class}>> {
-        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| *b.clone()))
+{label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
+        Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
 }
 @%- endif %@
