@@ -212,7 +212,7 @@ function EditValue() {
               <AutoField name="srid" {...formData} hidden={!detail} />
               <AutoField name="default" {...formData} hidden={!detail} />
               <AutoField name="query" {...formData} hidden={!detail} />
-              <AutoField name="stored" {...formData} hidden={!detail} />
+              <AutoField name="generated_is_stored" {...formData} hidden={!detail} />
               <AutoField name="sql_comment" {...formData} hidden={!detail} />
               <AutoField name="hidden" {...formData} hidden={!detail} />
               <AutoField name="secret" {...formData} hidden={!detail} />

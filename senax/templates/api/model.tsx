@@ -49,7 +49,7 @@ export const Update@{ model_route|pascal }@Query = graphql(`mutation update_@{ p
 export const Delete@{ model_route|pascal }@Query = graphql(`mutation delete_@{ path }@($_id:ID!){@{ curly_begin }@{delete(_id:$_id)}@{ curly_end }@}`);
 @%- if api_def.use_delete_by_pk %@
 
-export const DeleteByPk@{ model_route|pascal }@Query = graphql(`query delete_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${ident}:{gql_type}", ",") }@){@{ curly_begin }@{deleteByPk(@{ def.primaries()|fmt_join("{ident}: ${ident}", ",") }@)}@{ curly_end }@}`);
+export const DeleteByPk@{ model_route|pascal }@Query = graphql(`mutation delete_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${ident}:{gql_type}", ",") }@){@{ curly_begin }@{deleteByPk(@{ def.primaries()|fmt_join("{ident}: ${ident}", ",") }@)}@{ curly_end }@}`);
 @%- endif %@
 @%- for (selector, selector_def) in def.selectors %@
 @%- for api_selector_def in api_def.selector(selector) %@

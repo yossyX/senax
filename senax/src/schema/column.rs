@@ -577,7 +577,7 @@ pub struct FieldDef {
     pub query: Option<String>,
     /// ### Generated Column を保存する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stored: Option<bool>,
+    pub generated_is_stored: Option<bool>,
     /// ### DBのテーブル定義に使用するコメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sql_comment: Option<String>,
@@ -699,7 +699,7 @@ pub struct FieldJson {
     pub query: Option<String>,
     /// ### Generated Column を保存する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stored: Option<bool>,
+    pub generated_is_stored: Option<bool>,
     /// ### DBのテーブル定義に使用するコメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sql_comment: Option<String>,
@@ -784,7 +784,7 @@ pub struct ValueObjectJson {
     pub query: Option<String>,
     /// ### Generated Column を保存する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub stored: bool,
+    pub generated_is_stored: bool,
     /// ### DBのテーブル定義に使用するコメント
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sql_comment: Option<String>,
@@ -827,7 +827,7 @@ impl From<FieldDef> for FieldJson {
             srid: value.srid,
             default: value.default.map(|v| yaml_value_to_str(&v).unwrap()),
             query: value.query,
-            stored: value.stored,
+            generated_is_stored: value.generated_is_stored,
             sql_comment: value.sql_comment,
             hidden: value.hidden,
             secret: value.secret,
@@ -901,7 +901,7 @@ impl From<FieldJson> for FieldDef {
                 serde_yaml::Value::String(v)
             }),
             query: value.query,
-            stored: value.stored,
+            generated_is_stored: value.generated_is_stored,
             sql_comment: value.sql_comment,
             hidden: value.hidden,
             secret: value.secret,
@@ -932,7 +932,7 @@ impl From<FieldDef> for ValueObjectJson {
             srid: value.srid,
             default: value.default.map(|v| yaml_value_to_str(&v).unwrap()),
             query: value.query,
-            stored: value.stored.unwrap_or_default(),
+            generated_is_stored: value.generated_is_stored.unwrap_or_default(),
             sql_comment: value.sql_comment,
             hidden: value.hidden.unwrap_or_default(),
             secret: value.secret.unwrap_or_default(),
@@ -981,7 +981,7 @@ impl From<ValueObjectJson> for FieldDef {
             srid: value.srid,
             default: value.default.map(|v| serde_yaml::from_str(&v).unwrap()),
             query: value.query,
-            stored: Some(value.stored),
+            generated_is_stored: Some(value.generated_is_stored),
             sql_comment: value.sql_comment,
             hidden: Some(value.hidden),
             secret: Some(value.secret),
@@ -1027,8 +1027,8 @@ impl FieldDef {
         if let Some(query) = org.query {
             self.query = Some(query);
         }
-        if let Some(stored) = org.stored {
-            self.stored = Some(stored);
+        if let Some(stored) = org.generated_is_stored {
+            self.generated_is_stored = Some(stored);
         }
         if let Some(sql_comment) = org.sql_comment {
             self.sql_comment = Some(sql_comment);

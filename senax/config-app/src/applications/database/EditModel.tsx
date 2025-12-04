@@ -483,7 +483,7 @@ function Field({ formData, definitions }: any) {
           />
           <AutoField name="default" {...formData} hidden={primary} />
           <AutoField name="query" {...formData} hidden={primary} />
-          <AutoField name="stored" {...formData} hidden={!query} />
+          <AutoField name="generated_is_stored" {...formData} hidden={!query} />
           <AutoField name="sql_comment" {...formData} />
           <AutoField name="hidden" {...formData} />
           <AutoField name="secret" {...formData} />

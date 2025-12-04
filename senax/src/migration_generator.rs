@@ -137,7 +137,7 @@ pub fn make_table_def(
             query: col
                 .query
                 .clone()
-                .map(|v| (v, col.stored.unwrap_or_default())),
+                .map(|v| (v, col.generated_is_stored.unwrap_or_default())),
         };
         let sql_type = match col.data_type {
             schema::DataType::TinyInt if col.signed => SqlType::Tinyint,
