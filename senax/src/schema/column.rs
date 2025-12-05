@@ -1213,6 +1213,12 @@ impl FieldDef {
                         &format!("ST_AsGeoJSON(`{}`)", self.get_col_name(name))
                     )
                 }
+                DataType::IdVarchar => {
+                    format!(
+                        "    #[sql(query = {:?})]\n",
+                        &format!("CONVERT(`{}` USING utf8mb4)", self.get_col_name(name))
+                    )
+                }
                 _ => {
                     if self
                         .collation
@@ -2424,9 +2430,9 @@ impl FieldDef {
             DataType::Int => "",
             DataType::BigInt => "",
             DataType::Float if !self.not_null && !req => {
-                ".map(|v| v.to_string().parse()).transpose()?"
+                ".map(|v| v.to_string().parse()).transpose().unwrap()"
             }
-            DataType::Float if !req => ".to_string().parse()?",
+            DataType::Float if !req => ".to_string().parse().unwrap()",
             DataType::Float => "",
             DataType::Double => "",
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar

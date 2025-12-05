@@ -615,6 +615,10 @@ impl ConfigDef {
         }
         name
     }
+
+    pub fn disable_no_semijoin(&self) -> bool {
+        !self.is_mysql() || self.disable_no_semijoin
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema)]

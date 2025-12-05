@@ -204,12 +204,11 @@ pub struct ModelDef {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table_name: Option<String>,
     /// ### DDL定義を出力しない
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub skip_ddl: Option<bool>,
-    /// ### 主キーのみで構成され、常に存在するダミー
-    /// deprecated
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dummy_always_present: Option<bool>,
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub skip_ddl: bool,
+    /// ### 主キー以外で結合する多対多リレーション用ダミーテーブル
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub dummy_always_joinable: bool,
     /// ### Upsertコンフリクト判定ユニークキー(PostgreSQLのみ)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upsert_conflict_target: Option<String>,
@@ -354,12 +353,11 @@ pub struct ModelJson {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table_name: Option<String>,
     /// ### DDL定義を出力しない
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub skip_ddl: Option<bool>,
-    /// ### 主キーのみで構成され、常に存在するダミー
-    /// deprecated
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dummy_always_present: Option<bool>,
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub skip_ddl: bool,
+    /// ### 主キー以外で結合する多対多リレーション用ダミーテーブル
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub dummy_always_joinable: bool,
     /// ### Upsertコンフリクト判定ユニークキー(PostgreSQLのみ)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upsert_conflict_target: Option<String>,
@@ -486,7 +484,7 @@ impl From<ModelDef> for ModelJson {
             comment: value.comment,
             table_name: value.table_name,
             skip_ddl: value.skip_ddl,
-            dummy_always_present: value.dummy_always_present,
+            dummy_always_joinable: value.dummy_always_joinable,
             upsert_conflict_target: value.upsert_conflict_target,
             ignore_foreign_key: value.ignore_foreign_key,
             timestampable: value.timestampable,
@@ -604,7 +602,7 @@ impl TryFrom<ModelJson> for ModelDef {
             comment: value.comment,
             table_name: value.table_name,
             skip_ddl: value.skip_ddl,
-            dummy_always_present: value.dummy_always_present,
+            dummy_always_joinable: value.dummy_always_joinable,
             upsert_conflict_target: value.upsert_conflict_target,
             ignore_foreign_key: value.ignore_foreign_key,
             timestampable: value.timestampable,
@@ -756,8 +754,8 @@ impl ModelDef {
         format!("{}::{}", &self.group_name, &self.name)
     }
 
-    pub fn dummy_always_present(&self) -> bool {
-        self.dummy_always_present.unwrap_or_default()
+    pub fn dummy_always_joinable(&self) -> bool {
+        self.dummy_always_joinable
     }
 
     pub fn act_as_session(&self) -> bool {

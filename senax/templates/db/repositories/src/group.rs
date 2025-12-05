@@ -73,7 +73,7 @@ pub(crate) async fn start(db_dir: Option<&Path>) -> Result<()> {
 
 pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
     @%- for (name, (_, def)) in models %@
-    @%- if !def.skip_ddl.unwrap_or_default() %@
+    @%- if !def.skip_ddl %@
     _base::_@{ def.mod_name() }@::check(shard_id).await?;
     @%- endif %@
     @%- endfor %@

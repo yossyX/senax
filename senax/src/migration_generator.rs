@@ -107,7 +107,7 @@ pub fn make_table_def(
         name: table_name.clone(),
         old_name: def._before_rename_name.clone(),
         engine: def.engine.clone().or_else(|| config.engine.clone()),
-        skip_ddl: def.skip_ddl.unwrap_or_default(),
+        skip_ddl: def.skip_ddl,
         ..Default::default()
     };
     let old_soft_delete = def._soft_delete.as_ref().and_then(|v| {
@@ -653,18 +653,6 @@ fn make_ddl(
             }
             found
         } {}
-        if old_tables.contains_key(table_name) {
-            for (name, new_field) in &new_table.columns {
-                if let Some(old_name) = &new_field.old_name
-                    && name != old_name
-                {
-                    anyhow::bail!(
-                        "A illegal rename of columns in the {} table was detected.",
-                        table_name
-                    );
-                }
-            }
-        }
     }
     for (table_name, old_table) in &old_tables {
         if let Some(new_table) = new_tables.get(table_name) {

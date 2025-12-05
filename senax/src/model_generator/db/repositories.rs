@@ -239,27 +239,29 @@ pub fn write_group_files(
                 }
 
                 let mut force_indexes = Vec::new();
-                let (_, _, idx_map) = crate::migration_generator::make_table_def(def, config)?;
-                for (index_name, index_def) in &def.merged_indexes {
-                    for (force_index_name, force_index_def) in &index_def.force_index_on {
-                        let force_index_def = force_index_def.clone().unwrap_or_default();
-                        let includes = force_index_def
-                            .includes
-                            .unwrap_or(StringOrArray::One(force_index_name.clone()));
-                        let mut cond: Vec<_> = includes
-                            .to_vec()
-                            .iter()
-                            .map(|v| format!("filter_digest.contains({:?})", v))
-                            .collect();
-                        let excludes = force_index_def
-                            .excludes
-                            .unwrap_or(StringOrArray::Many(vec![]));
-                        for v in excludes.to_vec() {
-                            cond.push(format!("!filter_digest.contains({:?})", v));
+                if is_mysql_mode() {
+                    let (_, _, idx_map) = crate::migration_generator::make_table_def(def, config)?;
+                    for (index_name, index_def) in &def.merged_indexes {
+                        for (force_index_name, force_index_def) in &index_def.force_index_on {
+                            let force_index_def = force_index_def.clone().unwrap_or_default();
+                            let includes = force_index_def
+                                .includes
+                                .unwrap_or(StringOrArray::One(force_index_name.clone()));
+                            let mut cond: Vec<_> = includes
+                                .to_vec()
+                                .iter()
+                                .map(|v| format!("filter_digest.contains({:?})", v))
+                                .collect();
+                            let excludes = force_index_def
+                                .excludes
+                                .unwrap_or(StringOrArray::Many(vec![]));
+                            for v in excludes.to_vec() {
+                                cond.push(format!("!filter_digest.contains({:?})", v));
+                            }
+                            let idx = idx_map.get(index_name).unwrap();
+                            let idx = format!("{:?}", filters::_to_db_col(idx, true));
+                            force_indexes.push((cond.join(" && "), idx));
                         }
-                        let idx = idx_map.get(index_name).unwrap();
-                        let idx = format!("{:?}", filters::_to_db_col(idx, true));
-                        force_indexes.push((cond.join(" && "), idx));
                     }
                 }
 

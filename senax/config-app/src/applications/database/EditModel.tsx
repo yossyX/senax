@@ -164,7 +164,7 @@ function EditModel() {
               <AutoField name="comment" {...formData} textarea />
               <AutoField name="table_name" {...formData} />
               <AutoField name="skip_ddl" {...formData} />
-              <AutoField name="dummy_always_present" {...formData} />
+              <AutoField name="dummy_always_joinable" {...formData} />
               <AutoField name="upsert_conflict_target" {...formData} hidden={formData.additionalData.db_data.db == "mysql"}
                 autocomplete={formData.additionalData.selfModel.indexes?.filter((v: any) => v.type == "unique").map(
                   (v: any) => v.name,

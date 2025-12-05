@@ -140,13 +140,11 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
             def.db = db.to_string();
             def.group_name.clone_from(group_name);
             def.name = model_name.to_string();
-            if def.dummy_always_present() {
+            if def.dummy_always_joinable() {
                 if def.use_all_rows_cache.is_none() {
                     def.use_all_rows_cache = Some(false);
                 }
-                if def.skip_ddl.is_none() {
-                    def.skip_ddl = Some(true);
-                }
+                def.skip_ddl = true;
             }
             for (name, _col) in def.fields.iter() {
                 crate::common::check_column_name(name);

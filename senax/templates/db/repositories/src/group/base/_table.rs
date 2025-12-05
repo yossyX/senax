@@ -3029,11 +3029,19 @@ pub fn write_belonging_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols
     } else {
         ""
     };
+    @%- if def.dummy_always_joinable() %@
+    if without_key {
+        write!(buf, r#"SELECT {} FROM (SELECT {cols} as {}) as _t{} WHERE "#, Primary::cols(), Primary::cols_with_paren(), idx + 1).unwrap();
+    } else {
+        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM (SELECT {cols} as {}) as _t{} WHERE "#, Primary::cols_with_paren(), idx + 1).unwrap();
+    }
+    @%- else %@
     if without_key {
         write!(buf, r#"SELECT {} FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, Primary::cols(), idx + 1).unwrap();
     } else {
-        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, Primary::cols_with_paren(), cols).unwrap();
+        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, Primary::cols_with_paren(), cols).unwrap();
     }
+    @%- endif %@
     let mut trash_mode = TrashMode::Not;
     if let Some(filter) = filter {
         filter.write(buf, idx + 1, &mut trash_mode, shard_id, is_outer);
@@ -3059,11 +3067,19 @@ pub fn write_having_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols1: 
     } else {
         ""
     };
+    @%- if def.dummy_always_joinable() %@
+    if without_key {
+        write!(buf, r#"SELECT {} FROM (SELECT {cols3} as {cols1}) as _t{} WHERE "#, cols1, idx + 1).unwrap();
+    } else {
+        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM (SELECT {cols3} as {cols1}) as _t{} WHERE "#, idx + 1).unwrap();
+    }
+    @%- else %@
     if without_key {
         write!(buf, r#"SELECT {} FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, cols1, idx + 1).unwrap();
     } else {
-        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, cols2, cols3).unwrap();
+        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, cols2, cols3).unwrap();
     }
+    @%- endif %@
     let mut trash_mode = TrashMode::Not;
     if let Some(filter) = filter {
         filter.write(buf, idx + 1, &mut trash_mode, shard_id, is_outer);
@@ -4782,12 +4798,12 @@ impl _@{ pascal_name }@_ {
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        @%- if def.dummy_always_present() %@
-        let data: Option<Data> = Some(Data {
+        @%- if def.dummy_always_joinable() %@
+        let data: Option<(Data, _)> = Some((Data {
             @{- def.primaries()|fmt_join("
             {ident}: id.{index}{raw_to_inner},", "") }@
             ..Default::default()
-        });
+        }, Default::default()));
         @%- else %@
         let data: Option<_> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?.map(|(v, f)| Data::from_row(&v).map(|v| (v, f))).transpose()?;
         @%- endif %@
@@ -4803,7 +4819,7 @@ impl _@{ pascal_name }@_ {
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        @%- if def.dummy_always_present() %@
+        @%- if def.dummy_always_joinable() %@
         Ok(Default::default())
         @%- else %@
         let data: Option<_> = __find_optional(conn, Exists::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?.map(|(_, f)| f);
@@ -4832,7 +4848,7 @@ impl _@{ pascal_name }@_ {
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        @%- if def.dummy_always_present() %@
+        @%- if def.dummy_always_joinable() %@
         let data: Option<Data> = Some(Data {
             @{- def.primaries()|fmt_join("
             {ident}: id.{index}{raw_to_inner},", "") }@
@@ -4853,7 +4869,7 @@ impl _@{ pascal_name }@_ {
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        @%- if def.dummy_always_present() %@
+        @%- if def.dummy_always_joinable() %@
         Ok(Default::default())
         @%- else %@
         let data: Option<_> = __find_optional(conn, Exists::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter, with_filter_flag.unwrap_or_default()).await?.map(|(_, f)| f);
@@ -5792,16 +5808,16 @@ async fn __find_many(
     let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
     let mut list = Vec::with_capacity(ids.len());
     for ids in id_chunks {
-        @%- if def.dummy_always_present() %@
+        @%- if def.dummy_always_joinable() %@
         let mut v = ids
             .iter()
             .map(|id| {
                 let id = id.clone();
-                Data {
+                (Data {
                     @{- def.primaries()|fmt_join("
                     {ident}: id.{index}{raw_to_inner},", "") }@
                     ..Default::default()
-                }
+                }, Default::default())
             })
             .collect();
         list.append(&mut v);
@@ -5882,7 +5898,7 @@ async fn ___find_many_for_cache(
     let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
     let mut result: Vec<CacheData> = Vec::with_capacity(ids.len());
     for ids in id_chunks {
-        @%- if def.dummy_always_present() %@
+        @%- if def.dummy_always_joinable() %@
         let mut v = ids
             .iter()
             .map(|id| {
