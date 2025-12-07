@@ -1391,7 +1391,12 @@ impl FieldDef {
         }}"#
                 )
             }
-            DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt if !is_mysql_mode() && !self.signed && self.enum_values.is_none() && !self.not_null => {
+            DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt
+                if !is_mysql_mode()
+                    && !self.signed
+                    && self.enum_values.is_none()
+                    && !self.not_null =>
+            {
                 format!(
                     r#"
         if let Some(v) = self.{ident_name} {{
@@ -1401,7 +1406,9 @@ impl FieldDef {
         }}"#
                 )
             }
-            DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt if !is_mysql_mode() && !self.signed && self.enum_values.is_none() => {
+            DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt
+                if !is_mysql_mode() && !self.signed && self.enum_values.is_none() =>
+            {
                 format!(
                     r#"
         if self.{ident_name} < 0 {{
@@ -1571,7 +1578,9 @@ impl FieldDef {
             _ if self.max.is_some() => {
                 validators.push(format!("range(max = {})", self.max.unwrap(),));
             }
-            DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt if !is_mysql_mode() && !self.signed && self.enum_values.is_none() => {
+            DataType::TinyInt | DataType::SmallInt | DataType::Int | DataType::BigInt
+                if !is_mysql_mode() && !self.signed && self.enum_values.is_none() =>
+            {
                 validators.push("range(min = 0)".to_string());
             }
             DataType::Double | DataType::Float if !self.signed => {

@@ -12,11 +12,8 @@ use ::tokio::sync::{Mutex, Semaphore};
 
 pub use _base::models::USE_FAST_CACHE;
 pub use _base::models::CACHE_UPDATE_LOCK;
-// pub const USE_FAST_CACHE: bool = @{ config.use_fast_cache() }@;
-// pub const USE_STORAGE_CACHE: bool = @{ config.use_storage_cache }@;
-// pub static CACHE_UPDATE_LOCK: RwLock<()> = RwLock::const_new(());
 @{-"\n"}@
-@%- for (name, (_, defs)) in groups %@
+@%- for (name, (_, defs, _)) in groups %@
 pub use _base::models::@{ name|snake|ident }@;
 @%- endfor %@
 
@@ -25,14 +22,14 @@ pub use _base::models::TableName;
 pub use _base::models::Handler;
 
 pub(crate) async fn start(db_dir: &Path) -> Result<()> {
-@%- for (name, (_, defs)) in groups %@
+@%- for name in unified %@
     _repo_@{ name|snake }@::start(db_dir).await?;
 @%- endfor %@
     Ok(())
 }
 
 pub(crate) async fn start_test() -> Result<()> {
-@%- for (name, (_, defs)) in groups %@
+@%- for name in unified %@
     _repo_@{ name|snake }@::start_test().await?;
 @%- endfor %@
     Ok(())
@@ -41,7 +38,7 @@ pub(crate) async fn start_test() -> Result<()> {
 #[rustfmt::skip]
 pub(crate) async fn check() -> Result<()> {
     for shard_id in DbConn::shard_num_range() {
-        @%- for (name, (_, defs)) in groups %@
+        @%- for name in unified %@
         _repo_@{ name|snake }@::check(shard_id).await?;
         @%- endfor %@
     }

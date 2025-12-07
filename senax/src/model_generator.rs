@@ -1,9 +1,9 @@
 use anyhow::{Context, Result, ensure};
 use askama::Template;
 use compact_str::CompactString;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use regex::Regex;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -23,7 +23,13 @@ use crate::{SEPARATED_BASE_FILES, filters};
 mod db;
 mod domain;
 
-pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) -> Result<()> {
+pub fn generate(
+    db: &str,
+    force: bool,
+    clean: bool,
+    skip_version_check: bool,
+    verbose: bool,
+) -> Result<()> {
     if !skip_version_check {
         check_version(db)?;
     }
@@ -64,8 +70,14 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     content = reg.replace_all(&content, "").into_owned();
     let reg = Regex::new(r#"[ \t]*"_repo_\w+/cache_update_only"[ \t]*,?[ \t]*\n?"#)?;
     content = reg.replace_all(&content, "").into_owned();
-    for (group, (_, _)) in groups.iter().rev() {
+    let mut unified_list = Vec::new();
+    for (group, _) in groups.iter().rev() {
         let db = &db.to_snake();
+        let group = config.unified_name(group);
+        if unified_list.contains(&group) {
+            continue;
+        }
+        unified_list.push(group.clone());
         let group = &group.to_snake();
         content = content.replace(
             "[dependencies]",
@@ -140,13 +152,13 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         r"(?m)^[ \t]*let _ = _base::models::\w+_HANDLER.set\(Box::new\(_repo_\w+::repositories::Handler\)\);\n",
     )?;
     content = reg.replace_all(&content, "").into_owned();
-    for (group, (_, _)) in groups.iter().rev() {
+    for (group, (_, _, unified)) in groups.iter().rev() {
         let group = &group.to_snake();
         content = content.replace(
             "pub mod repositories {",
             &format!(
                 "pub mod repositories {{\n    pub use _repo_{}::repositories::{};",
-                group,
+                unified,
                 _to_ident_name(group)
             ),
         );
@@ -154,7 +166,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             "pub fn init() {",
             &format!(
                 "pub fn init() {{\n    let _ = _base::models::{}_HANDLER.set(Box::new(_repo_{}::repositories::Handler));",
-                group.to_upper_snake(), group
+                group.to_upper_snake(), unified
             ),
         );
     }
@@ -167,11 +179,13 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     struct ModelsTemplate<'a> {
         pub config: &'a ConfigDef,
         pub groups: &'a GroupsDef,
+        pub unified: &'a [String],
     }
 
     let tpl = ModelsTemplate {
         config: &config,
         groups,
+        unified: &unified_list,
     };
     fs_write(file_path, tpl.render()?)?;
 
@@ -198,8 +212,31 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
     }
     if !exclude_from_domain {
         domain::base_domain::write_models_db_rs(&domain_models_dir, db, groups, force)?;
-        domain::repositories::write_lib_rs(&domain_repositories_src_dir, db, groups, force)?;
-        domain::repositories::write_cargo_toml(&domain_repositories_dir, db, groups, force)?;
+        let mut unified_list = IndexMap::new();
+        let mut groups = IndexSet::new();
+        for (group_name, def) in &config.groups {
+            if let Some(def) = def
+                && let Some(unified) = def.unified_repository.clone()
+            {
+                unified_list.insert(unified.clone(), group_name.clone());
+                groups.insert((unified, group_name.clone()));
+            } else {
+                groups.insert((group_name.clone(), group_name.clone()));
+            }
+        }
+        let unified_list: Vec<_> = unified_list
+            .into_iter()
+            .filter(|(k, _)| !groups.contains(&(k.clone(), k.clone())))
+            .collect();
+        let groups: Vec<_> = groups.into_iter().collect();
+        domain::repositories::write_lib_rs(
+            &domain_repositories_src_dir,
+            db,
+            &unified_list,
+            &groups,
+            force,
+        )?;
+        domain::repositories::write_cargo_toml(&domain_repositories_dir, db, &groups, force)?;
     }
 
     db::base::write_files(&base_dir, db, groups, &config, force, non_snake_case)?;
@@ -267,44 +304,7 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
         }
     }
 
-    for (group_name, (_, defs)) in groups {
-        begin_traverse(group_name);
-        let repo_include_groups: GroupsDef = groups
-            .iter()
-            .filter(|(_, (f, _))| f.relaxed_load() >= REL_INCLUDE)
-            .map(|(n, (f, v))| {
-                let v2: IndexMap<String, (AtomicUsize, Arc<ModelDef>)> = v
-                    .iter()
-                    .filter(|(_, (f, _))| f.relaxed_load() > 0)
-                    .map(|(n, (f, v))| {
-                        (
-                            n.to_string(),
-                            (AtomicUsize::new(f.relaxed_load()), v.clone()),
-                        )
-                    })
-                    .collect();
-                (n.to_string(), (AtomicUsize::new(f.relaxed_load()), v2))
-            })
-            .collect();
-        let ref_groups: Vec<_> = groups
-            .iter()
-            .filter(|(_, (f, _))| f.relaxed_load() == REL_USE)
-            .map(|(n, _)| n.to_string())
-            .collect();
-        let ref_db: BTreeSet<(String, String)> = groups
-            .iter()
-            .filter(|(_, (f, _))| f.relaxed_load() != 0)
-            .flat_map(|(_, (_, d))| {
-                d.iter().flat_map(|v| {
-                    v.1.1
-                        .belongs_to_outer_db()
-                        .iter()
-                        .map(|v| (v.1.db().to_string(), v.1.get_group_name()))
-                        .collect::<Vec<_>>()
-                })
-            })
-            .collect();
-
+    for (group_name, (_, defs, _)) in groups {
         let mod_names: BTreeSet<String> = defs.iter().map(|(_, (_, d))| d.mod_name()).collect();
         let entities_mod_names: BTreeSet<(String, &String)> = defs
             .iter()
@@ -313,33 +313,6 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             .collect();
 
         let model_group_dir = model_models_dir.join(group_name.to_snake());
-
-        db::repositories::write_group_files(
-            &db_repositories_dir,
-            db,
-            &config,
-            group_name,
-            &repo_include_groups,
-            &ref_groups,
-            &ref_db,
-            force,
-            exclude_from_domain,
-            &mut remove_files,
-        )?;
-
-        if !exclude_from_domain {
-            domain::repositories::write_group_files(
-                &domain_repositories_dir,
-                db,
-                &config,
-                group_name,
-                &repo_include_groups,
-                &ref_groups,
-                &ref_db,
-                force,
-                &mut remove_files,
-            )?;
-        }
 
         let mut table_output = String::new();
         let mut base_domain_output = String::new();
@@ -487,6 +460,130 @@ pub fn generate(db: &str, force: bool, clean: bool, skip_version_check: bool) ->
             )?;
         }
     }
+    let mut group_to_unified = HashMap::new();
+    let mut unified_to_group: HashMap<String, Vec<_>> = HashMap::new();
+    for (group_name, def) in &config.groups {
+        if let Some(def) = def
+            && let Some(unified) = def.unified_repository.clone()
+        {
+            group_to_unified.insert(group_name.clone(), unified.clone());
+            unified_to_group
+                .entry(unified)
+                .and_modify(|l| l.push(group_name.clone()))
+                .or_insert(vec![group_name.clone()]);
+        } else {
+            group_to_unified.insert(group_name.clone(), group_name.clone());
+            unified_to_group
+                .entry(group_name.clone())
+                .and_modify(|l| l.push(group_name.clone()))
+                .or_insert(vec![group_name.clone()]);
+        }
+    }
+    for (group_name, _) in groups {
+        reset_rel_flags();
+        let group_name = if let Some(unified) = group_to_unified.get(group_name) {
+            if let Some(groups) = unified_to_group.remove(unified) {
+                for group in groups {
+                    begin_traverse(&group);
+                }
+                unified
+            } else {
+                continue;
+            }
+        } else {
+            continue;
+        };
+        let repo_include_groups: GroupsDef = groups
+            .iter()
+            .filter(|(_, (f, _, _))| f.relaxed_load() >= REL_INCLUDE)
+            .map(|(n, (f, v, _))| {
+                let v2: IndexMap<String, (AtomicUsize, Arc<ModelDef>)> = v
+                    .iter()
+                    .filter(|(_, (f, _))| f.relaxed_load() > 0)
+                    .map(|(n, (f, v))| {
+                        (
+                            n.to_string(),
+                            (AtomicUsize::new(f.relaxed_load()), v.clone()),
+                        )
+                    })
+                    .collect();
+                (
+                    n.to_string(),
+                    (
+                        AtomicUsize::new(f.relaxed_load()),
+                        v2,
+                        config.unified_name(n),
+                    ),
+                )
+            })
+            .collect();
+        if verbose {
+            let count = groups
+                .iter()
+                .filter(|(_, (f, _, _))| f.relaxed_load() == REL_INCLUDE)
+                .count();
+            if count > 0 {
+                println!("{} group has {} include groups.", group_name, count);
+            }
+        }
+        let ref_groups: Vec<_> = groups
+            .iter()
+            .filter(|(_, (f, _, _))| f.relaxed_load() == REL_USE)
+            .map(|(n, _)| (config.unified_name(n), n.to_string()))
+            .collect();
+        let ref_db: BTreeSet<(String, (String, String))> = groups
+            .iter()
+            .filter(|(_, (f, _, _))| f.relaxed_load() != 0)
+            .flat_map(|(_, (_, d, _))| {
+                d.iter().flat_map(|v| {
+                    v.1.1
+                        .belongs_to_outer_db()
+                        .iter()
+                        .map(|v| {
+                            (
+                                v.1.db().to_string(),
+                                (
+                                    ConfigDef::outer_db_unified_name(
+                                        v.1.db(),
+                                        &v.1.get_group_name(),
+                                    )
+                                    .unwrap(),
+                                    v.1.get_group_name(),
+                                ),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect();
+
+        db::repositories::write_group_files(
+            &db_repositories_dir,
+            db,
+            &config,
+            group_name,
+            &repo_include_groups,
+            &ref_groups,
+            &ref_db,
+            force,
+            exclude_from_domain,
+            &mut remove_files,
+        )?;
+
+        if !exclude_from_domain {
+            domain::repositories::write_group_files(
+                &domain_repositories_dir,
+                db,
+                &config,
+                group_name,
+                &repo_include_groups,
+                &ref_groups,
+                &ref_db,
+                force,
+                &mut remove_files,
+            )?;
+        }
+    }
     if !exclude_from_domain {
         domain::base_domain::write_models_rs(&base_domain_src_dir, db)?;
         domain::write_repositories_rs(&domain_src_dir, db)?;
@@ -533,7 +630,7 @@ pub const REL_START: usize = 3;
 fn reset_rel_flags() {
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
-    for (_, (f, models)) in groups {
+    for (_, (f, models, _)) in groups {
         f.relaxed_store(0);
         for (_, (f, _)) in models {
             f.relaxed_store(0);
@@ -542,10 +639,9 @@ fn reset_rel_flags() {
 }
 
 fn begin_traverse(target_group: &str) {
-    reset_rel_flags();
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
-    for (group, (group_flag, models)) in groups {
+    for (group, (group_flag, models, _)) in groups {
         if group == target_group {
             group_flag.relaxed_store(REL_START);
             for (_, (model_flag, _)) in models {
@@ -568,7 +664,7 @@ fn traverse_rel_flags(target_group: &str, target_model: &str) -> usize {
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
     let mut ret = REL_USE;
-    for (group, (group_flag, models)) in groups {
+    for (group, (group_flag, models, _)) in groups {
         if group == target_group {
             let flag = group_flag.relaxed_load();
             if flag == 0 {

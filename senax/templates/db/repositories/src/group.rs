@@ -72,11 +72,13 @@ pub(crate) async fn start(db_dir: Option<&Path>) -> Result<()> {
 }
 
 pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
+    @%- if is_main_group %@
     @%- for (name, (_, def)) in models %@
     @%- if !def.skip_ddl %@
     _base::_@{ def.mod_name() }@::check(shard_id).await?;
     @%- endif %@
     @%- endfor %@
+    @%- endif %@
     Ok(())
 }
 
@@ -112,7 +114,7 @@ pub(crate) async fn _clear_cache(_shard_id: ShardId, _sync: u64, _clear_test: bo
 #[rustfmt::skip]
 #[allow(clippy::single_match)]
 #[allow(clippy::match_single_binding)]
-pub(crate) async fn seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()> {
+pub async fn seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()> {
     @%- if is_main_group %@
     if let Some(mapping) = seed.as_mapping() {
         for (name, value) in mapping {

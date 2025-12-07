@@ -200,7 +200,7 @@ pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef
             }
         }
 
-        let (_, group) = groups.get(org_group_name).unwrap();
+        let (_, group, _) = groups.get(org_group_name).unwrap();
         for (k, _) in &api_group_def {
             if !group.contains_key(k) {
                 eprintln!("There is no {} model in the {} group.", k, org_group_name)

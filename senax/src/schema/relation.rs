@@ -5,6 +5,8 @@ use std::sync::Arc;
 use crate::common::ToCase as _;
 use crate::common::to_singular;
 use crate::schema::_to_ident_name;
+use crate::schema::CONFIG;
+use crate::schema::ConfigDef;
 
 use super::{FieldDef, GROUPS, ModelDef, domain_mode, to_id_name};
 
@@ -843,6 +845,15 @@ impl RelDef {
     pub fn get_group_name(&self) -> String {
         let (group_name, _) = self.model.split_once(MODEL_NAME_SPLITTER).unwrap();
         group_name.to_string()
+    }
+
+    pub fn get_unified_name(&self) -> String {
+        if let Some(db) = &self.db {
+            ConfigDef::outer_db_unified_name(db, &self.get_group_name()).unwrap()
+        } else {
+            let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
+            config.unified_name(&self.get_group_name())
+        }
     }
 
     pub fn in_cache(&self) -> bool {

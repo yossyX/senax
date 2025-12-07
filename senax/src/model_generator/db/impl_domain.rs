@@ -42,7 +42,7 @@ pub fn write_impl_domain_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, (_, defs)) in groups %@
+@%- for (name, (_, defs, _)) in groups %@
 pub use _base::impl_domain::@{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
@@ -68,8 +68,8 @@ pub use _base::impl_domain::@{ name|snake|ident }@;
     #[template(
         source = r###"
     // Do not modify below this line. (RepoStart)
-    @%- for (name, (_, defs)) in groups %@
-    get_repo!(@{ name|snake|ident }@, dyn _repository::@{ name|snake|ident }@::@{ name|pascal }@Repository, _repo_@{ name|snake }@::impl_domain::@{ name|snake|ident }@::@{ name|pascal }@RepositoryImpl);
+    @%- for (name, (_, defs, unified)) in groups %@
+    get_repo!(@{ name|snake|ident }@, dyn _repository::@{ name|snake|ident }@::@{ name|pascal }@Repository, _repo_@{ unified|snake }@::impl_domain::@{ name|snake|ident }@::@{ name|pascal }@RepositoryImpl);
     @%- endfor %@
     // Do not modify above this line. (RepoEnd)"###,
         ext = "txt",
@@ -94,8 +94,8 @@ pub use _base::impl_domain::@{ name|snake|ident }@;
     #[template(
         source = r###"
     // Do not modify below this line. (QueryServiceStart)
-    @%- for (name, (_, defs)) in groups %@
-    get_repo!(@{ name|snake|ident }@, dyn _repository::@{ name|snake|ident }@::@{ name|pascal }@QueryService, _repo_@{ name|snake }@::impl_domain::@{ name|snake|ident }@::@{ name|pascal }@QueryServiceImpl);
+    @%- for (name, (_, defs, unified)) in groups %@
+    get_repo!(@{ name|snake|ident }@, dyn _repository::@{ name|snake|ident }@::@{ name|pascal }@QueryService, _repo_@{ unified|snake }@::impl_domain::@{ name|snake|ident }@::@{ name|pascal }@QueryServiceImpl);
     @%- endfor %@
     // Do not modify above this line. (QueryServiceEnd)"###,
         ext = "txt",

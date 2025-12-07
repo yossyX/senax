@@ -1,5 +1,4 @@
 use anyhow::Result;
-use db::DbConn;
 use senax_common::ShardId;
 use std::path::Path;
 
@@ -13,21 +12,21 @@ pub mod repositories;
 pub mod misc;
 
 pub async fn start(db_dir: &Path) -> Result<()> {
-    @%- for (name, (_, defs)) in groups %@
+    @%- for (name, (_, defs, _)) in groups %@
     repositories::@{ name|snake|ident }@::start(Some(db_dir)).await?;
     @%- endfor %@
     Ok(())
 }
 pub async fn start_test() -> Result<()> {
-    @%- for (name, (_, defs)) in groups %@
+    @%- for (name, (_, defs, _)) in groups %@
     repositories::@{ name|snake|ident }@::start(None).await?;
     @%- endfor %@
     Ok(())
 }
 pub async fn check(shard_id: ShardId) -> Result<()> {
-    repositories::@{ group|snake|ident }@::check(shard_id).await
-}
-pub async fn seed(value: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()> {
-    repositories::@{ group|snake|ident }@::seed(value, conns).await
+    @%- for (name, (_, defs, _)) in groups %@
+    repositories::@{ name|snake|ident }@::check(shard_id).await?;
+    @%- endfor %@
+    Ok(())
 }
 @{-"\n"}@

@@ -276,7 +276,7 @@ pub fn generate(
         } else {
             group_route
         };
-        let (_, group) = groups
+        let (_, group, _) = groups
             .get(group_name)
             .unwrap_or_else(|| panic!("The {db} DB does not have {group_name} group."));
         let group_route_mod_name = group_route.to_snake();

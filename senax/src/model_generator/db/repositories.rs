@@ -29,8 +29,8 @@ pub fn write_group_files(
     config: &ConfigDef,
     group: &str,
     groups: &GroupsDef,
-    ref_groups: &[String],
-    ref_db: &BTreeSet<(String, String)>,
+    ref_groups: &[(String, String)],
+    ref_db: &BTreeSet<(String, (String, String))>,
     force: bool,
     exclude_from_domain: bool,
     remove_files: &mut HashSet<OsString>,
@@ -66,7 +66,7 @@ pub fn write_group_files(
                 ),
             );
         }
-        let group = &group.to_snake();
+        let group = &group.0.to_snake();
         content = content.replace(
             "[dependencies]",
             &format!(
@@ -77,7 +77,7 @@ pub fn write_group_files(
     }
     for group in ref_groups {
         let db = &db.to_snake();
-        let group = &group.to_snake();
+        let group = &group.0.to_snake();
         content = content.replace(
             "[dependencies]",
             &format!(
@@ -95,16 +95,11 @@ pub fn write_group_files(
         #[derive(Template)]
         #[template(path = "db/repositories/src/lib.rs", escape = "none")]
         struct LibTemplate<'a> {
-            pub group: &'a str,
             pub config: &'a ConfigDef,
             pub groups: &'a GroupsDef,
         }
 
-        let tpl = LibTemplate {
-            group,
-            config,
-            groups,
-        };
+        let tpl = LibTemplate { config, groups };
         fs_write(file_path, tpl.render()?)?;
     }
 
@@ -112,16 +107,14 @@ pub fn write_group_files(
     #[template(path = "db/repositories/src/repositories.rs", escape = "none")]
     struct RepositoriesTemplate<'a> {
         pub db: &'a str,
-        pub group: &'a str,
         pub groups: &'a GroupsDef,
-        pub ref_groups: &'a [String],
+        pub ref_groups: &'a [(String, String)],
     }
 
     let file_path = src_dir.join("repositories.rs");
     remove_files.remove(file_path.as_os_str());
     let tpl = RepositoriesTemplate {
         db,
-        group,
         groups,
         ref_groups,
     };
@@ -144,7 +137,7 @@ pub fn write_group_files(
     let model_models_dir = src_dir.join("repositories");
     let impl_domain_dir = src_dir.join("impl_domain");
     let base_group_name = group;
-    for (group_name, (f, defs)) in groups {
+    for (group_name, (f, defs, _)) in groups {
         let is_main_group = f.relaxed_load() == REL_START;
         IS_MAIN_GROUP.relaxed_store(is_main_group);
         let mod_names: BTreeSet<String> = defs

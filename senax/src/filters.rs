@@ -92,7 +92,12 @@ pub fn fmt_join(v: Vec<(&String, &FieldDef)>, f: &str, sep: &str) -> ::askama::R
         .join(sep))
 }
 
-pub fn fmt_join_auto_or_not(v: Vec<(&String, &FieldDef)>, auto: &str, not_auto: &str, sep: &str) -> ::askama::Result<String> {
+pub fn fmt_join_auto_or_not(
+    v: Vec<(&String, &FieldDef)>,
+    auto: &str,
+    not_auto: &str,
+    sep: &str,
+) -> ::askama::Result<String> {
     let mut index = -1;
     Ok(v.iter()
         .map(|(name, col)| {
@@ -552,6 +557,7 @@ fn _fmt_rel_outer_db(
         .replace("{class}", &rel.get_foreign_class_name())
         .replace("{class_mod}", &rel.get_group_mod_name())
         .replace("{group_snake}", &rel.get_group_name().to_snake())
+        .replace("{unified_snake}", &rel.get_unified_name().to_snake())
         .replace("{group_ident}", &rel.get_group_ident())
         .replace("{class_mod_path}", &rel.get_group_mod_path())
         .replace("{base_class_mod_path}", &rel.get_base_group_mod_path())

@@ -61,7 +61,7 @@ use ::domain::repository::@{ rel_def.db()|snake|ident }@::@{ rel_def.get_group_n
 @%- else %@
 use ::db_@{ rel_def.db()|snake }@::repository::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name()|snake }@ as join_@{ rel_def.get_group_mod_name() }@;
 @%- endif %@
-use _repo_@{ rel_def.db()|snake }@_@{ rel_def.get_group_name()|snake }@::repositories::@{ rel_def.get_base_group_mod_path() }@ as repo_@{ rel_def.get_group_mod_name() }@;
+use _repo_@{ rel_def.db()|snake }@_@{ rel_def.get_unified_name()|snake }@::repositories::@{ rel_def.get_base_group_mod_path() }@ as repo_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 @%- endif %@
 @%- for mod_name in def.relation_mods() %@

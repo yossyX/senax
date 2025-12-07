@@ -286,9 +286,23 @@ pub async fn init() -> Result<()> {
                         break;
                     }
                 }
-                let etcd = senax_common::etcd::map("db/").await?;
-                config(&etcd, false).await?;
-                reconnect().await;
+                match senax_common::etcd::map("db/").await {
+                    Ok(etcd) => {
+                        match config(&etcd, false).await {
+                            Ok(()) => {
+                                reconnect().await;
+                            }
+                            Err(err) => {
+                                log::error!("{}", err);
+                                continue;
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        log::error!("{}", err);
+                        continue;
+                    }
+                }
             }
         }
     });
@@ -1777,7 +1791,7 @@ async fn reset_writer_pool(
                         tokio::spawn(async move {
                             if let Ok(pool) = new_pool.acquire().await {
                                 let sync = DbConn::___inc_cache_sync(pool).await.unwrap_or(0);
-                                @%- for (name, (_, defs)) in groups %@
+                                @%- for (name, (_, defs, _)) in groups %@
                                 if let Some(g) = models::@{ name|upper_snake }@_HANDLER.get() {
                                     g.clear_cache(idx as ShardId, sync, false).await;
                                 }

@@ -39,8 +39,14 @@ static AGGREGATION_TYPE: RwLock<CompactString> = RwLock::new(CompactString::cons
 static VERSION: RwLock<CompactString> = RwLock::new(CompactString::const_new(""));
 static MYSQL_MODE: AtomicBool = AtomicBool::new(true);
 
-pub type GroupsDef =
-    IndexMap<String, (AtomicUsize, IndexMap<String, (AtomicUsize, Arc<ModelDef>)>)>;
+pub type GroupsDef = IndexMap<
+    String,
+    (
+        AtomicUsize,
+        IndexMap<String, (AtomicUsize, Arc<ModelDef>)>,
+        String,
+    ),
+>;
 
 pub static CONFIG: RwLock<Option<ConfigDef>> = RwLock::new(None);
 pub static GROUPS: RwLock<Option<GroupsDef>> = RwLock::new(None);
@@ -727,7 +733,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
             map.insert(k, (AtomicUsize::new(0), Arc::new(model)));
             map
         });
-        map.insert(k, (AtomicUsize::new(0), v));
+        map.insert(k.clone(), (AtomicUsize::new(0), v, config.unified_name(&k)));
         map
     });
     CONFIG.write().unwrap().replace(config);

@@ -16,7 +16,7 @@ use ::base_domain::models::@{ db|snake|ident }@ as _model_;
 use crate::repositories as _repository_;
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
 pub use base_domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
-pub use repository_@{ rel_def.db()|snake }@_@{ rel_def.get_group_name()|snake }@::repositories as _@{ rel_def.db()|snake }@_repository_;
+pub use repository_@{ rel_def.db()|snake }@_@{ rel_def.get_unified_name()|snake }@::repositories as _@{ rel_def.db()|snake }@_repository_;
 @%- endfor %@
 #[cfg(any(feature = "mock", test))]
 use ::base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Entity;

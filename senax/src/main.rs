@@ -143,6 +143,8 @@ enum Commands {
         /// Skip Senax version check
         #[clap(long)]
         skip_version_check: bool,
+        #[clap(short, long)]
+        verbose: bool,
     },
     /// generate migration ddl
     GenMigrate {
@@ -323,7 +325,7 @@ async fn exec(cli: Cli) -> Result<()> {
             } => {
                 if let Some(db_type) = session {
                     init_generator::session(*db_type)?;
-                    model_generator::generate("session", false, false, false)?;
+                    model_generator::generate("session", false, false, false, false)?;
                 }
                 let db_list: Vec<_> = db.split(',').map(|v| v.trim()).collect();
                 actix_generator::generate(name, &db_list, session.is_some(), *force, true)?;
@@ -382,13 +384,14 @@ async fn exec(cli: Cli) -> Result<()> {
             force,
             clean,
             skip_version_check,
+            verbose,
         } => {
             if let Some(db) = db {
                 ensure!(db_re.is_match(db), "bad db name!");
-                model_generator::generate(db, *force, *clean, *skip_version_check)?;
+                model_generator::generate(db, *force, *clean, *skip_version_check, *verbose)?;
             } else {
                 for db in crate::db_generator::db_list(false)? {
-                    model_generator::generate(&db, *force, *clean, *skip_version_check)?;
+                    model_generator::generate(&db, *force, *clean, *skip_version_check, *verbose)?;
                 }
             }
         }

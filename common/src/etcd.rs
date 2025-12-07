@@ -118,7 +118,7 @@ pub async fn watch(key: &str, with_prefix: bool) -> Result<WatchStream> {
 #[derive(Debug, Clone)]
 pub struct SyncMap(Arc<RwLock<FxHashMap<String, String>>>);
 impl SyncMap {
-    pub async fn map(&self) -> RwLockReadGuard<FxHashMap<String, String>> {
+    pub async fn map(&self) -> RwLockReadGuard<'_, FxHashMap<String, String>> {
         self.0.read().await
     }
 }

@@ -46,19 +46,18 @@ pub fn write_impl_domain_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, (_, defs)) in groups %@
-pub@% if !name.eq(group_name) %@(crate)@% endif %@ mod @{ name|snake|ident }@;
+@%- for (name, (_, defs, _)) in groups %@
+pub mod @{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
         escape = "none"
     )]
     struct ModTemplate<'a> {
-        group_name: &'a str,
         groups: &'a GroupsDef,
     }
 
-    let tpl = ModTemplate { group_name, groups }.render()?;
+    let tpl = ModTemplate { groups }.render()?;
     let tpl = tpl.trim_start();
     let content = re.replace(&content, tpl);
 

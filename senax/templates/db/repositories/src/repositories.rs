@@ -7,11 +7,11 @@ use db::DbConn;
 use ::futures::future::BoxFuture;
 use ::fxhash::FxHashMap;
 use ::senax_common::{cache::msec::MSec, ShardId};
-@% for (name, (_, defs)) in groups %@
-pub@% if !name.eq(group) %@(crate)@% endif %@ mod @{ name|snake|ident }@;
+@% for (name, (_, defs, _)) in groups %@
+pub mod @{ name|snake|ident }@;
 @%- endfor %@
 @%- for name in ref_groups %@
-pub use _repo_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|ident }@;
+pub use _repo_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|snake|ident }@;
 @%- endfor %@
 
 pub struct Handler;
@@ -23,7 +23,7 @@ impl db::models::Handler for Handler {
         use db::CacheOp;
         for op in op.into_iter() {
             match op {
-                @%- for (name, (_, defs)) in groups %@
+                @%- for (name, (_, defs, _)) in groups %@
                 CacheOp::@{ name|pascal|ident }@(op) => op.handle_cache_msg(Arc::clone(&sync_map)).await,
                 @%- endfor %@
                 CacheOp::_AllClear => _clear_cache(&sync_map, false).await,
@@ -33,7 +33,7 @@ impl db::models::Handler for Handler {
     }
     #[cfg(not(feature="cache_update_only"))]
     async fn clear_cache(&self, shard_id: ShardId, sync: u64, clear_test: bool) {
-        @%- for (name, (_, defs)) in groups %@
+        @%- for (name, (_, defs, _)) in groups %@
         @{ name|snake|ident }@::_clear_cache(shard_id, sync, clear_test).await;
         @%- endfor %@
     }
@@ -46,12 +46,12 @@ pub(crate) async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, clear_test
             let shard_id = *shard_id;
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                @%- for (name, (_, defs)) in groups %@
+                @%- for (name, (_, defs, _)) in groups %@
                 @{ name|snake|ident }@::_clear_cache(shard_id, 0, clear_test).await;
                 @%- endfor %@
             });
         }
-        @%- for (name, (_, defs)) in groups %@
+        @%- for (name, (_, defs, _)) in groups %@
         @{ name|snake|ident }@::_clear_cache(*shard_id, *sync, clear_test).await;
         @%- endfor %@
     }

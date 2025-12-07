@@ -111,7 +111,7 @@ pub fn write_files(
     }
 
     let mut table_names = BTreeSet::default();
-    for (_, (_, defs)) in groups {
+    for (_, (_, defs, _)) in groups {
         for (_, (_, def)) in defs {
             table_names.insert(def.table_name());
         }

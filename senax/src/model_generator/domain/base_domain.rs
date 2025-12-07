@@ -205,7 +205,7 @@ pub fn write_models_db_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, (_, defs)) in groups %@
+@%- for (name, (_, defs, _)) in groups %@
 pub mod @{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,

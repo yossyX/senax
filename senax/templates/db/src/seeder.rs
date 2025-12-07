@@ -20,7 +20,7 @@ include!(concat!(env!("OUT_DIR"), "/seeds.rs"));
 #[allow(dead_code)]
 #[allow(non_snake_case)]
 pub struct SeedSchema {
-@%- for (name, (_, defs)) in groups %@@% if !defs.is_empty() %@
+@%- for (name, (_, defs, _)) in groups %@@% if !defs.is_empty() %@
     @{ name|ident }@: Option<crate::models::@{ name|snake|ident }@::@{ name|pascal }@>,
 @%- endif %@@% endfor %@
 }
@@ -36,9 +36,9 @@ impl SeedSchema {
         if let Some(mapping) = seeds.as_mapping() {
             for (name, value) in mapping {
                 match name.as_str() {
-                @%- for (name, (_, defs)) in groups %@@% if !defs.is_empty() %@
+                @%- for (name, (_, defs, unified)) in groups %@@% if !defs.is_empty() %@
                     Some("@{ name }@") => {
-                        _repo_@{ name|snake }@::seed(value, &mut conns).await?;
+                        _repo_@{ unified|snake }@::repositories::@{ name|snake|ident }@::seed(value, &mut conns).await?;
                     }
                 @%- endif %@@% endfor %@
                     _ => {}
