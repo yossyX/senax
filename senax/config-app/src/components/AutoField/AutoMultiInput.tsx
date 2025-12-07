@@ -36,7 +36,7 @@ export default (props: Props) => {
     <Controller
       name={fullPath}
       control={form.control}
-      render={({ field }) => {
+      render={({ field }: any) => {
         return (
           <FormField
             label={(field.value || []).length == 0 ? label : null}

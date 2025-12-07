@@ -11,6 +11,7 @@ interface Props {
   definitions: object;
   definition: object;
   component: any;
+  additionalData?: any;
 }
 
 function AutoObject(props: Props) {
@@ -33,6 +34,7 @@ function AutoObject(props: Props) {
     errors: errors[name] || {},
     schema: definition,
     definitions,
+    additionalData: props.additionalData,
   };
 
   return (

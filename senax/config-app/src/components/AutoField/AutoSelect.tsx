@@ -44,7 +44,7 @@ function AutoSelect(props: Props) {
     <Controller
       name={`${path}${name}`}
       control={form.control}
-      render={({ field }) => (
+      render={({ field }: any) => (
         <FormField
           label={label}
           description={props.definition.description}

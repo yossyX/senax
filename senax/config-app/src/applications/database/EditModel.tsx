@@ -365,12 +365,29 @@ function EditModel() {
 }
 export default EditModel;
 
-const Inheritance = (props: any) => {
-  const formData = props.formData;
+const Inheritance = ({ formData }: any) => {
+  const extendsList = React.useMemo(() => {
+    const baseGroup = formData.additionalData.group;
+    const list: string[] = [];
+    for (const model of formData.additionalData.model_names[baseGroup]) {
+      if (model != formData.additionalData.selfModel.name) {
+        list.push(model);
+      }
+    }
+    for (const group of formData.additionalData.group_names) {
+      if (group != baseGroup) {
+        for (const model of formData.additionalData.model_names[group]) {
+          list.push(group + "::" + model);
+        }
+      }
+    }
+    return list;
+  }, []);
+
   return (
     <>
       <SpaceBetween direction="vertical" size="xs">
-        <AutoField name="extends" {...formData} />
+        <AutoField name="extends" {...formData} autocomplete={extendsList} />
         <AutoField name="type" {...formData} />
         <AutoField name="key_field" {...formData} />
         <AutoField name="key_value" {...formData} />

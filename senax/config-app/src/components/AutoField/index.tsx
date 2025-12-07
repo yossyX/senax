@@ -155,6 +155,7 @@ function AutoField(props: Props) {
         definitions={definitions}
         definition={definition}
         component={props.component}
+        additionalData={props.additionalData}
       />
     );
   } else if (definition.enum) {
@@ -229,7 +230,7 @@ function AutoField(props: Props) {
       <Controller
         name={`${path}${name}`}
         control={form.control}
-        render={({ field }) => (
+        render={({ field }: any) => (
           <FormField
             description={definition.description}
             label={labelWithOptionality}
@@ -263,9 +264,9 @@ function AutoField(props: Props) {
     }
     return (
       <Controller
-        name={name}
+        name={`${path}${name}`}
         control={form.control}
-        render={({ field }) => {
+        render={({ field }: any) => {
           return (
             <FormField
               description={definition.description}
@@ -319,7 +320,7 @@ function AutoField(props: Props) {
       <Controller
         name={`${path}${name}`}
         control={form.control}
-        render={({ field }) => (
+        render={({ field }: any) => (
           <FormField
             description={definition.description}
             label={labelWithOptionality}
@@ -355,7 +356,7 @@ function AutoField(props: Props) {
     <Controller
       name={`${path}${name}`}
       control={form.control}
-      render={({ field }) => (
+      render={({ field }: any) => (
         <FormField
           description={definition.description}
           label={labelWithOptionality}

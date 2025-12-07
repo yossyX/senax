@@ -645,11 +645,14 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let joiner = if let Some(filter) = &self.filter {
+                let mut joiner = if let Some(filter) = &self.filter {
                     Joiner_::merge(self.joiner, filter.joiner_cache_only())
                 } else {
                     self.joiner
                 };
+                for (_, filter) in &self.with_filter_flag {
+                    joiner = Joiner_::merge(joiner, filter.joiner_cache_only())
+                }
                 @%- if def.is_soft_delete() %@
                 let obj = if self.with_trashed {
                     _@{ pascal_name }@_::find_optional_from_cache_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, joiner).await?

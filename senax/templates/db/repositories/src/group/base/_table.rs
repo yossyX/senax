@@ -3662,16 +3662,7 @@ impl QueryBuilder {
     #[allow(clippy::if_same_then_else)]
     fn _sql(&self, sql_cols: &str, for_update: bool, shard_id: ShardId, filter_digest: &str) -> String {
         let force_indexes = make_force_indexes(filter_digest);
-        let mut sql_cols = sql_cols.to_string();
-        sql_cols.reserve(1000);
-        for (name, filter) in &self.with_filter_flag {
-            let mut trash_mode: TrashMode = Default::default();
-            sql_cols.push_str(",(");
-            filter.write(&mut sql_cols, 1, &mut trash_mode, shard_id, false);
-            sql_cols.truncate(sql_cols.len() - " AND ".len());
-            sql_cols.push_str(") as ");
-            sql_cols.push_str(name);
-        }
+        let sql_cols = write_filter_flag(sql_cols, &self.with_filter_flag, shard_id);
         let mut sql = format!(
             r#"SELECT {}{} FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             if !force_indexes.is_empty() {
@@ -3769,16 +3760,7 @@ impl QueryBuilder {
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let filter_flag_names: Vec<_> = self.with_filter_flag.keys().cloned().collect();
-        let mut sql_cols = r#"@{ def.primaries()|fmt_join("{col_query}", ", ") }@"#.to_string();
-        sql_cols.reserve(1000);
-        for (name, filter) in &self.with_filter_flag {
-            let mut trash_mode: TrashMode = Default::default();
-            sql_cols.push_str(",(");
-            filter.write(&mut sql_cols, 1, &mut trash_mode, conn.shard_id(), false);
-            sql_cols.truncate(sql_cols.len() - " AND ".len());
-            sql_cols.push_str(") as ");
-            sql_cols.push_str(name);
-        }
+        let sql_cols = write_filter_flag(r#"@{ def.primaries()|fmt_join("{col_query}", ", ") }@"#, &self.with_filter_flag, conn.shard_id());
         let mut sql = format!(
             r#"SELECT {}{sql_cols} FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             if !force_indexes.is_empty() {
@@ -4154,6 +4136,21 @@ impl QueryBuilder {
         Ok(0)
     }
     @%- endif %@
+}
+
+#[inline(never)]
+fn write_filter_flag(cols: &str, with_filter_flag: &BTreeMap<&'static str, Filter_>, shard_id: ShardId) -> String {
+    let mut buf = String::with_capacity(1000);
+    buf.push_str(cols);
+    for (name, filter) in with_filter_flag {
+        let mut trash_mode: TrashMode = Default::default();
+        buf.push_str(", (");
+        filter.write(&mut buf, 1, &mut trash_mode, shard_id, false);
+        buf.truncate(buf.len() - " AND ".len());
+        buf.push_str(") as ");
+        buf.push_str(name);
+    }
+    buf
 }
 
 #[async_trait]
@@ -5836,16 +5833,7 @@ async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], t
         return Ok(Vec::new());
     }
     let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
-    let mut sql_cols = sql_cols.to_string();
-    sql_cols.reserve(1000);
-    for (name, filter) in &with_filter_flag {
-        let mut trash_mode: TrashMode = Default::default();
-        sql_cols.push_str(",(");
-        filter.write(&mut sql_cols, 1, &mut trash_mode, conn.shard_id(), false);
-        sql_cols.truncate(sql_cols.len() - " AND ".len());
-        sql_cols.push_str(") as ");
-        sql_cols.push_str(name);
-    }
+    let sql_cols = write_filter_flag(sql_cols, &with_filter_flag, conn.shard_id());
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {
         filter_str = "WHERE".to_string();
@@ -6005,34 +5993,18 @@ async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joi
                 let id = PrimaryHasher(InnerPrimary::from(&arc), shard_id);
                 let sync = CACHE_RESET_SYNC.get().unwrap()[shard_id as usize].read().await;
                 if *sync <= conn.cache_sync() {
-                    if Cache::get_from_memory::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0).is_none() {
-                        @%- if def.versioned %@
-                        let vw = VersionWrapper {
-                            id: id.0.clone(),
-                            shard_id,
-                            time: MSec::default(),
-                            version: 0,
-                        };
-                        if let Some(ver) = Cache::get_version::<VersionWrapper>(&vw, shard_id).await.filter(|o| o.id == id.0) {
-                            if arc._inner.@{ version_col }@.greater_equal(ver.version) {
-                                Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
-                            }
-                        } else {
-                            let cs = CacheSyncWrapper {
-                                id: id.0.clone(),
-                                shard_id,
-                                time: MSec::default(),
-                                sync: 0,
-                            };
-                            if let Some(cs) = Cache::get_version::<CacheSyncWrapper>(&cs, shard_id).await.filter(|o| o.id == id.0) {
-                                if cs.sync <= conn.cache_sync() {
-                                    Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
-                                }
-                            } else {
-                                Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
-                            }
+                    @%- if def.versioned %@
+                    let vw = VersionWrapper {
+                        id: id.0.clone(),
+                        shard_id,
+                        time: MSec::default(),
+                        version: 0,
+                    };
+                    if let Some(ver) = Cache::get_version::<VersionWrapper>(&vw, shard_id).await.filter(|o| o.id == id.0) {
+                        if arc._inner.@{ version_col }@.greater_equal(ver.version) {
+                            Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
                         }
-                        @%- else %@
+                    } else {
                         let cs = CacheSyncWrapper {
                             id: id.0.clone(),
                             shard_id,
@@ -6046,8 +6018,22 @@ async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joi
                         } else {
                             Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
                         }
-                        @%- endif %@
                     }
+                    @%- else %@
+                    let cs = CacheSyncWrapper {
+                        id: id.0.clone(),
+                        shard_id,
+                        time: MSec::default(),
+                        sync: 0,
+                    };
+                    if let Some(cs) = Cache::get_version::<CacheSyncWrapper>(&cs, shard_id).await.filter(|o| o.id == id.0) {
+                        if cs.sync <= conn.cache_sync() {
+                            Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
+                        }
+                    } else {
+                        Cache::insert_long(&id, arc.clone(), USE_FAST_CACHE).await;
+                    }
+                    @%- endif %@
                 }
                 if rest_ids2.contains(&id) {
                     list.push((arc, Default::default()).into());
@@ -6065,16 +6051,7 @@ async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joi
 async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Option<(DbRow, BTreeMap<&'static str, bool>)>>
 {
     let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
-    let mut sql_cols = sql_cols.to_string();
-    sql_cols.reserve(1000);
-    for (name, filter) in &with_filter_flag {
-        let mut trash_mode: TrashMode = Default::default();
-        sql_cols.push_str(",(");
-        filter.write(&mut sql_cols, 1, &mut trash_mode, conn.shard_id(), false);
-        sql_cols.truncate(sql_cols.len() - " AND ".len());
-        sql_cols.push_str(") as ");
-        sql_cols.push_str(name);
-    }
+    let sql_cols = write_filter_flag(sql_cols, &with_filter_flag, conn.shard_id());
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {
         filter_str = "WHERE".to_string();
@@ -6122,16 +6099,7 @@ where
 #[allow(clippy::needless_borrow)]
 async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Option<(Data, BTreeMap<&'static str, bool>)>> {
     let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
-    let mut sql_cols = Data::_sql_cols(@{ is_mysql_str }@).to_string();
-    sql_cols.reserve(1000);
-    for (name, filter) in &with_filter_flag {
-        let mut trash_mode: TrashMode = Default::default();
-        sql_cols.push_str(",(");
-        filter.write(&mut sql_cols, 1, &mut trash_mode, conn.shard_id(), false);
-        sql_cols.truncate(sql_cols.len() - " AND ".len());
-        sql_cols.push_str(") as ");
-        sql_cols.push_str(name);
-    }
+    let sql_cols = write_filter_flag(Data::_sql_cols(@{ is_mysql_str }@), &with_filter_flag, conn.shard_id());
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {
         filter_str = "WHERE".to_string();
@@ -6174,16 +6142,7 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
         return Ok(Vec::new());
     }
     let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
-    let mut sql_cols = Data::_sql_cols(@{ is_mysql_str }@).to_string();
-    sql_cols.reserve(1000);
-    for (name, filter) in &with_filter_flag {
-        let mut trash_mode: TrashMode = Default::default();
-        sql_cols.push_str(",(");
-        filter.write(&mut sql_cols, 1, &mut trash_mode, conn.shard_id(), false);
-        sql_cols.truncate(sql_cols.len() - " AND ".len());
-        sql_cols.push_str(") as ");
-        sql_cols.push_str(name);
-    }
+    let sql_cols = write_filter_flag(Data::_sql_cols(@{ is_mysql_str }@), &with_filter_flag, conn.shard_id());
     let mut list: Vec<__Updater__> = Vec::with_capacity(ids.len());
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {

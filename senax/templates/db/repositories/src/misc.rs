@@ -465,6 +465,7 @@ macro_rules! filter {
                 }
             };
         }
+        #[inline(never)]
         fn bind_to_query(
             self,
             mut query: sqlx::query::Query<'_, DbType, DbArguments>,
@@ -516,6 +517,7 @@ macro_rules! filter {
                 Filter_::Boolean(v) => query.bind(v),
             }
         }
+        #[inline(never)]
         fn write_where(
             filter: &Option<Filter_>,
             mut trash_mode: TrashMode,
@@ -550,6 +552,7 @@ pub use filter;
 #[macro_export]
 macro_rules! order {
     () => {
+        #[inline(never)]
         fn write(&self, buf: &mut String) {
             match self {
                 Order_::Asc(c) => {
@@ -570,6 +573,7 @@ macro_rules! order {
                 }
             };
         }
+        #[inline(never)]
         fn write_order(order: &Option<Vec<Order_>>, raw_order: &Option<String>) -> String {
             if let Some(raw_order) = raw_order {
                 return format!("ORDER BY {}", raw_order);
