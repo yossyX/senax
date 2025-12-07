@@ -17,7 +17,6 @@ pub use _repo_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|snake|i
 pub struct Handler;
 #[async_trait]
 impl db::models::Handler for Handler {
-    #[cfg(not(feature="cache_update_only"))]
     #[allow(unreachable_patterns)]
     async fn handle_cache_msg(&self, op: Vec<db::CacheOp>, sync_map: Arc<FxHashMap<ShardId, u64>>) {
         use db::CacheOp;
@@ -31,7 +30,6 @@ impl db::models::Handler for Handler {
             };
         }
     }
-    #[cfg(not(feature="cache_update_only"))]
     async fn clear_cache(&self, shard_id: ShardId, sync: u64, clear_test: bool) {
         @%- for (name, (_, defs, _)) in groups %@
         @{ name|snake|ident }@::_clear_cache(shard_id, sync, clear_test).await;
@@ -40,7 +38,6 @@ impl db::models::Handler for Handler {
 }
 
 pub(crate) async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, clear_test: bool) {
-    #[cfg(not(feature = "cache_update_only"))]
     for (shard_id, sync) in _sync_map.iter() {
         if *sync == 0 && !clear_test {
             let shard_id = *shard_id;

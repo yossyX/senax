@@ -83,7 +83,6 @@ pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
 }
 
 #[rustfmt::skip]
-#[cfg(not(feature="cache_update_only"))]
 impl super::GroupCacheOpTr for CacheOp {
     #[allow(unreachable_patterns)]
     #[allow(clippy::single_match)]
@@ -101,7 +100,6 @@ impl super::GroupCacheOpTr for CacheOp {
     }
 }
 
-#[cfg(not(feature="cache_update_only"))]
 #[rustfmt::skip]
 pub(crate) async fn _clear_cache(_shard_id: ShardId, _sync: u64, _clear_test: bool) {
 @%- if !config.force_disable_cache %@

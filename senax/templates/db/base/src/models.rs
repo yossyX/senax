@@ -58,14 +58,11 @@ impl CacheMsg {
     pub(crate) async fn handle_cache_msg(self) {
         let _lock = CACHE_UPDATE_LOCK.write().await;
         let _sync_map = Arc::new(self.1);
-        #[cfg(not(feature = "cache_update_only"))]
-        {
 @%- for (name, (_, defs, _)) in groups %@
-            if let Some(g) = @{ name|upper_snake }@_HANDLER.get() {
-                g.handle_cache_msg(self.0.clone(), Arc::clone(&_sync_map)).await;
-            }
-@%- endfor %@
+        if let Some(g) = @{ name|upper_snake }@_HANDLER.get() {
+            g.handle_cache_msg(self.0.clone(), Arc::clone(&_sync_map)).await;
         }
+@%- endfor %@
         DbConn::_publish_update_notice().await;
     }
 
@@ -101,7 +98,6 @@ impl CacheActor {
 
 pub async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, _clear_test: bool) {
 @%- if !config.force_disable_cache %@
-    #[cfg(not(feature = "cache_update_only"))]
     for (shard_id, sync) in _sync_map.iter() {
         if *sync == 0 && !_clear_test {
             let shard_id = *shard_id;
@@ -128,9 +124,7 @@ pub static @{ name|upper_snake }@_HANDLER: OnceCell<Box<dyn Handler + Send + Syn
 
 #[async_trait]
 pub trait Handler {
-    #[cfg(not(feature="cache_update_only"))]
     async fn handle_cache_msg(&self, op: Vec<CacheOp>, sync_map: Arc<FxHashMap<ShardId, u64>>);
-    #[cfg(not(feature="cache_update_only"))]
     async fn clear_cache(&self, shard_id: ShardId, sync: u64, clear_test: bool);
 }
 @{-"\n"}@

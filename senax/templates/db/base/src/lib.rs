@@ -109,7 +109,6 @@ pub async fn _start(
     set_bulk_insert_max_size().await?;
     @%- if !config.force_disable_cache %@
 
-    #[cfg(not(feature = "cache_update_only"))]
     Cache::start(
         is_hot_deploy,
         Some(&db_dir.join(CACHE_DB_DIR)),
@@ -125,8 +124,8 @@ pub async fn _start(
 
     if let Some(port) = linker_port {
         let pw = pw.as_ref().with_context(|| "LINKER_PASSWORD required")?;
-        let send_only = cfg!(feature = "cache_update_only");
-        let (sender, mut receiver) = linker::link(DB_ID, port, pw, exit_tx.clone(), send_only)?;
+        let send_only = false;
+        let (sender, mut receiver) = linker::link(DB_ID, port, pw, exit_tx.clone(), false)?;
         LINKER_SENDER.set(sender).unwrap_or_else(|_| panic!("LINKER_SENDER failed"));
         tokio::spawn(async move {
             while let Some(data) = receiver.recv().await {

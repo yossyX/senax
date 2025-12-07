@@ -181,7 +181,6 @@ pub enum CacheOp {
     InvalidateAll,
 }
 
-#[cfg(not(feature="cache_update_only"))]
 impl CacheOp {
     @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
     pub fn update(mut obj: CacheData, update: &Data, op: &OpData) -> CacheData {

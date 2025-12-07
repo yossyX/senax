@@ -143,7 +143,6 @@ pub(crate) async fn init_db(db: &sled::Db) -> Result<()> {
 }
 @%- if !config.force_disable_cache %@
 
-#[cfg(not(feature="cache_update_only"))]
 impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> for CacheOp {
     @%- if !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
     fn apply_to_obj(obj: &Option<Arc<CacheWrapper>>, msgs: &[CacheOp], shard_id: ShardId, time: MSec) -> Option<Arc<CacheWrapper>> {
@@ -713,7 +712,6 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
 @%- endif %@
 @%- if !config.force_disable_cache %@
 
-#[cfg(not(feature="cache_update_only"))]
 async fn clear_all_rows_cache(shard_id: ShardId, sync: u64, clear_test: bool) {
     @{- def.auto_inc_or_seq()|fmt_join("
     if clear_test {
@@ -736,7 +734,6 @@ async fn clear_all_rows_cache(shard_id: ShardId, sync: u64, clear_test: bool) {
     }
 }
 @%- endif %@
-#[cfg(not(feature="cache_update_only"))]
 pub(crate) async fn __clear_cache(_shard_id: ShardId, _sync: u64, _clear_test: bool) {
     @%- if !config.force_disable_cache %@
     clear_all_rows_cache(_shard_id, _sync, _clear_test).await;
@@ -1906,7 +1903,6 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
 @%- endif %@
 @%- if !config.force_disable_cache %@
 @%- if def.use_cache() %@
-#[cfg(not(feature="cache_update_only"))]
 trait CacheWrapperTr {
     fn _has_join(&self, joiner: &Option<Box<Joiner_>>) -> bool;
 @{- def.relations_one_cache(false)|fmt_rel_join("
@@ -1917,7 +1913,6 @@ trait CacheWrapperTr {
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()>;", "") }@
 }
 
-#[cfg(not(feature="cache_update_only"))]
 impl CacheWrapperTr for CacheWrapper {
     fn _has_join(&self, joiner: &Option<Box<Joiner_>>) -> bool {
         if let Some(joiner) = joiner {
@@ -2255,7 +2250,6 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
 @%- if !config.force_disable_cache %@
 @%- if def.use_cache() %@
 
-#[cfg(not(feature="cache_update_only"))]
 trait CacheWrapperVecTr {
     @{- def.relations_one_cache(false)|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()>;", "") }@
@@ -2265,7 +2259,6 @@ trait CacheWrapperVecTr {
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()>;", "") }@
 }
 
-#[cfg(not(feature="cache_update_only"))]
 impl CacheWrapperVecTr for CacheWrapper {
 @{- def.relations_one_cache(false)|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
@@ -3753,7 +3746,6 @@ impl QueryBuilder {
     }
     @%- if def.use_cache() %@
 
-    #[cfg(not(feature="cache_update_only"))]
     #[allow(clippy::if_same_then_else)]
     async fn _select_from_cache(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
@@ -3884,7 +3876,6 @@ impl QueryBuilder {
     }
     @%- if !config.force_disable_cache %@
 
-    #[cfg(not(feature="cache_update_only"))]
     pub(crate) async fn __select_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         let result: Vec<(CacheData, _)> = self._select(conn).await?;
         let time = MSec::now();
@@ -3894,12 +3885,6 @@ impl QueryBuilder {
     @%- endif %@
     @%- if def.use_cache() %@
 
-    #[cfg(feature="cache_update_only")]
-    pub async fn select_from_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
-        unimplemented!("cache_update_only feature disables fetching from cache.")
-    }
-
-    #[cfg(not(feature="cache_update_only"))]
     pub async fn select_from_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         self._select_from_cache(conn).await
     }
@@ -4160,7 +4145,6 @@ pub trait UnionBuilder {
 }
 @%- if !config.force_disable_cache %@
 
-#[cfg(not(feature="cache_update_only"))]
 #[async_trait]
 pub(crate) trait _UnionBuilder {
     async fn __select_union_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>>;
@@ -4252,7 +4236,6 @@ impl UnionBuilder for Vec<QueryBuilder> {
 }
 @%- if !config.force_disable_cache %@
 
-#[cfg(not(feature="cache_update_only"))]
 #[async_trait]
 impl _UnionBuilder for Vec<QueryBuilder> {
     async fn __select_union_for_cache(self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
@@ -4277,12 +4260,10 @@ impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% i
     }
 @%- endif %@
 @%- if def.use_cache() %@
-    #[cfg(not(feature="cache_update_only"))]
     async fn fetch_from_cache(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
         _@{ pascal_name }@_::find_optional_from_cache(conn, self, joiner).await
     }
 @%- if def.is_soft_delete() %@
-    #[cfg(not(feature="cache_update_only"))]
     async fn fetch_from_cache_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
         _@{ pascal_name }@_::find_optional_from_cache_with_trashed(conn, self, joiner).await
     }
@@ -4309,7 +4290,6 @@ impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% i
         }
     }
 @%- if def.use_cache() %@
-    #[cfg(not(feature="cache_update_only"))]
     async fn fetch_from_cache(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
         if let Some(id) = self {
             _@{ pascal_name }@_::find_optional_from_cache(conn, id, joiner).await
@@ -4318,7 +4298,6 @@ impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% i
         }
     }
     @%- if def.is_soft_delete() %@
-    #[cfg(not(feature="cache_update_only"))]
     async fn fetch_from_cache_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
         if let Some(id) = self {
             _@{ pascal_name }@_::find_from_cache_with_trashed(conn, id, joiner)
@@ -4426,7 +4405,6 @@ impl _@{ pascal_name }@Cache_ {
         Ok(())
     }
     @%- if def.use_cache() %@
-    #[cfg(not(feature="cache_update_only"))]
     pub async fn find_self(_self: &_@{ pascal_name }@Cache, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Cache> {
         @%- if def.is_soft_delete() %@
         _@{ pascal_name }@_::find_from_cache_with_trashed(conn, Primary::from(_self), joiner).await
@@ -4519,7 +4497,6 @@ impl _@{ pascal_name }@_ {
 @%- if def.use_all_rows_cache() %@
 @%- if def.use_filtered_row_cache() %@
 
-    #[cfg(not(feature="cache_update_only"))]
     #[allow(clippy::if_same_then_else)]
     pub async fn find_all_from_cache(
         conn: &DbConn,
@@ -4591,7 +4568,6 @@ impl _@{ pascal_name }@_ {
     }
 @%- else %@
 
-    #[cfg(not(feature="cache_update_only"))]
     pub async fn find_all_from_cache(
         conn: &DbConn,
         order: Option<Vec<Order_>>,
@@ -4688,7 +4664,6 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- if def.use_cache() %@
 
-    #[cfg(not(feature="cache_update_only"))]
     pub async fn find_from_cache<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Cache>
     where
         T: Into<Primary>,
@@ -4703,7 +4678,6 @@ impl _@{ pascal_name }@_ {
     }
     @%- if def.is_soft_delete() %@
 
-    #[cfg(not(feature="cache_update_only"))]
     pub async fn find_from_cache_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Cache>
     where
         T: Into<Primary>,
@@ -4767,7 +4741,6 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- if def.use_cache() %@
 
-    #[cfg(not(feature="cache_update_only"))]
     pub async fn find_many_from_cache<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>) -> Result<Vec<_@{ pascal_name }@Cache>>
     where
         I: IntoIterator<Item = T>,
@@ -4778,7 +4751,6 @@ impl _@{ pascal_name }@_ {
     }
     @%- if def.is_soft_delete() %@
 
-    #[cfg(not(feature="cache_update_only"))]
     pub async fn find_many_from_cache_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>) -> Result<Vec<_@{ pascal_name }@Cache>>
     where
         I: IntoIterator<Item = T>,
@@ -4876,7 +4848,6 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- if def.use_cache() %@
 
-    #[cfg(not(feature="cache_update_only"))]
     #[allow(clippy::needless_question_mark)]
     pub async fn find_optional_from_cache<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>>
     where
@@ -4887,7 +4858,6 @@ impl _@{ pascal_name }@_ {
     }
     @%- if def.is_soft_delete() %@
 
-    #[cfg(not(feature="cache_update_only"))]
     pub async fn find_optional_from_cache_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>>
     where
         T: Into<Primary>,
@@ -4960,15 +4930,6 @@ impl _@{ pascal_name }@_ {
 @%- endfor %@
 @%- if def.use_cache() %@
 @%- for (index_name, index) in def.unique_index() %@
-    #[cfg(feature="cache_update_only")]
-    pub async fn find_by_@{ index_name }@_from_cache<@{ index.fields(index_name, def)|fmt_index_col("T{index}", ", ") }@>(conn: &mut DbConn, @{ index.fields(index_name, def)|fmt_index_col("_{name}: T{index}", ", ") }@, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Cache>
-    where
-    @{- index.fields(index_name, def)|fmt_index_col("
-        T{index}: Into<{filter_type}>,", "") }@
-    {
-        unimplemented!("cache_update_only feature disables fetching from cache.")
-    }
-    #[cfg(not(feature="cache_update_only"))]
     pub async fn find_by_@{ index_name }@_from_cache<@{ index.fields(index_name, def)|fmt_index_col("T{index}", ", ") }@>(conn: &mut DbConn, @{ index.fields(index_name, def)|fmt_index_col("_{name}: T{index}", ", ") }@, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Cache>
     where
     @{- index.fields(index_name, def)|fmt_index_col("
@@ -4996,7 +4957,6 @@ impl _@{ pascal_name }@_ {
 @%- endfor %@
 @%- if !def.act_as_job_queue() && !def.use_clear_whole_cache() %@
 
-    #[cfg(not(feature="cache_update_only"))]
     pub async fn insert_dummy_cache(conn: &DbConn, obj: _@{ pascal_name }@Updater) -> Result<()> {
         let _lock = db::models::CACHE_UPDATE_LOCK.write().await;
         let cache_msg = CacheOp::Insert {
@@ -5875,7 +5835,6 @@ async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], t
 }
 @%- if def.use_cache() %@
 
-#[cfg(not(feature="cache_update_only"))]
 async fn ___find_many_for_cache(
     conn: &mut DbConn,
     ids: &[InnerPrimary],
@@ -5910,7 +5869,6 @@ async fn ___find_many_for_cache(
     Ok(list)
 }
 
-#[cfg(not(feature="cache_update_only"))]
 async fn __find_many_from_cache<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>) -> Result<Vec<_@{ pascal_name }@Cache>>
 where
     I: IntoIterator<Item = T>,
@@ -5920,7 +5878,6 @@ where
     let ids: Vec<_> = ids.into_iter().map(|id| PrimaryHasher(id.into(), shard_id)).collect();
     ___find_many_from_cache(conn, ids, joiner).await
 }
-#[cfg(not(feature="cache_update_only"))]
 #[allow(clippy::collapsible_if)]
 async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joiner: Option<Box<Joiner_>>) -> Result<Vec<_@{ pascal_name }@Cache>> {
     let mut list: Vec<_@{ pascal_name }@Cache> = Vec::new();
@@ -6084,7 +6041,6 @@ async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, tr
 }
 @%- if def.use_cache() %@
 
-#[cfg(not(feature="cache_update_only"))]
 async fn __find_optional_from_cache<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>>
 where
     T: Into<InnerPrimary>,

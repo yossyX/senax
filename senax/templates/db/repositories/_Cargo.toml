@@ -4,9 +4,6 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
-[features]
-cache_update_only = []
-
 [dependencies]
 domain = { path = "../../../../1_domain" }
 db = { package = "_db_@{ db|snake }@", path = "../../base" }

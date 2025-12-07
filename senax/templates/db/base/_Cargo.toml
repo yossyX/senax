@@ -5,7 +5,6 @@ edition = "2024"
 publish = false
 
 [features]
-cache_update_only = []
 etcd = [ "senax-common/etcd" ]
 seeder = [ "schemars" ]
 

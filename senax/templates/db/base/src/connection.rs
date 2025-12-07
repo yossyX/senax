@@ -50,7 +50,7 @@ const ID_OF_SEQUENCE: @{ config.db_type_switch("u32", "i32") }@ = 1;
 @%- if !config.force_disable_cache %@
 const ID_OF_CACHE_SYNC: @{ config.db_type_switch("u32", "i32") }@ = 2;
 @%- endif %@
-const DISABLE_CACHE: bool = @{ config.force_disable_cache }@ || cfg!(feature = "cache_update_only");
+const DISABLE_CACHE: bool = @{ config.force_disable_cache }@;
 
 static DB_URL: RwLock<String> = RwLock::const_new(String::new());
 static DB_USER: RwLock<Option<String>> = RwLock::const_new(None);
@@ -1785,7 +1785,6 @@ async fn reset_writer_pool(
                     let new_pool = writer_connect_with(pool_option, options).await?;
                     let pool = &mut pool_collection.write().await[idx];
                     @%- if !config.force_disable_cache %@
-                    #[cfg(not(feature = "cache_update_only"))]
                     if pool.is_some() {
                         let new_pool = new_pool.clone();
                         tokio::spawn(async move {

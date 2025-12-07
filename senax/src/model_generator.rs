@@ -68,8 +68,6 @@ pub fn generate(
     };
     let reg = Regex::new(r"(?m)^_repo_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
-    let reg = Regex::new(r#"[ \t]*"_repo_\w+/cache_update_only"[ \t]*,?[ \t]*\n?"#)?;
-    content = reg.replace_all(&content, "").into_owned();
     let mut unified_list = Vec::new();
     for (group, _) in groups.iter().rev() {
         let db = &db.to_snake();
@@ -86,30 +84,14 @@ pub fn generate(
                 group, db, group, group
             ),
         );
-        content = content.replace(
-            "\"_base/cache_update_only\"",
-            &format!(
-                "\"_base/cache_update_only\",\n    \"_repo_{}/cache_update_only\"",
-                group
-            ),
-        );
     }
     let reg = Regex::new(r"(?m)^db_\w+\s*=.+\n")?;
-    content = reg.replace_all(&content, "").into_owned();
-    let reg = Regex::new(r#"[ \t]*"db_\w+/cache_update_only"[ \t]*,?[ \t]*\n?"#)?;
     content = reg.replace_all(&content, "").into_owned();
     for db in config.outer_db().iter().rev() {
         let db = &db.to_snake();
         content = content.replace(
             "[dependencies]",
             &format!("[dependencies]\ndb_{} = {{ path = \"../{}\" }}", db, db),
-        );
-        content = content.replace(
-            "\"_base/cache_update_only\",",
-            &format!(
-                "\"_base/cache_update_only\",\n    \"db_{}/cache_update_only\",",
-                db
-            ),
         );
     }
     fs_write(file_path, &*content)?;
