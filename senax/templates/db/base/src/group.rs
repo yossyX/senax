@@ -36,7 +36,6 @@ pub enum CacheOp {
 }
 
 #[rustfmt::skip]
-#[cfg(feature = "seeder")]
 #[derive(::schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]

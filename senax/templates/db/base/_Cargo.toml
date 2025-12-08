@@ -6,7 +6,6 @@ publish = false
 
 [features]
 etcd = [ "senax-common/etcd" ]
-seeder = [ "schemars" ]
 
 [dependencies]
 @%- if !config.exclude_from_domain %@
@@ -38,7 +37,7 @@ phf = "0.8.0"
 rand.workspace = true
 regex.workspace = true
 rust_decimal.workspace = true
-schemars = { workspace = true, optional = true }
+schemars.workspace = true
 senax-common.workspace = true
 senax-encoder.workspace = true
 senax-macros.workspace = true

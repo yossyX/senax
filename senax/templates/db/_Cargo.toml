@@ -6,7 +6,6 @@ publish = false
 
 [features]
 etcd = [ "senax-common/etcd", "_base/etcd" ]
-seeder = [ "schemars", "_base/seeder" ]
 
 [dependencies]
 _base = { package = "_db_@{ db|snake }@", path = "base" }
@@ -35,7 +34,7 @@ phf = "0.8.0"
 rand.workspace = true
 regex.workspace = true
 rust_decimal.workspace = true
-schemars = { workspace = true, optional = true }
+schemars.workspace = true
 senax-common.workspace = true
 senax-macros.workspace = true
 serde.workspace = true

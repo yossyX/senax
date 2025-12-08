@@ -717,7 +717,7 @@ pub struct DbMigrateTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    // db_@{ db|snake }@::seeder::gen_seed_schema()?;
+    db_@{ db|snake }@::seeder::gen_seed_schema()?;
     // Do not modify this line. (gen_seed_schema)"###,
     ext = "txt",
     escape = "none"
@@ -729,7 +729,7 @@ pub struct DbGenSeedSchemaTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    // db_@{ db|snake }@::seeder::seed(_use_test, None).await?;
+    db_@{ db|snake }@::seeder::seed(_use_test, None).await?;
     // Do not modify this line. (seed)"###,
     ext = "txt",
     escape = "none"

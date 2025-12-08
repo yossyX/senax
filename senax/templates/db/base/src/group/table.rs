@@ -196,7 +196,7 @@ impl CacheOp {
 
 @% for (name, column_def) in def.id_except_auto_increment() -%@
 #[derive(Deserialize, Serialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, Default)]
-#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
+#[derive(::schemars::JsonSchema)]
 #[serde(transparent)]
 @%- if !column_def.is_displayable() %@
 #[display("{:?}", _0)]
@@ -205,13 +205,13 @@ pub struct @{ id_name }@(pub @{ column_def.get_inner_type(false, false) }@);
 @% endfor -%@
 @% for (name, column_def) in def.id_auto_inc_or_seq() -%@
 #[derive(Serialize, Hash, PartialEq, Eq, PartialOrd, Ord, Clone,@% if column_def.is_copyable() %@ Copy,@% endif %@ Display, Debug, Default)]
-#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
+#[derive(::schemars::JsonSchema)]
 #[serde(transparent)]
 @%- if !column_def.is_displayable() %@
 #[display("{:?}", _0)]
 @%- endif %@
 pub struct @{ id_name }@(
-    #[cfg_attr(feature = "seeder", schemars(schema_with = "crate::misc::id_schema"))]
+    #[schemars(schema_with = "crate::misc::id_schema")]
     pub @{ column_def.get_inner_type(true, false) }@
 );
 
@@ -438,7 +438,7 @@ impl sqlx::FromRow<'_, DbRow> for CacheData {
 @% for (name, column_def) in def.num_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
 #[derive(Pack, Unpack, Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, FromRepr, EnumMessage, EnumString, IntoStaticStr)]
-#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
+#[derive(::schemars::JsonSchema)]
 #[repr(@{ column_def.get_inner_type(true, true) }@)]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
@@ -508,7 +508,7 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 @% for (name, column_def) in def.str_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
 #[derive(Pack, Unpack, Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
-#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
+#[derive(::schemars::JsonSchema)]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum _@{ name|pascal }@ {
@@ -699,7 +699,7 @@ impl HashVal for CacheSyncWrapper {
 @%- endif %@
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[cfg_attr(feature = "seeder", derive(::schemars::JsonSchema))]
+#[derive(::schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct _@{ pascal_name }@Factory {
 @{ def.for_factory()|fmt_join("{label}{comment}{factory_default}    pub {ident}: {factory},", "\n") }@

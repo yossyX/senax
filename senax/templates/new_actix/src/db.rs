@@ -79,14 +79,12 @@ pub async fn migrate(db: Option<&str>, use_test: bool, clean: bool, ignore_missi
 
 pub fn gen_seed_schema() -> Result<()> {
     // Do not modify this line. (gen_seed_schema)
-    panic!("The gen_seed_schema function needs to be modified");
-    // Ok(())
+    Ok(())
 }
 
 pub async fn seed(_db: Option<&str>, _use_test: bool) -> Result<()> {
     // Do not modify this line. (seed)
-    panic!("The seed function needs to be modified");
-    // Ok(())
+    Ok(())
 }
 
 #[rustfmt::skip]

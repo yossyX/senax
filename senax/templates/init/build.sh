@@ -20,6 +20,7 @@ senax gen-migrate auto --skip-empty --use-test-db
 cargo run -- migrate -t
 cargo run -- migrate --ignore-missing
 senax reflect-migration-changes
+cargo run -- gen-seed-schema
 cargo run -- open-api > open-api.json
 
 codegen () {
