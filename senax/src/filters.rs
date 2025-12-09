@@ -241,10 +241,10 @@ fn _fmt_join(f: &str, name: &&String, col: &&FieldDef, index: i32, foreign: &[St
         .replace("{validate}", &col.get_validate(name))
         .replace("{api_validate_const}", &col.get_api_validate_const(name))
         .replace("{api_validate}", &col.get_api_validate(name))
-        .replace("{api_default}", &col.get_api_default(name))
+        .replace("{api_default}", &col.get_api_default(name, col))
         .replace(
             "{api_default_attribute}",
-            &col.get_api_default_attribute(name),
+            &col.get_api_default_attribute(name, col),
         )
         .replace("{graphql_secret}", col.graphql_secret())
         .replace("{outer}", &col.get_outer_type(false))

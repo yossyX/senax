@@ -1129,7 +1129,7 @@ impl FieldDef {
         }
     }
 
-    pub fn get_api_default(&self, name: &str) -> String {
+    pub fn get_api_default(&self, name: &str, field: &FieldDef) -> String {
         let conv = |value| -> String {
             let result = match self.data_type {
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
@@ -1176,7 +1176,7 @@ impl FieldDef {
                 format!("Some(Some({})).into()", &result)
             }
         };
-        if let Some(value) = ApiFieldDef::default(name) {
+        if let Some(value) = ApiFieldDef::default(name, field) {
             conv(&value)
         } else {
             "Default::default()".to_string()
@@ -1630,12 +1630,12 @@ impl FieldDef {
         }
     }
 
-    pub fn get_api_default_attribute(&self, name: &str) -> String {
-        if ApiFieldDef::default(name).is_some() {
+    pub fn get_api_default_attribute(&self, name: &str, field: &FieldDef) -> String {
+        if ApiFieldDef::default(name, field).is_some() {
             format!(
                 "    #[serde(default = \"default_{}\")]\n    #[graphql(default_with = \"{}\")]\n",
                 name,
-                self.get_api_default(name)
+                self.get_api_default(name, field)
             )
         } else {
             "".to_string()

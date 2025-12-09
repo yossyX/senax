@@ -325,7 +325,7 @@ async fn main() -> Result<()> {
         let app = make_app().into_app()
             .wrap(
                 middleware::Logger::new(
-                    r#"%a "%r" %s %b "%{Referer}i" "%{User-Agent}i" %{ctx}xi %{username}xi %T"#,
+                    r#"%a (%{r}a) "%r" %s %b "%{Referer}i" "%{User-Agent}i" %{ctx}xi %{username}xi %T"#,
                 )
                 .log_target("access_log")
                 .custom_request_replace("ctx", |req| {

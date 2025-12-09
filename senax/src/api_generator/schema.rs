@@ -1,4 +1,7 @@
-use crate::{common::yaml_value_to_str, schema::ModelDef};
+use crate::{
+    common::yaml_value_to_str,
+    schema::{FieldDef, ModelDef},
+};
 use indexmap::IndexMap;
 use schemars::{
     JsonSchema,
@@ -1203,11 +1206,19 @@ impl ApiFieldDef {
             None
         }
     }
-    pub fn default(name: &str) -> Option<serde_yaml::Value> {
+    pub fn default(name: &str, field: &FieldDef) -> Option<serde_yaml::Value> {
         if let Some(c) = API_COLUMNS.lock().unwrap().last()
             && let Some(Some(c)) = c.get(name)
         {
+            if c.required {
+                return None;
+            }
             return c.default.clone();
+        }
+        if !field.auto_gen
+            && let Some(default) = &field.default
+        {
+            return Some(default.clone());
         }
         None
     }

@@ -594,7 +594,7 @@ fn fields(def: &Arc<ModelDef>, indent: usize, camel_case: bool) -> Vec<Field> {
             has_many: false,
             replace: false,
             validator: ApiFieldDef::validator(name),
-            default: ApiFieldDef::default(name),
+            default: ApiFieldDef::default(name, field),
             on_insert_formula: ApiFieldDef::on_insert_formula(name),
             on_update_formula: ApiFieldDef::on_update_formula(name),
         });
