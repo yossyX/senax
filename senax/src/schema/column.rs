@@ -1168,7 +1168,7 @@ impl FieldDef {
         }
     }
 
-    pub fn get_api_default(&self, name: &str) -> String {
+    pub fn get_api_default(&self, name: &str, field: &FieldDef) -> String {
         let conv = |value| -> String {
             let mut result = match self.data_type {
                 DataType::Char | DataType::Varchar => {
@@ -1215,10 +1215,8 @@ impl FieldDef {
                 format!("Some({})", &result)
             }
         };
-        if let Some(value) = ApiFieldDef::default(name) {
+        if let Some(value) = ApiFieldDef::default(name, field) {
             conv(&value)
-        } else if let Some(value) = &self.default {
-            conv(value)
         } else {
             "Default::default()".to_string()
         }
@@ -1537,9 +1535,13 @@ impl FieldDef {
         }
     }
 
-    pub fn get_api_serde_default(&self, name: &str) -> String {
-        if self.default.is_some() {
-            format!("    #[serde(default = \"default_{}\")]\n", name)
+    pub fn get_api_serde_default(&self, name: &str, field: &FieldDef) -> String {
+        if ApiFieldDef::default(name, field).is_some() {
+            format!(
+                "    #[serde(default = \"default_{}\")]\n    #[graphql(default_with = \"{}\")]\n",
+                name,
+                self.get_api_default(name, field)
+            )
         } else {
             "".to_string()
         }
@@ -2091,14 +2093,18 @@ impl FieldDef {
             DataType::ArrayInt => "std::sync::Arc<Vec<u64>>",
             DataType::ArrayString if req => "Vec<String>",
             DataType::ArrayString => "std::sync::Arc<Vec<String>>",
-            DataType::Json if !req => "async_graphql::Json<std::sync::Arc<Box<serde_json::value::RawValue>>>",
+            DataType::Json if !req => {
+                "async_graphql::Json<std::sync::Arc<Box<serde_json::value::RawValue>>>"
+            }
             DataType::Json if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
             DataType::Json => "serde_json::Value",
             DataType::DbEnum => "",
             DataType::DbSet => "String",
             DataType::Point => "domain::models::Point",
             DataType::GeoPoint => "domain::models::GeoPoint",
-            DataType::Geometry if !req => "async_graphql::Json<std::sync::Arc<Box<serde_json::value::RawValue>>>",
+            DataType::Geometry if !req => {
+                "async_graphql::Json<std::sync::Arc<Box<serde_json::value::RawValue>>>"
+            }
             DataType::Geometry if self.json_class.is_some() => self.json_class.as_ref().unwrap(),
             DataType::Geometry => "serde_json::Value",
             DataType::ValueObject => unimplemented!(),
@@ -2600,7 +2606,9 @@ impl FieldDef {
                 DataType::Point => "senax_common::types::point::Point",
                 DataType::GeoPoint if is_domain => "domain::models::GeoPoint",
                 DataType::GeoPoint => "senax_common::types::geo_point::GeoPoint",
-                DataType::Geometry if !factory => "std::sync::Arc<Box<serde_json::value::RawValue>>",
+                DataType::Geometry if !factory => {
+                    "std::sync::Arc<Box<serde_json::value::RawValue>>"
+                }
                 DataType::Geometry if self.json_class.is_some() => {
                     self.json_class.as_ref().unwrap()
                 }

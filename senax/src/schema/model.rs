@@ -1539,7 +1539,7 @@ impl ModelDef {
     pub fn fields_with_default(&self) -> Vec<(&String, &FieldDef)> {
         self.for_api_request()
             .into_iter()
-            .filter(|(_k, v)| v.default.is_some())
+            .filter(|(k, field)| ApiFieldDef::default(k, field).is_some())
             .collect()
     }
     pub fn multi_index(&self, cache_only: bool) -> Vec<(String, IndexDef)> {
