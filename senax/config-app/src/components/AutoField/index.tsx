@@ -327,7 +327,7 @@ function AutoField(props: Props) {
               value={field.value}
               name={name}
               ref={field.ref}
-              rows={Math.max(3, (field.value || "").split("\n").length)}
+              rows={Math.max(1, (field.value || "").split("\n").length)}
             />
           </FormField>
         )}

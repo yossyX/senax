@@ -479,7 +479,7 @@ function Field({ formData, definitions }: any) {
             hidden={!["geo_point", "geometry"].includes(type)}
           />
           <AutoField name="default" {...formData} />
-          <AutoField name="query" {...formData} />
+          <AutoField name="query" {...formData} textarea />
           <AutoField name="stored" {...formData} />
           <AutoField name="sql_comment" {...formData} />
           <AutoField name="hidden" {...formData} />
@@ -791,7 +791,7 @@ function IndexField({ formData }: any) {
         />
         <AutoField name="direction" {...formData} />
         <AutoField name="length" {...formData} />
-        <AutoField name="query" {...formData} />
+        <AutoField name="query" {...formData} textarea />
       </SpaceBetween>
     </>
   );
