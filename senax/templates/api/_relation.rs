@@ -15,7 +15,7 @@ use senax_common::types::blob::{ApiToBlob as _, BlobToApi as _};
 #[allow(unused_imports)]
 use std::collections::HashMap;
 #[allow(unused_imports)]
-use _@{ server_name|snake }@ as _server;
+use ::_@{ server_name|snake }@ as _server_;
 
 @%- if !no_read %@
 
@@ -135,7 +135,7 @@ pub fn updater_joiner() -> Option<Box<_repository_::Joiner_>> {
 }
 
 use serde::{Deserialize, Serialize};
-use _server::auth::AuthInfo;
+use _server_::auth::AuthInfo;
 
 @{ def.label|label0 -}@
 #[derive(Debug, async_graphql::InputObject, validator::Validate, Serialize, Deserialize, schemars::JsonSchema)]

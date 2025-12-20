@@ -12,6 +12,7 @@ ahash = "0.8"
 anyhow = "1.0"
 async-graphql = { version = "7.0", features = ["apollo_persisted_queries", "chrono", "uuid", "decimal", "log", "raw_value"] }
 async-graphql-actix-web = "7.0"
+async-graphql-axum = "7.0"
 async-stream = "0.3"
 async-trait = "0.1"
 base64 = "0.22"
@@ -40,7 +41,7 @@ sqlx = { version = "0.8.5", features = ["runtime-tokio", "tls-rustls", "chrono",
 strum = { version = "0.27", features = ["derive"] }
 strum_macros = "0.27"
 thiserror = "2"
-tokio = { version = "1.41", features = [ "full" ] }
+tokio = "1.41"
 tracing = { version = "0.1", features = ["release_max_level_warn", "log-always"] }
 utoipa = { version = "5.2.0", features = ["chrono", "decimal", "uuid", "rc_schema"] }
 uuid = { version = "1.6.1", features = ["v6", "v7", "fast-rng", "serde"] }

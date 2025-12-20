@@ -386,7 +386,11 @@ async fn main() -> Result<()> {
     kill_parent();
     output_pid_file(&arg.pid)?;
 
-    info!("Starting server");
+    info!(
+        "Starting {} Ver.{}",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION")
+    );
     let exit_code = tokio::select! {
         result = server.run() => {
             match result {
@@ -412,7 +416,7 @@ async fn main() -> Result<()> {
 
     _base::end().await?;
 
-    info!("server stopped");
+    info!("{} stopped", env!("CARGO_PKG_NAME"));
     if exit_code != 0 {
         std::process::exit(exit_code);
     }

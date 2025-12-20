@@ -46,7 +46,7 @@ schemars = { version = "0.8.22", features = ["indexmap2", "preserve_order"] }
 semver = "1.0.22"
 senax-inflector = "0.1.1"
 senax-mysql-parser = { path = "../mysql-parser", version = "=0.1.10" }
-senax-pgsql-parser = "=0.1.0"
+senax-pgsql-parser = "=0.1.1"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
 serde_yaml = "0.9"
@@ -58,7 +58,7 @@ strum_macros = "0.27"
 syn = "2.0.48"
 tera = { version = "1.17.0", features = ["date-locale", "preserve_order"] }
 termcolor = "1.2.0"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["process", "signal"] }
 validator = { version = "0.20", features = ["derive", "unic"] }
 webbrowser = "1"
 

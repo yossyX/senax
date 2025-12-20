@@ -112,7 +112,7 @@ function DbConfig() {
               <AutoField name="with_label" {...formData} />
               <AutoField name="with_comment" {...formData} />
               <AutoField name="hide_timestamp" {...formData} />
-              <AutoField name="promote_children" {...formData} />
+              <AutoField name="promote_group_paths" {...formData} />
               <AutoField
                 name="groups"
                 {...formData}
@@ -140,7 +140,7 @@ function Groups({ formData }: any) {
           {...formData}
           autocomplete={formData.additionalData.groups}
         />
-        <AutoField name="promote_children" {...formData} />
+        <AutoField name="promote_model_paths" {...formData} />
         <AutoField
           name="group"
           {...formData}

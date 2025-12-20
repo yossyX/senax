@@ -153,6 +153,9 @@ enum Commands {
         /// Specify the DB
         #[clap(long)]
         db: Option<String>,
+        /// Create an empty file
+        #[clap(long)]
+        empty: bool,
         #[clap(long)]
         skip_empty: bool,
         #[clap(long)]
@@ -398,16 +401,24 @@ async fn exec(cli: Cli) -> Result<()> {
         Commands::GenMigrate {
             description,
             db,
+            empty,
             skip_empty,
             use_test_db,
         } => {
             if let Some(db) = db {
                 ensure!(db_re.is_match(db), "bad db name!");
-                migration_generator::generate(db, description, *skip_empty, *use_test_db).await?;
+                migration_generator::generate(db, description, *empty, *skip_empty, *use_test_db)
+                    .await?;
             } else {
                 for db in crate::db_generator::db_list(false)? {
-                    migration_generator::generate(&db, description, *skip_empty, *use_test_db)
-                        .await?;
+                    migration_generator::generate(
+                        &db,
+                        description,
+                        *empty,
+                        *skip_empty,
+                        *use_test_db,
+                    )
+                    .await?;
                 }
             }
         }

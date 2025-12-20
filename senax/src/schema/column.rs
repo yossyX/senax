@@ -1520,12 +1520,12 @@ impl FieldDef {
                 if !has_custom {
                     if self.not_null {
                         validators.push(
-                            "custom(function = \"_server::validator::validate_varchar\")"
+                            "custom(function = \"_server_::validator::validate_varchar\")"
                                 .to_string(),
                         );
                     } else {
                         validators.push(
-                            "custom(function = \"_server::validator::validate_varchar_opt\")"
+                            "custom(function = \"_server_::validator::validate_varchar_opt\")"
                                 .to_string(),
                         );
                     }
@@ -1537,11 +1537,11 @@ impl FieldDef {
                 if !has_custom {
                     if self.not_null {
                         validators.push(
-                            "custom(function = \"_server::validator::validate_text\")".to_string(),
+                            "custom(function = \"_server_::validator::validate_text\")".to_string(),
                         );
                     } else {
                         validators.push(
-                            "custom(function = \"_server::validator::validate_text_opt\")"
+                            "custom(function = \"_server_::validator::validate_text_opt\")"
                                 .to_string(),
                         );
                     }
@@ -1554,12 +1554,12 @@ impl FieldDef {
                 if !has_custom {
                     if self.not_null {
                         validators.push(
-                            "custom(function = \"_server::validator::validate_array_of_varchar\")"
+                            "custom(function = \"_server_::validator::validate_array_of_varchar\")"
                                 .to_string(),
                         );
                     } else {
                         validators.push(
-                            "custom(function = \"_server::validator::validate_array_of_varchar_opt\")"
+                            "custom(function = \"_server_::validator::validate_array_of_varchar_opt\")"
                                 .to_string(),
                         );
                     }
@@ -1589,12 +1589,12 @@ impl FieldDef {
             DataType::Decimal if !self.signed => {
                 if self.not_null {
                     validators.push(
-                        "custom(function = \"_server::validator::validate_unsigned_decimal\")"
+                        "custom(function = \"_server_::validator::validate_unsigned_decimal\")"
                             .to_string(),
                     );
                 } else {
                     validators.push(
-                        "custom(function = \"_server::validator::validate_unsigned_decimal_opt\")"
+                        "custom(function = \"_server_::validator::validate_unsigned_decimal_opt\")"
                             .to_string(),
                     );
                 }
@@ -1604,12 +1604,12 @@ impl FieldDef {
             {
                 if self.not_null {
                     validators.push(
-                        "custom(function = \"_server::validator::validate_json_object\")"
+                        "custom(function = \"_server_::validator::validate_json_object\")"
                             .to_string(),
                     );
                 } else {
                     validators.push(
-                        "custom(function = \"_server::validator::validate_json_object_opt\")"
+                        "custom(function = \"_server_::validator::validate_json_object_opt\")"
                             .to_string(),
                     );
                 }
@@ -1633,7 +1633,7 @@ impl FieldDef {
     pub fn get_api_default_attribute(&self, name: &str, field: &FieldDef) -> String {
         if ApiFieldDef::default(name, field).is_some() {
             format!(
-                "    #[serde(default = \"default_{}\")]\n    #[graphql(default_with = \"{}\")]\n",
+                "    #[serde(default = \"default_{}\")]\n    #[graphql(default_with = {:?})]\n",
                 name,
                 self.get_api_default(name, field)
             )
@@ -2215,7 +2215,7 @@ impl FieldDef {
         } else if option || !req {
             format!("Option<{}>", typ)
         } else {
-            format!("_server::MaybeUndefined<{}>", typ)
+            format!("_server_::MaybeUndefined<{}>", typ)
         }
     }
 

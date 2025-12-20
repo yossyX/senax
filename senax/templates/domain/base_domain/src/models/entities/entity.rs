@@ -73,41 +73,15 @@ impl From<&@{ id_name }@> for @{ id_name }@ {
 #[derive(Clone)]
 pub struct @{ pascal_name }@Primary(@{ def.primaries()|fmt_join("pub {domain_outer_owned}", ", ") }@);
 
-#[allow(clippy::clone_on_copy)]
-impl From<@{ def.primaries()|fmt_join_with_paren("{outer_ref}", ", ") }@> for @{ pascal_name }@Primary {
-    fn from(id: @{ def.primaries()|fmt_join_with_paren("{outer_ref}", ", ") }@) -> Self {
-        @% if def.primaries().len() == 1 -%@
-        Self(id.to_owned().into())
-        @%- else -%@
-        Self(@{ def.primaries()|fmt_join("id.{index}.to_owned().into()", ", ") }@)
-        @%- endif %@
-    }
-}
-@%- if def.primaries()|fmt_join_with_paren("{outer_ref}", ", ") != def.primaries()|fmt_join_with_paren("{inner}", ", ") %@
-#[allow(clippy::useless_conversion)]
-impl From<@{ def.primaries()|fmt_join_with_paren("{inner}", ", ") }@> for @{ pascal_name }@Primary {
-    fn from(id: @{ def.primaries()|fmt_join_with_paren("{inner}", ", ") }@) -> Self {
+impl<@{ def.primaries()|fmt_join("T{index}: Into<{domain_outer_owned}>", ", ") }@> From<@{ def.primaries()|fmt_join_with_paren("T{index}", ", ") }@> for @{ pascal_name }@Primary {
+    fn from(id: @{ def.primaries()|fmt_join_with_paren("T{index}", ", ") }@) -> Self {
         @% if def.primaries().len() == 1 %@Self(id.into())@% else %@Self(@{ def.primaries()|fmt_join("id.{index}.into()", ", ") }@)@% endif %@
     }
 }
-@%- endif %@
-@%- if def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") != def.primaries()|fmt_join_with_paren("{inner}", ", ") %@
-impl From<@{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@> for @{ pascal_name }@Primary {
-    fn from(id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Self {
-        @% if def.primaries().len() == 1 %@Self(id)@% else %@Self(@{ def.primaries()|fmt_join("id.{index}", ", ") }@)@% endif %@
-    }
-}
-@%- endif %@
-@% if def.primaries().len() > 1 -%@
-impl From<&@{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@> for @{ pascal_name }@Primary {
-    fn from(id: &@{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Self {
-        Self(@{ def.primaries()|fmt_join("id.{index}{clone}", ", ") }@)
-    }
-}
-@% endif -%@
-impl From<@{ pascal_name }@Primary> for @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@ {
-    fn from(id: @{ pascal_name }@Primary) -> Self {
-        @{ def.primaries()|fmt_join_with_paren("id.{index}", ", ") }@
+
+impl @{ pascal_name }@Primary {
+    pub fn into(self) -> @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@ {
+        @{ def.primaries()|fmt_join_with_paren("self.{index}", ", ") }@
     }
 }
 #[allow(clippy::useless_conversion)]

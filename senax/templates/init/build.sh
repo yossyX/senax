@@ -27,12 +27,12 @@ codegen () {
   pid=`ps auxw | grep $1 | awk '!/grep/{print $2}'`
   if [ -n "${pid}" ]; then
     kill -s USR2 ${pid}
-    sleep 20
+    sleep 1
     (cd $2; npm install; npm run codegen)
   else
     RUST_LOG=warn $1 &
     pid=$!
-    sleep 20
+    sleep 1
     (cd $2; npm install; npm run codegen) || true
     kill ${pid}
   fi

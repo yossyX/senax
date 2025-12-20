@@ -2,7 +2,6 @@
 
 use senax_common::ShardId;
 use sqlx::query::Query;
-// use std::convert::TryFrom;
 
 use db::{connection::{DbArguments, DbType}, misc::TrashMode};
 

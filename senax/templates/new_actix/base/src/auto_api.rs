@@ -1,5 +1,3 @@
-#[allow(unused_imports)]
-use actix_web::cookie::Cookie;
 use async_graphql::{Error, ErrorExtensions};
 use std::collections::BTreeMap;
 use validator::ValidationErrors;

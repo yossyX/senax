@@ -9,8 +9,11 @@ pub mod auto_api;
 pub mod common;
 pub mod context;
 pub mod db;
+pub mod maybe_undefined;
 pub mod response;
 pub mod validator;
+
+pub use maybe_undefined::MaybeUndefined;
 
 pub async fn start() -> anyhow::Result<()> {
     #[cfg(feature = "v8")]

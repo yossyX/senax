@@ -52,7 +52,7 @@ pub async fn generate(
         let mut model = ModelDef::default();
         let mut pk = Vec::new();
         let mut indexes = IndexMap::new();
-        let mut belongs_to: IndexMap<String, Option<BelongsToDef>> = IndexMap::new();
+        let mut belongs_to: IndexMap<String, Vec<BelongsToDef>> = IndexMap::new();
         let singular_name = to_singular_name(&config, table_name, non_snake_case);
         model.table_name = Some(table_name.clone());
         if use_label_as_sql_comment || config.use_label_as_sql_comment {
@@ -425,11 +425,8 @@ pub async fn generate(
                 ) => {
                     let parent_singular_name = to_singular_name(&config, table, non_snake_case);
                     let mut def = BelongsToDef {
-                        model: Some(to_combined_name(
-                            &config,
-                            &parent_singular_name,
-                            &singular_name,
-                        )),
+                        group: to_rel_group(&config, &parent_singular_name, &singular_name),
+                        model: to_rel_model(&config, &parent_singular_name, &singular_name),
                         ..Default::default()
                     };
                     let local = if columns.len() == 1 {
@@ -470,7 +467,7 @@ pub async fn generate(
 
                     if pk == local {
                         let name = parent_singular_name.clone();
-                        belongs_to.insert(name, Some(def));
+                        belongs_to.entry(name).or_default().push(def);
                         let foreign = if local
                             == StringOrArray::One(format!("{}_id", parent_singular_name))
                         {
@@ -479,11 +476,8 @@ pub async fn generate(
                             Some(local.clone())
                         };
                         let def = HasOneDef {
-                            model: Some(to_combined_name(
-                                &config,
-                                &singular_name,
-                                &parent_singular_name,
-                            )),
+                            group: to_rel_group(&config, &singular_name, &parent_singular_name),
+                            model: to_rel_model(&config, &singular_name, &parent_singular_name),
                             foreign,
                             ..Default::default()
                         };
@@ -495,7 +489,7 @@ pub async fn generate(
                         } else {
                             &parent_singular_name
                         };
-                        belongs_to.insert(name.to_string(), Some(def));
+                        belongs_to.entry(name.to_string()).or_default().push(def);
                         let foreign = if local
                             == StringOrArray::One(format!("{}_id", parent_singular_name))
                         {
@@ -504,11 +498,8 @@ pub async fn generate(
                             Some(local.clone())
                         };
                         let def = HasManyDef {
-                            model: Some(to_combined_name(
-                                &config,
-                                &singular_name,
-                                &parent_singular_name,
-                            )),
+                            group: to_rel_group(&config, &singular_name, &parent_singular_name),
+                            model: to_rel_model(&config, &singular_name, &parent_singular_name),
                             foreign,
                             ..Default::default()
                         };
@@ -538,11 +529,8 @@ pub async fn generate(
                     }
                     if table_exists {
                         let mut def = BelongsToDef {
-                            model: Some(to_combined_name(
-                                &config,
-                                parent_singular_name,
-                                &singular_name,
-                            )),
+                            group: to_rel_group(&config, parent_singular_name, &singular_name),
+                            model: to_rel_model(&config, parent_singular_name, &singular_name),
                             ..Default::default()
                         };
                         // if parent_singular_name == def.model.as_ref().unwrap() {
@@ -560,15 +548,15 @@ pub async fn generate(
                             constraint_idx.insert(format!("{},{}", name, ConfigDef::deleted()));
                         }
                         def.on_delete = Some(schema::ReferenceOption::Cascade);
-                        belongs_to.insert(parent_singular_name.to_string(), Some(def));
+                        belongs_to
+                            .entry(parent_singular_name.to_string())
+                            .or_default()
+                            .push(def);
 
                         if pk == local {
                             let def = HasOneDef {
-                                model: Some(to_combined_name(
-                                    &config,
-                                    &singular_name,
-                                    parent_singular_name,
-                                )),
+                                group: to_rel_group(&config, &singular_name, parent_singular_name),
+                                model: to_rel_model(&config, &singular_name, parent_singular_name),
                                 ..Default::default()
                             };
                             has_one
@@ -577,11 +565,8 @@ pub async fn generate(
                                 .push(def);
                         } else {
                             let def = HasManyDef {
-                                model: Some(to_combined_name(
-                                    &config,
-                                    &singular_name,
-                                    parent_singular_name,
-                                )),
+                                group: to_rel_group(&config, &singular_name, parent_singular_name),
+                                model: to_rel_model(&config, &singular_name, parent_singular_name),
                                 ..Default::default()
                             };
                             has_many
@@ -735,7 +720,26 @@ pub async fn generate(
             }
         }
         let (group_name, model_name) = to_group_and_model_name(&config, &singular_name);
-        model.belongs_to = belongs_to;
+        for (org_name, mut defs) in belongs_to {
+            if defs.len() == 1 {
+                model.belongs_to.insert(org_name, Some(defs.pop().unwrap()));
+            } else {
+                for def in defs {
+                    let mut name = String::new();
+                    name.push_str(
+                        def.local
+                            .as_ref()
+                            .unwrap()
+                            .last()
+                            .trim_end_matches("_id")
+                            .trim_end_matches(&format!("_{}", org_name)),
+                    );
+                    name.push('_');
+                    name.push_str(&org_name);
+                    model.belongs_to.insert(name, Some(def));
+                }
+            }
+        }
         if !is_mysql_mode() {
             let mut new_indexes = IndexMap::new();
             let header = format!("{}_", table_name);
@@ -753,11 +757,33 @@ pub async fn generate(
     }
     for (singular_name, relations) in has_one {
         if let Some(def) = defs.get_mut(&singular_name) {
+            let mut counter = HashMap::new();
+            for relation in &relations {
+                counter
+                    .entry(relation.model.clone().unwrap())
+                    .and_modify(|v| *v += 1)
+                    .or_insert(1);
+            }
             for mut relation in relations {
                 let names: Vec<_> = relation.model.as_ref().unwrap().split("::").collect();
-                let name = names.last().unwrap().to_string();
+                let mut name = String::new();
                 if relation.foreign == Some(StringOrArray::One(format!("{}_id", &def.name))) {
                     relation.foreign = None;
+                    name.push_str(names.last().unwrap());
+                } else {
+                    if *counter.get(relation.model.as_ref().unwrap()).unwrap() > 1 {
+                        name.push_str(
+                            relation
+                                .foreign
+                                .as_ref()
+                                .unwrap()
+                                .last()
+                                .trim_end_matches("_id")
+                                .trim_end_matches(&format!("_{}", names.last().unwrap())),
+                        );
+                        name.push('_');
+                    }
+                    name.push_str(names.last().unwrap());
                 }
                 def.has_one.insert(name, Some(relation));
             }
@@ -847,20 +873,34 @@ fn to_group_and_model_name(config: &ConfigDef, singular_name: &str) -> (String, 
         if singular_name.starts_with(&prefix) && name.len() > len {
             group = name.clone();
             len = name.len();
+        }
+    }
+    if let Some(group_def) = config.groups.get(&group) {
+        let exclude_group_from_table_name = group_def
+            .as_ref()
+            .map(|v| v.exclude_group_from_table_name)
+            .unwrap_or_default();
+        if !exclude_group_from_table_name {
+            let prefix = format!("{}_", group);
             model_name = singular_name.trim_start_matches(&prefix).to_string();
         }
     }
     (group, model_name)
 }
 
-fn to_combined_name(config: &ConfigDef, singular_name: &str, another: &str) -> String {
-    let (group, model_name) = to_group_and_model_name(config, singular_name);
+fn to_rel_group(config: &ConfigDef, singular_name: &str, another: &str) -> Option<String> {
+    let (group, _) = to_group_and_model_name(config, singular_name);
     let (another_group, _) = to_group_and_model_name(config, another);
     if group == another_group {
-        model_name
+        None
     } else {
-        format!("{}::{}", group, model_name)
+        Some(group)
     }
+}
+
+fn to_rel_model(config: &ConfigDef, singular_name: &str, _another: &str) -> Option<String> {
+    let (_, model_name) = to_group_and_model_name(config, singular_name);
+    Some(model_name)
 }
 
 fn to_singular_name(config: &ConfigDef, table_name: &str, non_snake_case: bool) -> String {

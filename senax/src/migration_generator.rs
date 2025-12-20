@@ -23,6 +23,7 @@ pub const MYSQL_UUID_COLLATION: &str = "ascii_general_ci";
 pub async fn generate(
     db: &str,
     description: &Option<String>,
+    empty: bool,
     skip_empty: bool,
     use_test_db: bool,
 ) -> Result<()> {
@@ -51,6 +52,10 @@ pub async fn generate(
     let old_tables = ddl::table::parse(&db_url).await?;
     let cli_mode = description.is_none();
     let (mut ddl, mut ddl_list) = make_ddl(new_tables, old_tables, cli_mode)?;
+    if empty {
+        ddl.clear();
+        ddl_list.clear();
+    }
     if skip_empty && ddl.is_empty() {
         return Ok(());
     }

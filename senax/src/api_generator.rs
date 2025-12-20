@@ -106,7 +106,7 @@ pub fn generate(
         let tpl = MutationRootTemplate { db_route };
         content = content.replace("impl MutationRoot {", tpl.render()?.trim_start());
     }
-    if db_config.promote_children {
+    if db_config.promote_group_paths {
         content = content.replace(
             &format!(r#"#[graphql(name = "{db_route}")]"#),
             &format!(r#"#[graphql(name = "{db_route}", flatten)]"#),
@@ -819,7 +819,7 @@ fn write_model_file(
         let tpl = template::ModelTsTemplate {
             path: format!(
                 "{}{}{}",
-                if config.promote_children {
+                if config.promote_group_paths {
                     String::new()
                 } else {
                     format!("{}_", db_route.to_snake())
@@ -834,7 +834,7 @@ fn write_model_file(
             model_route,
             curly_begin: format!(
                 "{}{}{}",
-                if config.promote_children {
+                if config.promote_group_paths {
                     String::new()
                 } else {
                     format!("{db_route}{{")
@@ -848,7 +848,7 @@ fn write_model_file(
             ),
             curly_end: format!(
                 "{}{}",
-                if config.promote_children { "" } else { "}" },
+                if config.promote_group_paths { "" } else { "}" },
                 if config.promote_group_children(group_route) {
                     ""
                 } else {
@@ -857,7 +857,7 @@ fn write_model_file(
             ),
             pascal_name: format!(
                 "{}{}{}",
-                if config.promote_children {
+                if config.promote_group_paths {
                     String::new()
                 } else {
                     db.to_pascal()

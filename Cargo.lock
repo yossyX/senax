@@ -4573,9 +4573,9 @@ dependencies = [
 
 [[package]]
 name = "senax-pgsql-parser"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ac692d1c5074035ca18728ffd9cd557607ba822852d8afaa0f8d84a3695b930"
+checksum = "2349f8ca05a75e819e5d00388938643b73f384992b2840ef07e1b7bd8e6f1b08"
 dependencies = [
  "serde",
  "sqlx",

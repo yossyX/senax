@@ -21,11 +21,11 @@ use std::collections::HashMap;
 #[allow(unused_imports)]
 use validator::Validate as _;
 
-use _@{ server_name|snake }@ as _server;
-use _server::db::RepositoryImpl;
-use _server::{auth::AuthInfo, auto_api::GqlError};
+use ::_@{ server_name|snake }@ as _server_;
+use _server_::db::RepositoryImpl;
+use _server_::{auth::AuthInfo, auto_api::GqlError};
 #[allow(unused_imports)]
-use _server::{
+use _server_::{
     auth::Role,
     auto_api::{NoGuard, RoleGuard},
 };
