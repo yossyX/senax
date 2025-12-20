@@ -43,7 +43,7 @@ async fn find(
     let @{ mod_name }@_repo = repo.@{ group|ident }@().@{ mod_name|ident }@();
     let look_ahead = gql_ctx.look_ahead();
     let result = @{ mod_name }@_repo
-        .find(primary.clone().into())
+        .find(primary.clone().into_inner())
         .join(joiner(&look_ahead)?)
         .with_filter_flag("_readable", readable_filter(auth)?)
         .with_filter_flag_when(look_ahead.field("_updatable").exists(), "_updatable", updatable_filter(auth)?)
@@ -65,7 +65,7 @@ async fn find_for_update(
     let @{ mod_name }@_repo = repo.@{ mod_name|ident }@();
     let look_ahead = gql_ctx.look_ahead();
     @{ mod_name }@_repo
-        .find(primary.clone().into())
+        .find(primary.clone().into_inner())
         .join(joiner(&look_ahead)?)
         .with_filter_flag("_readable", updatable_filter(auth)?)
         .with_filter_flag_when(look_ahead.field("_updatable").exists(), "_updatable", updatable_filter(auth)?)
@@ -82,7 +82,7 @@ async fn delete(
     primary: _domain_::@{ mod_name|pascal }@Primary,
 ) -> anyhow::Result<()> {
     let @{ mod_name }@_repo = repo.@{ mod_name|ident }@();
-    let mut query = @{ mod_name }@_repo.find(primary.into());
+    let mut query = @{ mod_name }@_repo.find(primary.into_inner());
     query = query.with_filter_flag("_deletable", deletable_filter(auth)?);
     match query.query_for_update().await {
         Ok(obj) => {
@@ -510,7 +510,7 @@ impl GqlMutation@{ graphql_name }@ {
                 None
             };
             if let Some(primary) = primary {
-                let query = @{ group|snake }@_repo.@{ mod_name|ident }@().find(primary.into()).with_filter_flag("_updatable", updatable_filter(auth)?);
+                let query = @{ group|snake }@_repo.@{ mod_name|ident }@().find(primary.into_inner()).with_filter_flag("_updatable", updatable_filter(auth)?);
                 match query.join(updater_joiner()).query_for_update().await {
                     Ok(obj) => {
                         if !obj.get_flag("_updatable").unwrap_or_default() {
@@ -574,7 +574,7 @@ impl GqlMutation@{ graphql_name }@ {
             return Err(GqlError::ValidationError(e).extend());
         };
         let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
-        let mut query = @{ group|snake }@_repo.@{ mod_name|ident }@().find(primary.into());
+        let mut query = @{ group|snake }@_repo.@{ mod_name|ident }@().find(primary.into_inner());
         query = query.with_filter_flag("_updatable", updatable_filter(auth)?);
         let obj = query
             .join(updater_joiner())

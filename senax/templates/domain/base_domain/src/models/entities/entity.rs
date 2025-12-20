@@ -80,7 +80,7 @@ impl<@{ def.primaries()|fmt_join("T{index}: Into<{domain_outer_owned}>", ", ") }
 }
 
 impl @{ pascal_name }@Primary {
-    pub fn into(self) -> @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@ {
+    pub fn into_inner(self) -> @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@ {
         @{ def.primaries()|fmt_join_with_paren("self.{index}", ", ") }@
     }
 }
