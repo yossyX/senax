@@ -614,15 +614,6 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     && def.borrow().inheritance_type() != Some(InheritanceType::ColumnAggregation)
                 {
                     for (rel_name, rel_def) in def.clone().borrow().merged_relations.iter() {
-                        if !rel_def.is_type_of_has_many() && rel_def.on_delete.is_some() {
-                            let mut model =
-                                get_model(&rel_def.model, cur_group_name, &groups).borrow_mut();
-                            model.on_delete_list.insert(format!(
-                                "{}::_base::_{}",
-                                &_to_ident_name(&cur_group_name.to_snake()),
-                                &cur_model_name.to_snake()
-                            ));
-                        }
                         if rel_def.in_cache {
                             let ref_model = get_model(&rel_def.model, cur_group_name, &groups);
                             let mut ref_model = ref_model.borrow_mut();
@@ -656,25 +647,6 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                             rel_name,
                             model.name
                         );
-                    }
-                    if !model.full_name().eq(&rel_def.model) {
-                        let mut rel_model =
-                            get_model(&rel_def.model, cur_group_name, &groups).borrow_mut();
-                        let m_name = format!("{}::{}", cur_group_name, cur_model_name);
-                        if rel_def.on_delete.is_some()
-                            && !rel_model
-                                .merged_relations
-                                .iter()
-                                .any(|(__, v)| v.model == m_name)
-                        {
-                            let r = RelDef {
-                                model: m_name,
-                                ..Default::default()
-                            };
-                            rel_model
-                                .merged_relations
-                                .insert(format!("_{}_{}_", cur_group_name, cur_model_name), r);
-                        }
                     }
                 }
                 if rel_def.is_type_of_has() {

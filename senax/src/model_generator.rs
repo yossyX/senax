@@ -28,7 +28,6 @@ pub fn generate(
     force: bool,
     clean: bool,
     skip_version_check: bool,
-    verbose: bool,
 ) -> Result<()> {
     if !skip_version_check {
         check_version(db)?;
@@ -41,6 +40,7 @@ pub fn generate(
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
     let model_dir = Path::new(DB_PATH).join(db.to_snake());
+    let base_repositories_dir = model_dir.join("base_repositories");
     let db_repositories_dir = model_dir.join("repositories");
     let domain_src_dir = Path::new(DOMAIN_PATH).join("src");
     let base_domain_src_dir = Path::new(DOMAIN_PATH).join(BASE_DOMAIN_PATH).join("src");
@@ -66,6 +66,8 @@ pub fn generate(
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
+    let reg = Regex::new(r"(?m)^_base_repo_\w+\s*=.+\n")?;
+    content = reg.replace_all(&content, "").into_owned();
     let reg = Regex::new(r"(?m)^_repo_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
     let mut unified_list = Vec::new();
@@ -77,6 +79,13 @@ pub fn generate(
         }
         unified_list.push(group.clone());
         let group = &group.to_snake();
+        content = content.replace(
+            "[dependencies]",
+            &format!(
+                "[dependencies]\n_base_repo_{} = {{ package = \"_base_repo_{}_{}\", path = \"base_repositories/{}\" }}",
+                group, db, group, group
+            ),
+        );
         content = content.replace(
             "[dependencies]",
             &format!(
@@ -262,6 +271,14 @@ pub fn generate(
     let domain_db_dir = domain_models_dir.join(db.to_snake());
     if clean && domain_db_dir.exists() {
         for entry in glob::glob(&format!("{}/**/*.rs", domain_db_dir.display()))? {
+            match entry {
+                Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
+                Err(_) => false,
+            };
+        }
+    }
+    if base_repositories_dir.exists() {
+        for entry in glob::glob(&format!("{}/**/*.*", base_repositories_dir.display()))? {
             match entry {
                 Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
                 Err(_) => false,
@@ -499,15 +516,6 @@ pub fn generate(
                 )
             })
             .collect();
-        if verbose {
-            let count = groups
-                .iter()
-                .filter(|(_, (f, _, _))| f.relaxed_load() == REL_INCLUDE)
-                .count();
-            if count > 0 {
-                println!("{} group has {} include groups.", group_name, count);
-            }
-        }
         let ref_groups: Vec<_> = groups
             .iter()
             .filter(|(_, (f, _, _))| f.relaxed_load() == REL_USE)
@@ -538,6 +546,19 @@ pub fn generate(
                 })
             })
             .collect();
+
+        db::repositories::write_base_group_files(
+            &base_repositories_dir,
+            db,
+            &config,
+            group_name,
+            &repo_include_groups,
+            &ref_groups,
+            &ref_db,
+            force,
+            exclude_from_domain,
+            &mut remove_files,
+        )?;
 
         db::repositories::write_group_files(
             &db_repositories_dir,

@@ -1,32 +1,33 @@
-use super::_base::_@{ mod_name }@;
-// use crate::repositories::_ModelTr;
+#![allow(unused_imports)]
+
+use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@;
 use anyhow::Result;
 use db::DbConn;
 use senax_common::ShardId;
 
 @% for (enum_name, column_def) in def.num_enums(false) -%@
-pub use super::_base::_@{ mod_name }@::_@{ enum_name|pascal }@;
+pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::_@{ enum_name|pascal }@;
 @% endfor -%@
 @% for (enum_name, column_def) in def.str_enums(false) -%@
-pub use super::_base::_@{ mod_name }@::_@{ enum_name|pascal }@;
+pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::_@{ enum_name|pascal }@;
 @% endfor -%@
 #[rustfmt::skip]
-pub use super::_base::_@{ mod_name }@::{
+pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{
     _@{ pascal_name }@, _@{ pascal_name }@_,@% if !config.force_disable_cache %@ _@{ pascal_name }@Cache, _@{ pascal_name }@Cache_,@% endif %@ _@{ pascal_name }@Factory, _@{ pascal_name }@Updater,
-    @% for id in def.id() %@@{ id_name }@, @% endfor %@_@{ pascal_name }@Joiner, _@{ pascal_name }@Getter, UnionBuilder as _@{ pascal_name }@UnionBuilder,
+    @% for id in def.id() %@@{ id_name }@, @% endfor %@_@{ pascal_name }@Joiner, _@{ pascal_name }@Getter, UnionBuilder as _@{ pascal_name }@UnionBuilder, Filter_
 };
 @%- if config.exclude_from_domain %@
-pub use super::_base::_@{ mod_name }@::{Joiner_, join};
+pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{Joiner_, join};
 @%- else %@
 pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{Joiner_, join};
 @%- endif %@
 @%- if config.exclude_from_domain %@
-pub use super::_base::_@{ mod_name }@::{filter, order};
+pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{filter, order};
 @%- else %@
 pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{filter, order};
 @%- endif %@
 @%- if def.act_as_job_queue() %@
-pub use super::_base::_@{ mod_name }@::QUEUE_NOTIFIER;
+pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::QUEUE_NOTIFIER;
 @%- endif %@
 @%- if def.act_as_session() %@
 
@@ -55,7 +56,7 @@ pub struct SaveData {
 
 async fn save_data(
     shard_id: usize,
-    mut update_map: FxHashMap<_@{ pascal_name }@Id, Vec<Arc<SaveData>>>,
+    update_map: FxHashMap<_@{ pascal_name }@Id, Vec<Arc<SaveData>>>,
     new_list: Vec<Arc<SaveData>>,
 ) -> Result<()> {
     let update_ids: Vec<&_@{ pascal_name }@Id> = update_map.keys().collect();
@@ -211,7 +212,6 @@ impl SessionStore for _@{ pascal_name }@Store {
                     .push(x);
             }
         }
-        let key: String = (&buf.key).into();
         if !contains {
             if buf.is_new {
                 new_list.push(buf.clone());
@@ -271,7 +271,7 @@ async fn gc(shard_id: ShardId, start_key: SessionKey) -> Result<()> {
         .unwrap()
         .as_secs()
         >> EOL_SHIFT) as @{ config.u32() }@;
-    let mut filter = filter!((key < s_key) AND (eol < eol));
+    let filter = filter!((key < s_key) AND (eol < eol));
     const LIMIT: usize = 1000;
     loop {
         if _@{ pascal_name }@_::query()

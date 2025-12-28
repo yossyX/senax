@@ -173,8 +173,6 @@ pub struct ModelDef {
     #[serde(default, skip)]
     pub exclude_group_from_table_name: Option<bool>,
     #[serde(default, skip)]
-    pub on_delete_list: BTreeSet<String>,
-    #[serde(default, skip)]
     pub cache_owners: Vec<(String, String, String, u64)>,
     #[serde(default, skip)]
     pub merged_fields: IndexMap<String, FieldDef>,
@@ -592,7 +590,6 @@ impl TryFrom<ModelJson> for ModelDef {
             group_name: Default::default(),
             name: Default::default(),
             exclude_group_from_table_name: None,
-            on_delete_list: Default::default(),
             cache_owners: Default::default(),
             merged_fields: Default::default(),
             relations: Default::default(),
@@ -1988,77 +1985,6 @@ impl ModelDef {
             .iter()
             .filter(|v| v.1.is_type_of_belongs_to_outer_db() && !v.1.disable_index)
             .map(|v| (self, v.0, v.1))
-            .collect()
-    }
-    pub fn relations_on_delete_mod(&self) -> BTreeSet<String> {
-        self.merged_relations
-            .iter()
-            .filter(|v| v.1.on_delete.is_some())
-            .map(|v| {
-                let rel = v.1;
-                rel.get_group_mod_name()
-            })
-            .collect()
-    }
-    pub fn relations_on_delete_cascade(&self) -> Vec<(String, &String, &RelDef)> {
-        self.merged_relations
-            .iter()
-            .filter(|v| v.1.on_delete == Some(ReferenceOption::Cascade))
-            .map(|v| {
-                let rel_name = v.0;
-                let rel = v.1;
-                let mod_name = rel.get_group_mod_name();
-                (mod_name, rel_name, rel)
-            })
-            .collect()
-    }
-    pub fn relations_on_delete_restrict(&self) -> Vec<(String, &String, &RelDef)> {
-        self.merged_relations
-            .iter()
-            .filter(|v| v.1.on_delete == Some(ReferenceOption::Restrict))
-            .map(|v| {
-                let rel_name = v.0;
-                let rel = v.1;
-                let mod_name = rel.get_group_mod_name();
-                (mod_name, rel_name, rel)
-            })
-            .collect()
-    }
-    pub fn relations_on_delete_not_cascade(
-        &self,
-    ) -> Vec<(String, &String, String, &str, &str, &RelDef)> {
-        let pk: Vec<_> = self.primaries().iter().map(|v| v.0).collect();
-        self.merged_relations
-            .iter()
-            .filter(|v| {
-                v.1.on_delete == Some(ReferenceOption::SetNull)
-                    || v.1.on_delete == Some(ReferenceOption::SetZero)
-            })
-            .map(|v| {
-                let rel_name = v.0;
-                let rel = v.1;
-                let mod_name = rel.get_group_mod_name();
-                let mode = rel.on_delete.unwrap();
-                let local: Vec<_> = rel
-                    .get_local_id(rel_name, self)
-                    .iter()
-                    .filter(|v| !pk.contains(v))
-                    .cloned()
-                    .collect();
-                if local.len() != 1 {
-                    error_exit!(
-                        "\"{}\" requires only one column that is not a primary key.",
-                        mode
-                    );
-                }
-                let local = local[0].clone();
-                let (val, val2) = if mode == ReferenceOption::SetNull {
-                    ("null", "None")
-                } else {
-                    ("0", "0")
-                };
-                (mod_name, rel_name, local, val, val2, rel)
-            })
             .collect()
     }
 

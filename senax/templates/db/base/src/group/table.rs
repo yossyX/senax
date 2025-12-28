@@ -168,14 +168,6 @@ pub enum CacheOp {
         #[senax(id = 2)]
         shard_id: ShardId,
     },
-@%- for (mod_name, rel_name, local, val, val2, rel) in def.relations_on_delete_not_cascade() %@
-    Reset@{ rel_name|pascal }@@{ val|pascal }@ {
-        #[senax(id = 1)]
-        ids: Vec<InnerPrimary>,
-        #[senax(id = 2)]
-        shard_id: ShardId,
-    },
-@%- endfor %@
 @%- endif %@
     #[senax(id = 14)]
     InvalidateAll,

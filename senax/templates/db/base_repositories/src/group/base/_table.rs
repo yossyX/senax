@@ -61,7 +61,7 @@ use ::domain::repository::@{ rel_def.db()|snake|ident }@::@{ rel_def.get_group_n
 @%- else %@
 use ::db_@{ rel_def.db()|snake }@::repository::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name()|snake }@ as join_@{ rel_def.get_group_mod_name() }@;
 @%- endif %@
-use _repo_@{ rel_def.db()|snake }@_@{ rel_def.get_unified_name()|snake }@::repositories::@{ rel_def.get_base_group_mod_path() }@ as repo_@{ rel_def.get_group_mod_name() }@;
+use _base_repo_@{ rel_def.db()|snake }@_@{ rel_def.get_unified_name()|snake }@::repositories::@{ rel_def.get_base_group_mod_path() }@ as repo_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 @%- endif %@
 @%- for mod_name in def.relation_mods() %@
@@ -174,9 +174,6 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 CacheOp::Invalidate { .. } => {},
                 CacheOp::Notify { .. } => {},
                 CacheOp::InvalidateAll => {},
-                @%- for (mod_name, rel_name, local, val, val2, rel) in def.relations_on_delete_not_cascade() %@
-                CacheOp::Reset@{ rel_name|pascal }@@{ val|pascal }@ { .. } => {},
-                @%- endfor %@
             }
         }
         obj
@@ -229,9 +226,6 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 CacheOp::Invalidate { .. } => {},
                 CacheOp::Notify { .. } => {},
                 CacheOp::InvalidateAll => {},
-                @%- for (mod_name, rel_name, local, val, val2, rel) in def.relations_on_delete_not_cascade() %@
-                CacheOp::Reset@{ rel_name|pascal }@@{ val|pascal }@ { .. } => {},
-                @%- endfor %@
             }
         }
         map.into_values().collect()
@@ -663,39 +657,6 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::invalidate, &id).await;
                     }
                 }
-                @%- for (mod_name, rel_name, local, val, val2, rel) in def.relations_on_delete_not_cascade() %@
-                CacheOp::Reset@{ rel_name|pascal }@@{ val|pascal }@ { ids, shard_id } => {
-                    let sync = *sync_map.get(&shard_id).unwrap();
-                    clear_all_rows_cache(shard_id, sync, false).await;
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
-                        for id in &ids {
-                            DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::update, id).await;
-                        }
-                    }
-                    if USE_CACHE {
-                        for id in &ids {
-                            let id = PrimaryHasher(id.clone(), shard_id);
-                            let mut update = Data::default();
-                            let mut op = OpData::default();
-                            update.@{ local|ident }@ = @{ val2 }@;
-                            op.@{ local|ident }@ = Op::Set;
-                            if let Some(cache) = Cache::get::<CacheWrapper>(&id, shard_id, USE_FAST_CACHE).await.filter(|o| InnerPrimary::from(o) == id.0) {
-                                let mut cache = cache.as_ref().clone();
-                                cache._inner = CacheOp::update(cache._inner, &update, &op);
-                                Cache::insert_long(&id, Arc::new(cache), USE_FAST_CACHE).await;
-                            } else {
-                                let cs = CacheSyncWrapper {
-                                    id: id.0.clone(),
-                                    shard_id,
-                                    time,
-                                    sync,
-                                };
-                                Cache::insert_version(&cs, Arc::new(cs.clone())).await;
-                            }
-                        }
-                    }
-                }
-                @%- endfor %@
                 @%- endif %@
                 CacheOp::InvalidateAll => {
                     for (shard_id, sync) in sync_map.iter() {
@@ -2513,7 +2474,7 @@ impl Col_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Col_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Col_;
 @%- endif %@
 impl ColTr for Col_ {
     fn name(&self) -> &'static str {
@@ -2547,7 +2508,7 @@ impl ColOne_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColOne_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColOne_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColOne_ {
@@ -2603,7 +2564,7 @@ impl ColKey_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColKey_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColKey_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColKey_ {
@@ -2669,7 +2630,7 @@ impl ColMany_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColMany_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColMany_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColMany_ {
@@ -2734,7 +2695,7 @@ impl ColJson_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColJson_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColJson_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColJson_ {
@@ -2777,7 +2738,7 @@ impl ColJsonArray_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColJsonArray_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColJsonArray_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColJsonArray_ {
@@ -2833,7 +2794,7 @@ impl ColGeo_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColGeo_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColGeo_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColGeo_ {
@@ -2876,7 +2837,7 @@ impl ColGeoDistance_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColGeoDistance_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColGeoDistance_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColGeoDistance_ {
@@ -2940,7 +2901,7 @@ impl std::fmt::Display for ColRel_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColRel_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColRel_;
 @%- endif %@
 impl ColRelTr for ColRel_ {
     #[allow(unused_mut)]
@@ -3258,7 +3219,7 @@ impl Filter_ {
     }
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_;
 @%- endif %@
 impl FilterTr for Filter_ {
     crate::misc::filter!(Data);
@@ -3437,7 +3398,7 @@ pub enum Order_ {
     IsNullDesc(Col_),
 }
 @%- else %@
-pub(crate) use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Order_;
+pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Order_;
 @%- endif %@
 impl OrderTr for Order_ {
     crate::misc::order!();
@@ -4024,7 +3985,6 @@ impl QueryBuilder {
     #[allow(unused_mut)]
     #[allow(clippy::if_same_then_else)]
     pub async fn force_delete(self, conn: &mut DbConn) -> Result<u64> {
-        @%- if def.on_delete_list.is_empty() %@
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
@@ -4074,47 +4034,6 @@ impl QueryBuilder {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
         Ok(result.rows_affected())
-        @%- else %@
-        let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
-        let force_indexes = make_force_indexes(&filter_digest);
-        let mut sql = format!(
-            r#"SELECT {}@{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
-            if !force_indexes.is_empty() {
-                format!("/*+ INDEX(_t1 {}) */ ", force_indexes.join(","))
-            } else {
-                String::new()
-            },
-            Filter_::write_where(&self.filter, self.trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id()),
-            &self.raw_query,
-            Order_::write_order(&self.order, &self.raw_order),
-        );
-        if let Some(limit) = self.limit {
-            write!(sql, " limit {}", limit)?;
-        }
-        if let Some(offset) = self.offset {
-            write!(sql, " offset {}", offset)?;
-        }
-        if self.skip_locked {
-            write!(sql, " FOR UPDATE SKIP LOCKED").unwrap();
-        } else {
-            write!(sql, " FOR UPDATE").unwrap();
-        }
-        @%- if !config.is_mysql() %@
-        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
-        @%- endif %@
-        let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        query = self._bind(query, false);
-        let now = std::time::Instant::now();
-        let result = crate::misc::fetch!(conn, query, fetch_all);
-        if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
-        }
-        let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
-        let ids: Vec<@{ def.primaries()|fmt_join_with_paren("{outer_owned}", ", ") }@> = result?.iter().map(|id| id.into()).collect();
-        _@{ pascal_name }@_::force_delete_by_ids(conn, ids).await
-        @%- endif %@
     }
     @%- else %@
     pub(crate) async fn delete(self, _conn: &mut DbConn) -> Result<u64> {
@@ -5323,9 +5242,6 @@ impl _@{ pascal_name }@_ {
             let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
             for ids in id_chunks {
                 let q = "@{ def.primaries()|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
-    @%- for on_delete_str in def.on_delete_list %@
-                crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, ids, false).await?;
-    @%- endfor %@
                 let sql = format!(
                     r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ def.primaries()|fmt_join_with_paren("{col_esc}", ",") }@ in ({});"#,
                     &q[0..q.len() - 1]
@@ -5445,9 +5361,6 @@ impl _@{ pascal_name }@_ {
     #[allow(clippy::needless_borrow)]
     pub async fn force_delete(conn: &mut DbConn, obj: _@{ pascal_name }@Updater) -> Result<()> {
         let id: InnerPrimary = (&obj).into();
-@%- for on_delete_str in def.on_delete_list %@
-        crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, std::slice::from_ref(&id), false).await?;
-@%- endfor %@
         let sql = r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@"#;
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(sql);
@@ -5484,14 +5397,6 @@ impl _@{ pascal_name }@_ {
         Ok(())
     }
 @%- endif %@
-
-    pub async fn force_delete_relations(conn: &mut DbConn, obj: _@{ pascal_name }@Updater) -> Result<()> {
-        let id: InnerPrimary = (&obj).into();
-@%- for on_delete_str in def.on_delete_list %@
-        crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, std::slice::from_ref(&id), true).await?;
-@%- endfor %@
-        Ok(())
-    }
 
     pub async fn force_delete_all(conn: &mut DbConn) -> Result<()> {
         let query = sqlx::query(r#"DELETE FROM @{ table_name|db_esc }@"#);
@@ -5541,216 +5446,6 @@ impl _@{ pascal_name }@_ {
         Ok(())
     }
 }
-
-@%- for base_mod_name in def.relations_on_delete_mod() %@
-
-pub(crate) fn __on_delete_@{ base_mod_name }@<'a>(
-    conn: &'a mut DbConn,
-    ids: &'a [rel_@{ base_mod_name }@::InnerPrimary],
-    cascade_only: bool,
-) -> BoxFuture<'a, Result<()>> {
-    async move {
-        @%- for (mod_name, rel_name, rel) in def.relations_on_delete_cascade() %@
-        @%- if base_mod_name == mod_name %@
-        __on_delete_@{ mod_name }@_for_@{ rel_name }@(conn, ids, cascade_only).await?;
-        @%- endif %@
-        @%- endfor %@
-        @%- for (mod_name, rel_name, rel) in def.relations_on_delete_restrict() %@
-        @%- if base_mod_name == mod_name %@
-        __on_delete_@{ mod_name }@_for_@{ rel_name }@(conn, ids, cascade_only).await?;
-        @%- endif %@
-        @%- endfor %@
-        @%- for (mod_name, rel_name, local, val, val2, rel) in def.relations_on_delete_not_cascade() %@
-        @%- if base_mod_name == mod_name %@
-        __on_delete_@{ mod_name }@_for_@{ rel_name }@(conn, ids, cascade_only).await?;
-        @%- endif %@
-        @%- endfor %@
-        Ok(())
-    }.boxed()
-}
-@%- endfor %@
-@%- for (rel_mod_name, rel_name, rel) in def.relations_on_delete_cascade() %@
-
-#[allow(clippy::needless_borrow)]
-async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
-    conn: &mut DbConn,
-    ids: &[rel_@{ rel_mod_name }@::InnerPrimary],
-    cascade_only: bool,
-) -> Result<()> {
-    if ids.is_empty() {
-        return Ok(());
-    }
-    let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
-    for ids in id_chunks {
-        let q = "@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
-        let sql = format!(
-            r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
-            &q[0..q.len() - 1]
-        );
-        @%- if !config.is_mysql() %@
-        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
-        @%- endif %@
-        let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as_not_null})", "") }@;
-        }
-        let result = if conn.wo_tx() {
-            query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
-        } else {
-            query.fetch_all(conn.get_tx().await?.as_mut()).await?
-        };
-        let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
-        let id_list = result?;
-        let result_num = id_list.len() as u64;
-@%- if !config.force_disable_cache %@
-        @%- if def.act_as_job_queue() %@
-        @%- else if def.use_clear_whole_cache() %@
-        conn.clear_whole_cache = true;
-        @%- else %@
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
-            let cache_msg = CacheOp::Cascade { ids: id_list.clone(), shard_id: conn.shard_id() };
-            conn.push_cache_op(cache_msg.wrap()).await;
-        }
-        @%- endif %@
-@%- endif %@
-@%- for on_delete_str in def.on_delete_list %@
-        crate::repositories::@{ on_delete_str }@::__on_delete_@{ group_name }@_@{ mod_name }@(conn, &id_list, cascade_only).await?;
-@%- endfor %@
-        let sql = format!(
-            r#"DELETE FROM @{ table_name|db_esc }@ WHERE @{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
-            &q[0..q.len() - 1]
-        );
-        @%- if !config.is_mysql() %@
-        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
-        @%- endif %@
-        let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as_not_null})", "") }@;
-        }
-        let result = if conn.wo_tx() {
-            query.execute(conn.acquire_writer().await?.as_mut()).await?
-        } else {
-            query.execute(conn.get_tx().await?.as_mut()).await?
-        };
-        ensure!(
-            result_num == result.rows_affected(),
-            "Mismatch occurred when deleting @{ table_name }@."
-        );
-    }
-    Ok(())
-}
-@%- endfor %@
-@%- for (rel_mod_name, rel_name, rel) in def.relations_on_delete_restrict() %@
-
-#[allow(clippy::needless_borrow)]
-async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
-    conn: &mut DbConn,
-    ids: &[rel_@{ rel_mod_name }@::InnerPrimary],
-    cascade_only: bool,
-) -> Result<()> {
-    if ids.is_empty() || cascade_only {
-        return Ok(());
-    }
-    let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
-    for ids in id_chunks {
-        let q = "@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
-        let sql = format!(
-            r#"SELECT count(*) as c FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
-            &q[0..q.len() - 1]
-        );
-        @%- if !config.is_mysql() %@
-        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
-        @%- endif %@
-        let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as_not_null})", "") }@;
-        }
-        let result = if conn.wo_tx() {
-            Count::from_row(&query.fetch_one(conn.acquire_writer().await?.as_mut()).await?)?
-        } else {
-            Count::from_row(&query.fetch_one(conn.get_tx().await?.as_mut()).await?)?
-        };
-        ensure!(
-            result.c == 0,
-            "Cannot delete or update a parent row: a foreign key constraint fails on @{ table_name }@."
-        );
-    }
-    Ok(())
-}
-@%- endfor %@
-@%- for (rel_mod_name, rel_name, local, val, val2, rel) in def.relations_on_delete_not_cascade() %@
-
-#[allow(clippy::needless_borrow)]
-async fn __on_delete_@{ rel_mod_name }@_for_@{ rel_name }@(
-    conn: &mut DbConn,
-    ids: &[rel_@{ rel_mod_name }@::InnerPrimary],
-    cascade_only: bool,
-) -> Result<()> {
-    if ids.is_empty() || cascade_only {
-        return Ok(());
-    }
-    let id_chunks = ids.chunks(IN_CONDITION_LIMIT);
-    for ids in id_chunks {
-        let q = "@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{placeholder}", ",") }@,".repeat(ids.len());
-        let sql = format!(
-            r#"SELECT @{ def.primaries()|fmt_join("{col_query}", ", ") }@ FROM @{ table_name|db_esc }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
-            &q[0..q.len() - 1]
-        );
-        @%- if !config.is_mysql() %@
-        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
-        @%- endif %@
-        let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as_not_null})", "") }@;
-        }
-        let result = if conn.wo_tx() {
-            query.fetch_all(conn.acquire_writer().await?.as_mut()).await?
-        } else {
-            query.fetch_all(conn.get_tx().await?.as_mut()).await?
-        };
-        let result: sqlx::Result<Vec<_>> = result.iter().map(InnerPrimary::from_row).collect();
-        let id_list = result?;
-        let result_num = id_list.len() as u64;
-@%- if !config.force_disable_cache %@
-        @%- if def.act_as_job_queue() %@
-        @%- else if def.use_clear_whole_cache() %@
-        conn.clear_whole_cache = true;
-        @%- else %@
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
-            let cache_msg = CacheOp::Reset@{ rel_name|pascal }@@{ val|pascal }@ { ids: id_list.clone(), shard_id: conn.shard_id() };
-            conn.push_cache_op(cache_msg.wrap()).await;
-        }
-        @%- endif %@
-@%- endif %@
-        let sql = format!(
-            r#"UPDATE @{ table_name|db_esc }@ SET @{ local|db_esc }@ = @{ val }@ WHERE @{ def.inheritance_cond(" AND ") }@@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@ in ({});"#,
-            &q[0..q.len() - 1]
-        );
-        @%- if !config.is_mysql() %@
-        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
-        @%- endif %@
-        let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        for id in ids {
-            query = query@{ rel.get_local_cols(rel_name, def)|fmt_join(".bind(id.{index}{bind_as_not_null})", "") }@;
-        }
-        let result = if conn.wo_tx() {
-            query.execute(conn.acquire_writer().await?.as_mut()).await?
-        } else {
-            query.execute(conn.get_tx().await?.as_mut()).await?
-        };
-        ensure!(
-            result_num == result.rows_affected(),
-            "Mismatch occurred when set @{ local }@ = @{ val }@ @{ table_name }@."
-        );
-    }
-    Ok(())
-}
-@%- endfor %@
 
 async fn __find_many(
     conn: &mut DbConn,

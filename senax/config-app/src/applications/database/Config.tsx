@@ -258,7 +258,6 @@ function Groups({ formData }: any) {
       <SpaceBetween direction="vertical" size="xs">
         <AutoField name="name" {...formData} />
         <AutoField name="label" {...formData} />
-        <AutoField name="unified_repository" {...formData} />
         <AutoField name="exclude_group_from_table_name" {...formData} />
         <AutoField name="hidden_layer" {...formData} />
       </SpaceBetween>
