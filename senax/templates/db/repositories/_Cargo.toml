@@ -7,7 +7,6 @@ publish = false
 [dependencies]
 domain = { path = "../../../../1_domain" }
 db = { package = "_db_@{ db|snake }@", path = "../../base" }
-base_repository = { package = "_base_repo_@{ db|snake }@_@{ group|snake }@", path = "../../base_repositories/@{ group|snake }@" }
 
 ahash.workspace = true
 anyhow.workspace = true

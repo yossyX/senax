@@ -13,24 +13,24 @@ use ::tokio::sync::{Mutex, Semaphore};
 pub use _base::models::USE_FAST_CACHE;
 pub use _base::models::CACHE_UPDATE_LOCK;
 @{-"\n"}@
-@%- for (name, (_, defs, _)) in groups %@
+@%- for (name, defs) in groups %@
 pub use _base::models::@{ name|snake|ident }@;
 @%- endfor %@
 
 pub use _base::models::NotifyOp;
 pub use _base::models::TableName;
-pub use _base::models::Handler;
+pub use _base::models::CacheHandler;
 
 pub(crate) async fn start(db_dir: &Path) -> Result<()> {
 @%- for name in unified %@
-    _base_repo_@{ name|snake }@::start(db_dir).await?;
+    _base_repo_@{ name }@::start(&db_dir.join("@{ name }@")).await?;
 @%- endfor %@
     Ok(())
 }
 
 pub(crate) async fn start_test() -> Result<()> {
 @%- for name in unified %@
-    _base_repo_@{ name|snake }@::start_test().await?;
+    _base_repo_@{ name }@::start_test().await?;
 @%- endfor %@
     Ok(())
 }
@@ -39,7 +39,7 @@ pub(crate) async fn start_test() -> Result<()> {
 pub(crate) async fn check() -> Result<()> {
     for shard_id in DbConn::shard_num_range() {
         @%- for name in unified %@
-        _base_repo_@{ name|snake }@::check(shard_id).await?;
+        _base_repo_@{ name }@::check(shard_id).await?;
         @%- endfor %@
     }
     Ok(())

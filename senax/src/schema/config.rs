@@ -593,8 +593,8 @@ impl ConfigDef {
         let group_lock = super::GROUPS.read().unwrap();
         let groups = group_lock.as_ref().unwrap();
         for (_, models) in groups {
-            for (_, model) in &models.1 {
-                for (_, belongs) in &model.1.belongs_to_outer_db() {
+            for (_, model) in models {
+                for (_, belongs) in &model.belongs_to_outer_db() {
                     v.insert(belongs.db().to_string());
                 }
             }
@@ -622,34 +622,6 @@ impl ConfigDef {
     pub fn disable_no_semijoin(&self) -> bool {
         !self.is_mysql() || self.disable_no_semijoin
     }
-
-    pub fn unified_name(&self, group: &str) -> String {
-        if let Some(Some(group)) = self.groups.get(group)
-            && let Some(unified) = &group.unified_repository
-        {
-            unified.to_string()
-        } else {
-            group.to_string()
-        }
-    }
-    pub fn outer_db_unified_name(db: &str, group: &str) -> anyhow::Result<String> {
-        static CONFIGS: Mutex<BTreeMap<String, ConfigDef>> = Mutex::new(BTreeMap::new());
-        let mut configs = CONFIGS.lock().unwrap();
-        let config = if let Some(config) = configs.get(db) {
-            config
-        } else {
-            let path = std::path::Path::new(SCHEMA_PATH).join(format!("{db}.yml"));
-            let config: ConfigDef = crate::common::parse_yml_file(&path)?;
-            configs.entry(db.to_string()).or_insert(config)
-        };
-        if let Some(Some(group)) = config.groups.get(group)
-            && let Some(unified) = &group.unified_repository
-        {
-            Ok(unified.to_string())
-        } else {
-            Ok(group.to_string())
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema)]
@@ -659,9 +631,6 @@ pub struct GroupDef {
     /// ### 論理名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    /// ### 統合リポジトリ名
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub unified_repository: Option<String>,
     /// ### テーブル名にグループ名を使用しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub exclude_group_from_table_name: bool,
@@ -686,9 +655,6 @@ pub struct GroupJson {
     /// ### 論理名
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    /// ### 統合リポジトリ名
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub unified_repository: Option<String>,
     /// ### テーブル名にグループ名を使用しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub exclude_group_from_table_name: bool,
@@ -707,7 +673,6 @@ impl From<GroupDef> for GroupJson {
             name: String::new(),
             _name: None,
             label: value.label,
-            unified_repository: value.unified_repository,
             exclude_group_from_table_name: value.exclude_group_from_table_name,
             hidden_layer: value.hidden_layer,
         }
@@ -718,7 +683,6 @@ impl From<GroupJson> for GroupDef {
     fn from(value: GroupJson) -> Self {
         Self {
             label: value.label,
-            unified_repository: value.unified_repository,
             exclude_group_from_table_name: value.exclude_group_from_table_name,
             hidden_layer: value.hidden_layer,
             models: IndexMap::new(),

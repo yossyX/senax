@@ -1,7 +1,6 @@
 use crate::common::ToCase as _;
 use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
-use crate::model_generator::REL_START;
-use crate::schema::{ConfigDef, GroupsDef, IS_MAIN_GROUP};
+use crate::schema::{ConfigDef, GroupsDef};
 use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{
     common::fs_write,
@@ -26,15 +25,13 @@ pub fn write_group_files(
     config: &ConfigDef,
     group_name: &str,
     groups: &GroupsDef,
-    ref_groups: &[(String, String)],
-    ref_db: &BTreeSet<(String, (String, String))>,
     force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
     let base_dir = domain_repositories_dir.join(group_name.to_snake());
     let file_path = base_dir.join("Cargo.toml");
     remove_files.remove(file_path.as_os_str());
-    let mut content = if force || !file_path.exists() {
+    let content = if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "domain/group_repositories/_Cargo.toml", escape = "none")]
         struct Template<'a> {
@@ -45,40 +42,6 @@ pub fn write_group_files(
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let reg = Regex::new(r"(?m)^repository_\w+\s*=.+\n")?;
-    content = reg.replace_all(&content, "").into_owned();
-    let mut done = Vec::new();
-    for (db, group) in ref_db {
-        let db = &db.to_snake();
-        let group = &group.0.to_snake();
-        if done.contains(group) {
-            continue;
-        }
-        done.push(group.clone());
-        content = content.replace(
-            "[dependencies]",
-            &format!(
-                "[dependencies]\nrepository_{}_{} = {{ path = \"../../../{}/groups/{}\" }}",
-                db, group, db, group
-            ),
-        );
-    }
-    let mut done = Vec::new();
-    for group in ref_groups {
-        let db = &db.to_snake();
-        let group = &group.0.to_snake();
-        if done.contains(group) {
-            continue;
-        }
-        done.push(group.clone());
-        content = content.replace(
-            "[dependencies]",
-            &format!(
-                "[dependencies]\nrepository_{}_{} = {{ path = \"../{}\" }}",
-                db, group, group
-            ),
-        );
-    }
     fs_write(file_path, &*content)?;
 
     let src_dir = base_dir.join("src");
@@ -110,11 +73,8 @@ pub fn write_group_files(
         #[template(
             source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, (_, defs, _)) in groups %@
+@%- for (name, defs) in groups %@
 pub mod @{ name|snake|ident }@;
-@%- endfor %@
-@%- for name in ref_groups %@
-pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
             ext = "txt",
@@ -123,7 +83,6 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
         struct ModTemplate<'a> {
             pub db: &'a str,
             pub groups: &'a GroupsDef,
-            pub ref_groups: &'a [(String, String)],
         }
 
         let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();
@@ -132,12 +91,7 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
             "File contents are invalid.: {:?}",
             &file_path
         );
-        let tpl = ModTemplate {
-            db,
-            groups,
-            ref_groups,
-        }
-        .render()?;
+        let tpl = ModTemplate { db, groups }.render()?;
         let tpl = tpl.trim_start();
         let content = re.replace(&content, tpl);
 
@@ -145,7 +99,7 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
         #[template(
             source = r###"
     // Do not modify below this line. (RepoStart)
-    @%- for (name, (_, defs, _)) in groups %@
+    @%- for (name, defs) in groups %@
     fn @{ name|snake|ident }@(&self) -> Box<dyn @{ name|snake|ident }@::@{ name|pascal }@Repository>;
     @%- endfor %@
     // Do not modify above this line. (RepoEnd)"###,
@@ -170,7 +124,7 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
         #[template(
             source = r###"
     // Do not modify below this line. (QueryServiceStart)
-    @%- for (name, (_, defs, _)) in groups %@
+    @%- for (name, defs) in groups %@
     fn @{ name|snake|ident }@(&self) -> Box<dyn @{ name|snake|ident }@::@{ name|pascal }@QueryService>;
     @%- endfor %@
     // Do not modify above this line. (QueryServiceEnd)"###,
@@ -195,7 +149,7 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
         #[template(
             source = r###"
     // Do not modify below this line. (EmuRepoStart)
-    @%- for (name, (_, defs, _)) in groups %@
+    @%- for (name, defs) in groups %@
     get_emu_repo!(@{ name|snake|ident }@, dyn @{ name|snake|ident }@::@{ name|pascal }@Repository, @{ name|snake|ident }@::Emu@{ name|pascal }@Repository);
     @%- endfor %@
     // Do not modify above this line. (EmuRepoEnd)"###,
@@ -220,7 +174,7 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
         #[template(
             source = r###"
     // Do not modify below this line. (EmuQueryServiceStart)
-    @%- for (name, (_, defs, _)) in groups %@
+    @%- for (name, defs) in groups %@
     get_emu_repo!(@{ name|snake|ident }@, dyn @{ name|snake|ident }@::@{ name|pascal }@QueryService, @{ name|snake|ident }@::Emu@{ name|pascal }@QueryService);
     @%- endfor %@
     // Do not modify above this line. (EmuQueryServiceEnd)"###,
@@ -244,19 +198,17 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
     }
 
     let repositories_dir = src_dir.join("repositories");
-    for (name, (f, defs, _)) in groups {
-        let is_main_group = f.relaxed_load() == REL_START;
-        IS_MAIN_GROUP.relaxed_store(is_main_group);
+    for (name, defs) in groups {
         let mod_names: BTreeSet<String> = defs
             .iter()
-            .filter(|(_k, (_, v))| !v.abstract_mode)
-            .map(|(_, (_, d))| d.mod_name())
+            .filter(|(_k, v)| !v.abstract_mode)
+            .map(|(_, d)| d.mod_name())
             .collect();
         let mod_names = &mod_names;
         let entities_mod_names: BTreeSet<(String, &String)> = defs
             .iter()
-            .filter(|(_, (_, d))| !d.abstract_mode)
-            .map(|(model_name, (_, def))| (def.mod_name(), model_name))
+            .filter(|(_, d)| !d.abstract_mode)
+            .map(|(model_name, def)| (def.mod_name(), model_name))
             .collect();
         let entities_mod_names = &entities_mod_names;
         let file_path = repositories_dir.join(format!("{}.rs", name.to_snake()));
@@ -430,7 +382,7 @@ pub mod @{ mod_name|ident }@;
         }
         let mut output = String::new();
         output.push_str(OVERWRITTEN_MSG);
-        for (model_name, (_, def)) in defs {
+        for (model_name, def) in defs {
             let group_name = name;
             let mod_name = def.mod_name();
             let mod_name = &mod_name;
@@ -455,15 +407,13 @@ pub mod @{ mod_name|ident }@;
             fs_write(file_path, output)?;
         }
     }
-    IS_MAIN_GROUP.relaxed_store(true);
     Ok(())
 }
 
 pub fn write_lib_rs(
     domain_repositories_src_dir: &Path,
     db: &str,
-    unified_list: &[(String, String)],
-    groups: &[(String, String)],
+    groups: &GroupsDef,
     force: bool,
 ) -> Result<()> {
     let file_path = domain_repositories_src_dir.join("lib.rs");
@@ -477,11 +427,8 @@ pub fn write_lib_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-@%- for name in unified_list %@
-pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|snake|ident }@ as @{ name.0|snake|ident }@;
-@%- endfor %@
-@%- for name in groups %@
-pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|snake|ident }@ as @{ name.1|snake|ident }@;
+@%- for (name, defs) in groups %@
+pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|ident }@ as @{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
@@ -489,8 +436,7 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
     )]
     pub struct ModTemplate<'a> {
         pub db: &'a str,
-        pub unified_list: &'a [(String, String)],
-        pub groups: &'a [(String, String)],
+        pub groups: &'a GroupsDef,
     }
 
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();
@@ -499,12 +445,7 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
         "File contents are invalid.: {:?}",
         &file_path
     );
-    let tpl = ModTemplate {
-        db,
-        unified_list,
-        groups,
-    }
-    .render()?;
+    let tpl = ModTemplate { db, groups }.render()?;
     let tpl = tpl.trim_start();
     let content = re.replace(&content, tpl);
 
@@ -519,15 +460,15 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
     #[template(
         source = r###"
     // Do not modify below this line. (RepoStart)
-    @%- for name in groups %@
-    fn @{ name.1|snake|ident }@(&self) -> Box<dyn @{ name.1|snake|ident }@::@{ name.1|pascal }@Repository>;
+    @%- for (name, defs) in groups %@
+    fn @{ name|snake|ident }@(&self) -> Box<dyn @{ name|snake|ident }@::@{ name|pascal }@Repository>;
     @%- endfor %@
     // Do not modify above this line. (RepoEnd)"###,
         ext = "txt",
         escape = "none"
     )]
     pub struct DomainDbRepoTemplate<'a> {
-        pub groups: &'a [(String, String)],
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = DomainDbRepoTemplate { groups }.render()?;
@@ -545,15 +486,15 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
     #[template(
         source = r###"
     // Do not modify below this line. (QueryServiceStart)
-    @%- for name in groups %@
-    fn @{ name.1|snake|ident }@(&self) -> Box<dyn @{ name.1|snake|ident }@::@{ name.1|pascal }@QueryService>;
+    @%- for (name, defs) in groups %@
+    fn @{ name|snake|ident }@(&self) -> Box<dyn @{ name|snake|ident }@::@{ name|pascal }@QueryService>;
     @%- endfor %@
     // Do not modify above this line. (QueryServiceEnd)"###,
         ext = "txt",
         escape = "none"
     )]
     pub struct QueryServiceDbQueryServiceTemplate<'a> {
-        pub groups: &'a [(String, String)],
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = QueryServiceDbQueryServiceTemplate { groups }.render()?;
@@ -571,15 +512,15 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
     #[template(
         source = r###"
     // Do not modify below this line. (EmuRepoStart)
-    @%- for name in groups %@
-    get_emu_group!(@{ name.1|snake|ident }@, dyn @{ name.1|snake|ident }@::@{ name.1|pascal }@Repository, @{ name.1|snake|ident }@::Emu@{ name.1|pascal }@Repository);
+    @%- for (name, defs) in groups %@
+    get_emu_group!(@{ name|snake|ident }@, dyn @{ name|snake|ident }@::@{ name|pascal }@Repository, @{ name|snake|ident }@::Emu@{ name|pascal }@Repository);
     @%- endfor %@
     // Do not modify above this line. (EmuRepoEnd)"###,
         ext = "txt",
         escape = "none"
     )]
     pub struct DomainDbEmuRepoTemplate<'a> {
-        pub groups: &'a [(String, String)],
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = DomainDbEmuRepoTemplate { groups }.render()?;
@@ -597,15 +538,15 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
     #[template(
         source = r###"
     // Do not modify below this line. (EmuQueryServiceStart)
-    @%- for name in groups %@
-    get_emu_group!(@{ name.1|snake|ident }@, dyn @{ name.1|snake|ident }@::@{ name.1|pascal }@QueryService, @{ name.1|snake|ident }@::Emu@{ name.1|pascal }@QueryService);
+    @%- for (name, defs) in groups %@
+    get_emu_group!(@{ name|snake|ident }@, dyn @{ name|snake|ident }@::@{ name|pascal }@QueryService, @{ name|snake|ident }@::Emu@{ name|pascal }@QueryService);
     @%- endfor %@
     // Do not modify above this line. (EmuQueryServiceEnd)"###,
         ext = "txt",
         escape = "none"
     )]
     pub struct DomainDbEmuQueryServiceTemplate<'a> {
-        pub groups: &'a [(String, String)],
+        pub groups: &'a GroupsDef,
     }
 
     let tpl = DomainDbEmuQueryServiceTemplate { groups }.render()?;
@@ -619,7 +560,7 @@ pub use repository_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|sn
 pub fn write_cargo_toml(
     domain_repositories_dir: &Path,
     db: &str,
-    groups: &[(String, String)],
+    groups: &GroupsDef,
     force: bool,
 ) -> Result<()> {
     let file_path = domain_repositories_dir.join("Cargo.toml");
@@ -632,14 +573,9 @@ pub fn write_cargo_toml(
     content = reg.replace_all(&content, "").into_owned();
     let reg = Regex::new(r#"[ \t]*"repository_\w+/mock"[ \t]*,?[ \t]*\n?"#)?;
     content = reg.replace_all(&content, "").into_owned();
-    let mut done = Vec::new();
-    for group in groups.iter().rev() {
+    for (group, _) in groups.iter().rev() {
         let db = &db.to_snake();
-        let group = &group.0.to_snake();
-        if done.contains(group) {
-            continue;
-        }
-        done.push(group.clone());
+        let group = &group.to_snake();
         content = content.replace(
             "\"mockall\"",
             &format!("\"mockall\",\n    \"repository_{}_{}/mock\"", db, group),
@@ -664,7 +600,7 @@ pub fn write_cargo_toml(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn write_entity(
+fn write_entity(
     repositories_dir: &Path,
     db: &str,
     config: &ConfigDef,
@@ -761,11 +697,9 @@ pub use self::{MockQueryService_ as Mock@{ pascal_name }@QueryService, MockRepos
 #[cfg(any(feature = "mock", test))]
 pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
 @{- def.relations()|fmt_rel_join("
-pub use base_domain::models::--1--::{class_mod_path} as _{raw_rel_name}_model_;
-pub use crate::repositories::{class_mod_path} as _{raw_rel_name}_repository_;", "")|replace1(db|snake|ident) }@
+pub use base_domain::models::--1--::{class_mod_path} as _{raw_rel_name}_model_;", "")|replace1(db|snake|ident) }@
 @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-pub use base_domain::models::{db_mod_ident}::{class_mod_path} as _{raw_rel_name}_model_;
-pub use repository_{db_snake}_{unified_snake}::repositories::{class_mod_path} as _{raw_rel_name}_repository_;", "") }@
+pub use base_domain::models::{db_mod_ident}::{class_mod_path} as _{raw_rel_name}_model_;", "") }@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
         escape = "none"

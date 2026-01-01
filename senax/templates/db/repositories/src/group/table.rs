@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 
+pub use _base_repo_@{ db|snake|ident }@_@{ unified_name }@ as base_repository;
 use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@;
 use anyhow::Result;
 use db::DbConn;
@@ -19,12 +20,12 @@ pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ 
 @%- if config.exclude_from_domain %@
 pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{Joiner_, join};
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{Joiner_, join};
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{Joiner_, join};
 @%- endif %@
 @%- if config.exclude_from_domain %@
 pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{filter, order};
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{filter, order};
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{filter, order};
 @%- endif %@
 @%- if def.act_as_job_queue() %@
 pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::QUEUE_NOTIFIER;

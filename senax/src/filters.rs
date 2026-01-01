@@ -557,7 +557,6 @@ fn _fmt_rel_outer_db(
         .replace("{class}", &rel.get_foreign_class_name())
         .replace("{class_mod}", &rel.get_group_mod_name())
         .replace("{group_snake}", &rel.get_group_name().to_snake())
-        .replace("{unified_snake}", &rel.get_unified_name().to_snake())
         .replace("{group_ident}", &rel.get_group_ident())
         .replace("{class_mod_path}", &rel.get_group_mod_path())
         .replace("{base_class_mod_path}", &rel.get_base_group_mod_path())

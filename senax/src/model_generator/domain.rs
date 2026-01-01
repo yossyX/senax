@@ -6,6 +6,7 @@ use regex::Regex;
 use std::{fs, path::Path};
 
 pub mod base_domain;
+pub mod base_relations;
 pub mod repositories;
 
 pub fn write_repositories_rs(domain_src_dir: &Path, db: &str) -> Result<()> {

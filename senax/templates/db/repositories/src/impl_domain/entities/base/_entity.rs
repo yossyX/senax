@@ -4,8 +4,8 @@ use db::misc::{Updater as _, ToJsonRawValue as _};
 #[allow(unused_imports)]
 use domain::models::ToRawValue as _;
 #[allow(unused_imports)]
-use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{self, *};
-use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::*;
+use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{self, *};
+use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::*;
 #[allow(unused_imports)]
 use senax_common::types::geo_point::ToGeoPoint as _;
 #[allow(unused_imports)]
@@ -27,7 +27,7 @@ pub struct @{ pascal_name }@RepositoryImpl {
 }
 
 #[allow(clippy::needless_update)]
-fn updater_from_factory(_v: domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Factory) -> _@{ pascal_name }@Updater {
+fn updater_from_factory(_v: domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Factory) -> _@{ pascal_name }@Updater {
     _@{ pascal_name }@Updater {
         _data: ::db::models::@{ group_name|snake|ident }@::@{ mod_name|ident }@::Data {
 @{ def.for_factory()|fmt_join("            {ident}: _v.{ident}{convert_domain_factory}{convert_from_entity},", "\n") }@
@@ -219,7 +219,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 with_trashed: bool,
                 @%- endif %@
                 joiner: Option<Box<Joiner_>>,
-            ) -> anyhow::Result<crate::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::QueryBuilder> {
+            ) -> anyhow::Result<base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::QueryBuilder> {
                 let mut query = _@{ pascal_name }@_::query();
                 let mut fltr = if let Some(filter) = selector_filter {
                     _filter_@{ selector }@(&filter)?
@@ -298,12 +298,12 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
 @%- for filter_map in selector_def.nested_filters(selector, def) %@
 #[allow(unused_variables)]
 #[allow(unused_mut)]
-fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> anyhow::Result<crate::repositories::@{ filter_map.model_group()|snake|ident }@::_base::_@{ filter_map.model_name()|snake }@::Filter_> {
+fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> anyhow::Result<base_repository::repositories::@{ filter_map.model_group()|snake|ident }@::_base::_@{ filter_map.model_name()|snake }@::Filter_> {
     #[allow(unused_imports)]
     @%- if config.exclude_from_domain %@
     use crate::repository::@{ filter_map.model_group()|snake|ident }@::@{ filter_map.model_name()|snake|ident }@::filter;
     @%- else %@
-    use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ filter_map.model_group()|snake|ident }@::@{ filter_map.model_name()|snake|ident }@::filter;
+    use domain::repository::@{ filter_map.db()|snake|ident }@::@{ filter_map.model_group()|snake|ident }@::@{ filter_map.model_name()|snake|ident }@::filter;
     @%- endif %@
     #[allow(unused_imports)]
     use anyhow::Context;
@@ -367,7 +367,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
         #[allow(unused_mut)]
         #[allow(unused_variables)]
         #[allow(clippy::match_single_binding)]
-        fn _cursor(mut fltr: crate::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_, cursor: &@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> anyhow::Result<crate::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_> {
+        fn _cursor(mut fltr: base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_, cursor: &@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> anyhow::Result<base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_> {
             @%- if !selector_def.orders.is_empty() %@
             match cursor {
                 @%- for (cursor, cursor_def) in selector_def.orders %@

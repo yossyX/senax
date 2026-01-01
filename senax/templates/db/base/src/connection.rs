@@ -155,7 +155,11 @@ async fn config(etcd: &FxHashMap<String, String>, test_mode: bool) -> Result<()>
         let mut v = Vec::new();
         for source in split_shard!(s_url) {
             let url = url::Url::parse(source)?;
+@%- if config.is_mysql() %@
+            v.push(format!("`{}`.", url.path().trim_matches('/')));
+@%- else %@
             v.push(format!("\"{}\".", url.path().trim_matches('/')));
+@%- endif %@
         }
         let _ = REAL_DB_NAME.set(v);
         let r_url = REPLICA_DB_URL.read().await.to_owned();
@@ -1790,8 +1794,8 @@ async fn reset_writer_pool(
                         tokio::spawn(async move {
                             if let Ok(pool) = new_pool.acquire().await {
                                 let sync = DbConn::___inc_cache_sync(pool).await.unwrap_or(0);
-                                @%- for (name, (_, defs, _)) in groups %@
-                                if let Some(g) = models::@{ name|upper_snake }@_HANDLER.get() {
+                                @%- for name in unified %@
+                                if let Some(g) = models::@{ name|upper }@_HANDLER.get() {
                                     g.clear_cache(idx as ShardId, sync, false).await;
                                 }
                                 @%- endfor %@

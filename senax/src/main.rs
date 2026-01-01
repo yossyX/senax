@@ -53,6 +53,7 @@ pub const SCHEMA_PATH: &str = "0_schema";
 pub const DOMAIN_PATH: &str = "1_domain";
 pub const BASE_DOMAIN_PATH: &str = "base_domain";
 pub const USER_DEFINED_TYPES_PATH: &str = "user_defined_types";
+pub const DOMAIN_BASE_RELATIONS_PATH: &str = "base_relations";
 pub const DOMAIN_REPOSITORIES_PATH: &str = "repositories";
 pub const DB_PATH: &str = "2_db";
 pub const SIMPLE_VALUE_OBJECTS_FILE: &str = "_simple_value_objects.yml";
@@ -143,6 +144,8 @@ enum Commands {
         /// Skip Senax version check
         #[clap(long)]
         skip_version_check: bool,
+        #[clap(long)]
+        model_split_size: Option<usize>,
     },
     /// generate migration ddl
     GenMigrate {
@@ -326,7 +329,7 @@ async fn exec(cli: Cli) -> Result<()> {
             } => {
                 if let Some(db_type) = session {
                     init_generator::session(*db_type)?;
-                    model_generator::generate("session", false, false, false)?;
+                    model_generator::generate("session", false, false, false, None)?;
                 }
                 let db_list: Vec<_> = db.split(',').map(|v| v.trim()).collect();
                 actix_generator::generate(name, &db_list, session.is_some(), *force, true)?;
@@ -385,13 +388,26 @@ async fn exec(cli: Cli) -> Result<()> {
             force,
             clean,
             skip_version_check,
+            model_split_size,
         } => {
             if let Some(db) = db {
                 ensure!(db_re.is_match(db), "bad db name!");
-                model_generator::generate(db, *force, *clean, *skip_version_check)?;
+                model_generator::generate(
+                    db,
+                    *force,
+                    *clean,
+                    *skip_version_check,
+                    *model_split_size,
+                )?;
             } else {
                 for db in crate::db_generator::db_list(false)? {
-                    model_generator::generate(&db, *force, *clean, *skip_version_check)?;
+                    model_generator::generate(
+                        &db,
+                        *force,
+                        *clean,
+                        *skip_version_check,
+                        *model_split_size,
+                    )?;
                 }
             }
         }

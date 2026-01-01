@@ -3,7 +3,7 @@ use domain::models::FromRawValue as _;
 #[allow(unused_imports)]
 use domain::models::@{ db|snake|ident }@::@{ rel_mod }@ as _domain_;
 #[allow(unused_imports)]
-use super::_repository_::_@{ rel_name }@_repository_ as _repository_;
+use domain::repository::@{ db|snake|ident }@::@{ rel_mod }@ as _repository_;
 #[allow(unused_imports)]
 use super::_Repository as _Repository;
 #[allow(unused_imports)]

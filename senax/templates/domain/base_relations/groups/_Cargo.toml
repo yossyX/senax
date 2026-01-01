@@ -1,26 +1,20 @@
 [package]
-name = "repository_@{ db|snake }@_@{ group_name|snake }@"
+name = "base_relations_@{ db|snake }@_@{ unified_name }@"
 version = "0.0.0"
 edition = "2024"
 publish = false
 
-[features]
-mock = ["mockall", "base_domain/mock"]
-
 [dependencies]
 base_domain = { path = "../../../../base_domain" }
-base_relations_@{ db|snake }@ = { path = "../../../../base_relations/@{ db|snake }@" }
 user_defined_types = { path = "../../../../user_defined_types" }
 anyhow.workspace = true
 async-graphql.workspace = true
 async-stream.workspace = true
-async-trait.workspace = true
 base64.workspace = true
 chrono.workspace = true
 ciborium.workspace = true
 derive-new.workspace = true
 futures.workspace = true
-mockall = {version = "0.13", optional = true}
 rust_decimal.workspace = true
 schemars.workspace = true
 serde.workspace = true
@@ -29,8 +23,4 @@ tokio.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
 validator.workspace = true
-
-[dev-dependencies]
-mockall = "0.13"
-base_domain = { path = "../../../../base_domain", features = ["mock"] }
 @{-"\n"}@

@@ -276,7 +276,7 @@ pub fn generate(
         } else {
             group_route
         };
-        let (_, group, _) = groups
+        let group = groups
             .get(group_name)
             .unwrap_or_else(|| panic!("The {db} DB does not have {group_name} group."));
         let group_route_mod_name = group_route.to_snake();
@@ -322,7 +322,7 @@ pub fn generate(
         } else if inquiry {
             group
                 .iter()
-                .filter(|(_, (_, def))| !def.abstract_mode)
+                .filter(|(_, def)| !def.abstract_mode)
                 .map(|(v, _)| v.clone())
                 .collect()
         } else {
@@ -344,7 +344,7 @@ pub fn generate(
             } else {
                 model_route
             };
-            let (_, def) = group.get(model_name).unwrap_or_else(|| {
+            let def = group.get(model_name).unwrap_or_else(|| {
                 panic!("The {group_name} group does not have {model_name} model.")
             });
 

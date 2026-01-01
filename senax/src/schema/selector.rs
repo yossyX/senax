@@ -392,8 +392,8 @@ impl FilterDef {
     }}"
                 )
             }
-            FilterType::Exists => "".to_string(), // TODO implement
-            FilterType::EqAny => "".to_string(),  // TODO implement
+            FilterType::Exists => "\n    // TODO implement FilterType::Exists".to_string(), // TODO implement
+            FilterType::EqAny => "\n    // TODO implement FilterType::EqAny".to_string(), // TODO implement
             FilterType::FullText => {
                 let mut v = Vec::new();
                 for (field, _) in &self.fields {
@@ -552,14 +552,14 @@ impl FilterDef {
                     format!(
             "
     {prefix}
-        fltr = fltr.and(crate::repositories::{group}::_base::_{mod_name}::Filter_::Exists(crate::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(None)));
+        fltr = fltr.and(base_repository::repositories::{group}::_base::_{mod_name}::Filter_::Exists(base_repository::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(None)));
     }}"
             )
                 } else {
                     format!(
             "
     {prefix}
-        fltr = fltr.and(crate::repositories::{group}::_base::_{mod_name}::Filter_::Exists(crate::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(Some(Box::new(_filter{suffix}_{name}(f)?)))));
+        fltr = fltr.and(base_repository::repositories::{group}::_base::_{mod_name}::Filter_::Exists(base_repository::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(Some(Box::new(_filter{suffix}_{name}(f)?)))));
     }}"
             )
                 }
@@ -573,14 +573,14 @@ impl FilterDef {
                     format!(
             "
     {prefix}
-        fltr = fltr.and(crate::repositories::{group}::_base::_{mod_name}::Filter_::EqAny(crate::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(None)));
+        fltr = fltr.and(base_repository::repositories::{group}::_base::_{mod_name}::Filter_::EqAny(base_repository::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(None)));
     }}"
             )
                 } else {
                     format!(
             "
     {prefix}
-        fltr = fltr.and(crate::repositories::{group}::_base::_{mod_name}::Filter_::EqAny(crate::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(Some(Box::new(_filter{suffix}_{name}(f)?)))));
+        fltr = fltr.and(base_repository::repositories::{group}::_base::_{mod_name}::Filter_::EqAny(base_repository::repositories::{group}::_base::_{mod_name}::ColRel_::{_relation}(Some(Box::new(_filter{suffix}_{name}(f)?)))));
     }}"
             )
                 }
@@ -1112,6 +1112,9 @@ pub struct FilterMap {
 }
 
 impl FilterMap {
+    pub fn db(&self) -> &str {
+        &self.model.db
+    }
     pub fn model_group(&self) -> &str {
         &self.model.group_name
     }

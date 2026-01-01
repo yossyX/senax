@@ -547,7 +547,9 @@ pub trait ToCase<T: AsRef<str>> {
     fn to_camel(&self) -> String;
     fn to_snake(&self) -> String;
     fn to_upper_snake(&self) -> String;
+    fn to_upper(&self) -> String;
     fn to_title(&self) -> String;
+    fn to_ident(&self) -> String;
 }
 impl<T: AsRef<str>> ToCase<T> for T
 where
@@ -593,6 +595,9 @@ where
         ])
         .to_case(Case::UpperSnake)
     }
+    fn to_upper(&self) -> String {
+        self.as_ref().to_uppercase()
+    }
     fn to_title(&self) -> String {
         use convert_case::{Boundary, Case, Casing};
         self.without_boundaries(&[
@@ -602,6 +607,9 @@ where
             Boundary::UPPER_DIGIT,
         ])
         .to_case(Case::Title)
+    }
+    fn to_ident(&self) -> String {
+        schema::_to_ident_name(self.as_ref())
     }
 }
 

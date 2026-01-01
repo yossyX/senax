@@ -7,22 +7,19 @@ use db::DbConn;
 use ::futures::future::BoxFuture;
 use ::fxhash::FxHashMap;
 use ::senax_common::{cache::msec::MSec, ShardId};
-@% for (name, (_, defs, _)) in groups %@
+@% for (name, defs) in groups %@
 pub mod @{ name|snake|ident }@;
 @%- endfor %@
-@%- for name in ref_groups %@
-pub use _base_repo_@{ db|snake }@_@{ name.0|snake }@::repositories::@{ name.1|snake|ident }@;
-@%- endfor %@
 
-pub struct Handler;
+pub struct CacheHandler;
 #[async_trait]
-impl db::models::Handler for Handler {
+impl db::models::CacheHandler for CacheHandler {
     #[allow(unreachable_patterns)]
     async fn handle_cache_msg(&self, op: Vec<db::CacheOp>, sync_map: Arc<FxHashMap<ShardId, u64>>) {
         use db::CacheOp;
         for op in op.into_iter() {
             match op {
-                @%- for (name, (_, defs, _)) in groups %@
+                @%- for (name, defs) in groups %@
                 CacheOp::@{ name|pascal|ident }@(op) => op.handle_cache_msg(Arc::clone(&sync_map)).await,
                 @%- endfor %@
                 CacheOp::_AllClear => _clear_cache(&sync_map, false).await,
@@ -31,7 +28,7 @@ impl db::models::Handler for Handler {
         }
     }
     async fn clear_cache(&self, shard_id: ShardId, sync: u64, clear_test: bool) {
-        @%- for (name, (_, defs, _)) in groups %@
+        @%- for (name, defs) in groups %@
         @{ name|snake|ident }@::_clear_cache(shard_id, sync, clear_test).await;
         @%- endfor %@
     }
@@ -43,12 +40,12 @@ pub(crate) async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, clear_test
             let shard_id = *shard_id;
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                @%- for (name, (_, defs, _)) in groups %@
+                @%- for (name, defs) in groups %@
                 @{ name|snake|ident }@::_clear_cache(shard_id, 0, clear_test).await;
                 @%- endfor %@
             });
         }
-        @%- for (name, (_, defs, _)) in groups %@
+        @%- for (name, defs) in groups %@
         @{ name|snake|ident }@::_clear_cache(*shard_id, *sync, clear_test).await;
         @%- endfor %@
     }
@@ -105,5 +102,22 @@ pub trait IdFetcherWithCache<Model, Cache, Updater, Joiner> {
     fn fetch_for_update_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner>>) -> impl std::future::Future<Output = Result<Updater>> + Send {
         Self::fetch_for_update(self, conn, joiner)
     }
+}
+
+#[rustfmt::skip]
+#[allow(clippy::single_match)]
+#[allow(clippy::match_single_binding)]
+pub async fn seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()> {
+    if let Some(mapping) = seed.as_mapping() {
+        for (name, value) in mapping {
+            match name.as_str() {
+@% for (name, defs) in groups %@
+                Some("@{ name }@") => @{ name|snake|ident }@::seed(value, conns).await?,
+@%- endfor %@
+                _ => {}
+            }
+        }
+    }
+    Ok(())
 }
 @{-"\n"}@

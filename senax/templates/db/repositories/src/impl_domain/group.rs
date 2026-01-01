@@ -1,5 +1,5 @@
 use db::DbConn;
-use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::{self as _domain, @{ group_name|pascal }@QueryService, @{ group_name|pascal }@Repository};
+use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::{self as _domain, @{ group_name|pascal }@QueryService, @{ group_name|pascal }@Repository};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

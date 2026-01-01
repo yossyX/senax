@@ -53,22 +53,26 @@ pub use ::db::models::@{ group_name|snake|ident }@::@{ mod_name|ident }@::*;
 @%- if !config.exclude_from_domain %@
 #[allow(unused_imports)]
 use ::domain::value_objects;
-pub use ::domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{join, Joiner_};
+pub use ::domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{join, Joiner_};
 @%- for (name, rel_def) in def.belongs_to_outer_db() %@
 use ::db_@{ rel_def.db()|snake }@::models::@{ rel_def.get_group_mod_path() }@ as rel_@{ rel_def.get_group_mod_name() }@;
 @%- if !config.exclude_from_domain %@
-use ::domain::repository::@{ rel_def.db()|snake|ident }@::@{ rel_def.get_group_name()|snake|ident }@::_super::@{ rel_def.get_group_mod_path() }@ as join_@{ rel_def.get_group_mod_name() }@;
+use ::domain::repository::@{ rel_def.db()|snake|ident }@::@{ rel_def.get_group_mod_path() }@ as join_@{ rel_def.get_group_mod_name() }@;
 @%- else %@
 use ::db_@{ rel_def.db()|snake }@::repository::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name()|snake }@ as join_@{ rel_def.get_group_mod_name() }@;
 @%- endif %@
-use _base_repo_@{ rel_def.db()|snake }@_@{ rel_def.get_unified_name()|snake }@::repositories::@{ rel_def.get_base_group_mod_path() }@ as repo_@{ rel_def.get_group_mod_name() }@;
+use _repo_@{ rel_def.db()|snake }@_@{ rel_def.get_group_name()|snake }@::repositories::@{ rel_def.get_base_group_mod_path() }@ as repo_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 @%- endif %@
 @%- for mod_name in def.relation_mods() %@
 use ::db::models::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
+@%- if unified_group.is_ref(mod_name) %@
+use _base_repo_@{ db|snake }@_@{ UnifiedGroup::unified_name_from_rel(unified_groups, mod_name) }@::repositories::@{ mod_name[0]|ident }@::_base::_@{ mod_name[1] }@ as repo_@{ mod_name[0] }@_@{ mod_name[1] }@;
+@%- else %@
 use crate::repositories::@{ mod_name[0]|ident }@::_base::_@{ mod_name[1] }@ as repo_@{ mod_name[0] }@_@{ mod_name[1] }@;
+@%- endif %@
 @%- if !config.exclude_from_domain %@
-use ::domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
+use ::domain::repository::@{ db|snake|ident }@::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- else %@
 use crate::repositories::@{ mod_name[0]|ident }@::_base::_@{ mod_name[1] }@ as join_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- endif %@
@@ -2442,19 +2446,19 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
 @%- if config.exclude_from_domain %@
 @%- for (index_name, index) in def.multi_index(false) %@
 
-// #[allow(non_camel_case_types)]
-// #[derive(PartialEq, Eq, Debug, Clone)]
-// pub struct _@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "pub {filter_type}", ", ") }@);
-// impl<@{ index.join_fields(def, "T{index}", ", ") }@> TryFrom<(@{ index.join_fields(def, "T{index}", ", ") }@)> for _@{ pascal_name }@Index_@{ index_name }@
-// where@{ index.join_fields(def, "
-//     T{index}: TryInto<{filter_type}>,
-//     T{index}::Error: Into<anyhow::Error>,", "") }@
-// {
-//     type Error = anyhow::Error;
-//     fn try_from(value: (@{ index.join_fields(def, "T{index}", ", ") }@)) -> Result<Self, Self::Error> {
-//         Ok(Self(@{ index.join_fields(def, "value.{index}.try_into().map_err(|e| e.into())?", ", ") }@))
-//     }
-// }
+#[allow(non_camel_case_types)]
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct _@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "pub {filter_type}", ", ") }@);
+impl<@{ index.join_fields(def, "T{index}", ", ") }@> TryFrom<(@{ index.join_fields(def, "T{index}", ", ") }@)> for _@{ pascal_name }@Index_@{ index_name }@
+where@{ index.join_fields(def, "
+    T{index}: TryInto<{filter_type}>,
+    T{index}::Error: Into<anyhow::Error>,", "") }@
+{
+    type Error = anyhow::Error;
+    fn try_from(value: (@{ index.join_fields(def, "T{index}", ", ") }@)) -> Result<Self, Self::Error> {
+        Ok(Self(@{ index.join_fields(def, "value.{index}.try_into().map_err(|e| e.into())?", ", ") }@))
+    }
+}
 @%- endfor %@
 
 #[allow(non_camel_case_types)]
@@ -2474,7 +2478,7 @@ impl Col_ {
     }
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Col_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Col_;
 @%- endif %@
 impl ColTr for Col_ {
     fn name(&self) -> &'static str {
@@ -2508,7 +2512,7 @@ impl ColOne_ {
     }
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColOne_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColOne_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColOne_ {
@@ -2564,7 +2568,7 @@ impl ColKey_ {
     }
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColKey_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColKey_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColKey_ {
@@ -2630,7 +2634,7 @@ impl ColMany_ {
     }
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColMany_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColMany_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColMany_ {
@@ -2695,7 +2699,7 @@ impl ColJson_ {
     }
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColJson_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColJson_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColJson_ {
@@ -2738,7 +2742,7 @@ impl ColJsonArray_ {
     }
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColJsonArray_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColJsonArray_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColJsonArray_ {
@@ -2794,7 +2798,7 @@ impl ColGeo_ {
     }
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColGeo_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColGeo_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColGeo_ {
@@ -2837,7 +2841,7 @@ impl ColGeoDistance_ {
     }
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColGeoDistance_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColGeoDistance_;
 @%- endif %@
 #[allow(clippy::match_single_binding)]
 impl BindTr for ColGeoDistance_ {
@@ -2901,7 +2905,7 @@ impl std::fmt::Display for ColRel_ {
     }
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColRel_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::ColRel_;
 @%- endif %@
 impl ColRelTr for ColRel_ {
     #[allow(unused_mut)]
@@ -3219,7 +3223,7 @@ impl Filter_ {
     }
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_;
 @%- endif %@
 impl FilterTr for Filter_ {
     crate::misc::filter!(Data);
@@ -3398,7 +3402,7 @@ pub enum Order_ {
     IsNullDesc(Col_),
 }
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ base_group_name|snake|ident }@::_super::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Order_;
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Order_;
 @%- endif %@
 impl OrderTr for Order_ {
     crate::misc::order!();

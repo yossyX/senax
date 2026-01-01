@@ -200,7 +200,7 @@ pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef
             }
         }
 
-        let (_, group, _) = groups.get(org_group_name).unwrap();
+        let group = groups.get(org_group_name).unwrap();
         for (k, _) in &api_group_def {
             if !group.contains_key(k) {
                 eprintln!("There is no {} model in the {} group.", k, org_group_name)
@@ -213,9 +213,9 @@ pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef
         let model_list: Vec<_> = group
             .iter()
             .filter(|(name, _)| api_group_def.contains_key(*name))
-            .filter(|(_, (_, def))| !def.abstract_mode)
+            .filter(|(_, def)| !def.abstract_mode)
             .collect();
-        for (name, (_, def)) in &model_list {
+        for (name, def) in &model_list {
             if api_group_def.get(*name).is_some() {
                 api_models.push(make_model(
                     db,

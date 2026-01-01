@@ -33,6 +33,10 @@ pub mod _base {
 @%- for name in mod_names %@
     pub mod _@{ name }@;
 @%- endfor %@
+
+@%- for (u, m) in unified_names %@
+    pub use _base_repo_@{ db|snake }@_@{ u }@::repositories::@{ group_name|snake|ident }@::_base::_@{ m }@;
+@%- endfor %@
 }
 @%- else %@
 pub mod _base;
@@ -40,10 +44,9 @@ pub mod _base;
 
 #[rustfmt::skip]
 pub async fn start(db_dir: Option<&Path>) -> Result<()> {
-@%- for (name, (_, def)) in models %@
+@%- for (name, def) in models %@
     _base::_@{ def.mod_name() }@::init().await?;
 @%- endfor %@
-@%- if is_main_group %@
 
     if !db::is_test_mode() {
         let path = db_dir.unwrap().join(DELAYED_DB_DIR).join("@{ group_name }@");
@@ -53,7 +56,7 @@ pub async fn start(db_dir: Option<&Path>) -> Result<()> {
                 let db = sled::open(&path);
                 match db {
                     Ok(db) => {
-                        @%- for (name, (_, def)) in models %@
+                        @%- for (name, def) in models %@
                         _base::_@{ def.mod_name() }@::init_db(&db).await.unwrap();
                         @%- endfor %@
                         break;
@@ -63,19 +66,15 @@ pub async fn start(db_dir: Option<&Path>) -> Result<()> {
             }
         });
     }
-@%- endif %@
-
     Ok(())
 }
 
 pub async fn check(shard_id: ShardId) -> Result<()> {
-    @%- if is_main_group %@
-    @%- for (name, (_, def)) in models %@
+    @%- for (name, def) in models %@
     @%- if !def.skip_ddl %@
     _base::_@{ def.mod_name() }@::check(shard_id).await?;
     @%- endif %@
     @%- endfor %@
-    @%- endif %@
     Ok(())
 }
 
@@ -88,7 +87,7 @@ impl super::GroupCacheOpTr for CacheOp {
         use super::CacheOpTr as _;
 
         match self {
-@%- for (name, (_, def)) in models %@
+@%- for (name, def) in models %@
             CacheOp::@{ name|to_pascal_name }@(msg) => msg.handle_cache_msg(_sync_map).await,
 @%- endfor %@
             _ => {},
@@ -100,7 +99,7 @@ impl super::GroupCacheOpTr for CacheOp {
 #[rustfmt::skip]
 pub async fn _clear_cache(_shard_id: ShardId, _sync: u64, _clear_test: bool) {
 @%- if !config.force_disable_cache %@
-@%- for (name, (_, def)) in models %@
+@%- for (name, def) in models %@
     _base::_@{ def.mod_name() }@::__clear_cache(_shard_id, _sync, _clear_test).await;
 @%- endfor %@
 @%- endif %@
@@ -110,18 +109,16 @@ pub async fn _clear_cache(_shard_id: ShardId, _sync: u64, _clear_test: bool) {
 #[allow(clippy::single_match)]
 #[allow(clippy::match_single_binding)]
 pub async fn seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Result<()> {
-    @%- if is_main_group %@
     if let Some(mapping) = seed.as_mapping() {
         for (name, value) in mapping {
             match name.as_str() {
-@%- for (name, (_, def)) in models %@
+@%- for (name, def) in models %@
                 Some("@{ name }@") => _base::_@{ def.mod_name() }@::_seed(value, conns).await?,
 @%- endfor %@
                 _ => {}
             }
         }
     }
-    @%- endif %@
     Ok(())
 }
 @{-"\n"}@

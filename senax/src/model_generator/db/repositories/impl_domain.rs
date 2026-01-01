@@ -46,7 +46,7 @@ pub fn write_impl_domain_rs(
     #[template(
         source = r###"
 // Do not modify below this line. (ModStart)
-@%- for (name, (_, defs, _)) in groups %@
+@%- for (name, defs) in groups %@
 pub mod @{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
@@ -120,7 +120,6 @@ pub mod @{ name|snake|ident }@;
 pub fn write_group_rs(
     impl_domain_dir: &Path,
     db: &str,
-    base_group_name: &str,
     group_name: &str,
     entities_mod_names: &BTreeSet<(String, &String)>,
     force: bool,
@@ -133,16 +132,10 @@ pub fn write_group_rs(
         #[template(path = "db/repositories/src/impl_domain/group.rs", escape = "none")]
         struct GroupTemplate<'a> {
             db: &'a str,
-            base_group_name: &'a str,
             group_name: &'a str,
         }
 
-        GroupTemplate {
-            db,
-            base_group_name,
-            group_name,
-        }
-        .render()?
+        GroupTemplate { db, group_name }.render()?
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
@@ -253,7 +246,6 @@ pub fn write_entity(
     impl_domain_dir: &Path,
     db: &str,
     config: &ConfigDef,
-    base_group_name: &str,
     group_name: &str,
     mod_name: &str,
     force: bool,
@@ -274,7 +266,6 @@ pub fn write_entity(
         )]
         struct EntityTemplate<'a> {
             db: &'a str,
-            base_group_name: &'a str,
             group_name: &'a str,
             mod_name: &'a str,
             pascal_name: &'a str,
@@ -282,7 +273,6 @@ pub fn write_entity(
 
         let tpl = EntityTemplate {
             db,
-            base_group_name,
             group_name,
             mod_name,
             pascal_name,
@@ -298,7 +288,6 @@ pub fn write_entity(
     struct BaseEntityTemplate<'a> {
         db: &'a str,
         config: &'a ConfigDef,
-        base_group_name: &'a str,
         group_name: &'a str,
         mod_name: &'a str,
         pascal_name: &'a str,
@@ -308,7 +297,6 @@ pub fn write_entity(
     let tpl = BaseEntityTemplate {
         db,
         config,
-        base_group_name,
         group_name,
         mod_name,
         pascal_name,

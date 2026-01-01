@@ -5,7 +5,7 @@ use domain::models::@{ db|snake|ident }@::@{ rel_mod }@::{
     self as _domain_, @{ pascal_name }@Updater as _
 };
 #[allow(unused_imports)]
-use super::_repository_::_@{ rel_name }@_repository_ as _repository_;
+use domain::repository::@{ db|snake|ident }@::@{ rel_mod }@ as _repository_;
 #[allow(unused_imports)]
 use super::_Repository as _Repository;
 #[allow(unused_imports)]

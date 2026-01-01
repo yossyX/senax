@@ -13,6 +13,7 @@ pub fn write_files(
     db: &str,
     groups: &GroupsDef,
     config: &ConfigDef,
+    unified: &Vec<String>,
     force: bool,
     non_snake_case: bool,
 ) -> Result<()> {
@@ -86,6 +87,7 @@ pub fn write_files(
         pub db: &'a str,
         pub config: &'a ConfigDef,
         pub groups: &'a GroupsDef,
+        pub unified: &'a Vec<String>,
         pub tx_isolation: Option<&'a str>,
         pub read_tx_isolation: Option<&'a str>,
     }
@@ -95,6 +97,7 @@ pub fn write_files(
         db,
         config,
         groups,
+        unified,
         tx_isolation: config.tx_isolation.map(|v| v.as_str()),
         read_tx_isolation: config.read_tx_isolation.map(|v| v.as_str()),
     };
@@ -105,20 +108,22 @@ pub fn write_files(
     #[derive(Template)]
     #[template(path = "db/base/src/models.rs", escape = "none")]
     struct ModelsTemplate<'a> {
-        pub groups: &'a GroupsDef,
         pub config: &'a ConfigDef,
+        pub groups: &'a GroupsDef,
+        pub unified: &'a Vec<String>,
         pub table_names: BTreeSet<String>,
     }
 
     let mut table_names = BTreeSet::default();
-    for (_, (_, defs, _)) in groups {
-        for (_, (_, def)) in defs {
+    for (_, defs) in groups {
+        for (_, def) in defs {
             table_names.insert(def.table_name());
         }
     }
     let tpl = ModelsTemplate {
-        groups,
         config,
+        groups,
+        unified,
         table_names,
     };
     fs_write(file_path, tpl.render()?)?;

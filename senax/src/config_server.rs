@@ -446,10 +446,10 @@ async fn get_merged_models(AxumPath(path): AxumPath<(String, String)>) -> impl I
         let groups = group_lock.as_ref().unwrap();
         let models: Vec<_> = groups
             .get(&path.1)
-            .map(|(_, models, _)| {
+            .map(|models| {
                 models
                     .iter()
-                    .map(|(k, (_, v))| {
+                    .map(|(k, v)| {
                         let mut model: ModelJson = v.as_ref().clone().into();
                         model.name = k.to_string();
                         model
@@ -807,10 +807,10 @@ async fn get_api_server_models(
         let groups = group_lock.as_ref().unwrap();
         let models: Vec<_> = groups
             .get(group)
-            .map(|(_, models, _)| {
+            .map(|models| {
                 models
                     .iter()
-                    .map(|(k, (_, v))| {
+                    .map(|(k, v)| {
                         let mut model: ModelJson = v.as_ref().clone().into();
                         model.name = k.to_string();
                         model

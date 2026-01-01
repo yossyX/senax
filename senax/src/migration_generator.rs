@@ -33,8 +33,8 @@ pub async fn generate(
     {
         let group_lock = GROUPS.read().unwrap();
         let groups = group_lock.as_ref().unwrap();
-        for (_group_name, (_, defs, _)) in groups {
-            for (_model_name, (_, def)) in defs {
+        for (_group_name, defs) in groups {
+            for (_model_name, def) in defs {
                 if def.has_table() {
                     let (table_name, table, _) = make_table_def(def, &config)?;
                     new_tables.insert(table_name, table);

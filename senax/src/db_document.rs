@@ -153,8 +153,8 @@ pub fn generate(
                 .context("The specified group was not found.")?
                 .clone()
                 .unwrap_or_default(),
-            models: models.map(|(_, i, _)| {
-                i.iter().fold(IndexMap::new(), |mut acc, (k, (_, v))| {
+            models: models.map(|i| {
+                i.iter().fold(IndexMap::new(), |mut acc, (k, v)| {
                     if v.has_table() {
                         acc.insert(k, v.into());
                     }
@@ -170,8 +170,8 @@ pub fn generate(
             group_list.push(Group {
                 group_name,
                 group_def: group_def.clone().unwrap_or_default(),
-                models: models.map(|(_, i, _)| {
-                    i.iter().fold(IndexMap::new(), |mut acc, (k, (_, v))| {
+                models: models.map(|i| {
+                    i.iter().fold(IndexMap::new(), |mut acc, (k, v)| {
                         if v.has_table() {
                             acc.insert(k, v.into());
                         }
@@ -321,15 +321,11 @@ impl Filter for UpperSnake {
 #[allow(clippy::type_complexity)]
 fn gen_er(
     group_name: &str,
-    models: &Option<&(
-        AtomicUsize,
-        IndexMap<String, (AtomicUsize, Arc<ModelDef>)>,
-        String,
-    )>,
+    models: &Option<&IndexMap<String, Arc<ModelDef>>>,
     use_er: bool,
 ) -> Result<Option<String>> {
     let models = match models {
-        Some((_, v, _)) if !v.is_empty() && use_er => v,
+        Some(v) if !v.is_empty() && use_er => v,
         _ => {
             return Ok(None);
         }
@@ -337,7 +333,7 @@ fn gen_er(
     let mut target_models: IndexMap<String, Model> = IndexMap::new();
     let mut another_models: IndexMap<String, AnotherModel> = IndexMap::new();
     let mut relations: IndexMap<String, Relation> = IndexMap::new();
-    for (model_name, (_, model)) in models.iter() {
+    for (model_name, model) in models.iter() {
         if !model.has_table() {
             continue;
         }

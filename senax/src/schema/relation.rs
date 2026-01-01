@@ -847,15 +847,6 @@ impl RelDef {
         group_name.to_string()
     }
 
-    pub fn get_unified_name(&self) -> String {
-        if let Some(db) = &self.db {
-            ConfigDef::outer_db_unified_name(db, &self.get_group_name()).unwrap()
-        } else {
-            let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
-            config.unified_name(&self.get_group_name())
-        }
-    }
-
     pub fn in_cache(&self) -> bool {
         let target_model = self.get_foreign_model();
         target_model.use_cache() && self.in_cache
@@ -870,10 +861,9 @@ fn get_model(group_name: &str, stem_name: &str) -> Arc<ModelDef> {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .1
         .get(stem_name)
     {
-        return model.1.clone();
+        return model.clone();
     }
     let singular_name = to_singular(stem_name);
     GROUPS
@@ -883,10 +873,8 @@ fn get_model(group_name: &str, stem_name: &str) -> Arc<ModelDef> {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .1
         .get(&singular_name)
         .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name))
-        .1
         .clone()
 }
 
@@ -898,10 +886,9 @@ fn get_model_name(group_name: &str, stem_name: &str) -> String {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .1
         .get(stem_name)
     {
-        return model.1.name.clone();
+        return model.name.clone();
     }
     let singular_name = to_singular(stem_name);
     let group_lock = GROUPS.read().unwrap();
@@ -910,8 +897,7 @@ fn get_model_name(group_name: &str, stem_name: &str) -> String {
         .unwrap()
         .get(group_name)
         .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
-        .1
         .get(&singular_name)
         .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name));
-    model.1.name.clone()
+    model.name.clone()
 }

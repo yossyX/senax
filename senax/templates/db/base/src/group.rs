@@ -30,7 +30,7 @@ pub mod @{ name|ident }@;
 #[allow(clippy::large_enum_variant)]
 #[derive(Pack, Unpack, Clone, Debug)]
 pub enum CacheOp {
-@%- for (name, (_, def)) in models %@
+@%- for (name, def) in models %@
     @{ name|to_pascal_name }@(@{ def.mod_name()|ident }@::CacheOp),
 @%- endfor %@
 }
@@ -40,7 +40,7 @@ pub enum CacheOp {
 #[serde(deny_unknown_fields)]
 #[allow(non_snake_case)]
 pub struct @{ group_name|pascal }@ {
-@%- for (name, (_, def)) in models %@
+@%- for (name, def) in models %@
     #[serde(default)]
     @{ name|ident }@: IndexMap<String, @{ def.mod_name()|ident }@::_@{ name|pascal }@Factory>,
 @%- endfor %@
