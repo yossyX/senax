@@ -54,7 +54,7 @@ pub use ::db::models::@{ group_name|snake|ident }@::@{ mod_name|ident }@::*;
 #[allow(unused_imports)]
 use ::domain::value_objects;
 pub use ::domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{join, Joiner_};
-@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+@%- for (name, rel_def) in def.belongs_to_outer_db(Joinable::Filter) %@
 use ::db_@{ rel_def.db()|snake }@::models::@{ rel_def.get_group_mod_path() }@ as rel_@{ rel_def.get_group_mod_name() }@;
 @%- if !config.exclude_from_domain %@
 use ::domain::repository::@{ rel_def.db()|snake|ident }@::@{ rel_def.get_group_mod_path() }@ as join_@{ rel_def.get_group_mod_name() }@;
@@ -277,8 +277,8 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 @%- endif %@
                 @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
                 CacheOp::Insert { overwrite, shard_id, data
-                    @{- def.relations_one_cache(false)|fmt_rel_join(", _{rel_name}", "") -}@ 
-                    @{- def.relations_many_cache(false)|fmt_rel_join(", _{rel_name}", "") }@ } => {
+                    @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join(", _{rel_name}", "") -}@ 
+                    @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join(", _{rel_name}", "") }@ } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
                     let mut cache = CacheWrapper::from_data(data.clone(), shard_id, time);
@@ -292,13 +292,13 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, op, &id).await;
                     }
                     let id = PrimaryHasher(id, shard_id);
-    @{- def.relations_one_cache(false)|fmt_rel_join("
+    @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
                     if let Some(_{rel_name}) = _{rel_name} {
                         for msg in _{rel_name} {
                             msg.handle_cache_msg(Arc::clone(&sync_map)).await;
                         }
                     }", "")|replace1("_inner") }@
-    @{- def.relations_many_cache(false)|fmt_rel_join("
+    @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
                     if let Some(_{rel_name}) = _{rel_name} {
                         for msg in _{rel_name} {
                             msg.handle_cache_msg(Arc::clone(&sync_map)).await;
@@ -359,7 +359,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                         };
                         Cache::insert_version(&cs, Arc::new(cs.clone())).await;
                         Cache::invalidate(&id, shard_id).await;
-                        @{- def.relations_one_cache(false)|fmt_rel_join("
+                        @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
                         if let Some(Some(_{rel_name})) = row.{rel_name} {
                             rel_{class_mod}::CacheOp::BulkInsert {
                                 replace,
@@ -369,7 +369,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                                 list: vec![*_{rel_name}],
                             }.handle_cache_msg(Arc::clone(&sync_map)).await;
                         }", "")|replace1("_data") }@
-                        @{- def.relations_many_cache(false)|fmt_rel_join("
+                        @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
                         if let Some(_{rel_name}) = row.{rel_name} {
                             rel_{class_mod}::CacheOp::BulkInsert {
                                 replace,
@@ -396,8 +396,8 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     @%- endif %@
                 }
                 CacheOp::Update { id, shard_id, update, op
-                    @{- def.relations_one_cache(false)|fmt_rel_join(", _{rel_name}", "") -}@ 
-                    @{- def.relations_many_cache(false)|fmt_rel_join(", _{rel_name}", "") }@ } => {
+                    @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join(", _{rel_name}", "") -}@ 
+                    @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join(", _{rel_name}", "") }@ } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
                     if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
@@ -435,7 +435,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                             }
                             @%- endif %@
                             cache._inner = CacheOp::update_with_unique_cache(&id, cache._inner, &update, &op, time).await;
-                            @{- def.relations_one_cache(false)|fmt_rel_join("
+                            @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
                             if let Some(_{rel_name}) = _{rel_name} {
                                 if let Some(rel) = &mut cache.{rel_name} {
                                     *rel = rel_{class_mod}::CacheOp::apply_to_obj(rel, &_{rel_name}, shard_id, time){soft_delete_filter};
@@ -444,7 +444,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                                     msg.handle_cache_msg(Arc::clone(&sync_map)).await;
                                 }
                             }", "")|replace1("_inner") }@
-                            @{- def.relations_many_cache(false)|fmt_rel_join("
+                            @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
                             if let Some(_{rel_name}) = _{rel_name} {
                                 if let Some(rel) = &mut cache.{rel_name} {
                                     *rel = rel_{class_mod}::CacheOp::apply_to_list(rel, &_{rel_name}, shard_id, time).into_iter(){soft_delete_filter}.collect();
@@ -1145,11 +1145,11 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
                     _upsert: false,
                     _is_loaded: true,
                     _op: op.clone(),
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
                     {rel_name}: None,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
                     {rel_name}: None,", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("
                     {rel_name}: None,", "") }@
                 };
                 @%- if def.updated_at_conf().is_some() %@
@@ -1233,11 +1233,11 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
                     _upsert: false,
                     _is_loaded: true,
                     _op: op.clone(),
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
                     {rel_name}: None,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
                     {rel_name}: None,", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("
                     {rel_name}: None,", "") }@
                 };
                 @%- if def.updated_at_conf().is_some() %@
@@ -1262,7 +1262,7 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
     while join_set.join_next().await.is_some() {};
 }
 @%- endif %@
-@%- for (model, rel_name, rel) in def.relations_belonging(false) %@
+@%- for (model, rel_name, rel) in def.relations_belonging(Joinable::Filter, false) %@
 
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
@@ -1295,7 +1295,7 @@ impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
 }
 @%- endif %@
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_belonging_outer_db(false) %@
+@%- for (model, rel_name, rel) in def.relations_belonging_outer_db(Joinable::Filter, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn cols() -> &'static str {
@@ -1327,7 +1327,7 @@ impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
 }
 @%- endif %@
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_one(false) %@
+@%- for (model, rel_name, rel) in def.relations_one(Joinable::Filter, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn cols() -> &'static str {
@@ -1530,7 +1530,7 @@ impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.
     }
 }
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_many(false) %@
+@%- for (model, rel_name, rel) in def.relations_many(Joinable::Filter, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn cols() -> &'static str {
@@ -1738,28 +1738,28 @@ impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.
 pub trait _@{ pascal_name }@Joiner {
     async fn join(&mut self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<()> {
         if let Some(joiner) = joiner {
-            @{- def.relations()|fmt_rel_join("
+            @{- def.relations(Joinable::Join)|fmt_rel_join("
             if joiner.{rel_name}.is_some() {
                 self.join_{raw_rel_name}(conn, joiner.{rel_name}).await?;
             }", "") }@
-            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+            @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
             if joiner.{rel_name}.is_some() {
                 self.join_{raw_rel_name}(conn, joiner.{rel_name}).await?;
             }", "") }@
         }
         Ok(())
     }
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()>;", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()>;", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()>;", "") }@
 }
 
 #[async_trait]
 impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
             let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None, None).await?;
@@ -1773,7 +1773,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
             let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None, None).await?;
@@ -1787,13 +1787,13 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
         }
         Ok(())
     }", "") }@
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         self.{rel_name} = Some(repo_{class_mod}::{class}_::query().filter(filter).join(joiner).select(conn).await?.pop().map(Box::new));
         Ok(())
     }", "") }@
-@{- def.relations_many_without_limit()|fmt_rel_join("
+@{- def.relations_many_without_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
@@ -1802,7 +1802,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
         self.{rel_name} = Some(l);
         Ok(())
     }", "") }@
-@{- def.relations_many_with_limit()|fmt_rel_join("
+@{- def.relations_many_with_limit(Joinable::Join)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         let order = vec![{order}];
@@ -1814,7 +1814,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@ {
 
 #[async_trait]
 impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
             let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None, None).await?;
@@ -1828,7 +1828,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
             let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None, None).await?;
@@ -1842,13 +1842,13 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
         }
         Ok(())
     }", "") }@
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         self.{rel_name} = Some(repo_{class_mod}::{class}_::query().filter(filter).join(joiner).select_for_update(conn).await?);
         Ok(())
     }", "") }@
-@{- def.relations_many_without_limit()|fmt_rel_join("
+@{- def.relations_many_without_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
@@ -1857,7 +1857,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
         self.{rel_name} = Some(l);
         Ok(())
     }", "") }@
-@{- def.relations_many_with_limit()|fmt_rel_join("
+@{- def.relations_many_with_limit(Joinable::Join)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         let order = vec![{order}];
@@ -1870,28 +1870,28 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Updater {
 @%- if def.use_cache() %@
 trait CacheWrapperTr {
     fn _has_join(&self, joiner: &Option<Box<Joiner_>>) -> bool;
-@{- def.relations_one_cache(false)|fmt_rel_join("
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()>;", "") }@
-@{- def.relations_many_cache_without_limit()|fmt_rel_join("
+@{- def.relations_many_cache_without_limit(Joinable::Join)|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()>;", "") }@
-@{- def.relations_many_cache_with_limit()|fmt_rel_join("
+@{- def.relations_many_cache_with_limit(Joinable::Join)|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()>;", "") }@
 }
 
 impl CacheWrapperTr for CacheWrapper {
     fn _has_join(&self, joiner: &Option<Box<Joiner_>>) -> bool {
         if let Some(joiner) = joiner {
-@{- def.relations_in_cache()|fmt_rel_join("\n            if self.{rel_name}.is_none() && joiner.{rel_name}.is_some() { return false; }", "") }@
+@{- def.relations_in_cache(Joinable::Join)|fmt_rel_join("\n            if self.{rel_name}.is_none() && joiner.{rel_name}.is_some() { return false; }", "") }@
         }
         true
     }
-@{- def.relations_one_cache(false)|fmt_rel_join("
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         self.{rel_name} = Some(repo_{class_mod}::{class}_::query().filter(filter).__select_for_cache(conn).await?.into_iter().map(|v| v._wrapper).next());
         Ok(())
     }", "") }@
-@{- def.relations_many_cache_without_limit()|fmt_rel_join("
+@{- def.relations_many_cache_without_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
@@ -1900,7 +1900,7 @@ impl CacheWrapperTr for CacheWrapper {
         self.{rel_name} = Some(l);
         Ok(())
     }", "") }@
-@{- def.relations_many_cache_with_limit()|fmt_rel_join("
+@{- def.relations_many_cache_with_limit(Joinable::Join)|fmt_rel_join("
     async fn fetch_{raw_rel_name}(&mut self, conn: &mut DbConn) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         let order = vec![{order}];
@@ -1911,7 +1911,7 @@ impl CacheWrapperTr for CacheWrapper {
 
 #[async_trait]
 impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
-@{- def.relations_belonging_cache(false)|fmt_rel_join("
+@{- def.relations_belonging_cache(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
             let obj = repo_{class_mod}::{class}_::find_optional_from_cache{with_trashed}(conn, id, joiner).await?;
@@ -1925,7 +1925,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_uncached(false)|fmt_rel_join("
+@{- def.relations_belonging_uncached(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
             let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(conn, id, joiner, None, None).await?;
@@ -1939,7 +1939,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if let Some(id) = RelPk{rel_name_pascal}::primary(self) {
             let obj = repo_{class_mod}::{class}_::find_optional{with_trashed}(&mut conn._{db_snake}_db, id, joiner, None, None).await?;
@@ -1953,7 +1953,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         }
         Ok(())
     }", "") }@
-@{- def.relations_one_cache(false)|fmt_rel_join("
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if !matches!(joiner.as_ref().map(|v| v.has_some()), Some(true)) {
             if self.{rel_name}.is_none() && let Some(v) = self._wrapper.{rel_name}.as_ref() {
@@ -1972,13 +1972,13 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         }
         Ok(())
     }", "") }@
-@{- def.relations_one_uncached(false)|fmt_rel_join("
+@{- def.relations_one_uncached(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         self.{rel_name} = Some(repo_{class_mod}::{class}_::query().filter(filter).join(joiner).select(conn).await?.pop().map(Box::new));
         Ok(())
     }", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if !matches!(joiner.as_ref().map(|v| v.has_some()), Some(true)) {
             if self.{rel_name}.is_none() && let Some(v) = self._wrapper.{rel_name}.as_ref() {
@@ -1996,7 +1996,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_uncached_without_limit()|fmt_rel_join("
+@{- def.relations_many_uncached_without_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
@@ -2005,7 +2005,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
         self.{rel_name} = Some(l);
         Ok(())
     }", "") }@
-@{- def.relations_many_uncached_with_limit()|fmt_rel_join("
+@{- def.relations_many_uncached_with_limit(Joinable::Join)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let filter = RelFil{rel_name_pascal}::filter(self){additional_filter};
         let order = vec![{order}];
@@ -2018,7 +2018,7 @@ impl _@{ pascal_name }@Joiner for _@{ pascal_name }@Cache {
 
 #[async_trait]
 impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
@@ -2033,7 +2033,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
@@ -2048,7 +2048,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let mut map = AHashMap::default();
@@ -2066,7 +2066,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_without_limit()|fmt_rel_join("
+@{- def.relations_many_without_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
@@ -2087,7 +2087,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_with_limit()|fmt_rel_join("
+@{- def.relations_many_with_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
@@ -2115,7 +2115,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
 
 #[async_trait]
 impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
@@ -2130,7 +2130,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
@@ -2145,7 +2145,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
@@ -2166,7 +2166,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_without_limit()|fmt_rel_join("
+@{- def.relations_many_without_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
@@ -2187,7 +2187,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_with_limit()|fmt_rel_join("
+@{- def.relations_many_with_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
@@ -2216,16 +2216,16 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Updater> {
 @%- if def.use_cache() %@
 
 trait CacheWrapperVecTr {
-    @{- def.relations_one_cache(false)|fmt_rel_join("
+    @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()>;", "") }@
-@{- def.relations_many_cache_without_limit()|fmt_rel_join("
+@{- def.relations_many_cache_without_limit(Joinable::Join)|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()>;", "") }@
-@{- def.relations_many_cache_with_limit()|fmt_rel_join("
+@{- def.relations_many_cache_with_limit(Joinable::Join)|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()>;", "") }@
 }
 
 impl CacheWrapperVecTr for CacheWrapper {
-@{- def.relations_one_cache(false)|fmt_rel_join("
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
         let mut map = AHashMap::default();
@@ -2243,7 +2243,7 @@ impl CacheWrapperVecTr for CacheWrapper {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_cache_without_limit()|fmt_rel_join("
+@{- def.relations_many_cache_without_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
@@ -2264,7 +2264,7 @@ impl CacheWrapperVecTr for CacheWrapper {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_cache_with_limit()|fmt_rel_join("
+@{- def.relations_many_cache_with_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn fetch_{raw_rel_name}_for_vec(vec: &mut [CacheWrapper], conn: &mut DbConn) -> Result<()> {
         if vec.is_empty() { return Ok(()); }
@@ -2291,7 +2291,7 @@ impl CacheWrapperVecTr for CacheWrapper {
 
 #[async_trait]
 impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
-@{- def.relations_one_cache(false)|fmt_rel_join("
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if !matches!(joiner.as_ref().map(|v| v.has_some()), Some(true)) {
             for val in self.iter_mut() {
@@ -2314,7 +2314,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_one_uncached(false)|fmt_rel_join("
+@{- def.relations_one_uncached(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
         let mut map = AHashMap::default();
@@ -2332,7 +2332,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if !matches!(joiner.as_ref().map(|v| v.has_some()), Some(true)) {
             for val in self.iter_mut() {
@@ -2351,7 +2351,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_uncached_without_limit()|fmt_rel_join("
+@{- def.relations_many_uncached_without_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
@@ -2372,7 +2372,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_many_uncached_with_limit()|fmt_rel_join("
+@{- def.relations_many_uncached_with_limit(Joinable::Join)|fmt_rel_join("
     #[allow(unused_parens)]
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         if self.is_empty() { return Ok(()); }
@@ -2395,7 +2395,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_cache(false)|fmt_rel_join("
+@{- def.relations_belonging_cache(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
@@ -2410,7 +2410,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_uncached(false)|fmt_rel_join("
+@{- def.relations_belonging_uncached(Joinable::Join, false)|fmt_rel_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
@@ -2425,7 +2425,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         }
         Ok(())
     }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     async fn join_{raw_rel_name}(&mut self, conn: &mut DbConn, joiner: Option<Box<join_{class_mod}::Joiner_>>) -> Result<()> {
         let ids: FxHashSet<_> = self.iter().flat_map(RelPk{rel_name_pascal}::primary).collect();
         if ids.is_empty() { return Ok(()); }
@@ -2874,27 +2874,27 @@ impl BindTr for ColGeoDistance_ {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColRel_ {
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("\n    {rel_name}(Option<Box<repo_{class_mod}::Filter_>>),", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n    {rel_name}(Option<Box<repo_{class_mod}::Filter_>>),", "") }@
+@{- def.relations_one_and_belonging(Joinable::Filter, false)|fmt_rel_join("\n    {rel_name}(Option<Box<repo_{class_mod}::Filter_>>),", "") }@
+@{- def.relations_many(Joinable::Filter, false)|fmt_rel_join("\n    {rel_name}(Option<Box<repo_{class_mod}::Filter_>>),", "") }@
 }
 #[allow(unreachable_patterns)]
 #[allow(clippy::match_single_binding)]
 impl std::fmt::Display for ColRel_ {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            @{- def.relations_one_and_belonging(false)|fmt_rel_join("
+            @{- def.relations_one_and_belonging(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(v) => if let Some(v) = v {
                 write!(_f, \"{raw_rel_name}:<{}>\", v)
             } else {
                 write!(_f, \"{raw_rel_name}\")
             },", "") }@
-            @{- def.relations_many(false)|fmt_rel_join("
+            @{- def.relations_many(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(v) => if let Some(v) = v {
                 write!(_f, \"{raw_rel_name}:<{}>\", v)
             } else {
                 write!(_f, \"{raw_rel_name}\")
             },", "") }@
-            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+            @{- def.relations_belonging_outer_db(Joinable::Filter, false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(v) => if let Some(v) = v {
                 write!(_f, \"{raw_rel_name}:<{}>\", v)
             } else {
@@ -2911,21 +2911,21 @@ impl ColRelTr for ColRel_ {
     #[allow(unused_mut)]
     #[allow(clippy::ptr_arg)]
     fn write_rel(&self, buf: &mut String, idx: usize, without_key: bool, shard_id: ShardId, is_outer: bool) {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db(false).len() > 0 %@
+@%- if def.relations_one_and_belonging(Joinable::Filter, false).len() + def.relations_many(Joinable::Filter, false).len() + def.relations_belonging_outer_db(Joinable::Filter, false).len() > 0 %@
         match self {
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 repo_{class_mod}::write_belonging_rel(buf, c, RelCol{rel_name_pascal}::cols_with_idx(idx), idx, without_key, shard_id, is_outer);
             }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Filter, false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(c) => {
                 repo_{class_mod}::write_belonging_rel(buf, c, RelCol{rel_name_pascal}::cols_with_idx(idx), idx, without_key, shard_id, true);
             }", "") }@
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 repo_{class_mod}::write_having_rel(buf, c, RelCol{rel_name_pascal}::cols(), Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren(), idx, without_key, shard_id, is_outer);
             }", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 repo_{class_mod}::write_having_rel(buf, c, RelCol{rel_name_pascal}::cols(), Primary::cols_with_idx(idx), RelCol{rel_name_pascal}::cols_with_paren(), idx, without_key, shard_id, is_outer);
             }", "") }@
@@ -2935,21 +2935,21 @@ impl ColRelTr for ColRel_ {
     #[allow(unused_mut)]
     #[allow(clippy::ptr_arg)]
     fn write_key(&self, buf: &mut String) {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db(false).len() > 0 %@
+@%- if def.relations_one_and_belonging(Joinable::Filter, false).len() + def.relations_many(Joinable::Filter, false).len() + def.relations_belonging_outer_db(Joinable::Filter, false).len() > 0 %@
         match self {
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 buf.push_str(RelCol{rel_name_pascal}::cols());
             }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Filter, false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(c) => {
                 buf.push_str(RelCol{rel_name_pascal}::cols());
             }", "") }@
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 buf.push_str(Primary::cols());
             }", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 buf.push_str(Primary::cols());
             }", "") }@
@@ -2960,17 +2960,17 @@ impl ColRelTr for ColRel_ {
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-@%- if def.relations_one_and_belonging(false).len() + def.relations_many(false).len() + def.relations_belonging_outer_db(false).len() > 0 %@
+@%- if def.relations_one_and_belonging(Joinable::Filter, false).len() + def.relations_many(Joinable::Filter, false).len() + def.relations_belonging_outer_db(Joinable::Filter, false).len() > 0 %@
         match self {
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 repo_{class_mod}::bind_for_rel_query(c, query)
             }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Filter, false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(c) => {
                 repo_{class_mod}::bind_for_rel_query(c, query)
             }", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => {
                 repo_{class_mod}::bind_for_rel_query(c, query)
             }", "") }@
@@ -3305,11 +3305,11 @@ pub use @{ filter_macro_name }@_geo_distance as filter_geo_distance;
 
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_rel {
-@%- for (model_def, col_name, rel_def) in def.relations_one_and_belonging(false) %@
+@%- for (model_def, col_name, rel_def) in def.relations_one_and_belonging(Joinable::Filter, false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
     (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::repositories::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
-@%- for (model_def, col_name, rel_def) in def.relations_many(false) %@
+@%- for (model_def, col_name, rel_def) in def.relations_many(Joinable::Filter, false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
     (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::repositories::@{ rel_def.get_group_name()|snake|ident }@::_base::_@{ rel_def.get_mod_name() }@::filter!($t)))));
 @%- endfor %@
@@ -3439,7 +3439,7 @@ pub use @{ order_macro_name }@ as order;
 
 #[derive(Debug, Clone, Default)]
 pub struct Joiner_ {
-@{- def.relations()|fmt_rel_join("
+@{- def.relations(Joinable::Join)|fmt_rel_join("
     pub {rel_name}: Option<Box<join_{class_mod}::Joiner_>>,", "") }@
     pub _dummy: bool,
 }
@@ -3447,14 +3447,14 @@ impl Joiner_ {
     #[allow(clippy::nonminimal_bool)]
     pub fn has_some(&self) -> bool {
         false
-        @{- def.relations()|fmt_rel_join("
+        @{- def.relations(Joinable::Join)|fmt_rel_join("
             || self.{rel_name}.is_some()", "") }@
     }
     pub fn merge(lhs: Option<Box<Self>>, rhs: Option<Box<Self>>) -> Option<Box<Self>> {
         if let Some(lhs) = lhs {
             if let Some(rhs) = rhs {
                 Some(Box::new(Joiner_{
-                    @{- def.relations()|fmt_rel_join("
+                    @{- def.relations(Joinable::Join)|fmt_rel_join("
                     {rel_name}: join_{class_mod}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
                     ..Default::default()
                 }))
@@ -3470,7 +3470,7 @@ impl Joiner_ {
 @%- let base_path = "$crate::models::{}::{}::_base::_{}"|format(db|snake|ident, group_name|ident, mod_name) %@
 #[macro_export]
 macro_rules! _join_@{ fetch_macro_name }@ {
-@{- def.relations()|fmt_rel_join("
+@{- def.relations(Joinable::Join)|fmt_rel_join("
     ({rel_name}) => ($crate::models::{class_mod_path}::_{mod_name}::join!({}));
     ({rel_name}: $p:tt) => ($crate::models::{class_mod_path}::_{mod_name}::join!($p));", "") }@
     () => ();
@@ -4351,10 +4351,10 @@ impl _@{ pascal_name }@_ {
             _upsert: false,
             _is_loaded: false,
             _op: OpData::default(),
-@{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 
@@ -4376,10 +4376,10 @@ impl _@{ pascal_name }@_ {
             _upsert: false,
             _is_loaded: false,
             _op: OpData::default(),
-@{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 @%- for parent in def.downcast_aggregation() %@
@@ -4392,9 +4392,9 @@ impl _@{ pascal_name }@_ {
                     @{- def.all_fields()|fmt_join("
                     {ident}: clone.{ident},", "") }@
                 },
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("\n                {rel_name}: None,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n                {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n                {rel_name}: None,", "") }@
+@{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("\n                {rel_name}: None,", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n                {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("\n                {rel_name}: None,", "") }@
             })
         } else {
             None
@@ -4410,9 +4410,9 @@ impl _@{ pascal_name }@_ {
                 @{- def.all_fields()|fmt_join("
                 {ident}: clone.{ident},", "") }@
             },
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 @%- endfor %@
@@ -4480,7 +4480,7 @@ impl _@{ pascal_name }@_ {
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
         let mut list: Vec<CacheWrapper> = result?.into_iter().map(|data| CacheWrapper::from_inner(data, shard_id, time)).collect();
-        @{- def.relations_in_cache()|fmt_rel_join("\n        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut list, &mut conn).await?;", "") }@
+        @{- def.relations_in_cache(Joinable::Join)|fmt_rel_join("\n        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut list, &mut conn).await?;", "") }@
         let list: Vec<_@{ pascal_name }@Cache> = list.into_iter().map(|v| Arc::new(v).into()).collect();
         let arc = Arc::new(list);
         let sync = CACHE_RESET_SYNC_ALL_ROWS.get().unwrap()[shard_id as usize].lock().await;
@@ -4530,7 +4530,7 @@ impl _@{ pascal_name }@_ {
         let time = MSec::now();
         #[allow(clippy::needless_collect)]
         let mut list: Vec<CacheWrapper> = result?.into_iter().map(|data| CacheWrapper::from_inner(data, shard_id, time)).collect();
-        @{- def.relations_in_cache()|fmt_rel_join("\n        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut list, &mut conn).await?;", "") }@
+        @{- def.relations_in_cache(Joinable::Join)|fmt_rel_join("\n        CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut list, &mut conn).await?;", "") }@
         let list: Vec<_@{ pascal_name }@Cache> = list.into_iter().map(|v| Arc::new(v).into()).collect();
         let arc = Arc::new(list);
         let sync = CACHE_RESET_SYNC_ALL_ROWS.get().unwrap()[shard_id as usize].lock().await;
@@ -4886,8 +4886,8 @@ impl _@{ pascal_name }@_ {
             overwrite: false,
             shard_id: conn.shard_id(),
             data: obj._data,
-@{- def.relations_one_cache(false)|fmt_rel_join("\n            _{rel_name}: None,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n            _{rel_name}: None,", "") }@
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("\n            _{rel_name}: None,", "") }@
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("\n            _{rel_name}: None,", "") }@
         };
         let mut sync_map = FxHashMap::default();
         sync_map.insert(conn.shard_id(), 0);
@@ -4964,8 +4964,8 @@ impl _@{ pascal_name }@_ {
                 overwrite: false,
                 shard_id: conn.shard_id(),
                 data: obj._data.clone(),
-@{- def.relations_one_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
             };
             conn.push_cache_op(cache_msg.wrap()).await;
         }
@@ -5005,9 +5005,9 @@ impl _@{ pascal_name }@_ {
         if obj.will_be_deleted() {
             obj._op = OpData::default();
         }
-@{- def.relations_one(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
         let shard_id = conn.shard_id() as usize;
         conn.push_callback(Box::new(move || {
             async move {
@@ -5036,9 +5036,9 @@ impl _@{ pascal_name }@_ {
         }
         @%- endif %@
         obj.__validate()?;
-@{- def.relations_one(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
         let shard_id = conn.shard_id() as usize;
         conn.push_callback(Box::new(move || {
             async move {
@@ -5065,9 +5065,9 @@ impl _@{ pascal_name }@_ {
         }
         @%- endif %@
         obj.__set_default_value(conn).await?;
-@{- def.relations_one(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("\n        obj.{rel_name} = None;", "") }@
         let shard_id = conn.shard_id() as usize;
         conn.push_callback(Box::new(move || {
             async move {
@@ -5638,7 +5638,7 @@ async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joi
             #[allow(unused_mut)]
             let mut result = ___find_many_for_cache(&mut conn, &ids).await?;
             if let Some(joiner) = &joiner {
-@{- def.relations_in_cache()|fmt_rel_join("
+@{- def.relations_in_cache(Joinable::Join)|fmt_rel_join("
                 if joiner.{rel_name}.is_some() {
                     CacheWrapper::fetch_{raw_rel_name}_for_vec(&mut result, &mut conn).await?;
                 }", "") }@
@@ -5964,22 +5964,22 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, ov
     obj._data.{ident} = Default::default();", "") }@
     @%- if def.act_as_job_queue() %@
     let cache_msg = CacheOp::Queued;
-    @{- def.relations_one(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
-    @{- def.relations_many(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
+    @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
+    @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
     @%- else if !config.force_disable_cache && !def.use_clear_whole_cache() %@
     let cache_msg = CacheOp::Insert {
         overwrite,
         shard_id: conn.shard_id(),
         data: obj._data,
-@{- def.relations_one_cache(false)|fmt_rel_join("\n            _{rel_name}: save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n            _{rel_name}: save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?,", "") }@
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("\n            _{rel_name}: save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?,", "") }@
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("\n            _{rel_name}: save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?,", "") }@
     };
-@{- def.relations_one_uncached(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
-@{- def.relations_many_uncached(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
+@{- def.relations_one_uncached(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
+@{- def.relations_many_uncached(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
     @%- else %@
     let cache_msg = CacheOp::None;
-    @{- def.relations_one(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
-    @{- def.relations_many(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
+    @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
+    @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
     @%- endif %@
     Ok((obj2, cache_msg))
 }
@@ -6056,18 +6056,18 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         shard_id: conn.shard_id(),
         update:obj._update,
         op: obj._op,
-@{- def.relations_one_cache(false)|fmt_rel_join("\n            _{rel_name}: save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n            _{rel_name}: save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?,", "") }@
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("\n            _{rel_name}: save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?,", "") }@
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("\n            _{rel_name}: save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?,", "") }@
     });
     if !update_cache {
         cache_msg = None;
     }
-@{- def.relations_one_uncached(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
-@{- def.relations_many_uncached(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
+@{- def.relations_one_uncached(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
+@{- def.relations_many_uncached(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
     @%- else %@
     let cache_msg = None;
-@{- def.relations_one(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
     @%- endif %@
     Ok((obj2, cache_msg))
 }
@@ -6130,8 +6130,8 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
             overwrite: false,
             shard_id: conn.shard_id(),
             data: obj._data,
-@{- def.relations_one_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
         });
         @%- else %@
         let cache_msg = None;
@@ -6157,8 +6157,8 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
             shard_id: conn.shard_id(),
             update:obj._update,
             op: obj._op,
-@{- def.relations_one_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("\n                _{rel_name}: None,", "") }@
         });
         @%- else %@
         let cache_msg = None;
@@ -6421,10 +6421,10 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         let mut ids_iter = ids.iter();", "") }@
     @%- endif %@
         let mut data_list = Vec::new();
-        @{- def.relations_one(false)|fmt_rel_join("
+        @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
         let mut _{rel_name} = Vec::new();
         let mut __{rel_name} = Vec::new();", "") }@
-        @{- def.relations_many(false)|fmt_rel_join("
+        @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
         let mut _{rel_name} = Vec::new();
         let mut __{rel_name} = Vec::new();", "") }@
         for row in list {
@@ -6442,14 +6442,14 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
             @{- def.auto_inc()|fmt_join("
             obj._data.{ident} = *ids_iter.next().unwrap();", "") }@
     @%- endif %@
-            @{- def.relations_one(false)|fmt_rel_join("
+            @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
             obj.{rel_name}.map(|v| v.map(|v| {
                 let mut v = v.as_ref().clone();
                 RelFk{rel_name_pascal}::set_fk(&mut v, (&obj._data).into());
                 _{rel_name}.push(v);
                 __{rel_name}.push(row);
             }));", "") }@
-            @{- def.relations_many(false)|fmt_rel_join("
+            @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
             if let Some(v) = obj.{rel_name} {
                 v.into_iter().for_each(|mut v| {
                     RelFk{rel_name_pascal}::set_fk(&mut v, (&obj._data).into());
@@ -6460,25 +6460,25 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
             data_list.push((obj._data, obj._is_new));
         }
         if ignore || replace || overwrite {
-            @{- def.relations_one(false)|fmt_rel_join("
+            @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
             if !__{rel_name}.is_empty() {
                 let filter = RelFil{rel_name_pascal}::in_filter(&__{rel_name});
                 repo_{class_mod}::{class}_::query().filter(filter).delete(conn).await?;
             }", "") }@
-            @{- def.relations_many(false)|fmt_rel_join("
+            @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
             if !__{rel_name}.is_empty() {
                 let filter = RelFil{rel_name_pascal}::in_filter(&__{rel_name});
                 repo_{class_mod}::{class}_::query().filter(filter).delete(conn).await?;
             }", "") }@
         }
-        @{- def.relations_one(false)|fmt_rel_join("
+        @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
         let mut _{rel_name} = repo_{class_mod}::___bulk_insert(conn, &_{rel_name}, ignore, replace, overwrite).await?.into_iter().fold(FxHashMap::default(), |mut map, v| {
             for v in v {
                 map.insert(RelFk{rel_name_pascal}::get_fk(&v._data).unwrap(), v);
             }
             map
         });", "") }@
-        @{- def.relations_many(false)|fmt_rel_join("
+        @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
         let mut _{rel_name} = repo_{class_mod}::___bulk_insert(conn, &_{rel_name}, ignore, replace, overwrite).await?.into_iter().fold(FxHashMap::default(), |mut map: FxHashMap<_, Vec<_>>, v| {
             for v in v {
                 map.entry(RelFk{rel_name_pascal}::get_fk(&v._data).unwrap())
@@ -6488,9 +6488,9 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
             map
         });", "") }@
         let data_list = data_list.into_iter().map(|(v, n)| ForInsert {
-            @{- def.relations_one(false)|fmt_rel_join("
+            @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
             {rel_name}: Some(_{rel_name}.remove(&(&v).into()).map(Box::new)),", "") }@
-            @{- def.relations_many(false)|fmt_rel_join("
+            @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
             {rel_name}: _{rel_name}.remove(&(&v).into()),", "") }@
             _data: v,
             _is_new: n,
@@ -6638,7 +6638,7 @@ pub(crate) async fn _seed(seed: &serde_yaml::Value, conns: &mut [DbConn]) -> Res
     }
     Ok(())
 }
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
 
 async fn save_{rel_name}(
     conn: &mut DbConn,
@@ -6665,7 +6665,7 @@ async fn save_{rel_name}(
     }
     Ok(None)
 }", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
 
 async fn save_{rel_name}(
     conn: &mut DbConn,
@@ -6692,7 +6692,7 @@ async fn save_{rel_name}(
     }
     Ok(None)
 }", "") }@
-@{- def.relations_one_and_many(false)|fmt_rel_join("
+@{- def.relations_one_and_many(Joinable::Join, false)|fmt_rel_join("
 
 fn _save_{rel_name}(
     conn: &mut DbConn,

@@ -11,7 +11,7 @@ use crate::api_generator::schema::{API_CONFIG, ApiConfigDef, ApiDbDef, ApiFieldD
 use crate::common::ToCase as _;
 use crate::common::parse_yml_file;
 use crate::schema::{
-    CONFIG, DataType, FilterDef, FilterSortDirection, FilterType, GROUPS, ModelDef,
+    CONFIG, DataType, FilterDef, FilterSortDirection, FilterType, GROUPS, Joinable, ModelDef
 };
 
 use super::schema::{ApiRelationDef, ApiRoleDef, JsUpdaterDef, RelationVisibility};
@@ -387,7 +387,7 @@ fn make_relation(
     no_update: bool,
 ) -> Result<Vec<Arc<Relation>>> {
     let mut relations = Vec::new();
-    for (_model, rel_name, rel) in def.relations_one(false) {
+    for (_model, rel_name, rel) in def.relations_one(Joinable::Join, false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
@@ -445,7 +445,7 @@ fn make_relation(
         ApiRelationDef::pop();
         ApiFieldDef::pop();
     }
-    for (_model, rel_name, rel) in def.relations_many(false) {
+    for (_model, rel_name, rel) in def.relations_many(Joinable::Join, false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
@@ -503,7 +503,7 @@ fn make_relation(
         ApiRelationDef::pop();
         ApiFieldDef::pop();
     }
-    for (_model, rel_name, rel) in def.relations_belonging(false) {
+    for (_model, rel_name, rel) in def.relations_belonging(Joinable::Join, false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         ApiRelationDef::push(api_relation.relations(&rel_model)?);

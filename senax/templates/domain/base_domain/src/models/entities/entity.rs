@@ -7,7 +7,7 @@ use crate::value_objects;
 
 #[allow(unused_imports)]
 use crate::models::@{ db|snake|ident }@ as _model_;
-@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+@%- for (name, rel_def) in def.belongs_to_outer_db(Joinable::Filter) %@
 pub use crate::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 
@@ -209,19 +209,19 @@ pub trait @{ pascal_name }@: std::fmt::Debug + crate::models::FilterFlag + dyn_c
 {label}{comment}    fn {ident}(&self) -> {outer};", "") }@
 @{- def.cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
-@{- def.relations_belonging(true)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, true)|fmt_rel_join("
     fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
-@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
     fn _{raw_rel_name}_id(&self) -> Option<_{db_snake}_model_::{class_mod_path}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
-@{- def.relations_one_and_belonging(true)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>>;", "") }@
-@{- def.relations_many(true)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>>;", "") }@
-@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>>;", "") }@
 }
 
@@ -231,10 +231,10 @@ dyn_clone::clone_trait_object!(@{ pascal_name }@);
 pub trait @{ pascal_name }@Updater: std::any::Any + Send + Sync + @{ pascal_name }@ + crate::models::MarkForDelete@% for parent in def.parent() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@ + 'static {
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_name}(&mut self, v: {domain_factory});", "") }@
-@{- def.relations_one(true)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_path}::{class}Updater>>;
 {label}{comment}    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>);", "") }@
-@{- def.relations_many(true)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> + '_>>;
 {label}{comment}    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>>;
 {label}{comment}    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>);
@@ -253,11 +253,11 @@ pub struct @{ pascal_name }@Entity {
     pub {ident}: {domain_outer_owned},", "") }@
 @{- def.non_primaries_except_invisibles(false)|fmt_join("
     pub {ident}: {domain_outer_owned},", "") }@
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("
     pub {rel_name}: Option<Box<_model_::{class_mod_path}::{class}Entity>>,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
     pub {rel_name}: Vec<Box<_model_::{class_mod_path}::{class}Entity>>,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     pub {rel_name}: Option<Box<_{db_snake}_model_::{class_mod_path}::{class}Entity>>,", "") }@
     #[serde(skip)]
     pub _delete: bool,
@@ -282,11 +282,11 @@ impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ pa
     fn {ident}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{ident}{clone_for_outer}{convert_domain_outer}
     }", "") }@
-@{- parent.relations_one_and_belonging(true)|fmt_rel_join("
+@{- parent.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
         Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _model_::{class_mod_path}::{class}))
     }", "") }@
-@{- parent.relations_many(true)|fmt_rel_join("
+@{- parent.relations_many(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
         Ok(Box::new(self.{rel_name}.iter().map(|v| v.as_ref() as &dyn _model_::{class_mod_path}::{class})))
     }", "") }@
@@ -298,7 +298,7 @@ impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ pa
     fn set_{raw_name}(&mut self, v: {domain_factory}) {
         self.{ident} = v{convert_domain_factory}
     }", "") }@
-@{- parent.relations_one(true)|fmt_rel_join("
+@{- parent.relations_one(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_path}::{class}Updater>> {
         Ok(self.{rel_name}.as_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_path}::{class}Updater))
     }
@@ -309,7 +309,7 @@ impl super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ pa
             panic!(\"Only {class}Entity is accepted.\");
         };
     }", "") }@
-@{- parent.relations_many(true)|fmt_rel_join("
+@{- parent.relations_many(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> + '_>> {
         struct V<'a, T>(&'a mut Vec<Box<T>>);
         impl<T: _model_::{class_mod_path}::{class}Updater> domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> for V<'_, T> {
@@ -353,15 +353,15 @@ impl @{ pascal_name }@ for @{ pascal_name }@Entity {
     fn {ident}(&self) -> {domain_outer} {
         {convert_domain_outer_prefix}self.{ident}{clone_for_outer}{convert_domain_outer}
     }", "") }@
-@{- def.relations_one_and_belonging(true)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
         Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _model_::{class_mod_path}::{class}))
     }", "") }@
-@{- def.relations_many(true)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
         Ok(Box::new(self.{rel_name}.iter().map(|v| v.as_ref() as &dyn _model_::{class_mod_path}::{class})))
     }", "") }@
-@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
         Ok(self.{rel_name}.as_ref().map(|v| v.as_ref() as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
     }", "") }@
@@ -380,7 +380,7 @@ impl @{ pascal_name }@Updater for @{ pascal_name }@Entity {
     fn set_{raw_name}(&mut self, v: {domain_factory}) {
         self.{ident} = v{convert_domain_factory}
     }", "") }@
-@{- def.relations_one(true)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_path}::{class}Updater>> {
         Ok(self.{rel_name}.as_mut().map(|v| v.as_mut() as &mut dyn _model_::{class_mod_path}::{class}Updater))
     }
@@ -391,7 +391,7 @@ impl @{ pascal_name }@Updater for @{ pascal_name }@Entity {
             panic!(\"Only {class}Entity is accepted.\");
         };
     }", "") }@
-@{- def.relations_many(true)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> + '_>> {
         struct V<'a, T>(&'a mut Vec<Box<T>>);
         impl<T: _model_::{class_mod_path}::{class}Updater> domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> for V<'_, T> {

@@ -5,8 +5,6 @@ use std::sync::Arc;
 use crate::common::ToCase as _;
 use crate::common::to_singular;
 use crate::schema::_to_ident_name;
-use crate::schema::CONFIG;
-use crate::schema::ConfigDef;
 
 use super::{FieldDef, GROUPS, ModelDef, domain_mode, to_id_name};
 
@@ -98,6 +96,9 @@ pub struct HasOneDef {
     /// ### 結合先のフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub foreign: Option<StringOrArray>,
+    /// ### join可能
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub joinable: bool,
     /// ### 親モデルのキャッシュに含まれない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_cache: bool,
@@ -127,6 +128,9 @@ pub struct HasOneJson {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(inner(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$")))]
     pub foreign: Option<Vec<String>>,
+    /// ### join可能
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub joinable: bool,
     /// ### 親モデルのキャッシュに含まれない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_cache: bool,
@@ -141,6 +145,7 @@ impl From<HasOneDef> for HasOneJson {
             group: value.group,
             model: value.model,
             foreign: value.foreign.map(|v| v.to_vec()),
+            joinable: value.joinable,
             disable_cache: value.disable_cache,
         }
     }
@@ -154,6 +159,7 @@ impl From<HasOneJson> for HasOneDef {
             group: value.group,
             model: value.model,
             foreign: StringOrArray::from_vec(value.foreign),
+            joinable: value.joinable,
             disable_cache: value.disable_cache,
         }
     }
@@ -171,6 +177,7 @@ impl From<&HasOneDef> for RelDef {
             },
             rel_type: Some(RelationsType::HasOne),
             foreign: value.foreign.as_ref().map(|v| v.to_vec()),
+            joinable: value.joinable,
             in_cache: !value.disable_cache,
             ..Default::default()
         }
@@ -225,6 +232,9 @@ pub struct HasManyDef {
     /// ### 結合先のフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub foreign: Option<StringOrArray>,
+    /// ### join可能
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub joinable: bool,
     /// ### 親モデルのキャッシュに含まれない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_cache: bool,
@@ -267,6 +277,9 @@ pub struct HasManyJson {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(inner(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$")))]
     pub foreign: Option<Vec<String>>,
+    /// ### join可能
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub joinable: bool,
     /// ### 親モデルのキャッシュに含まれない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_cache: bool,
@@ -294,6 +307,7 @@ impl From<HasManyDef> for HasManyJson {
             group: value.group,
             model: value.model,
             foreign: value.foreign.map(|v| v.to_vec()),
+            joinable: value.joinable,
             disable_cache: value.disable_cache,
             additional_filter: value.additional_filter,
             order_by: value.order_by,
@@ -311,6 +325,7 @@ impl From<HasManyJson> for HasManyDef {
             group: value.group,
             model: value.model,
             foreign: StringOrArray::from_vec(value.foreign),
+            joinable: value.joinable,
             disable_cache: value.disable_cache,
             additional_filter: value.additional_filter,
             order_by: value.order_by,
@@ -332,6 +347,7 @@ impl From<&HasManyDef> for RelDef {
             },
             rel_type: Some(RelationsType::HasMany),
             foreign: value.foreign.as_ref().map(|v| v.to_vec()),
+            joinable: value.joinable,
             in_cache: !value.disable_cache,
             additional_filter: value.additional_filter.clone(),
             order_by: value.order_by.clone(),
@@ -393,6 +409,9 @@ pub struct BelongsToDef {
     /// ### リレーション先が論理削除されていても取得する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub with_trashed: bool,
+    /// ### join可能
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub joinable: bool,
     /// ### リレーションのインデックスを設定しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_index: bool,
@@ -433,6 +452,9 @@ pub struct BelongsToJson {
     /// ### リレーション先が論理削除されていても取得する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub with_trashed: bool,
+    /// ### join可能
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub joinable: bool,
     /// ### リレーションのインデックスを設定しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_index: bool,
@@ -455,6 +477,7 @@ impl From<BelongsToDef> for BelongsToJson {
             group: value.group,
             model: value.model,
             local: value.local.map(|v| v.to_vec()),
+            joinable: value.joinable,
             with_trashed: value.with_trashed,
             disable_index: value.disable_index,
             on_delete: value.on_delete,
@@ -471,6 +494,7 @@ impl From<BelongsToJson> for BelongsToDef {
             group: value.group,
             model: value.model,
             local: StringOrArray::from_vec(value.local),
+            joinable: value.joinable,
             with_trashed: value.with_trashed,
             disable_index: value.disable_index,
             on_delete: value.on_delete,
@@ -491,6 +515,7 @@ impl From<&BelongsToDef> for RelDef {
             },
             rel_type: Some(RelationsType::BelongsTo),
             local: value.local.as_ref().map(|v| v.to_vec()),
+            joinable: value.joinable,
             with_trashed: value.with_trashed,
             disable_index: value.disable_index,
             on_delete: value.on_delete,
@@ -548,6 +573,9 @@ pub struct BelongsToOuterDbDef {
     /// ### 結合するローカルのフィールド名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub local: Option<StringOrArray>,
+    /// ### join可能
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub joinable: bool,
     /// ### リレーション先が論理削除されていても取得する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub with_trashed: bool,
@@ -581,6 +609,9 @@ pub struct BelongsToOuterDbJson {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(inner(regex(pattern = r"^\p{XID_Start}\p{XID_Continue}*(?<!_)$")))]
     pub local: Option<Vec<String>>,
+    /// ### join可能
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub joinable: bool,
     /// ### リレーション先が論理削除されていても取得する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub with_trashed: bool,
@@ -599,6 +630,7 @@ impl From<BelongsToOuterDbDef> for BelongsToOuterDbJson {
             group: value.group,
             model: value.model,
             local: value.local.map(|v| v.to_vec()),
+            joinable: value.joinable,
             with_trashed: value.with_trashed,
             disable_index: value.disable_index,
         }
@@ -614,6 +646,7 @@ impl From<BelongsToOuterDbJson> for BelongsToOuterDbDef {
             group: value.group,
             model: value.model,
             local: StringOrArray::from_vec(value.local),
+            joinable: value.joinable,
             with_trashed: value.with_trashed,
             disable_index: value.disable_index,
         }
@@ -632,6 +665,7 @@ impl From<&BelongsToOuterDbDef> for RelDef {
             ),
             rel_type: Some(RelationsType::BelongsToOuterDb),
             local: value.local.as_ref().map(|v| v.to_vec()),
+            joinable: value.joinable,
             with_trashed: value.with_trashed,
             disable_index: value.disable_index,
             ..Default::default()
@@ -670,6 +704,7 @@ pub struct RelDef {
     pub rel_type: Option<RelationsType>,
     pub local: Option<Vec<String>>,
     pub foreign: Option<Vec<String>>,
+    pub joinable: bool,
     pub in_cache: bool,
     pub additional_filter: Option<String>,
     pub order_by: Option<String>,

@@ -133,7 +133,7 @@ pub fn write_files(
     Ok(())
 }
 
-pub fn write_impl_domain_rs(src_dir: &Path, groups: &GroupsDef) -> Result<()> {
+fn write_impl_domain_rs(src_dir: &Path, groups: &GroupsDef) -> Result<()> {
     let file_path = src_dir.join("impl_domain.rs");
 
     #[derive(Template)]

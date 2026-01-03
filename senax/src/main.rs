@@ -273,6 +273,8 @@ enum Server {
         /// Delete files under the directory before generating
         #[clap(short, long)]
         clean: bool,
+        #[clap(long)]
+        auto_fix: bool,
     },
 }
 
@@ -347,16 +349,17 @@ async fn exec(cli: Cli) -> Result<()> {
                 inquiry,
                 force,
                 clean,
+                auto_fix,
             } => {
                 if let Some(db) = db {
                     ensure!(db_re.is_match(db), "bad db name!");
                     api_generator::generate(
-                        name, db, group, model, ts_dir, *inquiry, *force, *clean,
+                        name, db, group, model, ts_dir, *inquiry, *force, *clean, *auto_fix,
                     )?;
                 } else {
                     for db in crate::api_generator::api_db_list(Path::new(name))? {
                         api_generator::generate(
-                            name, &db, group, model, ts_dir, *inquiry, *force, *clean,
+                            name, &db, group, model, ts_dir, *inquiry, *force, *clean, *auto_fix,
                         )?;
                     }
                 }

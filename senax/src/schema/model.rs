@@ -299,6 +299,7 @@ pub struct ModelDef {
     pub belongs_to: IndexMap<String, Option<BelongsToDef>>,
     /// ### belongs_to_outer_db リレーション
     /// 他のDBのモデルを参照するbelongs_to
+    /// joinとfilterマクロは記述可能。GraphQL等の自動生成APIは非対応
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub belongs_to_outer_db: IndexMap<String, BelongsToOuterDbDef>,
     /// ### has_one リレーション
@@ -448,6 +449,7 @@ pub struct ModelJson {
     pub belongs_to: Vec<BelongsToJson>,
     /// ### belongs_to_outer_db リレーション
     /// 他のDBのモデルを参照するbelongs_to
+    /// joinとfilterマクロは記述可能。GraphQL等の自動生成APIは非対応
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub belongs_to_outer_db: Vec<BelongsToOuterDbJson>,
     /// ### has_one リレーション
@@ -1644,7 +1646,7 @@ impl ModelDef {
                 }
             }
         }
-        for (model, name, rel) in self.relations_belonging(false) {
+        for (model, name, rel) in self.relations_belonging(Joinable::Filter, false) {
             let local_id = rel.get_local_id(name, model);
             if local_id.len() > 1 {
                 let fields: Vec<_> = local_id
@@ -1735,61 +1737,68 @@ impl ModelDef {
             })
             .collect()
     }
-    pub fn relations(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !v.1.is_type_of_belongs_to_outer_db() && v.1.rel_type.is_some())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_in_cache(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_in_cache(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| v.1.is_type_of_has() && v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn belongs_to_outer_db(&self) -> Vec<(&String, &RelDef)> {
+    pub fn belongs_to_outer_db(&self, joinable: Joinable) -> Vec<(&String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| v.1.is_type_of_belongs_to_outer_db())
             .map(|v| (v.0, v.1))
             .collect()
     }
     pub fn relations_one_and_belonging(
-        &self,
+        &self, joinable: Joinable,
         self_only: bool,
     ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_belongs_to() || v.1.is_type_of_has_one())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_belonging(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_belonging(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| ApiRelationDef::has(v.0))
             .filter(|v| v.1.is_type_of_belongs_to())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_belonging_cache(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_belonging_cache(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_belongs_to() && v.1.get_foreign_model().use_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
     pub fn relations_belonging_uncached(
-        &self,
+        &self, joinable: Joinable,
         self_only: bool,
     ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_belongs_to() && !v.1.get_foreign_model().use_cache())
             .map(|v| (self, v.0, v.1))
@@ -1798,51 +1807,57 @@ impl ModelDef {
     pub fn relations_belonging_for_api_response(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| Joinable::Join.is(v.1.joinable))
             .filter(|v| ApiRelationDef::check(v.0, false))
             .filter(|v| v.1.is_type_of_belongs_to())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
     pub fn relations_belonging_outer_db(
-        &self,
+        &self, joinable: Joinable,
         self_only: bool,
     ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             // .filter(|v| ApiRelationDef::has(v.0))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_belongs_to_outer_db())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_one_and_many(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_one_and_many(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_has_one() || v.1.is_type_of_has_many())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_one(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_one(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| ApiRelationDef::has(v.0))
             .filter(|v| v.1.is_type_of_has_one())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_one_cache(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_one_cache(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_has_one() && v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_one_uncached(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_one_uncached(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_has_one() && !v.1.in_cache())
             .map(|v| (self, v.0, v.1))
@@ -1851,74 +1866,84 @@ impl ModelDef {
     pub fn relations_one_for_api_response(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| Joinable::Join.is(v.1.joinable))
             .filter(|v| ApiRelationDef::check(v.0, false))
             .filter(|v| v.1.is_type_of_has_one())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| ApiRelationDef::has(v.0))
             .filter(|v| v.1.is_type_of_has_many())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_without_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_without_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| v.1.is_type_of_has_many() && v.1.limit.is_none())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_with_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_with_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| v.1.is_type_of_has_many() && v.1.limit.is_some())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_cache(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_cache(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_cache_without_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_cache_without_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache() && v.1.limit.is_none())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_cache_with_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_cache_with_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| v.1.is_type_of_has_many() && v.1.in_cache() && v.1.limit.is_some())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_uncached(&self, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_uncached(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !self_only || !v.1.in_abstract)
             .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_uncached_without_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_uncached_without_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache() && v.1.limit.is_none())
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_uncached_with_limit(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_uncached_with_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| v.1.is_type_of_has_many() && !v.1.in_cache() && v.1.limit.is_some())
             .map(|v| (self, v.0, v.1))
             .collect()
@@ -1926,6 +1951,7 @@ impl ModelDef {
     pub fn relations_many_for_api_response(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| Joinable::Join.is(v.1.joinable))
             .filter(|v| ApiRelationDef::check(v.0, false))
             .filter(|v| v.1.is_type_of_has_many())
             .map(|v| (self, v.0, v.1))
@@ -1934,6 +1960,7 @@ impl ModelDef {
     pub fn relations_many_for_api_request(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| Joinable::Join.is(v.1.joinable))
             .filter(|v| ApiRelationDef::check(v.0, true))
             .filter(|v| v.1.is_type_of_has_many())
             .map(|v| (self, v.0, v.1))
@@ -1942,6 +1969,7 @@ impl ModelDef {
     pub fn relations_one_for_api_request(&self) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| Joinable::Join.is(v.1.joinable))
             .filter(|v| ApiRelationDef::check(v.0, true))
             .filter(|v| v.1.is_type_of_has_one())
             .map(|v| (self, v.0, v.1))
@@ -1953,6 +1981,7 @@ impl ModelDef {
     ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
+            .filter(|v| Joinable::Join.is(v.1.joinable))
             .filter(|v| ApiRelationDef::check(v.0, true))
             .filter(|v| ApiRelationDef::get(v.0).unwrap().use_replace == is_replace)
             .filter(|v| v.1.is_type_of_has_one())
@@ -2146,6 +2175,19 @@ impl ModelDef {
                     .collect::<Vec<_>>()
                     .join(",")
             )
+        }
+    }
+}
+
+pub enum Joinable {
+    Join,
+    Filter,
+}
+impl Joinable{
+    fn is(&self, target: bool) -> bool {
+        match self {
+            Joinable::Join => target == true,
+            Joinable::Filter => true,
         }
     }
 }

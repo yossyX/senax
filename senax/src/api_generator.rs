@@ -2,6 +2,7 @@ use anyhow::{Context, Result, ensure};
 use askama::Template;
 use indexmap::IndexMap;
 use regex::{Captures, Regex};
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fmt::Write as _;
@@ -10,13 +11,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-use crate::api_generator::schema::{API_CONFIG, ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef};
+use crate::api_generator::schema::{
+    API_CONFIG, ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef, Relations,
+};
 use crate::api_generator::template::{DbConfigTemplate, MutationRootTemplate, QueryRootTemplate};
 use crate::common::ToCase as _;
 use crate::common::{fs_write, parse_yml_file, simplify_yml};
-use crate::filters;
-use crate::schema::{_to_ident_name, GROUPS, ModelDef, to_id_name};
+use crate::schema::{_to_ident_name, ConfigDef, GROUPS, Joinable, ModelDef, to_id_name};
 use crate::{API_SCHEMA_PATH, model_generator};
+use crate::{SCHEMA_PATH, filters};
 
 use self::schema::{ApiRelationDef, RelationVisibility};
 
@@ -34,6 +37,7 @@ pub fn generate(
     inquiry: bool,
     force: bool,
     clean: bool,
+    auto_fix: bool,
 ) -> Result<()> {
     let server_dir = Path::new(server);
     ensure!(
@@ -426,6 +430,11 @@ pub fn generate(
             }
         }
     }
+
+    if auto_fix {
+        fix_config(server, db_route)?;
+    }
+
     Ok(())
 }
 
@@ -899,13 +908,13 @@ fn inquire_relation(
     rel_list: &mut Vec<String>,
 ) -> Result<schema::Relations> {
     let mut items = Vec::new();
-    for (_, rel_name, _) in def.relations_one(false) {
+    for (_, rel_name, _) in def.relations_one(Joinable::Filter,  false) {
         items.push(rel_name);
     }
-    for (_, rel_name, _) in def.relations_many(false) {
+    for (_, rel_name, _) in def.relations_many(Joinable::Filter, false) {
         items.push(rel_name);
     }
-    for (_, rel_name, _) in def.relations_belonging(false) {
+    for (_, rel_name, _) in def.relations_belonging(Joinable::Filter, false) {
         items.push(rel_name);
     }
     if items.is_empty() {
@@ -945,19 +954,19 @@ fn inquire_relation(
                 Ok(Some(api_def))
             }
         };
-    for (_, rel_name, rel) in def.relations_one(false) {
+    for (_, rel_name, rel) in def.relations_one(Joinable::Filter, false) {
         if !selected.contains(rel_name) {
             continue;
         }
         relations.insert(rel_name.clone(), closure(rel_name, rel)?);
     }
-    for (_, rel_name, rel) in def.relations_many(false) {
+    for (_, rel_name, rel) in def.relations_many(Joinable::Filter, false) {
         if !selected.contains(rel_name) {
             continue;
         }
         relations.insert(rel_name.clone(), closure(rel_name, rel)?);
     }
-    for (_, rel_name, rel) in def.relations_belonging(false) {
+    for (_, rel_name, rel) in def.relations_belonging(Joinable::Filter, false) {
         if !selected.contains(rel_name) {
             continue;
         }
@@ -981,7 +990,7 @@ fn write_relation(
     api_def: &ApiModelDef,
 ) -> Result<()> {
     let mut relation_buf = String::new();
-    for (_model, rel_name, rel) in def.relations_one(false) {
+    for (_model, rel_name, rel) in def.relations_one(Joinable::Join, false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
@@ -1032,7 +1041,7 @@ fn write_relation(
         ApiFieldDef::pop();
         relation_buf.push_str("\n}");
     }
-    for (_model, rel_name, rel) in def.relations_many(false) {
+    for (_model, rel_name, rel) in def.relations_many(Joinable::Join,false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
@@ -1083,7 +1092,7 @@ fn write_relation(
         ApiFieldDef::pop();
         relation_buf.push_str("\n}");
     }
-    for (_model, rel_name, rel) in def.relations_belonging(false) {
+    for (_model, rel_name, rel) in def.relations_belonging(Joinable::Join,false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
@@ -1142,4 +1151,134 @@ pub fn api_db_list(server: &Path) -> Result<Vec<String>> {
         }
     }
     Ok(list)
+}
+
+fn fix_config(server: &str, db_route: &str) -> Result<()> {
+    use crate::common::{read_group_yml, write_group_yml};
+    let server_dir = Path::new(server);
+    ensure!(
+        server_dir.exists() && server_dir.is_dir(),
+        "The crate path does not exist."
+    );
+
+    let schema_dir = server_dir.join(API_SCHEMA_PATH);
+    let db_config_path = schema_dir.join(format!("{db_route}.yml"));
+    ensure!(
+        db_config_path.exists(),
+        "The route path does not exist.: {}",
+        db_route
+    );
+    let db_config: ApiDbDef = parse_yml_file(&db_config_path)?;
+    let db = db_config.db.clone().unwrap_or(db_route.to_string());
+
+    model_generator::check_version(&db)?;
+
+    let path = Path::new(SCHEMA_PATH).join(format!("{db}.yml"));
+    let config: ConfigDef = parse_yml_file(&path)?;
+    let mut groups = IndexMap::new();
+    for (group_name, _) in config.groups {
+        let models = read_group_yml(&db, &group_name)?;
+        groups.insert(group_name, models);
+    }
+    let groups = RefCell::new(groups);
+
+    let schema_dir = schema_dir.join(db_route);
+    for (group_route, api_group_def) in db_config.groups {
+        let schema_path = schema_dir.join(format!("{group_route}.yml"));
+        if !schema_path.exists() {
+            continue;
+        }
+        let group_name = if let Some(api_group_def) = api_group_def.as_ref() {
+            api_group_def.group.as_ref().unwrap_or(&group_route)
+        } else {
+            &group_route
+        };
+        let api_model_map: IndexMap<String, Option<ApiModelDef>> = parse_yml_file(&schema_path)?;
+        for (api_model_name, api_model_def) in api_model_map {
+            if let Some(api_model_def) = api_model_def {
+                let model_name = api_model_def.model.as_ref().unwrap_or(&api_model_name);
+                traverse_relation(&groups, group_name, model_name, &api_model_def.relations);
+            }
+        }
+    }
+    for (group_name, models) in groups.borrow().iter() {
+        write_group_yml(&db, group_name, models)?;
+    }
+
+    Ok(())
+}
+
+fn traverse_relation(
+    groups: &RefCell<IndexMap<String, IndexMap<String, ModelDef>>>,
+    group_name: &str,
+    model_name: &str,
+    relation: &Relations,
+) {
+    for (rel_name, rel) in relation {
+        let result = set_joinable(groups, group_name, model_name, rel_name);
+        if let Some(rel) = rel {
+            if let Some((group_name, model_name)) = result {
+                traverse_relation(groups, &group_name, &model_name, &rel.relations);
+            }
+        }
+    }
+}
+
+fn set_joinable(
+    groups: &RefCell<IndexMap<String, IndexMap<String, ModelDef>>>,
+    group_name: &str,
+    model_name: &str,
+    rel: &str,
+) -> Option<(String, String)> {
+    if let Some(models) = groups.borrow_mut().get_mut(group_name) {
+        if let Some(model) = models.get_mut(model_name) {
+            if let Some(r) = model.belongs_to.get_mut(rel) {
+                if let Some(r) = r {
+                    r.joinable = true;
+                    return Some((
+                        r.group.as_deref().unwrap_or(group_name).to_string(),
+                        r.model.as_deref().unwrap_or(rel).to_string(),
+                    ));
+                } else {
+                    let mut r = crate::schema::BelongsToDef::default();
+                    r.joinable = true;
+                    model.belongs_to.insert(rel.to_string(), Some(r));
+                    return Some((group_name.to_string(), rel.to_string()));
+                }
+            }
+            if let Some(r) = model.belongs_to_outer_db.get_mut(rel) {
+                r.joinable = true;
+                return None;
+            }
+            if let Some(r) = model.has_one.get_mut(rel) {
+                if let Some(r) = r {
+                    r.joinable = true;
+                    return Some((
+                        r.group.as_deref().unwrap_or(group_name).to_string(),
+                        r.model.as_deref().unwrap_or(rel).to_string(),
+                    ));
+                } else {
+                    let mut r = crate::schema::HasOneDef::default();
+                    r.joinable = true;
+                    model.has_one.insert(rel.to_string(), Some(r));
+                    return Some((group_name.to_string(), rel.to_string()));
+                }
+            }
+            if let Some(r) = model.has_many.get_mut(rel) {
+                if let Some(r) = r {
+                    r.joinable = true;
+                    return Some((
+                        r.group.as_deref().unwrap_or(group_name).to_string(),
+                        r.model.as_deref().unwrap_or(rel).to_string(),
+                    ));
+                } else {
+                    let mut r = crate::schema::HasManyDef::default();
+                    r.joinable = true;
+                    model.has_many.insert(rel.to_string(), Some(r));
+                    return Some((group_name.to_string(), rel.to_string()));
+                }
+            }
+        }
+    }
+    None
 }

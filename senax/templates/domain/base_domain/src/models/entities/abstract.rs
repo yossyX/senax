@@ -85,13 +85,13 @@ pub trait @{ pascal_name }@: std::fmt::Debug@% if !def.parents().is_empty() %@@%
 {label}{comment}    fn {ident}(&self) -> {outer};", "") }@
 @{- def.cols_except_primaries_and_invisibles()|fmt_join("
 {label}{comment}    fn {ident}(&self) -> {domain_outer};", "") }@
-@{- def.relations_belonging(true)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, true)|fmt_rel_join("
     fn _{raw_rel_name}_id(&self) -> Option<_model_::{class_mod_path}::{class}Primary> {
         Some({local_keys}.into())
     }", "") }@
-@{- def.relations_one_and_belonging(true)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>>;", "") }@
-@{- def.relations_many(true)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>>;", "") }@
 }
 
@@ -100,10 +100,10 @@ pub trait @{ pascal_name }@: std::fmt::Debug@% if !def.parents().is_empty() %@@%
 pub trait @{ pascal_name }@Updater: @{ pascal_name }@ + crate::models::MarkForDelete@% if !def.parents().is_empty() %@@% for parent in def.parents() %@ + super::super::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@Updater@% endfor %@@% endif %@ {
 @{- def.non_primaries_except_invisible_and_read_only(true)|fmt_join("
 {label}{comment}    fn set_{raw_name}(&mut self, v: {domain_factory});", "") }@
-@{- def.relations_one(true)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_path}::{class}Updater>>;
 {label}{comment}    fn set_{raw_rel_name}(&mut self, v: Box<dyn _model_::{class_mod_path}::{class}Updater>);", "") }@
-@{- def.relations_many(true)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
 {label}{comment}    fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> + '_>>;
 {label}{comment}    fn take_{raw_rel_name}(&mut self) -> Option<Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>>;
 {label}{comment}    fn replace_{raw_rel_name}(&mut self, list: Vec<Box<dyn _model_::{class_mod_path}::{class}Updater>>);

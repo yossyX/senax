@@ -12,7 +12,7 @@ use ::base_domain::value_objects;
 use ::base_domain::models::@{ db|snake|ident }@ as _model_;
 #[allow(unused_imports)]
 use crate::repositories as _repository_;
-@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+@%- for (name, rel_def) in def.belongs_to_outer_db(Joinable::Join) %@
 pub use ::base_domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 #[cfg(any(feature = "mock", test))]

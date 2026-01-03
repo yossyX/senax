@@ -6,6 +6,7 @@ use crate::{
     common::fs_write,
     schema::{ModelDef, set_domain_mode, to_id_name},
 };
+use crate::schema::Joinable;
 use anyhow::{Result, ensure};
 use askama::Template;
 use regex::Regex;
@@ -651,7 +652,7 @@ use async_trait::async_trait;
 use base_domain as domain;
 #[allow(unused_imports)]
 use base_domain::models::@{ db|snake|ident }@ as _model_;
-@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+@%- for (name, rel_def) in def.belongs_to_outer_db(Joinable::Join) %@
 #[allow(unused_imports)]
 pub use base_domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
@@ -696,10 +697,10 @@ pub use super::_base::_@{ mod_name }@::{@{ pascal_name }@Query@{ selector|pascal
 pub use self::{MockQueryService_ as Mock@{ pascal_name }@QueryService, MockRepository_ as Mock@{ pascal_name }@Repository};
 #[cfg(any(feature = "mock", test))]
 pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
-@{- def.relations()|fmt_rel_join("
-pub use base_domain::models::--1--::{class_mod_path} as _{raw_rel_name}_model_;", "")|replace1(db|snake|ident) }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
-pub use base_domain::models::{db_mod_ident}::{class_mod_path} as _{raw_rel_name}_model_;", "") }@
+@{- def.relations(Joinable::Join)|fmt_rel_join("
+// pub use base_domain::models::--1--::{class_mod_path} as _{raw_rel_name}_model_;", "")|replace1(db|snake|ident) }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
+// pub use base_domain::models::{db_mod_ident}::{class_mod_path} as _{raw_rel_name}_model_;", "") }@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
         escape = "none"

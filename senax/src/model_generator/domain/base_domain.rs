@@ -7,6 +7,7 @@ use crate::{
     common::fs_write,
     schema::{FieldDef, ModelDef, VALUE_OBJECTS, set_domain_mode, to_id_name},
 };
+use crate::schema::Joinable;
 use anyhow::{Result, ensure};
 use askama::Template;
 use regex::Regex;

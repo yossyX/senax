@@ -11,6 +11,7 @@ use std::{
     sync::Arc,
 };
 
+use crate::schema::Joinable;
 use crate::model_generator::analyzer::UnifiedGroup;
 use crate::schema::is_mysql_mode;
 use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable, to_id_name};

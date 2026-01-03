@@ -20,7 +20,7 @@ use senax_common::types::point::ToPoint as _;
 use std::ops::{Deref as _, DerefMut as _};
 #[allow(unused_imports)]
 use domain::models::@{ db|snake|ident }@ as _model_;
-@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+@%- for (name, rel_def) in def.belongs_to_outer_db(Joinable::Filter) %@
 use domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 
@@ -67,17 +67,17 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
     fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
-@{- parent.relations_one_and_belonging(true)|fmt_rel_join("
+@{- parent.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
         Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _model_::{class_mod_path}::{class}))
     }", "") }@
-@{- parent.relations_many(true)|fmt_rel_join("
+@{- parent.relations_many(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
         Ok(Box::new(__Getter__::_{raw_rel_name}(self)?.iter().map(|v| v as &dyn _model_::{class_mod_path}::{class})))
     }", "") }@
-@{- parent.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+@{- parent.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
         Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
@@ -101,17 +101,17 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
     fn {ident}(&self) -> {domain_outer} {
         panic!(\"Cannot be accessed due to being non-cacheable.: {raw_name}\")
     }", "") }@
-@{- parent.relations_one_and_belonging(true)|fmt_rel_join("
+@{- parent.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
         Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| v as &dyn _model_::{class_mod_path}::{class}))
     }", "") }@
-@{- parent.relations_many(true)|fmt_rel_join("
+@{- parent.relations_many(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
         Ok(Box::new(__Cache__::_{raw_rel_name}(self)?.iter().map(|v| v as &dyn _model_::{class_mod_path}::{class})))
     }", "") }@
-@{- parent.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+@{- parent.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
         Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
@@ -138,7 +138,7 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
     fn set_{raw_name}(&mut self, v: {domain_factory}) {
         __Updater__::mut_{raw_name}(self).set(v{convert_domain_inner_type})
     }", "") }@
-@{- parent.relations_one(true)|fmt_rel_join("
+@{- parent.relations_one(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_path}::{class}Updater>> {
         Ok(self.{rel_name}.as_mut().context(\"{raw_rel_name} is not joined.\")?.iter_mut().last().filter(|v| !v.will_be_deleted() && !v.has_been_deleted()).map(|v| v as &mut dyn _model_::{class_mod_path}::{class}Updater))
     }
@@ -151,7 +151,7 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
             }
         )
     }", "") }@
-@{- parent.relations_many(true)|fmt_rel_join("
+@{- parent.relations_many(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> + '_>> {
         struct V<'a, T: crate::misc::Updater>(crate::accessor::AccessorHasMany<'a, T>);
         impl<T: crate::misc::Updater + _model_::{class_mod_path}::{class}Updater> domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> for V<'_, T> {
@@ -198,17 +198,17 @@ impl @{ pascal_name }@ for _@{ pascal_name }@ {
     fn {ident}(&self) -> {domain_outer} {
         __Getter__::_{raw_name}(self){convert_impl_domain_outer}
     }", "") }@
-@{- def.relations_one_and_belonging(true)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
         Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _model_::{class_mod_path}::{class}))
     }", "") }@
-@{- def.relations_many(true)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
         Ok(Box::new(__Getter__::_{raw_rel_name}(self)?.iter().map(|v| v as &dyn _model_::{class_mod_path}::{class})))
     }", "") }@
-@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
         Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
@@ -239,17 +239,17 @@ impl @{ pascal_name }@ for _@{ pascal_name }@Cache {
     fn {ident}(&self) -> {domain_outer} {
         panic!(\"Cannot be accessed due to being non-cacheable.: {raw_name}\")
     }", "") }@
-@{- def.relations_one_and_belonging(true)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
         Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| v as &dyn _model_::{class_mod_path}::{class}))
     }", "") }@
-@{- def.relations_many(true)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
         Ok(Box::new(__Cache__::_{raw_rel_name}(self)?.iter().map(|v| v as &dyn _model_::{class_mod_path}::{class})))
     }", "") }@
-@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
         Ok(__Cache__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
@@ -275,15 +275,15 @@ impl @{ pascal_name }@ for _@{ pascal_name }@Updater {
     fn {ident}(&self) -> {domain_outer} {
         {convert_impl_domain_outer_for_updater}
     }", "") }@
-@{- def.relations_one_and_belonging(true)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
         unimplemented!()
     }", "") }@
-@{- def.relations_many(true)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
         unimplemented!()
     }", "") }@
-@{- def.relations_belonging_outer_db(true)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
         unimplemented!()
     }", "") }@
@@ -300,7 +300,7 @@ impl @{ pascal_name }@Updater for _@{ pascal_name }@Updater {
     fn set_{raw_name}(&mut self, v: {domain_factory}) {
         __Updater__::mut_{raw_name}(self).set(v{convert_domain_inner_type})
     }", "") }@
-@{- def.relations_one(true)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> anyhow::Result<Option<&mut dyn _model_::{class_mod_path}::{class}Updater>> {
         Ok(self.{rel_name}.as_mut().context(\"{raw_rel_name} is not joined.\")?.iter_mut().last().filter(|v| !v.will_be_deleted() && !v.has_been_deleted()).map(|v| v as &mut dyn _model_::{class_mod_path}::{class}Updater))
     }
@@ -313,7 +313,7 @@ impl @{ pascal_name }@Updater for _@{ pascal_name }@Updater {
             }
         )
     }", "") }@
-@{- def.relations_many(true)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&mut self) -> anyhow::Result<Box<dyn domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> + '_>> {
         struct V<'a, T: crate::misc::Updater>(crate::accessor::AccessorHasMany<'a, T>);
         impl<T: crate::misc::Updater + _model_::{class_mod_path}::{class}Updater> domain::models::UpdateIterator<dyn _model_::{class_mod_path}::{class}Updater> for V<'_, T> {

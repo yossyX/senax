@@ -138,9 +138,9 @@ pub trait _@{ pascal_name }@Getter: Send + Sync {
 {label}{comment}    fn _{raw_name}(&self) -> &{inner};", "") -}@
 @{- def.non_primaries()|fmt_join("
 {label}{comment}    fn _{raw_name}(&self) -> {outer};", "") -}@
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("
 {label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;", "") -}@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
 {label}{comment}    fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>>;", "") -}@
 }
 @{-"\n"}@

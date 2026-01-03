@@ -14,7 +14,7 @@ use senax_common::types::point::ToPoint as _;
 use std::ops::{Deref as _, DerefMut as _};
 #[allow(unused_imports)]
 use domain::models::@{ db|snake|ident }@ as _model_;
-@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+@%- for (name, rel_def) in def.belongs_to_outer_db(Joinable::Filter) %@
 #[allow(unused_imports)]
 use domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
@@ -40,10 +40,10 @@ fn updater_from_factory(_v: domain::repository::@{ db|snake|ident }@::@{ group_n
         _upsert: false,
         _is_loaded: true,
         _op: Default::default(),
-@{- def.relations_one(false)|fmt_rel_join("\n        {rel_name}: None,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n        {rel_name}: None,", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("\n        {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n        {rel_name}: None,", "") }@
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n        {rel_name}: None,", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n        {rel_name}: None,", "") }@
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("\n        {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("\n        {rel_name}: None,", "") }@
     }
 }
 

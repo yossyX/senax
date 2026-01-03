@@ -13,25 +13,25 @@ use ::base_domain::value_objects;
 use ::base_domain::models::@{ db|snake|ident }@ as _model_;
 #[allow(unused_imports)]
 use crate::relations as _relations_;
-@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+@%- for (name, rel_def) in def.belongs_to_outer_db(Joinable::Filter) %@
 pub use ::base_domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 pub use ::base_relations_@{ rel_def.db()|snake }@ as _@{ rel_def.db()|snake }@_relations_;
 @%- endfor %@
 
 #[derive(Debug, Clone, Default)]
 pub struct Joiner_ {
-@{- def.relations()|fmt_rel_join("
+@{- def.relations(Joinable::Join)|fmt_rel_join("
     pub {rel_name}: Option<Box<_relations_::{class_mod_path}::Joiner_>>,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     pub {rel_name}: Option<Box<_{db_snake}_relations_::{class_mod_path}::Joiner_>>,", "") }@
 }
 impl Joiner_ {
     #[allow(clippy::nonminimal_bool)]
     pub fn has_some(&self) -> bool {
         false
-        @{- def.relations()|fmt_rel_join("
+        @{- def.relations(Joinable::Join)|fmt_rel_join("
             || self.{rel_name}.is_some()", "") }@
-        @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+        @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
             || self.{rel_name}.is_some()", "") }@
     }
     #[allow(unused_variables)]
@@ -39,9 +39,9 @@ impl Joiner_ {
         if let Some(lhs) = lhs {
             if let Some(rhs) = rhs {
                 Some(Box::new(Joiner_{
-                    @{- def.relations()|fmt_rel_join("
+                    @{- def.relations(Joinable::Join)|fmt_rel_join("
                     {rel_name}: _relations_::{class_mod_path}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
-                    @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+                    @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
                     {rel_name}: _{db_snake}_relations_::{class_mod_path}::Joiner_::merge(lhs.{rel_name}, rhs.{rel_name}),", "") }@
                 }))
             } else {
@@ -57,10 +57,10 @@ impl Joiner_ {
 @% let base_path = "$crate::models::{}::{}::_base::_{}"|format(db|snake|ident, group_name|ident, mod_name) -%@
 #[macro_export]
 macro_rules! _join_@{ fetch_macro_name }@ {
-@{- def.relations()|fmt_rel_join("
+@{- def.relations(Joinable::Join)|fmt_rel_join("
     ({rel_name}) => ($crate::models::--1--::{group_ident}::{mod_ident}::join!({}));
     ({rel_name}: $p:tt) => ($crate::models::--1--::{group_ident}::{mod_ident}::join!($p));", "")|replace1(db|snake|ident) }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     ({rel_name}) => (--1--::_{db_snake}_model_::{group_ident}::{mod_ident}::join!({}));
     ({rel_name}: $p:tt) => (--1--::_{db_snake}_model_::{group_ident}::{mod_ident}::join!($p));", "")|replace1(base_path) }@
     () => ();
@@ -430,11 +430,11 @@ impl ColGeoDistance_ {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug)]
 pub enum ColRel_ {
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("
+@{- def.relations_one_and_belonging(Joinable::Filter, false)|fmt_rel_join("
     {rel_name}(Option<Box<_relations_::{class_mod_path}::Filter_>>),", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Filter, false)|fmt_rel_join("
     {rel_name}(Option<Box<_relations_::{class_mod_path}::Filter_>>),", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Filter, false)|fmt_rel_outer_db_join("
     {rel_name}(Option<Box<_{db_snake}_relations_::{class_mod_path}::Filter_>>),", "") }@
 }
 #[allow(unreachable_patterns)]
@@ -442,19 +442,19 @@ pub enum ColRel_ {
 impl std::fmt::Display for ColRel_ {
     fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            @{- def.relations_one_and_belonging(false)|fmt_rel_join("
+            @{- def.relations_one_and_belonging(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(v) => if let Some(v) = v {
                 write!(_f, \"{raw_rel_name}:<{}>\", v)
             } else {
                 write!(_f, \"{raw_rel_name}\")
             },", "") }@
-            @{- def.relations_many(false)|fmt_rel_join("
+            @{- def.relations_many(Joinable::Filter, false)|fmt_rel_join("
             ColRel_::{rel_name}(v) => if let Some(v) = v {
                 write!(_f, \"{raw_rel_name}:<{}>\", v)
             } else {
                 write!(_f, \"{raw_rel_name}\")
             },", "") }@
-            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+            @{- def.relations_belonging_outer_db(Joinable::Filter, false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(v) => if let Some(v) = v {
                 write!(_f, \"{raw_rel_name}:<{}>\", v)
             } else {
@@ -470,22 +470,22 @@ impl ColRel_ {
     #[allow(clippy::match_single_binding)]
     fn joiner(&self) -> Option<Box<Joiner_>> {
         match self {
-            @{- def.relations_one_and_belonging(false)|fmt_rel_join("
+            @{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => Some(Box::new(Joiner_{
                 {rel_name}: Some(c.as_ref().and_then(|c| c.joiner()).unwrap_or_default()),
                 ..Default::default()
             })),", "") }@
-            @{- def.relations_many(false)|fmt_rel_join("
+            @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => Some(Box::new(Joiner_{
                 {rel_name}: Some(c.as_ref().and_then(|c| c.joiner()).unwrap_or_default()),
                 ..Default::default()
             })),", "") }@
-            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+            @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(c) => Some(Box::new(Joiner_{
                 {rel_name}: Some(c.as_ref().and_then(|c| c.joiner()).unwrap_or_default()),
                 ..Default::default()
             })),", "") }@
-            _ => unreachable!()
+            _ => None
         }
     }
     #[allow(unreachable_patterns)]
@@ -493,17 +493,17 @@ impl ColRel_ {
     #[allow(clippy::match_single_binding)]
     fn joiner_cache_only(&self) -> Option<Box<Joiner_>> {
         match self {
-            @{- def.relations_belonging_cache(false)|fmt_rel_join("
+            @{- def.relations_belonging_cache(Joinable::Join, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => Some(Box::new(Joiner_{
                 {rel_name}: Some(c.as_ref().and_then(|c| c.joiner_cache_only()).unwrap_or_default()),
                 ..Default::default()
             })),", "") }@
-            @{- def.relations_one_cache(false)|fmt_rel_join("
+            @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => Some(Box::new(Joiner_{
                 {rel_name}: Some(c.as_ref().and_then(|c| c.joiner_cache_only()).unwrap_or_default()),
                 ..Default::default()
             })),", "") }@
-            @{- def.relations_many_cache(false)|fmt_rel_join("
+            @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
             ColRel_::{rel_name}(c) => Some(Box::new(Joiner_{
                 {rel_name}: Some(c.as_ref().and_then(|c| c.joiner_cache_only()).unwrap_or_default()),
                 ..Default::default()
@@ -518,16 +518,16 @@ impl Check_<dyn @{ pascal_name }@> for ColRel_ {
     #[allow(clippy::match_single_binding)]
     fn check(&self, _obj: &dyn @{ pascal_name }@) -> anyhow::Result<bool> {
         Ok(match self {
-            @{- def.relations_one_and_belonging(false)|fmt_rel_join("
+            @{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("
             ColRel_::{rel_name}(None) => _obj.{rel_name}()?.is_some(),
             ColRel_::{rel_name}(Some(f)) => _obj.{rel_name}()?.map(|v| f.check(v)).unwrap_or(Ok(false))?,", "") }@
-            @{- def.relations_many(false)|fmt_rel_join("
+            @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
             ColRel_::{rel_name}(None) => _obj.{rel_name}()?.next().is_some(),
             ColRel_::{rel_name}(Some(f)) => _obj.{rel_name}()?.try_fold(false, |acc, v| Ok::<bool, anyhow::Error>(acc || f.check(v)?))?,", "") }@
-            @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+            @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
             ColRel_::{rel_name}(None) => _obj.{rel_name}()?.is_some(),
             ColRel_::{rel_name}(Some(f)) => _obj.{rel_name}()?.map(|v| f.check(v)).unwrap_or(Ok(false))?,", "") }@
-            _ => unreachable!()
+            _ => anyhow::bail!("")
         })
     }
 }
@@ -812,15 +812,15 @@ pub use @{ filter_macro_name }@_geo_distance as filter_geo_distance;
 
 #[macro_export]
 macro_rules! @{ filter_macro_name }@_rel {
-@%- for (model_def, col_name, rel_def) in def.relations_one_and_belonging(false) %@
+@%- for (model_def, col_name, rel_def) in def.relations_one_and_belonging(Joinable::Filter, false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
     (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::relations::@{ rel_def.get_group_name()|snake|ident }@::@{ rel_def.get_mod_name()|ident }@::filter!($t)))));
 @%- endfor %@
-@%- for (model_def, col_name, rel_def) in def.relations_many(false) %@
+@%- for (model_def, col_name, rel_def) in def.relations_many(Joinable::Filter, false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
     (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new($crate::relations::@{ rel_def.get_group_name()|snake|ident }@::@{ rel_def.get_mod_name()|ident }@::filter!($t)))));
 @%- endfor %@
-@%- for (model_def, col_name, rel_def) in def.relations_belonging_outer_db(false) %@
+@%- for (model_def, col_name, rel_def) in def.relations_belonging_outer_db(Joinable::Filter, false) %@
     (@{ col_name }@) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(None));
     (@{ col_name }@ $t:tt) => (@{ model_path }@::ColRel_::@{ col_name|ident }@(Some(Box::new(@{ model_path }@::_@{ rel_def.db()|snake }@_relations_::@{ rel_def.get_group_name()|snake|ident }@::@{ rel_def.get_mod_name()|ident }@::filter!($t)))));
 @%- endfor %@

@@ -594,7 +594,7 @@ impl ConfigDef {
         let groups = group_lock.as_ref().unwrap();
         for (_, models) in groups {
             for (_, model) in models {
-                for (_, belongs) in &model.belongs_to_outer_db() {
+                for (_, belongs) in &model.belongs_to_outer_db(super::Joinable::Filter) {
                     v.insert(belongs.db().to_string());
                 }
             }

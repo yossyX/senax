@@ -497,16 +497,24 @@ SESSION_SECRET_KEY={}
 }
 
 fn fix_build_sh(content: &str, name: &str) -> Result<String> {
-    if !content.contains(&format!("senax actix api {}", name)) {
-        let content = content.replace(
+    let mut content = content.to_owned();
+    if !content.contains(&format!("senax actix api {name}")) {
+        content = content.replace(
             "# Do not modify this line. (Api)",
             &format!(
-                "senax actix api {name} -c -f ${name}_client\ncargo run -p {name} -- gen-gql-schema ${name}_client\n# Do not modify this line. (Api)",
+                "senax actix api {name} --auto-fix -c -f  ${name}_client\n# Do not modify this line. (Api)",
             ),
         );
-        return Ok(content);
     }
-    Ok(content.to_owned())
+    if !content.contains(&format!("cargo run -p {name} -- gen-gql-schema")) {
+        content = content.replace(
+            "# Do not modify this line. (ApiClient)",
+            &format!(
+                "cargo run -p {name} -- gen-gql-schema ${name}_client\n# Do not modify this line. (ApiClient)",
+            ),
+        );
+    }
+    Ok(content)
 }
 
 struct Secret;

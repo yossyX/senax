@@ -19,6 +19,7 @@ use crate::{
     schema::{self, CONFIG, GROUPS, ModelDef, to_id_name},
 };
 use crate::{SEPARATED_BASE_FILES, filters};
+use crate::schema::Joinable;
 
 mod analyzer;
 mod db;
@@ -532,7 +533,7 @@ pub fn generate(
                             == Some(&analyzer::Mark::Include)
                     })
                     .flat_map(|(_, v)| {
-                        v.belongs_to_outer_db()
+                        v.belongs_to_outer_db(Joinable::Filter)
                             .iter()
                             .map(|v| (v.1.db().to_string(), v.1.get_group_name()))
                             .collect::<Vec<_>>()

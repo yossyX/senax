@@ -2,9 +2,11 @@
 
 # Do not modify this line. (Client)
 
+# Do not modify this line. (Api)
+
 senax model -c
 
-# Do not modify this line. (Api)
+# Do not modify this line. (ApiClient)
 
 cargo run -- gql-schema > schema.graphql
 if sed --version 2>&1 | grep -q GNU; then

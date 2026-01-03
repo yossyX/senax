@@ -44,7 +44,7 @@ use domain::value_objects;
 @%- for mod_name in def.relation_mods() %@
 use crate::models::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- endfor %@
-@%- for (name, rel_def) in def.belongs_to_outer_db() %@
+@%- for (name, rel_def) in def.belongs_to_outer_db(Joinable::Filter) %@
 use db_@{ rel_def.db()|snake }@::models::@{ rel_def.get_group_mod_path() }@ as rel_@{ rel_def.get_group_mod_name() }@;
 @%- endfor %@
 
@@ -71,9 +71,9 @@ pub enum CacheOp {
         shard_id: ShardId,
         #[senax(id = 3)]
         data: Data,
-@{- def.relations_one_cache(false)|fmt_rel_join("
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
         _{rel_name}: Option<Vec<rel_{class_mod}::CacheOp>>,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
         _{rel_name}: Option<Vec<rel_{class_mod}::CacheOp>>,", "") }@
     },
     #[senax(id = 4)]
@@ -99,9 +99,9 @@ pub enum CacheOp {
         update: Data,
         #[senax(id = 4)]
         op: OpData,
-@{- def.relations_one_cache(false)|fmt_rel_join("
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
         _{rel_name}: Option<Vec<rel_{class_mod}::CacheOp>>,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
         _{rel_name}: Option<Vec<rel_{class_mod}::CacheOp>>,", "") }@
     },
     #[senax(id = 6)]
@@ -548,10 +548,10 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 pub struct _@{ pascal_name }@ {
     pub _inner: Data,
     pub _filter_flag: BTreeMap<&'static str, bool>,
-@{ def.relations_one(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
-@{ def.relations_many(false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}>>,\n", "") -}@
-@{ def.relations_belonging(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
-@{ def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_one(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_many(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}>>,\n", "") -}@
+@{ def.relations_belonging(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy, strum::Display, EnumMessage, EnumString, IntoStaticStr, strum_macros::EnumIter, strum_macros::EnumProperty)]
@@ -568,21 +568,21 @@ pub struct CacheWrapper {
     pub _inner: CacheData,
     _shard_id: ShardId,
     _time: MSec,
-@{ def.relations_one_cache(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Arc<rel_{class_mod}::CacheWrapper>>>,\n", "") -}@
-@{ def.relations_many_cache(false)|fmt_rel_join("    pub {rel_name}: Option<Vec<Arc<rel_{class_mod}::CacheWrapper>>>,\n", "") -}@
+@{ def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Option<Arc<rel_{class_mod}::CacheWrapper>>>,\n", "") -}@
+@{ def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Vec<Arc<rel_{class_mod}::CacheWrapper>>>,\n", "") -}@
 }
 
 #[derive(Clone, Debug)]
 pub struct _@{ pascal_name }@Cache {
     pub _wrapper: Arc<CacheWrapper>,
     pub _filter_flag: BTreeMap<&'static str, bool>,
-@{ def.relations_one_cache(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}Cache>>>,\n", "") -}@
-@{ def.relations_one_uncached(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
-@{ def.relations_many_cache(false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}Cache>>,\n", "") -}@
-@{ def.relations_many_uncached(false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}>>,\n", "") -}@
-@{ def.relations_belonging_cache(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}Cache>>>,\n", "") -}@
-@{ def.relations_belonging_uncached(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
-@{ def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}Cache>>>,\n", "") -}@
+@{ def.relations_one_uncached(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}Cache>>,\n", "") -}@
+@{ def.relations_many_uncached(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}>>,\n", "") -}@
+@{ def.relations_belonging_cache(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}Cache>>>,\n", "") -}@
+@{ def.relations_belonging_uncached(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 
 #[derive(Pack, Unpack, Clone, Debug)]
@@ -695,8 +695,8 @@ impl HashVal for CacheSyncWrapper {
 #[serde(deny_unknown_fields)]
 pub struct _@{ pascal_name }@Factory {
 @{ def.for_factory()|fmt_join("{label}{comment}{factory_default}    pub {ident}: {factory},", "\n") }@
-@{ def.relations_one(false)|fmt_rel_join("    pub {rel_name}: Option<rel_{class_mod}::{class}Factory>,\n", "") -}@
-@{ def.relations_many(false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}Factory>>,\n", "") -}@
+@{ def.relations_one(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<rel_{class_mod}::{class}Factory>,\n", "") -}@
+@{ def.relations_many(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}Factory>>,\n", "") -}@
 }
 
 #[derive(Clone, Debug)]
@@ -709,10 +709,10 @@ pub struct _@{ pascal_name }@Updater {
     pub _upsert: bool,
     pub _is_loaded: bool,
     pub _op: OpData,
-@{ def.relations_one(false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}Updater>>,\n", "") -}@
-@{ def.relations_many(false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}Updater>>,\n", "") -}@
-@{ def.relations_belonging(false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
-@{ def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_one(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}Updater>>,\n", "") -}@
+@{ def.relations_many(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Vec<rel_{class_mod}::{class}Updater>>,\n", "") -}@
+@{ def.relations_belonging(Joinable::Join, false)|fmt_rel_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
+@{ def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 
 #[derive(Pack, Unpack, Clone, Debug)]
@@ -721,9 +721,9 @@ pub struct ForInsert {
     pub _data: Data,
     #[senax(id = 2)]
     pub _is_new: bool,
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
     pub {rel_name}: Option<Option<Box<rel_{class_mod}::ForInsert>>>,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
     pub {rel_name}: Option<Vec<rel_{class_mod}::ForInsert>>,", "") }@
 }
 
@@ -732,9 +732,9 @@ impl From<_@{ pascal_name }@Updater> for ForInsert {
         Self {
             _data: v._data,
             _is_new: v._is_new,
-            @{- def.relations_one(false)|fmt_rel_join("
+            @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
             {rel_name}: v.{rel_name}.map(|v| v.into_iter().filter(|v| !v.will_be_deleted()).next_back().map(|v| Box::new(v.into()))),", "") }@
-            @{- def.relations_many(false)|fmt_rel_join("
+            @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
             {rel_name}: v.{rel_name}.map(|v| v.into_iter().map(|v| v.into()).collect()),", "") }@
         }
     }
@@ -745,9 +745,9 @@ impl From<Box<_@{ pascal_name }@Updater>> for Box<ForInsert> {
         Box::new(ForInsert {
             _data: v._data,
             _is_new: v._is_new,
-            @{- def.relations_one(false)|fmt_rel_join("
+            @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
             {rel_name}: v.{rel_name}.map(|v| v.into_iter().filter(|v| !v.will_be_deleted()).next_back().map(|v| Box::new(v.into()))),", "") }@
-            @{- def.relations_many(false)|fmt_rel_join("
+            @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
             {rel_name}: v.{rel_name}.map(|v| v.into_iter().map(|v| v.into()).collect()),", "") }@
         })
     }
@@ -763,15 +763,15 @@ impl fmt::Display for ForInsert {
 pub trait _@{ pascal_name }@Getter: Send + Sync + 'static {
 @{ def.all_fields()|fmt_join("{label}{comment}    fn _{raw_name}(&self) -> {outer};
 ", "") -}@
-@{ def.relations_one_and_belonging(false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
+@{ def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
 ", "") -}@
-@{ def.relations_many(false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>>;
+@{ def.relations_many(Joinable::Join, false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>>;
 ", "") -}@
-@{ def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
+@{ def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
 ", "") -}@
 }
 @#
-@%- for (model, rel_name, rel) in def.relations_belonging(false) %@
+@%- for (model, rel_name, rel) in def.relations_belonging(Joinable::Filter, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn cols() -> &'static str {
@@ -803,7 +803,7 @@ impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
 }
 @%- endif %@
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_belonging_outer_db(false) %@
+@%- for (model, rel_name, rel) in def.relations_belonging_outer_db(Joinable::Filter, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn cols() -> &'static str {
@@ -835,7 +835,7 @@ impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
 }
 @%- endif %@
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_one(false) %@
+@%- for (model, rel_name, rel) in def.relations_one(Joinable::Filter, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn cols() -> &'static str {
@@ -1038,7 +1038,7 @@ impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.
     }
 }
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_many(false) %@
+@%- for (model, rel_name, rel) in def.relations_many(Joinable::Filter, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn cols() -> &'static str {
@@ -1242,7 +1242,7 @@ impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.
 }
 @%- endfor %@
 #@
-@%- for (model, rel_name, rel) in def.relations_one(false) %@
+@%- for (model, rel_name, rel) in def.relations_one(Joinable::Filter, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn set_op_none(op: &mut rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::OpData) {
@@ -1251,7 +1251,7 @@ impl RelCol@{ rel_name|pascal }@ {
     }
 }
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_many(false) %@
+@%- for (model, rel_name, rel) in def.relations_many(Joinable::Filter, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn set_op_none(op: &mut rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::OpData) {
@@ -1287,10 +1287,10 @@ impl @{ id_name }@ {
             _upsert: false,
             _is_loaded: false,
             _op: OpData::default(),
-@{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 @%- endif %@
@@ -1477,15 +1477,15 @@ impl _@{ pascal_name }@Getter for _@{ pascal_name }@ {
     fn _{raw_name}(&self) -> {outer} {
         {convert_outer_prefix}self._inner.{ident}{clone_for_outer}{convert_outer}
     }", "") }@
-    @{- def.relations_one_and_belonging(false)|fmt_rel_join("
+    @{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
-    @{- def.relations_many(false)|fmt_rel_join("
+    @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
         self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")
     }", "") }@
-    @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+    @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
@@ -1501,11 +1501,11 @@ impl crate::models::@{ parent.group_name|snake|ident }@::@{ parent.name|snake|id
     fn _{raw_name}(&self) -> {outer} {
         {convert_outer_prefix}self._inner.{ident}{clone_for_outer}{convert_outer}
     }", "") }@
-    @{- parent.relations_one_and_belonging(false)|fmt_rel_join("
+    @{- parent.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
-    @{- parent.relations_many(false)|fmt_rel_join("
+    @{- parent.relations_many(Joinable::Join, false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref())
     }", "") }@
@@ -1523,9 +1523,9 @@ impl CacheVal for CacheWrapper {
         size += self._inner.{ident}._size();", "") }@
         @{- def.cache_cols_null_sized()|fmt_join("
         size += self._inner.{ident}.as_ref().map(|v| v._size()).unwrap_or(0);", "") }@
-        @{- def.relations_one_cache(false)|fmt_rel_join("
+        @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
         size += self.{rel_name}.as_ref().map(|l| l.as_ref().map(|v| v._size() as usize).unwrap_or(0)).unwrap_or(0);", "") }@
-        @{- def.relations_many_cache(false)|fmt_rel_join("
+        @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
         size += self.{rel_name}.as_ref().map(|l| l.iter().fold(0, |i, v| i + v._size() as usize)).unwrap_or(0);", "") }@
         size.try_into().unwrap_or(u32::MAX)
     }
@@ -1564,11 +1564,11 @@ impl CacheWrapper {
     fn _{raw_name}(&self) -> {outer} {
         {convert_outer_prefix}self._inner.{ident}{clone_for_outer}{convert_outer}
     }", "") }@
-    @{- def.relations_one_cache(false)|fmt_rel_join("
+    @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&Arc<rel_{class_mod}::CacheWrapper>>> {
         self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\").map(|v| v.as_ref())
     }", "") }@
-    @{- def.relations_many_cache(false)|fmt_rel_join("
+    @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<&Vec<Arc<rel_{class_mod}::CacheWrapper>>> {
         self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")
     }", "") }@
@@ -1579,31 +1579,31 @@ impl _@{ pascal_name }@Cache {
 {label}{comment}    pub fn _{raw_name}(&self) -> {outer} {
         self._wrapper._{raw_name}()
     }", "") }@
-    @{- def.relations_one_cache(false)|fmt_rel_join("
+    @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}Cache>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
-    @{- def.relations_one_uncached(false)|fmt_rel_join("
+    @{- def.relations_one_uncached(Joinable::Join, false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
-    @{- def.relations_many_cache(false)|fmt_rel_join("
+    @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}Cache>> {
         self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")
     }", "") }@
-    @{- def.relations_many_uncached(false)|fmt_rel_join("
+    @{- def.relations_many_uncached(Joinable::Join, false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
         self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")
     }", "") }@
-    @{- def.relations_belonging_cache(false)|fmt_rel_join("
+    @{- def.relations_belonging_cache(Joinable::Join, false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}Cache>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
-    @{- def.relations_belonging_uncached(false)|fmt_rel_join("
+    @{- def.relations_belonging_uncached(Joinable::Join, false)|fmt_rel_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
-    @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+    @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
 {label}{comment}    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
@@ -1676,25 +1676,25 @@ impl _@{ pascal_name }@Updater {
             _phantom: Default::default(),
         }
     }", "") }@
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
 {label}{comment}    pub fn mut_{raw_rel_name}(&mut self) -> AccessorHasOne<'_, rel_{class_mod}::{class}Updater> {
         AccessorHasOne {
             name: \"{raw_rel_name}\",
             val: &mut self.{rel_name},
         }
     }", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
 {label}{comment}    pub fn mut_{raw_rel_name}(&mut self) -> AccessorHasMany<'_, rel_{class_mod}::{class}Updater> {
         AccessorHasMany {
             name: \"{raw_rel_name}\",
             val: &mut self.{rel_name},
         }
     }", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
     fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
@@ -1703,7 +1703,7 @@ impl _@{ pascal_name }@Updater {
 impl crate::misc::UpdaterForInner for _@{ pascal_name }@Updater {
     fn __validate(&self) -> Result<()> {
         self._data.validate()?;
-@{- def.relations_one_and_many(false)|fmt_rel_join("
+@{- def.relations_one_and_many(Joinable::Join, false)|fmt_rel_join("
         if let Some(v) = self.{rel_name}.as_ref() {
             for v in v.iter() {
                 v.__validate()?;
@@ -1749,7 +1749,7 @@ impl crate::misc::UpdaterForInner for _@{ pascal_name }@Updater {
             self.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
         }
         @%- endif %@
-@{- def.relations_one_and_many(false)|fmt_rel_join("
+@{- def.relations_one_and_many(Joinable::Join, false)|fmt_rel_join("
         if let Some(v) = self.{rel_name}.as_mut() {
             for v in v.iter_mut() {
                 RelCol{rel_name_pascal}::set_op_none(&mut v._op);
@@ -1779,7 +1779,7 @@ impl crate::misc::UpdaterForInner for _@{ pascal_name }@Updater {
             self._op.@{ ConfigDef::version() }@ = Op::Set;
         }
         @%- endif %@
-        @{- def.relations_one_and_many(false)|fmt_rel_join("
+        @{- def.relations_one_and_many(Joinable::Join, false)|fmt_rel_join("
         if let Some(v) = self.{rel_name}.as_mut() {
             for v in v.iter_mut() {
                 v.__set_overwrite_extra_value(conn);
@@ -1811,9 +1811,9 @@ impl From<(Data, BTreeMap<&'static str, bool>)> for _@{ pascal_name }@ {
         Self {
             _inner: v.0,
             _filter_flag: v.1,
-@{- def.relations_one_and_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -1828,10 +1828,10 @@ impl From<(Data, BTreeMap<&'static str, bool>)> for _@{ pascal_name }@Updater {
             _upsert: false,
             _is_loaded: true,
             _op: OpData::default(),
-@{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -1842,13 +1842,13 @@ impl From<(Arc<CacheWrapper>, BTreeMap<&'static str, bool>)> for _@{ pascal_name
         Self {
             _wrapper: v.0,
             _filter_flag: v.1,
-@{- def.relations_one_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_one_uncached(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many_uncached(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_uncached(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one_uncached(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_many_uncached(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_cache(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_uncached(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -1859,8 +1859,8 @@ impl CacheWrapper {
             _inner: inner,
             _shard_id: shard_id,
             _time: time,
-@{- def.relations_one_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
         }
     }
     pub fn from_data(data: Data, shard_id: ShardId, time: MSec) -> Self {
@@ -1870,8 +1870,8 @@ impl CacheWrapper {
             },
             _shard_id: shard_id,
             _time: time,
-@{- def.relations_one_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_many_cache(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -1885,30 +1885,30 @@ impl Serialize for _@{ pascal_name }@ {
         use serde::ser::SerializeStruct;
         #[allow(unused_mut)]
         let mut len = @{ def.serializable().len() }@;
-        @{- def.relations_one_and_belonging(false)|fmt_rel_join("
+        @{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("
         if self.{rel_name}.is_some() {
             len += 1;
         }", "") }@
-        @{- def.relations_many(false)|fmt_rel_join("
+        @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
         if self.{rel_name}.is_some() {
             len += 1;
         }", "") }@
-        @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+        @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
         if self.{rel_name}.is_some() {
             len += 1;
         }", "") }@
         let mut state = serializer.serialize_struct("@{ pascal_name }@", len)?;
         @{- def.serializable()|fmt_join("
         state.serialize_field(\"{ident}\", &(self._inner.{ident}{convert_serialize}))?;", "") }@
-        @{- def.relations_one_and_belonging(false)|fmt_rel_join("
+        @{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("
         if let Some(v) = &self.{rel_name} {
             state.serialize_field(\"{raw_rel_name}\", v)?;
         }", "") }@
-        @{- def.relations_many(false)|fmt_rel_join("
+        @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
         if let Some(v) = &self.{rel_name} {
             state.serialize_field(\"{raw_rel_name}\", v)?;
         }", "") }@
-        @{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+        @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
         if let Some(v) = &self.{rel_name} {
             state.serialize_field(\"{raw_rel_name}\", v)?;
         }", "") }@
@@ -1923,19 +1923,19 @@ impl Serialize for _@{ pascal_name }@Cache {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let len = @{ def.serializable_cache().len() + def.relations_one_cache(false).len() + def.relations_belonging_cache(false).len() + def.relations_many_cache(false).len() }@;
+        let len = @{ def.serializable_cache().len() + def.relations_one_cache(Joinable::Join, false).len() + def.relations_belonging_cache(Joinable::Join, false).len() + def.relations_many_cache(Joinable::Join, false).len() }@;
         let mut state = serializer.serialize_struct("@{ pascal_name }@", len)?;
         @{- def.serializable_cache()|fmt_join("
         state.serialize_field(\"{ident}\", &(self._wrapper._inner.{ident}{convert_serialize}))?;", "") }@
-        @{- def.relations_one_cache(false)|fmt_rel_join("
+        @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join("
         if let Ok(v) = &self._{raw_rel_name}() {
             state.serialize_field(\"{raw_ident_rel_name}\", v)?;
         }", "") }@
-        @{- def.relations_many_cache(false)|fmt_rel_join("
+        @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join("
         if let Ok(v) = &self._{raw_rel_name}() {
             state.serialize_field(\"{raw_ident_rel_name}\", v)?;
         }", "") }@
-        @{- def.relations_belonging_cache(false)|fmt_rel_join("
+        @{- def.relations_belonging_cache(Joinable::Join, false)|fmt_rel_join("
         if self.{rel_name}.is_some() {
             state.serialize_field(\"{raw_ident_rel_name}\", &self.{rel_name})?;
         }", "") }@
@@ -1959,10 +1959,10 @@ impl _@{ pascal_name }@Factory {
             _upsert: false,
             _is_loaded: true,
             _op: OpData::default(),
-@{- def.relations_one(false)|fmt_rel_join("\n            {rel_name}: self.{rel_name}.map(|v| vec![v.create()]),", "") }@
-@{- def.relations_many(false)|fmt_rel_join("\n            {rel_name}: self.{rel_name}.map(|v| v.into_iter().map(|v| v.create()).collect()),", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: self.{rel_name}.map(|v| vec![v.create()]),", "") }@
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: self.{rel_name}.map(|v| v.into_iter().map(|v| v.create()).collect()),", "") }@
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("\n            {rel_name}: None,", "") }@
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("\n            {rel_name}: None,", "") }@
         }
     }
 }
@@ -1970,13 +1970,13 @@ impl _@{ pascal_name }@Factory {
 impl From<_@{ pascal_name }@Updater> for _@{ pascal_name }@ {
     fn from(from: _@{ pascal_name }@Updater) -> Self {
         let mut to: _@{ pascal_name }@ = (from._data, from._filter_flag).into();
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name}.map(|v| v.into_iter().filter(|v| !v.will_be_deleted()).next_back().map(|v| Box::new(v.into())));", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name}.map(|v| v.into_iter().map(|v| v.into()).collect());", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name};", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
         to.{rel_name} = from.{rel_name};", "") }@
         to
     }
@@ -1984,13 +1984,13 @@ impl From<_@{ pascal_name }@Updater> for _@{ pascal_name }@ {
 impl From<Box<_@{ pascal_name }@Updater>> for Box<_@{ pascal_name }@> {
     fn from(from: Box<_@{ pascal_name }@Updater>) -> Self {
         let mut to: _@{ pascal_name }@ = (from._data, from._filter_flag).into();
-@{- def.relations_one(false)|fmt_rel_join("
+@{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name}.map(|v| v.into_iter().filter(|v| !v.will_be_deleted()).next_back().map(|v| Box::new(v.into())));", "") }@
-@{- def.relations_many(false)|fmt_rel_join("
+@{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name}.map(|v| v.into_iter().map(|v| v.into()).collect());", "") }@
-@{- def.relations_belonging(false)|fmt_rel_join("
+@{- def.relations_belonging(Joinable::Join, false)|fmt_rel_join("
         to.{rel_name} = from.{rel_name};", "") }@
-@{- def.relations_belonging_outer_db(false)|fmt_rel_outer_db_join("
+@{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
         to.{rel_name} = from.{rel_name};", "") }@
         Box::new(to)
     }
