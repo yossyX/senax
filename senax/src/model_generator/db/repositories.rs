@@ -4,18 +4,18 @@ use compact_str::CompactString;
 use indexmap::IndexMap;
 use regex::Regex;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     ffi::OsString,
     fs,
     path::Path,
     sync::Arc,
 };
 
-use crate::schema::Joinable;
 use crate::model_generator::analyzer::UnifiedGroup;
 use crate::schema::is_mysql_mode;
 use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable, to_id_name};
 use crate::{SEPARATED_BASE_FILES, filters};
+use crate::{common::ToCase, schema::Joinable};
 use crate::{
     common::{OVERWRITTEN_MSG, ToCase as _, fs_write},
     model_generator::analyzer,
@@ -32,6 +32,8 @@ pub fn write_base_group_files(
     groups: &GroupsDef,
     unified_group: &UnifiedGroup,
     unified_groups: &Vec<UnifiedGroup>,
+    filter_unified_map: HashMap<(String, String), String>,
+    filter_unified_names: BTreeSet<String>,
     ref_db: &BTreeSet<(String, String)>,
     force: bool,
     remove_files: &mut HashSet<OsString>,
@@ -50,11 +52,13 @@ pub fn write_base_group_files(
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let reg = Regex::new(r"(?m)^_base_repo_\w+\s*=.+\n")?;
+    let reg = Regex::new(r"(?m)^db_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
     let reg = Regex::new(r"(?m)^_repo_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
-    let reg = Regex::new(r"(?m)^db_\w+\s*=.+\n")?;
+    let reg = Regex::new(r"(?m)^_base_repo_\w+\s*=.+\n")?;
+    content = reg.replace_all(&content, "").into_owned();
+    let reg = Regex::new(r"(?m)^_base_filter_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
     let mut db_chk = HashSet::new();
     for (db, group) in ref_db {
@@ -89,6 +93,17 @@ pub fn write_base_group_files(
             ),
         );
     }
+    for unified in &filter_unified_names {
+        let db = &db.to_snake();
+        content = content.replace(
+            "[dependencies]",
+            &format!(
+                "[dependencies]\n_base_filter_{}_{} = {{ path = \"../../base_filters/{}\" }}",
+                db, unified, unified
+            ),
+        );
+    }
+
     fs_write(file_path, &*content)?;
 
     let src_dir = base_dir.join("src");
@@ -239,6 +254,7 @@ pub fn write_base_group_files(
                     pub is_mysql_str: &'a str,
                     pub unified_group: &'a UnifiedGroup,
                     pub unified_groups: &'a Vec<UnifiedGroup>,
+                    pub unified_filter_group: &'a str,
                 }
 
                 let tpl = GroupBaseTableTemplate {
@@ -256,6 +272,9 @@ pub fn write_base_group_files(
                     is_mysql_str: if is_mysql_mode() { "true" } else { "false" },
                     unified_group,
                     unified_groups,
+                    unified_filter_group: filter_unified_map
+                        .get(&(group_name.clone(), model_name.clone()))
+                        .unwrap(),
                 };
                 let ret = tpl.render()?;
                 if SEPARATED_BASE_FILES {
@@ -268,6 +287,10 @@ pub fn write_base_group_files(
             }
         }
         if !SEPARATED_BASE_FILES {
+            for (u, m) in unified_names {
+                output.push_str(&format!("pub use _base_repo_{}_{u}::repositories::{}::_base::_{m};\n", db.to_snake(), group_name.to_snake().to_ident()));
+            }
+
             let file_path = model_group_dir.join("_base.rs");
             remove_files.remove(file_path.as_os_str());
             fs_write(file_path, output)?;
@@ -284,6 +307,7 @@ pub fn write_group_files(
     group: &str,
     groups: &GroupsDef,
     unified_groups: &Vec<UnifiedGroup>,
+    unified_joinable_groups: &Vec<UnifiedGroup>,
     force: bool,
     exclude_from_domain: bool,
     remove_files: &mut HashSet<OsString>,
@@ -313,13 +337,26 @@ pub fn write_group_files(
     };
     let reg = Regex::new(r"(?m)^_base_repo_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
-    for group in unified_groups.iter().rev() {
+    let reg = Regex::new(r"(?m)^_base_filter_\w+\s*=.+\n")?;
+    content = reg.replace_all(&content, "").into_owned();
+    for group in unified_joinable_groups.iter().rev() {
         let db = &db.to_snake();
         let group = &group.unified_name();
         content = content.replace(
             "[dependencies]",
             &format!(
                 "[dependencies]\n_base_repo_{}_{} = {{ path = \"../../base_repositories/{}\" }}",
+                db, group, group
+            ),
+        );
+    }
+    for group in unified_groups.iter().rev() {
+        let db = &db.to_snake();
+        let group = &group.unified_name();
+        content = content.replace(
+            "[dependencies]",
+            &format!(
+                "[dependencies]\n_base_filter_{}_{} = {{ path = \"../../base_filters/{}\" }}",
                 db, group, group
             ),
         );
@@ -369,7 +406,7 @@ pub fn write_group_files(
             .filter(|(_, d)| !d.abstract_mode)
             .map(|(model_name, d)| {
                 let u = UnifiedGroup::unified_name_from_rel(
-                    unified_groups,
+                    unified_joinable_groups,
                     &[group_name.to_string(), model_name.to_string()],
                 );
                 (u, d.mod_name())
@@ -426,7 +463,7 @@ pub fn write_group_files(
             let table_name = def.table_name();
             let mod_name = def.mod_name();
             let mod_name = &mod_name;
-            let unified = unified_groups.iter().find(|v| {
+            let unified = unified_joinable_groups.iter().find(|v| {
                 v.nodes
                     .contains_key(&(group_name.into(), model_name.into()))
             });
@@ -488,6 +525,10 @@ pub fn write_group_files(
                     }
                 }
 
+                let unified_filter_group = &UnifiedGroup::unified_name_from_rel(
+                    unified_groups,
+                    &[group_name.to_string(), model_name.to_string()],
+                );
                 if !exclude_from_domain {
                     impl_output.push_str(&impl_domain::write_entity(
                         &impl_domain_dir,
@@ -498,6 +539,7 @@ pub fn write_group_files(
                         force,
                         model_name,
                         def,
+                        unified_filter_group,
                         remove_files,
                     )?);
                 }

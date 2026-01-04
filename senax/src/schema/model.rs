@@ -2003,11 +2003,12 @@ impl ModelDef {
             .collect()
     }
 
-    pub fn relation_mods(&self) -> Vec<Vec<String>> {
+    pub fn relation_mods(&self, joinable: Joinable) -> Vec<Vec<String>> {
         let mut mods: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for (_name, rel) in self
             .merged_relations
             .iter()
+            .filter(|v| joinable.is(v.1.joinable))
             .filter(|v| !v.1.is_type_of_belongs_to_outer_db() && v.1.rel_type.is_some())
         {
             let group_name = rel.get_group_name().to_snake();

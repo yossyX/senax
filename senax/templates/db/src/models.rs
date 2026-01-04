@@ -22,14 +22,14 @@ pub use _base::models::TableName;
 pub use _base::models::CacheHandler;
 
 pub(crate) async fn start(db_dir: &Path) -> Result<()> {
-@%- for name in unified %@
+@%- for name in unified_joinable %@
     _base_repo_@{ name }@::start(&db_dir.join("@{ name }@")).await?;
 @%- endfor %@
     Ok(())
 }
 
 pub(crate) async fn start_test() -> Result<()> {
-@%- for name in unified %@
+@%- for name in unified_joinable %@
     _base_repo_@{ name }@::start_test().await?;
 @%- endfor %@
     Ok(())
@@ -38,7 +38,7 @@ pub(crate) async fn start_test() -> Result<()> {
 #[rustfmt::skip]
 pub(crate) async fn check() -> Result<()> {
     for shard_id in DbConn::shard_num_range() {
-        @%- for name in unified %@
+        @%- for name in unified_joinable %@
         _base_repo_@{ name }@::check(shard_id).await?;
         @%- endfor %@
     }

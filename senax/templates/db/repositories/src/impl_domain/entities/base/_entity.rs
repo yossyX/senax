@@ -20,6 +20,8 @@ use domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_
 @%- endfor %@
 
 use crate::repositories::@{ group_name|snake|ident }@::@{ mod_name|ident }@::*;
+#[allow(unused_imports)]
+use _base_filter_@{ db|snake }@_@{ unified_filter_group }@ as _base_filter_;
 
 #[derive(derive_new::new, Clone)]
 pub struct @{ pascal_name }@RepositoryImpl {
@@ -298,7 +300,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
 @%- for filter_map in selector_def.nested_filters(selector, def) %@
 #[allow(unused_variables)]
 #[allow(unused_mut)]
-fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> anyhow::Result<base_repository::repositories::@{ filter_map.model_group()|snake|ident }@::_base::_@{ filter_map.model_name()|snake }@::Filter_> {
+fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> anyhow::Result<_base_filter_::repositories::@{ filter_map.model_group()|snake|ident }@::_base::_@{ filter_map.model_name()|snake }@::Filter_> {
     #[allow(unused_imports)]
     @%- if config.exclude_from_domain %@
     use crate::repository::@{ filter_map.model_group()|snake|ident }@::@{ filter_map.model_name()|snake|ident }@::filter;
@@ -367,7 +369,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
         #[allow(unused_mut)]
         #[allow(unused_variables)]
         #[allow(clippy::match_single_binding)]
-        fn _cursor(mut fltr: base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_, cursor: &@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> anyhow::Result<base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_> {
+        fn _cursor(mut fltr: _base_filter_::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_, cursor: &@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> anyhow::Result<_base_filter_::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::Filter_> {
             @%- if !selector_def.orders.is_empty() %@
             match cursor {
                 @%- for (cursor, cursor_def) in selector_def.orders %@

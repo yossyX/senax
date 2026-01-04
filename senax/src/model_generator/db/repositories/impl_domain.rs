@@ -252,6 +252,7 @@ pub fn write_entity(
     force: bool,
     model_name: &str,
     def: &Arc<ModelDef>,
+    unified_filter_group: &str,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<String, anyhow::Error> {
     set_domain_mode(true);
@@ -293,6 +294,7 @@ pub fn write_entity(
         mod_name: &'a str,
         pascal_name: &'a str,
         def: &'a Arc<ModelDef>,
+        unified_filter_group: &'a str,
     }
 
     let tpl = BaseEntityTemplate {
@@ -302,6 +304,7 @@ pub fn write_entity(
         mod_name,
         pascal_name,
         def,
+        unified_filter_group,
     };
     let ret = tpl.render()?;
     set_domain_mode(false);

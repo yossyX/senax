@@ -1,5 +1,5 @@
 [package]
-name = "_base_repo_@{ db|snake }@_@{ unified_name }@"
+name = "_base_filter_@{ db|snake }@_@{ unified_name }@"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -10,31 +10,15 @@ db = { package = "_db_@{ db|snake }@", path = "../../base" }
 
 ahash.workspace = true
 anyhow.workspace = true
-arc-swap = "1.5.1"
-async-stream.workspace = true
-async-trait.workspace = true
-bytes = "1.4"
 chrono.workspace = true
-crossbeam = "0.8"
-futures.workspace = true
 fxhash = "0.2"
-indexmap = "2"
 log.workspace = true
-once_cell.workspace = true
 regex.workspace = true
 rust_decimal.workspace = true
 senax-common.workspace = true
-senax-encoder.workspace = true
-senax-macros.workspace = true
 serde.workspace = true
-serde_bytes = "0.11.12"
 serde_json.workspace = true
-serde_yaml.workspace = true
-sled = "0.34"
 sqlx.workspace = true
 tokio.workspace = true
-tracing.workspace = true
 uuid.workspace = true
-validator.workspace = true
-zstd = "0.13"
 @{-"\n"}@

@@ -33,7 +33,7 @@ impl SeedSchema {
         for conn in conns.iter_mut() {
             conn.begin().await?;
         }
-        @%- for unified in unified %@
+        @%- for unified in unified_joinable %@
         _base_repo_@{ unified }@::repositories::seed(&seeds, &mut conns).await?;
         @%- endfor %@
         for mut conn in conns {

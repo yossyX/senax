@@ -58,7 +58,7 @@ impl CacheMsg {
     pub(crate) async fn handle_cache_msg(self) {
         let _lock = CACHE_UPDATE_LOCK.write().await;
         let _sync_map = Arc::new(self.1);
-@%- for name in unified %@
+@%- for name in unified_joinable %@
         if let Some(g) = @{ name|upper }@_HANDLER.get() {
             g.handle_cache_msg(self.0.clone(), Arc::clone(&_sync_map)).await;
         }
@@ -103,14 +103,14 @@ pub async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, _clear_test: bool
             let shard_id = *shard_id;
             tokio::spawn(async move {
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                @%- for name in unified %@
+                @%- for name in unified_joinable %@
                 if let Some(g) = @{ name|upper }@_HANDLER.get() {
                     g.clear_cache(shard_id, 0, _clear_test).await;
                 }
                 @%- endfor %@
             });
         }
-        @%- for name in unified %@
+        @%- for name in unified_joinable %@
         if let Some(g) = @{ name|upper }@_HANDLER.get() {
             g.clear_cache(*shard_id, *sync, _clear_test).await;
         }
@@ -118,7 +118,7 @@ pub async fn _clear_cache(_sync_map: &FxHashMap<ShardId, u64>, _clear_test: bool
     }
 @%- endif %@
 }
-@% for name in unified %@
+@% for name in unified_joinable %@
 pub static @{ name|upper }@_HANDLER: OnceCell<Box<dyn CacheHandler + Send + Sync>> = OnceCell::new();
 @%- endfor %@
 

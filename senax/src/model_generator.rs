@@ -11,6 +11,7 @@ use std::sync::atomic::AtomicUsize;
 
 use crate::common::ToCase as _;
 use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
+use crate::schema::Joinable;
 use crate::schema::{_to_ident_name, ConfigDef, GroupsDef, Timestampable};
 use crate::{BASE_DOMAIN_PATH, DOMAIN_BASE_RELATIONS_PATH, DOMAIN_REPOSITORIES_PATH};
 use crate::{
@@ -19,7 +20,6 @@ use crate::{
     schema::{self, CONFIG, GROUPS, ModelDef, to_id_name},
 };
 use crate::{SEPARATED_BASE_FILES, filters};
-use crate::schema::Joinable;
 
 mod analyzer;
 mod db;
@@ -43,6 +43,7 @@ pub fn generate(
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
     let model_dir = Path::new(DB_PATH).join(db.to_snake());
+    let base_filters_dir = model_dir.join("base_filters");
     let base_repositories_dir = model_dir.join("base_repositories");
     let db_repositories_dir = model_dir.join("repositories");
     let domain_src_dir = Path::new(DOMAIN_PATH).join("src");
@@ -84,6 +85,34 @@ pub fn generate(
     let unified_groups =
         analyzer.merge_unified_groups(unified_groups, model_split_size.unwrap_or(10));
 
+    let mut analyzer = analyzer::GraphAnalyzer::new();
+    for (group_name, group) in groups {
+        let mut nodes = Vec::new();
+        for (model_name, model) in group.iter() {
+            let edges = model
+                .merged_relations
+                .iter()
+                .filter(|(_, r)| r.db.is_none() && r.joinable)
+                .map(|(_, r)| analyzer::EdgeTarget {
+                    group: Some(r.get_group_name()),
+                    node: r.get_foreign_model_name(),
+                })
+                .collect();
+
+            nodes.push(analyzer::Node {
+                name: model_name.clone(),
+                edges,
+            });
+        }
+        analyzer.add_group(analyzer::Group {
+            name: group_name.clone(),
+            nodes,
+        });
+    }
+    let unified_joinable_groups = analyzer.unify_all_nodes();
+    let unified_joinable_groups =
+        analyzer.merge_unified_groups(unified_joinable_groups, model_split_size.unwrap_or(10));
+
     let file_path = model_dir.join("Cargo.toml");
     let mut content = if force || !file_path.exists() {
         #[derive(Template)]
@@ -116,7 +145,7 @@ pub fn generate(
             ),
         );
     }
-    for unified_group in unified_groups.iter().rev() {
+    for unified_group in unified_joinable_groups.iter().rev() {
         let db = &db.to_snake();
         let unified_name = unified_group.unified_name();
         content = content.replace(
@@ -187,7 +216,7 @@ pub fn generate(
             ),
         );
     }
-    for unified_group in unified_groups.iter().rev() {
+    for unified_group in unified_joinable_groups.iter().rev() {
         let unified_name = unified_group.unified_name();
         content = content.replace(
             "pub fn init() {",
@@ -206,14 +235,14 @@ pub fn generate(
     struct ModelsTemplate<'a> {
         pub config: &'a ConfigDef,
         pub groups: &'a GroupsDef,
-        pub unified: &'a Vec<String>,
+        pub unified_joinable: &'a Vec<String>,
     }
 
-    let unified = unified_groups.iter().map(|g| g.unified_name()).collect();
+    let unified_joinable = &unified_joinable_groups.iter().map(|g| g.unified_name()).collect();
     let tpl = ModelsTemplate {
         config: &config,
         groups,
-        unified: &unified,
+        unified_joinable,
     };
     fs_write(file_path, tpl.render()?)?;
 
@@ -262,7 +291,7 @@ pub fn generate(
         db,
         groups,
         &config,
-        &unified,
+        unified_joinable,
         force,
         non_snake_case,
     )?;
@@ -272,14 +301,14 @@ pub fn generate(
     struct SeederTemplate<'a> {
         pub config: &'a ConfigDef,
         pub groups: &'a GroupsDef,
-        pub unified: &'a Vec<String>,
+        pub unified_joinable: &'a Vec<String>,
     }
 
     let file_path = model_src_dir.join("seeder.rs");
     let tpl = SeederTemplate {
         config: &config,
         groups,
-        unified: &unified,
+        unified_joinable,
     };
     fs_write(file_path, tpl.render()?)?;
 
@@ -308,6 +337,14 @@ pub fn generate(
     let domain_db_dir = domain_models_dir.join(db.to_snake());
     if clean && domain_db_dir.exists() {
         for entry in glob::glob(&format!("{}/**/*.rs", domain_db_dir.display()))? {
+            match entry {
+                Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
+                Err(_) => false,
+            };
+        }
+    }
+    if base_filters_dir.exists() {
+        for entry in glob::glob(&format!("{}/**/*.*", base_filters_dir.display()))? {
             match entry {
                 Ok(path) => remove_files.insert(path.as_os_str().to_owned()),
                 Err(_) => false,
@@ -541,8 +578,8 @@ pub fn generate(
             })
             .collect();
         let unified_name = unified_group.unified_name();
-        db::repositories::write_base_group_files(
-            &base_repositories_dir,
+        db::filters::write_base_group_files(
+            &base_filters_dir,
             db,
             &config,
             &unified_name,
@@ -569,6 +606,73 @@ pub fn generate(
             )?;
         }
     }
+    for unified_group in &unified_joinable_groups {
+        let include_groups = unified_group.include_groups();
+        let repo_include_groups: GroupsDef = groups
+            .iter()
+            .map(|(group_name, models)| {
+                let v2: IndexMap<String, Arc<ModelDef>> = models
+                    .iter()
+                    .filter(|(model_name, _)| {
+                        unified_group
+                            .nodes
+                            .get(&(group_name.into(), (*model_name).into()))
+                            == Some(&analyzer::Mark::Include)
+                    })
+                    .map(|(n, v)| (n.to_string(), v.clone()))
+                    .collect();
+                (group_name.to_string(), v2)
+            })
+            .collect();
+        let ref_db: BTreeSet<(String, String)> = groups
+            .iter()
+            .filter(|(n, _)| include_groups.contains(n.as_str()))
+            .flat_map(|(group_name, models)| {
+                models
+                    .iter()
+                    .filter(|(model_name, _)| {
+                        unified_group
+                            .nodes
+                            .get(&(group_name.into(), (*model_name).into()))
+                            == Some(&analyzer::Mark::Include)
+                    })
+                    .flat_map(|(_, v)| {
+                        v.belongs_to_outer_db(Joinable::Filter)
+                            .iter()
+                            .map(|v| (v.1.db().to_string(), v.1.get_group_name()))
+                            .collect::<Vec<_>>()
+                    })
+            })
+            .collect();
+        let unified_name = unified_group.unified_name();
+        let mut filter_unified_map = HashMap::new();
+        let mut filter_unified_names = BTreeSet::new();
+        for ((g, m), mark) in &unified_group.nodes {
+            if *mark == analyzer::Mark::Include {
+                let name = analyzer::UnifiedGroup::unified_name_from_rel(
+                    &unified_groups,
+                    &[g.to_string(), m.to_string()],
+                );
+                filter_unified_map.insert((g.to_string(), m.to_string()), name.clone());
+                filter_unified_names.insert(name);
+            }
+        }
+
+        db::repositories::write_base_group_files(
+            &base_repositories_dir,
+            db,
+            &config,
+            &unified_name,
+            &repo_include_groups,
+            &unified_group,
+            &unified_joinable_groups,
+            filter_unified_map,
+            filter_unified_names,
+            &ref_db,
+            force,
+            &mut remove_files,
+        )?;
+    }
     for (group_name, group) in groups {
         let mut groups = GroupsDef::new();
         groups.insert(group_name.clone(), group.clone());
@@ -579,6 +683,7 @@ pub fn generate(
             group_name,
             &groups,
             &unified_groups,
+            &unified_joinable_groups,
             force,
             exclude_from_domain,
             &mut remove_files,

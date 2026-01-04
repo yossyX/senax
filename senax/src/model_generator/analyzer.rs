@@ -518,7 +518,7 @@ impl GraphAnalyzer {
         candidate_groups.sort_by(|a, b| b.2.cmp(&a.2).then(b.1.cmp(&a.1)));
 
         for (i_pos, &(i, _, ref_i)) in candidate_groups.iter().enumerate() {
-            let mut best_ref_reduction = 0;
+            let mut best_node_reduction = 0;
             for &(j, _, ref_j) in candidate_groups.iter().skip(i_pos + 1) {
                 let merged_include_count =
                     self.calculate_merged_include_count(&groups[i].nodes, &groups[j].nodes);
@@ -534,17 +534,7 @@ impl GraphAnalyzer {
                         continue;
                     }
 
-                    let ref_count_i = groups[i]
-                        .nodes
-                        .values()
-                        .filter(|m| **m == Mark::Ref)
-                        .count();
-                    let ref_count_j = groups[j]
-                        .nodes
-                        .values()
-                        .filter(|m| **m == Mark::Ref)
-                        .count();
-                    let total_ref_before = ref_count_i + ref_count_j;
+                    let total_node_before = groups[i].nodes.len() + groups[j].nodes.len();
 
                     let mut merged_nodes = groups[i].nodes.clone();
                     for (node_key, mark_j) in &groups[j].nodes {
@@ -552,13 +542,10 @@ impl GraphAnalyzer {
                         merged_nodes
                             .insert(node_key.clone(), self.merge_marks(*mark_j, mark_i.copied()));
                     }
-                    let ref_count_after =
-                        merged_nodes.values().filter(|m| **m == Mark::Ref).count();
+                    let node_reduction = total_node_before.saturating_sub(merged_nodes.len());
 
-                    let ref_reduction = total_ref_before.saturating_sub(ref_count_after);
-
-                    if best_pair.is_none() || ref_reduction > best_ref_reduction {
-                        best_ref_reduction = ref_reduction;
+                    if best_pair.is_none() || node_reduction > best_node_reduction {
+                        best_node_reduction = node_reduction;
                         best_pair = Some((i, j));
                     }
                 }
@@ -782,7 +769,7 @@ impl UnifiedGroup {
     pub fn unified_name_from_rel(unified_groups: &[UnifiedGroup], rel: &[String]) -> String {
         let unified = unified_groups
             .iter()
-            .find(|v| v.nodes.contains_key(&((&rel[0]).into(), (&rel[1]).into())));
+            .find(|v| v.nodes.get(&((&rel[0]).into(), (&rel[1]).into())) == Some(&Mark::Include));
         unified.unwrap().unified_name()
     }
 }

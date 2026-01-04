@@ -57,15 +57,17 @@ trait GroupCacheOpTr {
 
 #[allow(dead_code)]
 #[allow(unused_variables)]
-trait CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> {
+pub trait CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> {
     fn apply_to_obj(obj: &Option<Arc<CacheWrapper>>, msgs: &[CacheOp], shard_id: ShardId, time: MSec) -> Option<Arc<CacheWrapper>> {
         unimplemented!("apply_to_obj is disabled.")
     }
     fn apply_to_list(_list: &[Arc<CacheWrapper>], msgs: &[CacheOp], shard_id: ShardId, time: MSec) -> Vec<Arc<CacheWrapper>> {
         unimplemented!("apply_to_list is disabled.")
     }
-    async fn update_with_unique_cache(id: &PrimaryHasher, obj: CacheData, update: &Data, op: &OpData, time: MSec) -> CacheData {
-        unimplemented!("update_with_unique_cache is disabled.")
+    fn update_with_unique_cache(id: &PrimaryHasher, obj: CacheData, update: &Data, op: &OpData, time: MSec) -> impl std::future::Future<Output = CacheData> + Send {
+        async {
+            unimplemented!("update_with_unique_cache is disabled.")
+        }
     }
     fn handle_cache_msg(self, sync_map: Arc<FxHashMap<ShardId, u64>>) -> BoxFuture<'static, ()>;
 }

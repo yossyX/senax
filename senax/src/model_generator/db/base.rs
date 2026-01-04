@@ -13,7 +13,7 @@ pub fn write_files(
     db: &str,
     groups: &GroupsDef,
     config: &ConfigDef,
-    unified: &Vec<String>,
+    unified_joinable: &Vec<String>,
     force: bool,
     non_snake_case: bool,
 ) -> Result<()> {
@@ -87,7 +87,7 @@ pub fn write_files(
         pub db: &'a str,
         pub config: &'a ConfigDef,
         pub groups: &'a GroupsDef,
-        pub unified: &'a Vec<String>,
+        pub unified_joinable: &'a Vec<String>,
         pub tx_isolation: Option<&'a str>,
         pub read_tx_isolation: Option<&'a str>,
     }
@@ -97,7 +97,7 @@ pub fn write_files(
         db,
         config,
         groups,
-        unified,
+        unified_joinable,
         tx_isolation: config.tx_isolation.map(|v| v.as_str()),
         read_tx_isolation: config.read_tx_isolation.map(|v| v.as_str()),
     };
@@ -110,7 +110,7 @@ pub fn write_files(
     struct ModelsTemplate<'a> {
         pub config: &'a ConfigDef,
         pub groups: &'a GroupsDef,
-        pub unified: &'a Vec<String>,
+        pub unified_joinable: &'a Vec<String>,
         pub table_names: BTreeSet<String>,
     }
 
@@ -123,7 +123,7 @@ pub fn write_files(
     let tpl = ModelsTemplate {
         config,
         groups,
-        unified,
+        unified_joinable,
         table_names,
     };
     fs_write(file_path, tpl.render()?)?;

@@ -654,6 +654,7 @@ pub fn fmt_cache_owners(v: &[(String, String, String, u64)], f: &str) -> ::askam
                 ),
             )
             .replace("{model_name}", &model_name.to_pascal())
+            .replace("{raw_rel_name}", name)
             .replace("{rel_name_pascal}", &name.to_pascal())
             .replace("{rel_hash}", &rel_hash.to_string())
         })

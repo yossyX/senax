@@ -607,7 +607,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     && def.borrow().inheritance_type() != Some(InheritanceType::ColumnAggregation)
                 {
                     for (rel_name, rel_def) in def.clone().borrow().merged_relations.iter() {
-                        if rel_def.in_cache {
+                        if rel_def.in_cache && rel_def.joinable {
                             let ref_model = get_model(&rel_def.model, cur_group_name, &groups);
                             let mut ref_model = ref_model.borrow_mut();
                             if ref_model.use_cache() {

@@ -41,7 +41,7 @@ use base_domain as domain;
 #[allow(unused_imports)]
 use domain::value_objects;
 @%- endif %@
-@%- for mod_name in def.relation_mods() %@
+@%- for mod_name in def.relation_mods(Joinable::Filter) %@
 use crate::models::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @%- endfor %@
 @%- for (name, rel_def) in def.belongs_to_outer_db(Joinable::Filter) %@
@@ -161,15 +161,8 @@ pub enum CacheOp {
         #[senax(id = 2)]
         shard_id: ShardId,
     },
-    #[senax(id = 13)]
-    Notify {
-        #[senax(id = 1)]
-        id: InnerPrimary,
-        #[senax(id = 2)]
-        shard_id: ShardId,
-    },
 @%- endif %@
-    #[senax(id = 14)]
+    #[senax(id = 100)]
     InvalidateAll,
 }
 
@@ -772,477 +765,477 @@ pub trait _@{ pascal_name }@Getter: Send + Sync + 'static {
 }
 @#
 @%- for (model, rel_name, rel) in def.relations_belonging(Joinable::Filter, false) %@
-struct RelCol@{ rel_name|pascal }@;
-impl RelCol@{ rel_name|pascal }@ {
-    fn cols() -> &'static str {
-        r#"@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@"#
-    }
-    fn cols_with_idx(idx: usize) -> String {
-        format!(r#"@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("_t{}.{col_esc}", ", ") }@"#, @{ rel.get_local_cols(rel_name, def)|fmt_join("idx", ", ") }@)
-    }
-}
+// struct RelCol@{ rel_name|pascal }@;
+// impl RelCol@{ rel_name|pascal }@ {
+//     fn cols() -> &'static str {
+//         r#"@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@"#
+//     }
+//     fn cols_with_idx(idx: usize) -> String {
+//         format!(r#"@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("_t{}.{col_esc}", ", ") }@"#, @{ rel.get_local_cols(rel_name, def)|fmt_join("idx", ", ") }@)
+//     }
+// }
 
-trait RelPk@{ rel_name|pascal }@ {
-    fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary>;
-}
-impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
-    fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
-    }
-}
-impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
-    fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
-    }
-}
+// trait RelPk@{ rel_name|pascal }@ {
+//     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary>;
+// }
+// impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
+//     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+//         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+//     }
+// }
+// impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
+//     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+//         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+//     }
+// }
 @%- if !config.force_disable_cache %@
-impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
-    fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
-    }
-}
+// impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
+//     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+//         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+//     }
+// }
 @%- endif %@
 @%- endfor %@
 @%- for (model, rel_name, rel) in def.relations_belonging_outer_db(Joinable::Filter, false) %@
-struct RelCol@{ rel_name|pascal }@;
-impl RelCol@{ rel_name|pascal }@ {
-    fn cols() -> &'static str {
-        r#"@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@"#
-    }
-    fn cols_with_idx(idx: usize) -> String {
-        format!(r#"@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("_t{}.{col_esc}", ", ") }@"#, @{ rel.get_local_cols(rel_name, def)|fmt_join("idx", ", ") }@)
-    }
-}
+// struct RelCol@{ rel_name|pascal }@;
+// impl RelCol@{ rel_name|pascal }@ {
+//     fn cols() -> &'static str {
+//         r#"@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("{col_esc}", ", ") }@"#
+//     }
+//     fn cols_with_idx(idx: usize) -> String {
+//         format!(r#"@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("_t{}.{col_esc}", ", ") }@"#, @{ rel.get_local_cols(rel_name, def)|fmt_join("idx", ", ") }@)
+//     }
+// }
 
-trait RelPk@{ rel_name|pascal }@ {
-    fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary>;
-}
-impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
-    fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
-    }
-}
-impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
-    fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
-    }
-}
+// trait RelPk@{ rel_name|pascal }@ {
+//     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary>;
+// }
+// impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
+//     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+//         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+//     }
+// }
+// impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
+//     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+//         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+//     }
+// }
 @%- if !config.force_disable_cache %@
-impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
-    fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
-        Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
-    }
-}
+// impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
+//     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+//         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+//     }
+// }
 @%- endif %@
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_one(Joinable::Filter, false) %@
+@%- for (model, rel_name, rel) in def.relations_one(Joinable::Join, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
-    fn cols() -> &'static str {
-        r#"@{ rel.get_foreign_cols(def)|fmt_join_foreign("{col_esc}", ", ") }@"#
-    }
-    fn cols_with_paren() -> &'static str {
-        r#"@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("{col_esc}", ", ") }@"#
-    }
+    // fn cols() -> &'static str {
+    //     r#"@{ rel.get_foreign_cols(def)|fmt_join_foreign("{col_esc}", ", ") }@"#
+    // }
+    // fn cols_with_paren() -> &'static str {
+    //     r#"@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("{col_esc}", ", ") }@"#
+    // }
     fn set_op_none(op: &mut rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::OpData) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
         op.{ident} = Op::None;", "") }@
     }
 }
 
-trait RelFil@{ rel_name|pascal }@ where Self: Sized {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_;
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_;
-}
-impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        let pk: Primary = self.into();
-        rel::Filter_::new_and()
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
-    }
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        @%- if rel.get_foreign_cols(def).len() == 1 %@
-        let mut vec = Vec::new();
-        for row in list {
-            let pk: Primary = row.into();
-            vec.push(pk.0.inner().into());
-        }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
-        @%- else %@
-        let mut filter = rel::Filter_::new_or();
-        for row in list {
-            let pk: Primary = row.into();
-            filter = filter.or(rel::Filter_::new_and()
-            @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
-        }
-        filter
-        @%- endif %@
-    }
-}
-impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        let pk: Primary = self.into();
-        rel::Filter_::new_and()
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
-    }
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        @%- if rel.get_foreign_cols(def).len() == 1 %@
-        let mut vec = Vec::new();
-        for row in list {
-            let pk: Primary = row.into();
-            vec.push(pk.0.inner().into());
-        }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
-        @%- else %@
-        let mut filter = rel::Filter_::new_or();
-        for row in list {
-            let pk: Primary = row.into();
-            filter = filter.or(rel::Filter_::new_and()
-            @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
-        }
-        filter
-        @%- endif %@
-    }
-}
-impl RelFil@{ rel_name|pascal }@ for &ForInsert {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        let pk: Primary = (&self._data).into();
-        rel::Filter_::new_and()
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
-    }
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        @%- if rel.get_foreign_cols(def).len() == 1 %@
-        let mut vec = Vec::new();
-        for row in list {
-            let pk: Primary = (&row._data).into();
-            vec.push(pk.0.inner().into());
-        }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
-        @%- else %@
-        let mut filter = rel::Filter_::new_or();
-        for row in list {
-            let pk: Primary = (&row._data).into();
-            filter = filter.or(rel::Filter_::new_and()
-            @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
-        }
-        filter
-        @%- endif %@
-    }
-}
+// trait RelFil@{ rel_name|pascal }@ where Self: Sized {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_;
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_;
+// }
+// impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         let pk: Primary = self.into();
+//         rel::Filter_::new_and()
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//             .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
+//     }
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         @%- if rel.get_foreign_cols(def).len() == 1 %@
+//         let mut vec = Vec::new();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             vec.push(pk.0.inner().into());
+//         }
+//         @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
+//         @%- else %@
+//         let mut filter = rel::Filter_::new_or();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             filter = filter.or(rel::Filter_::new_and()
+//             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//                 .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
+//         }
+//         filter
+//         @%- endif %@
+//     }
+// }
+// impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         let pk: Primary = self.into();
+//         rel::Filter_::new_and()
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//             .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
+//     }
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         @%- if rel.get_foreign_cols(def).len() == 1 %@
+//         let mut vec = Vec::new();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             vec.push(pk.0.inner().into());
+//         }
+//         @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
+//         @%- else %@
+//         let mut filter = rel::Filter_::new_or();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             filter = filter.or(rel::Filter_::new_and()
+//             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//                 .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
+//         }
+//         filter
+//         @%- endif %@
+//     }
+// }
+// impl RelFil@{ rel_name|pascal }@ for &ForInsert {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         let pk: Primary = (&self._data).into();
+//         rel::Filter_::new_and()
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//             .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
+//     }
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         @%- if rel.get_foreign_cols(def).len() == 1 %@
+//         let mut vec = Vec::new();
+//         for row in list {
+//             let pk: Primary = (&row._data).into();
+//             vec.push(pk.0.inner().into());
+//         }
+//         @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
+//         @%- else %@
+//         let mut filter = rel::Filter_::new_or();
+//         for row in list {
+//             let pk: Primary = (&row._data).into();
+//             filter = filter.or(rel::Filter_::new_and()
+//             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//                 .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
+//         }
+//         filter
+//         @%- endif %@
+//     }
+// }
 @%- if !config.force_disable_cache %@
-impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        let pk: Primary = self.into();
-        rel::Filter_::new_and()
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
-    }
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        @%- if rel.get_foreign_cols(def).len() == 1 %@
-        let mut vec = Vec::new();
-        for row in list {
-            let pk: Primary = row.into();
-            vec.push(pk.0.inner().into());
-        }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
-        @%- else %@
-        let mut filter = rel::Filter_::new_or();
-        for row in list {
-            let pk: Primary = row.into();
-            filter = filter.or(rel::Filter_::new_and()
-            @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
-        }
-        filter
-        @%- endif %@
-    }
-}
-impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        let pk: Primary = self.into();
-        rel::Filter_::new_and()
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
-    }
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        @%- if rel.get_foreign_cols(def).len() == 1 %@
-        let mut vec = Vec::new();
-        for row in list {
-            let pk: Primary = row.into();
-            vec.push(pk.0.inner().into());
-        }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
-        @%- else %@
-        let mut filter = rel::Filter_::new_or();
-        for row in list {
-            let pk: Primary = row.into();
-            filter = filter.or(rel::Filter_::new_and()
-            @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
-        }
-        filter
-        @%- endif %@
-    }
-}
+// impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         let pk: Primary = self.into();
+//         rel::Filter_::new_and()
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//             .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
+//     }
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         @%- if rel.get_foreign_cols(def).len() == 1 %@
+//         let mut vec = Vec::new();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             vec.push(pk.0.inner().into());
+//         }
+//         @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
+//         @%- else %@
+//         let mut filter = rel::Filter_::new_or();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             filter = filter.or(rel::Filter_::new_and()
+//             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//                 .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
+//         }
+//         filter
+//         @%- endif %@
+//     }
+// }
+// impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         let pk: Primary = self.into();
+//         rel::Filter_::new_and()
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//             .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
+//     }
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         @%- if rel.get_foreign_cols(def).len() == 1 %@
+//         let mut vec = Vec::new();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             vec.push(pk.0.inner().into());
+//         }
+//         @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
+//         @%- else %@
+//         let mut filter = rel::Filter_::new_or();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             filter = filter.or(rel::Filter_::new_and()
+//             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//                 .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
+//         }
+//         filter
+//         @%- endif %@
+//     }
+// }
 @%- endif %@
-pub(crate) trait RelFk@{ rel_name|pascal }@ {
-    fn get_fk(&self) -> Option<Primary>;
-    fn set_fk(&mut self, pk: InnerPrimary);
-}
-impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Data {
-    fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
-    }
-    fn set_fk(&mut self, pk: InnerPrimary) {
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_name} = pk.{index}{raw_to_inner};", "
-        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
-    }
-}
+// pub(crate) trait RelFk@{ rel_name|pascal }@ {
+//     fn get_fk(&self) -> Option<Primary>;
+//     fn set_fk(&mut self, pk: InnerPrimary);
+// }
+// impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Data {
+//     fn get_fk(&self) -> Option<Primary> {
+//         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
+//     }
+//     fn set_fk(&mut self, pk: InnerPrimary) {
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
+//         self.{raw_name} = pk.{index}{raw_to_inner};", "
+//         self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
+//     }
+// }
 @%- if !config.force_disable_cache %@
-impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::CacheData {
-    fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
-    }
-    fn set_fk(&mut self, pk: InnerPrimary) {
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_name} = pk.{index}{raw_to_inner};", "
-        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
-    }
-}
+// impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::CacheData {
+//     fn get_fk(&self) -> Option<Primary> {
+//         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
+//     }
+//     fn set_fk(&mut self, pk: InnerPrimary) {
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
+//         self.{raw_name} = pk.{index}{raw_to_inner};", "
+//         self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
+//     }
+// }
 @%- endif %@
-impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::ForInsert {
-    fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_name}{null_question}{clone}", ", ") }@.into())
-    }
-    fn set_fk(&mut self, pk: InnerPrimary) {
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self._data.{raw_name} = pk.{index}{raw_to_inner};", "
-        self._data.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
-    }
-}
+// impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::ForInsert {
+//     fn get_fk(&self) -> Option<Primary> {
+//         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_name}{null_question}{clone}", ", ") }@.into())
+//     }
+//     fn set_fk(&mut self, pk: InnerPrimary) {
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
+//         self._data.{raw_name} = pk.{index}{raw_to_inner};", "
+//         self._data.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
+//     }
+// }
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_many(Joinable::Filter, false) %@
+@%- for (model, rel_name, rel) in def.relations_many(Joinable::Join, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
-    fn cols() -> &'static str {
-        r#"@{ rel.get_foreign_cols(def)|fmt_join_foreign("{col_esc}", ", ") }@"#
-    }
-    fn cols_with_paren() -> &'static str {
-        r#"@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("{col_esc}", ", ") }@"#
-    }
+    // fn cols() -> &'static str {
+    //     r#"@{ rel.get_foreign_cols(def)|fmt_join_foreign("{col_esc}", ", ") }@"#
+    // }
+    // fn cols_with_paren() -> &'static str {
+    //     r#"@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("{col_esc}", ", ") }@"#
+    // }
     fn set_op_none(op: &mut rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::OpData) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
         op.{ident} = Op::None;", "") }@
     }
 }
 
-trait RelFil@{ rel_name|pascal }@ where Self: Sized {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_;
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_;
-}
-impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        let pk: Primary = self.into();
-        rel::Filter_::new_and()
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
-    }
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        @%- if rel.get_foreign_cols(def).len() == 1 %@
-        let mut vec = Vec::new();
-        for row in list {
-            let pk: Primary = row.into();
-            vec.push(pk.0.inner().into());
-        }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
-        @%- else %@
-        let mut filter = rel::Filter_::new_or();
-        for row in list {
-            let pk: Primary = row.into();
-            filter = filter.or(rel::Filter_::new_and()
-            @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
-        }
-        filter
-        @%- endif %@
-    }
-}
-impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        let pk: Primary = self.into();
-        rel::Filter_::new_and()
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
-    }
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        @%- if rel.get_foreign_cols(def).len() == 1 %@
-        let mut vec = Vec::new();
-        for row in list {
-            let pk: Primary = row.into();
-            vec.push(pk.0.inner().into());
-        }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
-        @%- else %@
-        let mut filter = rel::Filter_::new_or();
-        for row in list {
-            let pk: Primary = row.into();
-            filter = filter.or(rel::Filter_::new_and()
-            @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
-        }
-        filter
-        @%- endif %@
-    }
-}
-impl RelFil@{ rel_name|pascal }@ for &ForInsert {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        let pk: Primary = (&self._data).into();
-        rel::Filter_::new_and()
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
-    }
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        @%- if rel.get_foreign_cols(def).len() == 1 %@
-        let mut vec = Vec::new();
-        for row in list {
-            let pk: Primary = (&row._data).into();
-            vec.push(pk.0.inner().into());
-        }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
-        @%- else %@
-        let mut filter = rel::Filter_::new_or();
-        for row in list {
-            let pk: Primary = (&row._data).into();
-            filter = filter.or(rel::Filter_::new_and()
-            @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
-        }
-        filter
-        @%- endif %@
-    }
-}
+// trait RelFil@{ rel_name|pascal }@ where Self: Sized {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_;
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_;
+// }
+// impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@ {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         let pk: Primary = self.into();
+//         rel::Filter_::new_and()
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//             .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
+//     }
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         @%- if rel.get_foreign_cols(def).len() == 1 %@
+//         let mut vec = Vec::new();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             vec.push(pk.0.inner().into());
+//         }
+//         @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
+//         @%- else %@
+//         let mut filter = rel::Filter_::new_or();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             filter = filter.or(rel::Filter_::new_and()
+//             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//                 .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
+//         }
+//         filter
+//         @%- endif %@
+//     }
+// }
+// impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         let pk: Primary = self.into();
+//         rel::Filter_::new_and()
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//             .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
+//     }
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         @%- if rel.get_foreign_cols(def).len() == 1 %@
+//         let mut vec = Vec::new();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             vec.push(pk.0.inner().into());
+//         }
+//         @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
+//         @%- else %@
+//         let mut filter = rel::Filter_::new_or();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             filter = filter.or(rel::Filter_::new_and()
+//             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//                 .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
+//         }
+//         filter
+//         @%- endif %@
+//     }
+// }
+// impl RelFil@{ rel_name|pascal }@ for &ForInsert {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         let pk: Primary = (&self._data).into();
+//         rel::Filter_::new_and()
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//             .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
+//     }
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         @%- if rel.get_foreign_cols(def).len() == 1 %@
+//         let mut vec = Vec::new();
+//         for row in list {
+//             let pk: Primary = (&row._data).into();
+//             vec.push(pk.0.inner().into());
+//         }
+//         @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
+//         @%- else %@
+//         let mut filter = rel::Filter_::new_or();
+//         for row in list {
+//             let pk: Primary = (&row._data).into();
+//             filter = filter.or(rel::Filter_::new_and()
+//             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//                 .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
+//         }
+//         filter
+//         @%- endif %@
+//     }
+// }
 @%- if !config.force_disable_cache %@
-impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        let pk: Primary = self.into();
-        rel::Filter_::new_and()
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
-    }
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        @%- if rel.get_foreign_cols(def).len() == 1 %@
-        let mut vec = Vec::new();
-        for row in list {
-            let pk: Primary = row.into();
-            vec.push(pk.0.inner().into());
-        }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
-        @%- else %@
-        let mut filter = rel::Filter_::new_or();
-        for row in list {
-            let pk: Primary = row.into();
-            filter = filter.or(rel::Filter_::new_and()
-            @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
-        }
-        filter
-        @%- endif %@
-    }
-}
-impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
-    fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        let pk: Primary = self.into();
-        rel::Filter_::new_and()
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-            .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
-    }
-    fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
-        use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
-        @%- if rel.get_foreign_cols(def).len() == 1 %@
-        let mut vec = Vec::new();
-        for row in list {
-            let pk: Primary = row.into();
-            vec.push(pk.0.inner().into());
-        }
-        @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
-        @%- else %@
-        let mut filter = rel::Filter_::new_or();
-        for row in list {
-            let pk: Primary = row.into();
-            filter = filter.or(rel::Filter_::new_and()
-            @{- rel.get_foreign_cols(def)|fmt_join_foreign("
-                .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
-        }
-        filter
-        @%- endif %@
-    }
-}
+// impl RelFil@{ rel_name|pascal }@ for CacheWrapper {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         let pk: Primary = self.into();
+//         rel::Filter_::new_and()
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//             .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
+//     }
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         @%- if rel.get_foreign_cols(def).len() == 1 %@
+//         let mut vec = Vec::new();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             vec.push(pk.0.inner().into());
+//         }
+//         @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
+//         @%- else %@
+//         let mut filter = rel::Filter_::new_or();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             filter = filter.or(rel::Filter_::new_and()
+//             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//                 .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
+//         }
+//         filter
+//         @%- endif %@
+//     }
+// }
+// impl RelFil@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
+//     fn filter(&self) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         let pk: Primary = self.into();
+//         rel::Filter_::new_and()
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//             .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@
+//     }
+//     fn in_filter(list: &[Self]) -> rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Filter_ {
+//         use rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@ as rel;
+//         @%- if rel.get_foreign_cols(def).len() == 1 %@
+//         let mut vec = Vec::new();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             vec.push(pk.0.inner().into());
+//         }
+//         @{ rel.get_foreign_cols(def)|fmt_join_foreign("rel::Filter_::In(rel::ColMany_::{ident}(vec))", "") }@
+//         @%- else %@
+//         let mut filter = rel::Filter_::new_or();
+//         for row in list {
+//             let pk: Primary = row.into();
+//             filter = filter.or(rel::Filter_::new_and()
+//             @{- rel.get_foreign_cols(def)|fmt_join_foreign("
+//                 .and(rel::Filter_::Eq(rel::ColOne_::{ident}(pk.{index}.inner().into())))", "") }@);
+//         }
+//         filter
+//         @%- endif %@
+//     }
+// }
 @%- endif %@
-pub(crate) trait RelFk@{ rel_name|pascal }@ {
-    fn get_fk(&self) -> Option<Primary>;
-    fn set_fk(&mut self, pk: InnerPrimary);
-}
-impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Data {
-    fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
-    }
-    fn set_fk(&mut self, pk: InnerPrimary) {
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_name} = pk.{index}{raw_to_inner};", "
-        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
-    }
-}
+// pub(crate) trait RelFk@{ rel_name|pascal }@ {
+//     fn get_fk(&self) -> Option<Primary>;
+//     fn set_fk(&mut self, pk: InnerPrimary);
+// }
+// impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Data {
+//     fn get_fk(&self) -> Option<Primary> {
+//         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
+//     }
+//     fn set_fk(&mut self, pk: InnerPrimary) {
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
+//         self.{raw_name} = pk.{index}{raw_to_inner};", "
+//         self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
+//     }
+// }
 @%- if !config.force_disable_cache %@
-impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::CacheData {
-    fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
-    }
-    fn set_fk(&mut self, pk: InnerPrimary) {
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self.{raw_name} = pk.{index}{raw_to_inner};", "
-        self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
-    }
-}
+// impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::CacheData {
+//     fn get_fk(&self) -> Option<Primary> {
+//         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
+//     }
+//     fn set_fk(&mut self, pk: InnerPrimary) {
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
+//         self.{raw_name} = pk.{index}{raw_to_inner};", "
+//         self.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
+//     }
+// }
 @%- endif %@
-impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::ForInsert {
-    fn get_fk(&self) -> Option<Primary> {
-        Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_name}{null_question}{clone}", ", ") }@.into())
-    }
-    fn set_fk(&mut self, pk: InnerPrimary) {
-        @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
-        self._data.{raw_name} = pk.{index}{raw_to_inner};", "
-        self._data.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
-    }
-}
+// impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::ForInsert {
+//     fn get_fk(&self) -> Option<Primary> {
+//         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_name}{null_question}{clone}", ", ") }@.into())
+//     }
+//     fn set_fk(&mut self, pk: InnerPrimary) {
+//         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
+//         self._data.{raw_name} = pk.{index}{raw_to_inner};", "
+//         self._data.{raw_name} = Some(pk.{index}{raw_to_inner});", "") }@
+//     }
+// }
 @%- endfor %@
 #@
-@%- for (model, rel_name, rel) in def.relations_one(Joinable::Filter, false) %@
+@%- for (model, rel_name, rel) in def.relations_one(Joinable::Join, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn set_op_none(op: &mut rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::OpData) {
@@ -1251,7 +1244,7 @@ impl RelCol@{ rel_name|pascal }@ {
     }
 }
 @%- endfor %@
-@%- for (model, rel_name, rel) in def.relations_many(Joinable::Filter, false) %@
+@%- for (model, rel_name, rel) in def.relations_many(Joinable::Join, false) %@
 struct RelCol@{ rel_name|pascal }@;
 impl RelCol@{ rel_name|pascal }@ {
     fn set_op_none(op: &mut rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::OpData) {

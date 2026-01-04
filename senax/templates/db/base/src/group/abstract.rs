@@ -13,7 +13,7 @@ use crate::misc::BindValue;
 use base_domain as domain;
 @% endif %@
 
-@% for mod_name in def.relation_mods() -%@
+@% for mod_name in def.relation_mods(Joinable::Filter) -%@
 use crate::models::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as rel_@{ mod_name[0] }@_@{ mod_name[1] }@;
 @% endfor %@
 @% for (name, column_def) in def.num_enums(false) -%@
