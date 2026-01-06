@@ -36,12 +36,12 @@ pub enum CacheOp {
 }
 
 #[rustfmt::skip]
-#[derive(::schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "seed_schema", derive(::schemars::JsonSchema))]
+#[cfg_attr(feature = "seed_schema", schemars(deny_unknown_fields))]
 #[allow(non_snake_case)]
 pub struct @{ group_name|pascal }@ {
 @%- for (name, def) in models %@
-    #[serde(default)]
+    #[cfg_attr(feature = "seed_schema", schemars(default))]
     @{ name|ident }@: IndexMap<String, @{ def.mod_name()|ident }@::_@{ name|pascal }@Factory>,
 @%- endfor %@
 }

@@ -101,6 +101,7 @@ enum Command {
         test: bool,
     },
     /// Generate a schema for the seed
+    #[cfg(feature="seed_schema")]
     GenSeedSchema,
     /// Import the database seed.
     Seed {
@@ -205,6 +206,7 @@ async fn main() -> Result<()> {
                 db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing, remove_missing).await?;
                 return Ok(());
             }
+            #[cfg(feature="seed_schema")]
             Command::GenSeedSchema => {
                 db::gen_seed_schema()?;
                 return Ok(());

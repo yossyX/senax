@@ -714,7 +714,7 @@ impl GqlMutation@{ graphql_name }@ {
         @%- endif %@
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        let ctx: &crate::context::Ctx = gql_ctx.data()?;
+        let ctx: &::_server::context::Ctx = gql_ctx.data()?;
         let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
         let mut query = @{ group|snake }@_repo.@{ mod_name|ident }@().@{ selector|ident }@().join(updater_joiner());
         @%- if selector_def.filter_is_required() %@
@@ -786,7 +786,7 @@ impl GqlMutation@{ graphql_name }@ {
             .map_err(|e| GqlError::server_error(gql_ctx, e))?
         {
             result.push((&*obj).into());
-            _repository_::delete(repo, obj)
+            _repository_::delete(@{ group|snake }@_repo.as_ref().into(), obj)
                 .await
                 .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         }
@@ -953,7 +953,7 @@ async fn @{ selector }@_handler(
         query.stream(USE_SINGLE_TRANSACTION_FOR_STREAM).await
     }
 
-    let ctx = crate::context::Ctx::get(&http_req);
+    let ctx = ::_server::context::Ctx::get(&http_req);
     let ndjson = data.ndjson.unwrap_or_default();
     let result = async move {
         let auth = AuthInfo::retrieve(&http_req).unwrap_or_default();
@@ -1023,7 +1023,7 @@ async fn count_@{ selector }@_handler(
         Ok(count)
     }
 
-    let ctx = crate::context::Ctx::get(&http_req);
+    let ctx = ::_server::context::Ctx::get(&http_req);
     let filter = filter.into_inner();
     let result = async move {
         let auth = AuthInfo::retrieve(&http_req).unwrap_or_default();

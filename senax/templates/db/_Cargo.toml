@@ -6,6 +6,7 @@ publish = false
 
 [features]
 etcd = [ "senax-common/etcd", "_base/etcd" ]
+seed_schema = [ "schemars" ]
 
 [dependencies]
 _base = { package = "_db_@{ db|snake }@", path = "base" }
@@ -15,7 +16,6 @@ domain = { path = "../../1_domain" }
 
 ahash.workspace = true
 anyhow.workspace = true
-arc-swap = "1.5.1"
 async-stream.workspace = true
 async-trait.workspace = true
 bytes = "1.4"
@@ -34,7 +34,7 @@ phf = "0.8.0"
 rand.workspace = true
 regex.workspace = true
 rust_decimal.workspace = true
-schemars.workspace = true
+schemars = { workspace = true, optional = true }
 senax-common.workspace = true
 senax-macros.workspace = true
 serde.workspace = true
@@ -42,18 +42,14 @@ serde_bytes = "0.11.12"
 serde_json.workspace = true
 serde_repr.workspace = true
 serde_yaml.workspace = true
-sled = "0.34"
 sqlx = { workspace = true, features = ["@{ config.db }@"] }
 strum.workspace = true
 strum_macros.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-url = "2.2.2"
-utoipa.workspace = true
 uuid.workspace = true
 validator.workspace = true
-zstd = "0.13"
 
 [build-dependencies]
 includedir_codegen = "0.6.0"

@@ -16,7 +16,6 @@ ciborium.workspace = true
 derive-new.workspace = true
 futures.workspace = true
 rust_decimal.workspace = true
-schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

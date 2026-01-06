@@ -2,8 +2,6 @@
 
 use anyhow::{Result, bail};
 use regex::Regex;
-use schemars::JsonSchema;
-use schemars::r#gen::SchemaSettings;
 use senax_common::types::blob::FILES;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -15,8 +13,8 @@ use crate::{DbConn, connection, models::exec_ddl};
 // SEEDS
 include!(concat!(env!("OUT_DIR"), "/seeds.rs"));
 
-#[derive(JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "seed_schema", derive(::schemars::JsonSchema))]
+#[cfg_attr(feature = "seed_schema", schemars(deny_unknown_fields))]
 #[allow(dead_code)]
 #[allow(non_snake_case)]
 pub struct SeedSchema {
@@ -43,7 +41,9 @@ impl SeedSchema {
     }
 }
 
+#[cfg(feature="seed_schema")]
 pub fn gen_seed_schema() -> Result<()> {
+    use schemars::r#gen::SchemaSettings;
     let settings = SchemaSettings::draft07().with(|s| {
         s.option_nullable = false;
         s.option_add_null_type = true;

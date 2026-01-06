@@ -299,6 +299,7 @@ pub mod option_arc_bytes {
 }
 
 #[allow(dead_code)]
+#[cfg(feature="seed_schema")]
 pub(crate) fn id_schema(_: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
     use schemars::schema::{InstanceType, Schema, SchemaObject, SingleOrVec};
     let schema = SchemaObject {

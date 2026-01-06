@@ -22,7 +22,6 @@ derive-new.workspace = true
 futures.workspace = true
 mockall = {version = "0.13", optional = true}
 rust_decimal.workspace = true
-schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

@@ -6,6 +6,7 @@ publish = false
 
 [features]
 etcd = [ "senax-common/etcd" ]
+seed_schema = [ "schemars" ]
 
 [dependencies]
 @%- if !config.exclude_from_domain %@
@@ -28,16 +29,14 @@ derive_more.workspace = true
 derive-new.workspace = true
 futures.workspace = true
 fxhash = "0.2"
-includedir = "0.6.0"
 indexmap = "2"
 log.workspace = true
 num-traits = "0.2"
 once_cell.workspace = true
-phf = "0.8.0"
 rand.workspace = true
 regex.workspace = true
 rust_decimal.workspace = true
-schemars.workspace = true
+schemars = { workspace = true, optional = true }
 senax-common.workspace = true
 senax-encoder.workspace = true
 senax-macros.workspace = true
@@ -46,7 +45,6 @@ serde_bytes = "0.11.12"
 serde_json.workspace = true
 serde_repr.workspace = true
 serde_yaml.workspace = true
-sled = "0.34"
 sqlx = { workspace = true, features = ["@{ config.db }@"] }
 strum.workspace = true
 strum_macros.workspace = true
@@ -54,12 +52,7 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 url = "2.2.2"
-utoipa.workspace = true
 uuid.workspace = true
 validator.workspace = true
 zstd = "0.13"
-
-[build-dependencies]
-includedir_codegen = "0.6.0"
-walkdir = "2.3.1"
 @{-"\n"}@

@@ -204,7 +204,7 @@ impl @{ pascal_name }@Query@{ selector|pascal }@IdentityValues@{ filter_map.pasc
 @%- for (index_name, index) in def.multi_index(false) %@
 
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct @{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "pub {filter_type}", ", ") }@);
 impl<@{ index.join_fields(def, "T{index}", ", ") }@> TryFrom<(@{ index.join_fields(def, "T{index}", ", ") }@)> for @{ pascal_name }@Index_@{ index_name }@
 where@{ index.join_fields(def, "
