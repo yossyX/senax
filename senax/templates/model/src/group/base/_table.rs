@@ -3280,7 +3280,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
 @%- for (index_name, index) in def.multi_index(false) %@
 
 #[allow(non_camel_case_types)]
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct _@{ pascal_name }@Index_@{ index_name }@(@{ index.join_fields(def, "pub {filter_type}", ", ") }@);
 impl<@{ index.join_fields(def, "T{index}", ", ") }@> TryFrom<(@{ index.join_fields(def, "T{index}", ", ") }@)> for _@{ pascal_name }@Index_@{ index_name }@
 where@{ index.join_fields(def, "
