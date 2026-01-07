@@ -7,6 +7,7 @@ publish = false
 [features]
 etcd = [ "senax-common/etcd", "_base/etcd" ]
 seed_schema = [ "schemars" ]
+production_mode = [ "_base/production_mode" ]
 
 [dependencies]
 _base = { package = "_db_@{ db|snake }@", path = "base" }

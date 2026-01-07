@@ -17,6 +17,7 @@ use std::{fmt, fmt::Display, marker::PhantomData};
 use crate::misc::{JsonRawValue, ToJsonRawValue as _, Updater};
 
 #[derive(Pack, Unpack, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash)]
+#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 pub enum Op {
     #[default]
     #[senax(id = 1)]

@@ -200,6 +200,7 @@ impl_try_decimal!(f32);
 impl_try_decimal!(f64);
 
 #[derive(serde::Serialize, Pack, Unpack, Clone, Default)]
+#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 pub struct JsonRawValue(std::sync::Arc<Box<serde_json::value::RawValue>>);
 impl TryFrom<String> for JsonRawValue {
     type Error = Box<dyn std::error::Error + Send + Sync>;

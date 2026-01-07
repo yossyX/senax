@@ -43,10 +43,12 @@ pub enum TableName {
 pub(crate) struct CacheActor;
 
 #[derive(Pack, Unpack, Clone, Debug)]
+#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 pub struct CacheMsg(pub Vec<CacheOp>, pub FxHashMap<ShardId, u64>);
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Pack, Unpack, Clone, Debug)]
+#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 pub enum CacheOp {
 @%- for (name, defs) in groups %@
     @{ name|to_pascal_name }@(@{ name|snake|ident }@::CacheOp),

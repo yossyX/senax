@@ -223,6 +223,11 @@ function Models() {
                     sortingField: "name",
                     isRowHeader: true,
                   },
+                  {
+                    id: "label",
+                    header: "label",
+                    cell: (item: any) => item.label || "-",
+                  },
                 ]}
                 items={models}
                 sortingDisabled

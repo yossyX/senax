@@ -6,6 +6,7 @@ use ::std::{
 };
 
 #[rustfmt::skip]
+#[allow(non_snake_case)]
 #[allow(clippy::overly_complex_bool_expr)]
 #[allow(clippy::nonminimal_bool)]
 #[allow(clippy::useless_conversion)]

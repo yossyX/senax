@@ -17,7 +17,7 @@ use crate::api_generator::schema::{
 use crate::api_generator::template::{DbConfigTemplate, MutationRootTemplate, QueryRootTemplate};
 use crate::common::ToCase as _;
 use crate::common::{fs_write, parse_yml_file, simplify_yml};
-use crate::schema::{_to_ident_name, ConfigDef, GROUPS, Joinable, ModelDef, to_id_name};
+use crate::schema::{_to_ident_name, CONFIG, ConfigDef, GROUPS, Joinable, ModelDef, to_id_name};
 use crate::{API_SCHEMA_PATH, model_generator};
 use crate::{SCHEMA_PATH, filters};
 
@@ -722,12 +722,13 @@ fn write_model_file(
     model_route: &str,
     def: &Arc<ModelDef>,
     api_def: Option<ApiModelDef>,
-    config: &ApiDbDef,
+    api_db_config: &ApiDbDef,
     inquiry: bool,
     force: bool,
     ts_dir: &Option<PathBuf>,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<ApiModelDef> {
+    let db_config = CONFIG.read().unwrap().as_ref().unwrap().clone();
     let path = path.join("src/api");
     let api_def = if let Some(api_def) = api_def {
         api_def.clone()
@@ -747,7 +748,7 @@ fn write_model_file(
     let mod_name = &mod_name;
     let model_route_mod_name = model_route.to_snake();
     let pascal_name = &model_name.to_pascal();
-    let graphql_name = &config.graphql_name(db_route, group_route, model_route);
+    let graphql_name = &api_db_config.graphql_name(db_route, group_route, model_route);
     let file_path = path.join(format!("{}.rs", &model_route_mod_name));
     remove_files.remove(file_path.as_os_str());
     let content = if force || !file_path.exists() {
@@ -762,7 +763,7 @@ fn write_model_file(
             graphql_name,
             id_name: &to_id_name(model_name),
             def,
-            camel_case: config.camel_case(),
+            camel_case: api_db_config.camel_case(),
             api_def: &api_def,
             version_col: crate::schema::ConfigDef::version(),
         }
@@ -778,9 +779,9 @@ fn write_model_file(
     );
 
     ApiRelationDef::push(api_def.relations(def)?);
-    ApiFieldDef::push(api_def.fields(def, config)?);
+    ApiFieldDef::push(api_def.fields(def, api_db_config)?);
 
-    let mut gql_fields = make_gql_fields(def, config.camel_case());
+    let mut gql_fields = make_gql_fields(def, api_db_config.camel_case());
     let mut buf = template::BaseModelTemplate {
         db,
         group,
@@ -788,9 +789,9 @@ fn write_model_file(
         model_name,
         pascal_name,
         graphql_name,
-        config,
+        config: api_db_config,
         def,
-        camel_case: config.camel_case(),
+        camel_case: api_db_config.camel_case(),
         api_def: &api_def,
     }
     .render()?;
@@ -800,7 +801,7 @@ fn write_model_file(
         &mut buf,
         db,
         graphql_name,
-        config.camel_case(),
+        api_db_config.camel_case(),
         0,
         false,
         false,
@@ -820,7 +821,7 @@ fn write_model_file(
         let ts_dir = ts_dir.join(group_route);
         let file_path = ts_dir.join(format!("{}.tsx", model_name));
         use inflector::Inflector;
-        let model_case = if config.camel_case() {
+        let model_case = if api_db_config.camel_case() {
             model_route.to_camel_case()
         } else {
             model_route.to_string()
@@ -828,12 +829,12 @@ fn write_model_file(
         let tpl = template::ModelTsTemplate {
             path: format!(
                 "{}{}{}",
-                if config.promote_group_paths {
+                if api_db_config.promote_group_paths {
                     String::new()
                 } else {
                     format!("{}_", db_route.to_snake())
                 },
-                if config.promote_group_children(group_route) {
+                if api_db_config.promote_group_children(group_route) {
                     String::new()
                 } else {
                     format!("{}_", group_route.to_snake())
@@ -843,12 +844,12 @@ fn write_model_file(
             model_route,
             curly_begin: format!(
                 "{}{}{}",
-                if config.promote_group_paths {
+                if api_db_config.promote_group_paths {
                     String::new()
                 } else {
                     format!("{db_route}{{")
                 },
-                if config.promote_group_children(group_route) {
+                if api_db_config.promote_group_children(group_route) {
                     String::new()
                 } else {
                     format!("{group_route}{{")
@@ -857,25 +858,16 @@ fn write_model_file(
             ),
             curly_end: format!(
                 "{}{}",
-                if config.promote_group_paths { "" } else { "}" },
-                if config.promote_group_children(group_route) {
+                if api_db_config.promote_group_paths { "" } else { "}" },
+                if api_db_config.promote_group_children(group_route) {
                     ""
                 } else {
                     "}"
                 },
             ),
             pascal_name: format!(
-                "{}{}{}",
-                if config.promote_group_paths {
-                    String::new()
-                } else {
-                    db.to_pascal()
-                },
-                if config.promote_group_children(group_route) {
-                    String::new()
-                } else {
-                    group.to_pascal()
-                },
+                "{}{}",
+                db_config.layer_name(db, group),
                 model_name.to_pascal()
             ),
             graphql_name,

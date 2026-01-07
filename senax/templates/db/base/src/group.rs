@@ -29,6 +29,7 @@ pub mod @{ name|ident }@;
 #[rustfmt::skip]
 #[allow(clippy::large_enum_variant)]
 #[derive(Pack, Unpack, Clone, Debug)]
+#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 pub enum CacheOp {
 @%- for (name, def) in models %@
     @{ name|to_pascal_name }@(@{ def.mod_name()|ident }@::CacheOp),

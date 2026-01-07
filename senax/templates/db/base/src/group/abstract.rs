@@ -19,6 +19,7 @@ use crate::models::@{ mod_name[0]|ident }@::@{ mod_name[1]|ident }@ as rel_@{ mo
 @% for (name, column_def) in def.num_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
 #[derive(Pack, Unpack, Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, FromRepr, IntoStaticStr)]
+#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 #[cfg_attr(feature = "seed_schema", derive(::schemars::JsonSchema))]
 #[repr(@{ column_def.get_inner_type(true, true) }@)]
 #[allow(non_camel_case_types)]
@@ -89,6 +90,7 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 @% for (name, column_def) in def.str_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
 #[derive(Pack, Unpack, Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
+#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 #[cfg_attr(feature = "seed_schema", derive(::schemars::JsonSchema))]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
