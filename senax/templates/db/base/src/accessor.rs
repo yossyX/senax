@@ -7,7 +7,7 @@ use derive_more::Display;
 use log::kv::ToValue;
 use num_traits::{CheckedAdd, CheckedSub, Float, SaturatingAdd, SaturatingSub};
 use serde::{Serialize, de::DeserializeOwned};
-use senax_encoder::{Pack, Unpack};
+use senax_encoder::{Decode, Encode, Pack, Unpack};
 use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::ops::{BitAnd, BitOr};
@@ -16,8 +16,8 @@ use std::{fmt, fmt::Display, marker::PhantomData};
 
 use crate::misc::{JsonRawValue, ToJsonRawValue as _, Updater};
 
-#[derive(Pack, Unpack, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Pack, Unpack, PartialEq, Eq, Clone, Copy, Debug, Display, Default, Hash)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 pub enum Op {
     #[default]
     #[senax(id = 1)]

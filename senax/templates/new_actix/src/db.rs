@@ -77,7 +77,6 @@ pub async fn migrate(db: Option<&str>, use_test: bool, clean: bool, ignore_missi
     Ok(())
 }
 
-#[cfg(feature="seed_schema")]
 pub fn gen_seed_schema() -> Result<()> {
     // Do not modify this line. (gen_seed_schema)
     Ok(())

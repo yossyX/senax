@@ -45,23 +45,11 @@ pub async fn start(db_dir: Option<&Path>) -> Result<()> {
     _base::_@{ def.mod_name() }@::init().await?;
 @%- endfor %@
 
-    if !db::is_test_mode() {
-        let path = db_dir.unwrap().join(DELAYED_DB_DIR).join("@{ group_name }@");
-        tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(Duration::from_secs(2)).await;
-                let db = sled::open(&path);
-                match db {
-                    Ok(db) => {
-                        @%- for (name, def) in models %@
-                        _base::_@{ def.mod_name() }@::init_db(&db).await.unwrap();
-                        @%- endfor %@
-                        break;
-                    }
-                    Err(e) => ::log::error!("{}", e),
-                }
-            }
-        });
+    if let Some(db_dir) = db_dir {
+        let path = db_dir.join(DELAYED_DB_DIR).join("@{ group_name }@");
+        @%- for (name, def) in models %@
+        _base::_@{ def.mod_name() }@::init_db(&path).await?;
+        @%- endfor %@
     }
     Ok(())
 }

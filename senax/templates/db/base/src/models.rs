@@ -6,7 +6,7 @@ use ::fxhash::FxHashMap;
 use ::log::error;
 use ::once_cell::sync::OnceCell;
 use ::senax_common::ShardId;
-use ::senax_encoder::{Pack, Unpack};
+use ::senax_encoder::{Decode, Encode, Pack, Unpack};
 use ::std::sync::Arc;
 use ::tokio::sync::RwLock;
 
@@ -42,13 +42,13 @@ pub enum TableName {
 
 pub(crate) struct CacheActor;
 
-#[derive(Pack, Unpack, Clone, Debug)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Clone, Debug)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_encode))]
 pub struct CacheMsg(pub Vec<CacheOp>, pub FxHashMap<ShardId, u64>);
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Pack, Unpack, Clone, Debug)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Pack, Unpack, Clone, Debug)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 pub enum CacheOp {
 @%- for (name, defs) in groups %@
     @{ name|to_pascal_name }@(@{ name|snake|ident }@::CacheOp),

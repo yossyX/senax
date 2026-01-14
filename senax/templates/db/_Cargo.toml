@@ -6,7 +6,7 @@ publish = false
 
 [features]
 etcd = [ "senax-common/etcd", "_base/etcd" ]
-seed_schema = [ "schemars" ]
+seed_schema = [ "schemars", "_base/seed_schema" ]
 production_mode = [ "_base/production_mode" ]
 
 [dependencies]

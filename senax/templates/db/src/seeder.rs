@@ -41,23 +41,25 @@ impl SeedSchema {
     }
 }
 
-#[cfg(feature="seed_schema")]
 pub fn gen_seed_schema() -> Result<()> {
-    use schemars::r#gen::SchemaSettings;
-    let settings = SchemaSettings::draft07().with(|s| {
-        s.option_nullable = false;
-        s.option_add_null_type = true;
-    });
-    let generator = settings.into_generator();
-    let schema = generator.into_root_schema_for::<SeedSchema>();
-    let schema = serde_json::to_string_pretty(&schema)?;
-    let path = std::path::Path::new(file!())
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join("seed-schema.json");
-    fs::write(path, schema)?;
+    #[cfg(feature="seed_schema")]
+    {
+        use schemars::r#gen::SchemaSettings;
+        let settings = SchemaSettings::draft07().with(|s| {
+            s.option_nullable = false;
+            s.option_add_null_type = true;
+        });
+        let generator = settings.into_generator();
+        let schema = generator.into_root_schema_for::<SeedSchema>();
+        let schema = serde_json::to_string_pretty(&schema)?;
+        let path = std::path::Path::new(file!())
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("seed-schema.json");
+        fs::write(path, schema)?;
+    }
     Ok(())
 }
 

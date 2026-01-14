@@ -3,7 +3,7 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
 use rust_decimal::Decimal;
 use senax_common::cache::calc_mem_size;
-use ::senax_encoder::{Pack, Unpack};
+use ::senax_encoder::{Decode, Encode, Pack, Unpack};
 use serde_json::Value;
 use sqlx::query::Query;
 use std::convert::TryFrom;
@@ -199,8 +199,8 @@ impl_decimal!(Decimal);
 impl_try_decimal!(f32);
 impl_try_decimal!(f64);
 
-#[derive(serde::Serialize, Pack, Unpack, Clone, Default)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(serde::Serialize, Decode, Encode, Pack, Unpack, Clone, Default)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 pub struct JsonRawValue(std::sync::Arc<Box<serde_json::value::RawValue>>);
 impl TryFrom<String> for JsonRawValue {
     type Error = Box<dyn std::error::Error + Send + Sync>;

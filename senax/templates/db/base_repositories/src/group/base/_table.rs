@@ -24,6 +24,7 @@ use ::std::collections::{BTreeMap, HashMap};
 use ::std::convert::TryInto;
 use ::std::fmt::Write;
 use ::std::hash::{Hash, Hasher};
+use ::std::path::Path;
 use ::std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use ::std::sync::Arc;
 use ::std::time::{SystemTime, UNIX_EPOCH};
@@ -132,12 +133,24 @@ pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn init_db(db: &sled::Db) -> Result<()> {
+pub(crate) async fn init_db(path: &Path) -> Result<()> {
     @%- if def.use_insert_delayed() %@
-    let tree = db.open_tree(TABLE_NAME)?;
-    INSERT_DELAYED_DB.set(tree).unwrap();
-    DelayedActor::handle(DelayedMsg::InsertFromMemory);
-    DelayedActor::handle(DelayedMsg::InsertFromDisk);
+    let path = path.join(TABLE_NAME);
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            let db = sled::open(&path);
+            match db {
+                Ok(db) => {
+                    INSERT_DELAYED_DB.set(db).unwrap();
+                    DelayedActor::handle(DelayedMsg::InsertFromMemory);
+                    DelayedActor::handle(DelayedMsg::InsertFromDisk);
+                    break;
+                }
+                Err(e) => ::log::error!("{}", e),
+            }
+        }
+    });
     @%- endif %@
     Ok(())
 }
@@ -705,7 +718,7 @@ pub(crate) async fn __clear_cache(_shard_id: ShardId, _sync: u64, _clear_test: b
 }
 @% if def.use_insert_delayed() %@
 static INSERT_DELAYED_QUEUE: Lazy<SegQueue<ForInsert>> = Lazy::new(SegQueue::new);
-static INSERT_DELAYED_DB: OnceCell<sled::Tree> = OnceCell::new();
+static INSERT_DELAYED_DB: OnceCell<sled::Db> = OnceCell::new();
 static INSERT_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
 @%- endif %@
 static DELAYED_DB_NO: Lazy<AtomicU64> = Lazy::new(|| {

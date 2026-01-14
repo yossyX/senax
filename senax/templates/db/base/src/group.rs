@@ -11,7 +11,7 @@ use ::fxhash::FxHashMap;
 use ::indexmap::IndexMap;
 use ::senax_common::{cache::msec::MSec, ShardId};
 use ::serde::{Deserialize, Serialize};
-use senax_encoder::{Pack, Unpack};
+use ::senax_encoder::{Decode, Encode, Pack, Unpack};
 use ::std::path::Path;
 use ::std::sync::Arc;
 use ::std::time::Duration;
@@ -28,8 +28,8 @@ pub mod @{ name|ident }@;
 
 #[rustfmt::skip]
 #[allow(clippy::large_enum_variant)]
-#[derive(Pack, Unpack, Clone, Debug)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Pack, Unpack, Clone, Debug)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 pub enum CacheOp {
 @%- for (name, def) in models %@
     @{ name|to_pascal_name }@(@{ def.mod_name()|ident }@::CacheOp),

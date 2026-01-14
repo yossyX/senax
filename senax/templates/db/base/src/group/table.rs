@@ -12,7 +12,7 @@ use senax_common::cache::msec::MSec;
 use senax_common::cache::calc_mem_size;
 use senax_common::ShardId;
 use senax_common::{types::blob::*, types::geo_point::*, types::point::*, SqlColumns};
-use senax_encoder::{Pack, Unpack};
+use senax_encoder::{Decode, Encode, Pack, Unpack};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::boxed::Box;
@@ -54,8 +54,8 @@ static CACHE_SYNC_TYPE_ID: u64 = @{ def.get_type_id("CACHE_SYNC_TYPE_ID") }@;
 static CACHE_TYPE_ID: u64 = @{ def.get_type_id("CACHE_TYPE_ID") }@;
 pub static COL_KEY_TYPE_ID: u64 = @{ def.get_type_id("COL_KEY_TYPE_ID") }@;
 
-#[derive(Pack, Unpack, Clone, Debug)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Pack, Unpack, Clone, Debug)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 pub enum CacheOp {
     #[senax(id = 1)]
     None,
@@ -260,9 +260,9 @@ impl Primary {
     }
 }
 #[derive(
-    Hash, PartialEq, Eq, Serialize, Pack, Unpack, Clone, Debug, PartialOrd, Ord,
+    Hash, PartialEq, Eq, Serialize, Decode, Encode, Pack, Unpack, Clone, Debug, PartialOrd, Ord,
 )]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 pub struct InnerPrimary(@{ def.primaries()|fmt_join("pub {inner}", ", ") }@);
 impl sqlx::FromRow<'_, DbRow> for InnerPrimary {
     fn from_row(row: &DbRow) -> sqlx::Result<Self> {
@@ -279,7 +279,7 @@ impl SqlColumns for InnerPrimary {
 }
 
 #[derive(Hash, PartialEq, Eq, Pack, Unpack, Clone)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 pub struct PrimaryHasher(pub InnerPrimary, pub ShardId);
 @%- if !config.force_disable_cache %@
 
@@ -310,7 +310,7 @@ impl PrimaryHasher {
 }
 
 #[derive(Pack, Unpack, Clone, Debug)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 pub struct PrimaryWrapper(pub InnerPrimary, pub ShardId, pub MSec);
 @%- if !config.force_disable_cache %@
 
@@ -344,8 +344,8 @@ impl CacheVal for PrimaryWrapper {
 }
 @%- endif %@
 
-#[derive(Pack, Unpack, PartialEq, Clone, Debug, senax_macros::SqlCol)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Pack, Unpack, PartialEq, Clone, Debug, senax_macros::SqlCol)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 pub struct Data {
 @{ def.all_fields()|fmt_join("{column_query}    pub {ident}: {inner},\n", "") -}@
 }
@@ -403,16 +403,16 @@ impl Data {
     }
 }
 
-#[derive(Pack, Unpack, Clone, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Pack, Unpack, Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 pub struct OpData {
 @{- def.all_fields()|fmt_join("
     pub {ident}: Op,", "") }@
 }
 @%- if !config.force_disable_cache %@
 
-#[derive(Pack, Unpack, Clone, Debug, Default, senax_macros::SqlCol)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Pack, Unpack, Clone, Debug, Default, senax_macros::SqlCol)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 pub struct CacheData {
 @{ def.cache_cols()|fmt_join("{column_query}    pub {ident}: {inner},\n", "") -}@
 }
@@ -429,8 +429,8 @@ impl sqlx::FromRow<'_, DbRow> for CacheData {
 
 @% for (name, column_def) in def.num_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(Pack, Unpack, Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, FromRepr, EnumMessage, EnumString, IntoStaticStr)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Pack, Unpack, Serialize_repr, Deserialize_repr, sqlx::Type, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, FromRepr, EnumMessage, EnumString, IntoStaticStr)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 #[cfg_attr(feature = "seed_schema", derive(::schemars::JsonSchema))]
 #[repr(@{ column_def.get_inner_type(true, true) }@)]
 #[allow(non_camel_case_types)]
@@ -500,8 +500,8 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 @% endfor -%@
 @% for (name, column_def) in def.str_enums(false) -%@
 @% let values = column_def.enum_values.as_ref().unwrap() -%@
-#[derive(Pack, Unpack, Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Pack, Unpack, Serialize, Deserialize, Hash, PartialEq, Eq, Clone, Copy, Debug, Default, strum::Display, EnumMessage, EnumString, IntoStaticStr)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 #[cfg_attr(feature = "seed_schema", derive(::schemars::JsonSchema))]
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
@@ -566,7 +566,7 @@ pub enum _@{ pascal_name }@Info {
 @%- if !config.force_disable_cache %@
 
 #[derive(Pack, Unpack, Clone, Debug)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 pub struct CacheWrapper {
     pub _inner: CacheData,
     _shard_id: ShardId,
@@ -589,7 +589,7 @@ pub struct _@{ pascal_name }@Cache {
 }
 
 #[derive(Pack, Unpack, Clone, Debug)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 pub struct VersionWrapper {
     pub id: InnerPrimary,
     pub shard_id: ShardId,
@@ -642,7 +642,7 @@ impl HashVal for VersionWrapper {
 }
 
 #[derive(Pack, Unpack, Clone, Debug)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
 pub struct CacheSyncWrapper {
     pub id: InnerPrimary,
     pub shard_id: ShardId,
@@ -720,8 +720,8 @@ pub struct _@{ pascal_name }@Updater {
 @{ def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("    pub {rel_name}: Option<Option<Box<rel_{class_mod}::{class}>>>,\n", "") -}@
 }
 
-#[derive(Pack, Unpack, Clone, Debug)]
-#[cfg_attr(any(debug_assertions, not(feature = "production_mode")), senax(disable_pack))]
+#[derive(Decode, Encode, Pack, Unpack, Clone, Debug)]
+#[cfg_attr(all(debug_assertions, not(feature = "production_mode")), senax(disable_pack, disable_encode))]
 pub struct ForInsert {
     #[senax(id = 1)]
     pub _data: Data,

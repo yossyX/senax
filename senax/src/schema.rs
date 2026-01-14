@@ -124,7 +124,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
             if path.exists() {
                 parse_yml_file(&path)?
             } else {
-                IndexMap::new()
+                bail!("File not found: {}/{}/{}.yml", SCHEMA_PATH, db, group_name);
             }
         } else {
             group_def.models.clone()

@@ -23,7 +23,7 @@ pub use _base::models::CacheHandler;
 
 pub(crate) async fn start(db_dir: &Path) -> Result<()> {
 @%- for name in unified_joinable %@
-    _base_repo_@{ name }@::start(&db_dir.join("@{ name }@")).await?;
+    _base_repo_@{ name }@::start(db_dir).await?;
 @%- endfor %@
     Ok(())
 }

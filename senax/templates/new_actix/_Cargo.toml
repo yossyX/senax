@@ -10,7 +10,6 @@ default-run = "@{ name }@"
 default = []
 etcd = ["senax-common/etcd"]
 graphiql = []
-seed_schema = []
 
 [dependencies]
 @%- if session %@
