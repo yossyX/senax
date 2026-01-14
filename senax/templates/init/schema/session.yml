@@ -22,7 +22,7 @@ groups:
         table_name: session
         timestampable: real_time
         versioned: true
-        use_update_delayed: true
+        enable_delayed_update: true
         disable_insert_cache_propagation: true
         act_as:
           session: true

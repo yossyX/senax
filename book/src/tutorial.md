@@ -41,7 +41,7 @@ timestamp_time_zone: utc
 tx_isolation: read_committed
 read_tx_isolation: repeatable_read
 use_cache: true
-use_all_rows_cache: true
+enable_all_rows_cache: true
 preserve_column_order: false
 groups:
   note:
@@ -104,9 +104,9 @@ category:
     name: varchar_not_null
 
 counter:
-  counting: counter
+  counter_field: counter
   timestampable: none
-  use_save_delayed: true
+  enable_delayed_save: true
   fields:
     note_id:
       type: int
@@ -220,7 +220,7 @@ serverの部分は任意のパッケージ名で、actix-web を使用したWeb�
 TODO 下記のコードは example の一部なのでコードが不足しています。
 
 _Noteを取得して日毎のカウンターを加算しています。
-save_delayed ではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。
+delayed_save ではこの処理が終わった後で同一の更新対象をまとめてaddの内容を加算して更新します。その更新内容をキャッシュに反映して他のサーバにも伝達します。
 
 server/src/routes/api/cache.rs
 ```rust
@@ -298,7 +298,7 @@ async fn handler(
         .create();
         let _ = counter_updater.counter().add(1); // UPDATE加算
         counter_updater._upsert(); // INSERT ... ON DUPLICATE KEY UPDATE の指示
-        _Counter::update_delayed(&mut conn, counter_updater).await?;
+        _Counter::delayed_update(&mut conn, counter_updater).await?;
 
         Ok(Response {
             id: note.id(),

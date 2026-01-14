@@ -11,7 +11,7 @@ use crate::api_generator::schema::{API_CONFIG, ApiConfigDef, ApiDbDef, ApiFieldD
 use crate::common::ToCase as _;
 use crate::common::parse_yml_file;
 use crate::schema::{
-    CONFIG, DataType, FilterDef, FilterSortDirection, FilterType, GROUPS, Joinable, ModelDef
+    CONFIG, DataType, FilterDef, FilterSortDirection, FilterType, GROUPS, Joinable, ModelDef,
 };
 
 use super::schema::{ApiRelationDef, ApiRoleDef, JsUpdaterDef, RelationVisibility};
@@ -37,8 +37,8 @@ pub struct Group {
 pub struct Selector {
     pub name: String,
     pub js_updater: IndexMap<String, JsUpdaterDef>,
-    pub use_for_update_by_operator: bool,
-    pub use_for_delete: bool,
+    pub enable_update_by_operator: bool,
+    pub enable_delete_by_selector: bool,
     pub filters: Vec<Filter>,
     pub orders: IndexMap<String, Order>,
 }
@@ -73,9 +73,9 @@ pub struct DocModel {
     pub label: Option<String>,
     pub pk: String,
     pub has_all_query: bool,
-    pub use_find_by_pk: bool,
-    pub use_delete_by_pk: bool,
-    pub use_import: bool,
+    pub enable_find_by_pk: bool,
+    pub enable_delete_by_pk: bool,
+    pub enable_import: bool,
     pub disable_mutation: bool,
     pub disable_update: bool,
     pub readable_roles: Vec<String>,
@@ -302,10 +302,10 @@ fn make_model(
         gql_name,
         label: def.label.clone(),
         pk: crate::filters::fmt_join(def.primaries(), "{ident}: {gql_type}", ",")?,
-        has_all_query: def.use_all_rows_cache() && !def.use_filtered_row_cache(),
-        use_find_by_pk: api_def.use_find_by_pk,
-        use_delete_by_pk: api_def.use_delete_by_pk,
-        use_import: api_def.use_import,
+        has_all_query: def.enable_all_rows_cache() && !def.enable_filtered_rows_cache(),
+        enable_find_by_pk: api_def.enable_find_by_pk,
+        enable_delete_by_pk: api_def.enable_delete_by_pk,
+        enable_import: api_def.enable_import,
         disable_mutation: api_def.disable_mutation,
         disable_update: def.disable_update(),
         readable_roles: api_def.readable_roles(config, group),
@@ -326,8 +326,8 @@ fn make_model(
                     Selector {
                         name: n.to_string(),
                         js_updater: v.js_updater.clone(),
-                        use_for_delete: v.use_for_delete,
-                        use_for_update_by_operator: v.use_for_update_by_operator,
+                        enable_delete_by_selector: v.enable_delete_by_selector,
+                        enable_update_by_operator: v.enable_update_by_operator,
                         filters,
                         orders: def
                             .orders

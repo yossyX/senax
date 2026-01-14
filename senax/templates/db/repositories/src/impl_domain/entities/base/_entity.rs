@@ -168,12 +168,12 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         Ok(())
     }
     @%- endif %@
-    @%- if def.use_insert_delayed() %@
-    async fn insert_delayed(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()> {
+    @%- if def.enable_delayed_insert() %@
+    async fn delayed_insert(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()> {
         let Ok(obj) = (obj as Box<dyn std::any::Any>).downcast::<_@{ pascal_name }@Updater>() else {
             panic!("Only _@{ pascal_name }@Updater is accepted.");
         };
-        _@{ pascal_name }@_::insert_delayed(self._conn.lock().await.deref_mut(), *obj).await?;
+        _@{ pascal_name }@_::delayed_insert(self._conn.lock().await.deref_mut(), *obj).await?;
         Ok(())
     }
     @%- endif %@
@@ -335,7 +335,7 @@ fn _filter@{ filter_map.suffix }@(filter: &_@{ mod_name }@::@{ pascal_name }@Que
 #[allow(clippy::clone_on_copy)]
 #[async_trait]
 impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
-    @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
+    @%- if def.enable_all_rows_cache() && !def.enable_filtered_rows_cache() %@
     async fn all(&self) -> anyhow::Result<Box<dyn domain::models::EntityIterator<dyn @{ pascal_name }@>>> {
         struct V(std::sync::Arc<Vec<_@{ pascal_name }@Cache>>);
         impl domain::models::EntityIterator<dyn @{ pascal_name }@> for V {
@@ -652,7 +652,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 } else {
                     self.joiner
                 };
-                for (_, filter) in &self.with_filter_flag {
+                for filter in self.with_filter_flag.values() {
                     joiner = Joiner_::merge(joiner, filter.joiner_cache_only())
                 }
                 @%- if def.is_soft_delete() %@

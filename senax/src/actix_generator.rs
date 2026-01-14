@@ -609,7 +609,7 @@ pub struct DbClearLocalCacheTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    _db_@{ db|snake }@::clear_whole_cache().await;
+    _db_@{ db|snake }@::clear_all_cache().await;
     // Do not modify this line. (DbClearCache)"###,
     ext = "txt",
     escape = "none"

@@ -84,9 +84,9 @@ function EditApi() {
     control: form.control,
     name: "disable_mutation",
   });
-  const use_import = useWatch({
+  const enable_import = useWatch({
     control: form.control,
-    name: "use_import",
+    name: "enable_import",
   });
   const [modelData, setModelData] = React.useState(undefined as any);
   const server = params.server;
@@ -199,10 +199,10 @@ function EditApi() {
                 autocomplete={model_names}
               />
               <AutoField name="disable_auto_fields" {...formData} />
-              <AutoField name="use_find_by_pk" {...formData} />
-              <AutoField name="use_delete_by_pk" {...formData} />
+              <AutoField name="enable_find_by_pk" {...formData} />
+              <AutoField name="enable_delete_by_pk" {...formData} />
               <AutoField name="disable_mutation" {...formData} />
-              <AutoField name="use_import" {...formData} />
+              <AutoField name="enable_import" {...formData} />
               <AutoField
                 name="readable_roles"
                 {...formData}
@@ -218,7 +218,7 @@ function EditApi() {
                 name="importable_roles"
                 {...formData}
                 options={formData.additionalData.roles}
-                hidden={!use_import || disable_mutation}
+                hidden={!enable_import || disable_mutation}
               />
               <AutoField
                 name="updatable_roles"
@@ -277,8 +277,8 @@ function EditApi() {
                 {...formData}
                 columns={[
                   { field: "name", editable: true },
-                  { field: "use_for_update_by_operator", editable: true },
-                  { field: "use_for_delete", editable: true },
+                  { field: "enable_update_by_operator", editable: true },
+                  { field: "enable_delete_by_selector", editable: true },
                 ]}
                 dialog={Selector}
                 resolver={yupResolver(
@@ -419,8 +419,8 @@ function Selector({ formData, definitions }: any) {
             createYupSchema(definitions.JsUpdaterJson, definitions)
           )}
         />
-        <AutoField name="use_for_update_by_operator" {...formData} />
-        <AutoField name="use_for_delete" {...formData} />
+        <AutoField name="enable_update_by_operator" {...formData} />
+        <AutoField name="enable_delete_by_selector" {...formData} />
         <AutoField name="limit" {...formData} />
         </SpaceBetween>
     </>

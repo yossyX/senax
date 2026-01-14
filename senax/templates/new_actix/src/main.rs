@@ -485,7 +485,7 @@ async fn handle_signals() {
     let mut signals = Signals::new([SIGUSR1, SIGUSR2]).unwrap();
     while let Some(signal) = signals.next().await {
         match signal {
-            SIGUSR1 => _base::db::clear_whole_cache().await,
+            SIGUSR1 => _base::db::clear_all_cache().await,
             SIGUSR2 => match unsafe { unistd::fork() }.expect("fork failed") {
                 unistd::ForkResult::Parent { .. } => {}
                 unistd::ForkResult::Child => {

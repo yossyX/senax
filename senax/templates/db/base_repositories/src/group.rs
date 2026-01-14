@@ -56,7 +56,7 @@ pub async fn start(db_dir: Option<&Path>) -> Result<()> {
 
 pub async fn check(shard_id: ShardId) -> Result<()> {
     @%- for (name, def) in models %@
-    @%- if !def.skip_ddl %@
+    @%- if !def.no_table %@
     _base::_@{ def.mod_name() }@::check(shard_id).await?;
     @%- endif %@
     @%- endfor %@

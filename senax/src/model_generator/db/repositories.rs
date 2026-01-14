@@ -4,7 +4,7 @@ use compact_str::CompactString;
 use indexmap::IndexMap;
 use regex::Regex;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     ffi::OsString,
     fs,
     path::Path,
@@ -17,7 +17,7 @@ use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable
 use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{common::ToCase, schema::Joinable};
 use crate::{
-    common::{OVERWRITTEN_MSG, ToCase as _, fs_write},
+    common::{OVERWRITTEN_MSG, fs_write},
     model_generator::analyzer,
 };
 
@@ -31,7 +31,7 @@ pub fn write_base_group_files(
     unified_name: &str,
     groups: &GroupsDef,
     unified_group: &UnifiedGroup,
-    unified_groups: &Vec<UnifiedGroup>,
+    unified_groups: &[UnifiedGroup],
     filter_unified_map: HashMap<(String, String), String>,
     filter_unified_names: BTreeSet<String>,
     ref_db: &BTreeSet<(String, String)>,
@@ -113,24 +113,22 @@ pub fn write_base_group_files(
         #[derive(Template)]
         #[template(path = "db/base_repositories/src/lib.rs", escape = "none")]
         struct LibTemplate<'a> {
-            pub config: &'a ConfigDef,
             pub groups: &'a GroupsDef,
         }
 
-        let tpl = LibTemplate { config, groups };
+        let tpl = LibTemplate { groups };
         fs_write(file_path, tpl.render()?)?;
     }
 
     #[derive(Template)]
     #[template(path = "db/base_repositories/src/repositories.rs", escape = "none")]
     struct RepositoriesTemplate<'a> {
-        pub db: &'a str,
         pub groups: &'a GroupsDef,
     }
 
     let file_path = src_dir.join("repositories.rs");
     remove_files.remove(file_path.as_os_str());
-    let tpl = RepositoriesTemplate { db, groups };
+    let tpl = RepositoriesTemplate { groups };
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
@@ -150,11 +148,6 @@ pub fn write_base_group_files(
             .iter()
             .filter(|(_, d)| !d.abstract_mode)
             .map(|(_, d)| d.mod_name())
-            .collect();
-        let entities_mod_names: BTreeSet<(String, &String)> = defs
-            .iter()
-            .filter(|(_, d)| !d.abstract_mode)
-            .map(|(model_name, def)| (def.mod_name(), model_name))
             .collect();
         let unified_names: BTreeSet<(String, String)> = unified_group
             .nodes
@@ -253,7 +246,7 @@ pub fn write_base_group_files(
                     pub version_col: CompactString,
                     pub is_mysql_str: &'a str,
                     pub unified_group: &'a UnifiedGroup,
-                    pub unified_groups: &'a Vec<UnifiedGroup>,
+                    pub unified_groups: &'a [UnifiedGroup],
                     pub unified_filter_group: &'a str,
                 }
 
@@ -288,7 +281,11 @@ pub fn write_base_group_files(
         }
         if !SEPARATED_BASE_FILES {
             for (u, m) in unified_names {
-                output.push_str(&format!("pub use _base_repo_{}_{u}::repositories::{}::_base::_{m};\n", db.to_snake(), group_name.to_snake().to_ident()));
+                output.push_str(&format!(
+                    "pub use _base_repo_{}_{u}::repositories::{}::_base::_{m};\n",
+                    db.to_snake(),
+                    group_name.to_snake().to_ident()
+                ));
             }
 
             let file_path = model_group_dir.join("_base.rs");
@@ -306,8 +303,8 @@ pub fn write_group_files(
     config: &ConfigDef,
     group: &str,
     groups: &GroupsDef,
-    unified_groups: &Vec<UnifiedGroup>,
-    unified_joinable_groups: &Vec<UnifiedGroup>,
+    unified_groups: &[UnifiedGroup],
+    unified_joinable_groups: &[UnifiedGroup],
     force: bool,
     exclude_from_domain: bool,
     remove_files: &mut HashSet<OsString>,
@@ -371,23 +368,21 @@ pub fn write_group_files(
         #[template(path = "db/repositories/src/lib.rs", escape = "none")]
         struct LibTemplate<'a> {
             pub config: &'a ConfigDef,
-            pub groups: &'a GroupsDef,
         }
 
-        let tpl = LibTemplate { config, groups };
+        let tpl = LibTemplate { config };
         fs_write(file_path, tpl.render()?)?;
     }
 
     #[derive(Template)]
     #[template(path = "db/repositories/src/repositories.rs", escape = "none")]
     struct RepositoriesTemplate<'a> {
-        pub db: &'a str,
         pub groups: &'a GroupsDef,
     }
 
     let file_path = src_dir.join("repositories.rs");
     remove_files.remove(file_path.as_os_str());
-    let tpl = RepositoriesTemplate { db, groups };
+    let tpl = RepositoriesTemplate { groups };
     fs_write(file_path, tpl.render()?)?;
 
     if !exclude_from_domain {
@@ -420,7 +415,6 @@ pub fn write_group_files(
 
         let file_path = model_models_dir.join(format!("{}.rs", group_name.to_snake()));
         remove_files.remove(file_path.as_os_str());
-        let concrete_models = defs.iter().filter(|(_k, v)| !v.abstract_mode).collect();
 
         #[derive(Template)]
         #[template(path = "db/repositories/src/group.rs", escape = "none")]
@@ -429,8 +423,6 @@ pub fn write_group_files(
             pub group_name: &'a str,
             pub mod_names: &'a BTreeSet<String>,
             pub unified_names: &'a BTreeSet<(String, String)>,
-            pub models: IndexMap<&'a String, &'a Arc<ModelDef>>,
-            pub config: &'a ConfigDef,
         }
 
         let tpl = GroupTemplate {
@@ -438,8 +430,6 @@ pub fn write_group_files(
             group_name,
             mod_names: &mod_names,
             unified_names: &unified_names,
-            models: concrete_models,
-            config,
         };
         fs_write(file_path, tpl.render()?)?;
 
@@ -458,9 +448,7 @@ pub fn write_group_files(
         impl_output.push_str(OVERWRITTEN_MSG);
 
         let model_group_dir = model_models_dir.join(group_name.to_snake());
-        let model_group_base_dir = model_group_dir.join("_base");
         for (model_name, def) in defs {
-            let table_name = def.table_name();
             let mod_name = def.mod_name();
             let mod_name = &mod_name;
             let unified = unified_joinable_groups.iter().find(|v| {

@@ -214,7 +214,7 @@ pub async fn clear_local_cache() {
     models::_clear_cache(&sync_map, false).await;
 }
 
-pub async fn clear_whole_cache() {
+pub async fn clear_all_cache() {
     CacheMsg(vec![CacheOp::_AllClear], DbConn::inc_all_cache_sync().await)
         .do_send()
         .await;

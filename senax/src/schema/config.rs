@@ -3,13 +3,10 @@ use compact_str::CompactString;
 use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Mutex,
-};
+use std::collections::BTreeSet;
 use strum_macros::{AsRefStr, EnumString};
 
-use crate::{SCHEMA_PATH, common::ToCase as _};
+use crate::common::ToCase as _;
 
 use super::{AGGREGATION_TYPE, CREATED_AT, DELETED, DELETED_AT, ModelDef, UPDATED_AT, VERSION};
 
@@ -28,6 +25,9 @@ pub struct ConfigDef {
     pub db_id: Option<u64>,
     /// ### データベース
     pub db: DbType,
+    /// ### デフォルトでDDL定義を出力しない
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub skip_ddl: bool,
     /// ### デフォルトで外部キー制約をマイグレーションのDDLに出力しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub ignore_foreign_key: bool,
@@ -37,9 +37,9 @@ pub struct ConfigDef {
     /// ### テーブル名を複数形にする
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub plural_table_name: bool,
-    /// ### この階層の名前を隠す
+    /// ### DB階層の名前を隠す
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub hidden_layer: bool,
+    pub hide_db_layer_name: bool,
     /// ### 論理削除のデフォルト設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub soft_delete: Option<SoftDelete>,
@@ -69,30 +69,30 @@ pub struct ConfigDef {
     /// ### ストレージキャッシュを使用する(EXPERIMENTAL)
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_storage_cache: bool,
-    /// ### デフォルトで全行キャッシュを使用する
+    /// ### デフォルトで全行キャッシュを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_all_rows_cache: bool,
+    pub enable_all_rows_cache: bool,
     /// ### 全てのキャッシュを強制的に無効化
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub force_disable_cache: bool,
     /// ### デフォルトで更新時に常にすべてのキャッシュをクリアする
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_clear_whole_cache: bool,
-    /// ### デフォルトで更新通知を使用する
+    pub clear_all_cache_on_update: bool,
+    /// ### デフォルトで更新通知を有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_update_notice: bool,
-    /// ### デフォルトで遅延INSERTを使用する
+    pub enable_update_notice: bool,
+    /// ### デフォルトで遅延INSERTを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_insert_delayed: bool,
-    /// ### デフォルトで遅延SAVEを使用する
+    pub enable_delayed_insert: bool,
+    /// ### デフォルトで遅延SAVEを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_save_delayed: bool,
-    /// ### デフォルトで遅延UPDATEを使用する
+    pub enable_delayed_save: bool,
+    /// ### デフォルトで遅延UPDATEを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_update_delayed: bool,
-    /// ### デフォルトで遅延UPSERTを使用する
+    pub enable_delayed_update: bool,
+    /// ### デフォルトで遅延UPSERTを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_upsert_delayed: bool,
+    pub enable_delayed_upsert: bool,
     /// ### デフォルトで更新を無効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_update: bool,
@@ -131,7 +131,7 @@ pub struct ConfigDef {
     pub use_label_as_sql_comment: bool,
     /// ### 強制的にdatetimeを使用する(MySQLのみ)
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub force_datetime_on_mysql: bool,
+    pub mysql_force_datetime: bool,
     /// ### created_atに別名を使用
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rename_created_at: Option<String>,
@@ -168,11 +168,12 @@ pub struct ConfigDef {
     /// ### versionのラベル
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_of_version: Option<String>,
-    /// ### existsのNO_SEMIJOINを無効化(MySQLのみ)
-    /// SEMIJOINはexistsをanyに変換するため、existsとanyの区別ができなくなる。
-    /// 明示的にexistsとanyを区別するのではなく、MySQLに任せる場合にdisable_no_semijoinをtureにする。
+    /// ### existsのSEMIJOINを有効化(MySQLのみ)
+    /// MySQLのSEMIJOINはexistsをanyに変換するため、existsとanyの区別ができなくなる。
+    /// 多くの場合、高速化するが遅くなる場合もあるため、SenaxではNO_SEMIJOINでこの変換を無効化している。
+    /// 明示的にexistsとanyを区別するのではなく、MySQLに任せる場合に enable_semijoin をtureにする。
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub disable_no_semijoin: bool,
+    pub enable_semijoin: bool,
     /// ### モデルグループ
     pub groups: IndexMap<String, Option<GroupDef>>,
 }
@@ -192,6 +193,9 @@ pub struct ConfigJson {
     pub db_id: Option<u64>,
     /// ### データベース
     pub db: DbType,
+    /// ### デフォルトでDDL定義を出力しない
+    #[serde(default, skip_serializing_if = "super::is_false")]
+    pub skip_ddl: bool,
     /// ### デフォルトで外部キー制約をマイグレーションのDDLに出力しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub ignore_foreign_key: bool,
@@ -201,9 +205,9 @@ pub struct ConfigJson {
     /// ### テーブル名を複数形にする
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub plural_table_name: bool,
-    /// ### この階層の名前を隠す
+    /// ### DB階層の名前を隠す
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub hidden_layer: bool,
+    pub hide_db_layer_name: bool,
     /// ### 論理削除のデフォルト設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub soft_delete: Option<SoftDelete>,
@@ -233,30 +237,30 @@ pub struct ConfigJson {
     /// ### ストレージキャッシュを使用する(EXPERIMENTAL)
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_storage_cache: bool,
-    /// ### デフォルトで全行キャッシュを使用する
+    /// ### デフォルトで全行キャッシュを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_all_rows_cache: bool,
+    pub enable_all_rows_cache: bool,
     /// ### 全てのキャッシュを強制的に無効化
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub force_disable_cache: bool,
     /// ### デフォルトで更新時に常にすべてのキャッシュをクリアする
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_clear_whole_cache: bool,
-    /// ### デフォルトで更新通知を使用する
+    pub clear_all_cache_on_update: bool,
+    /// ### デフォルトで更新通知を有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_update_notice: bool,
-    /// ### デフォルトで遅延INSERTを使用する
+    pub enable_update_notice: bool,
+    /// ### デフォルトで遅延INSERTを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_insert_delayed: bool,
-    /// ### デフォルトで遅延SAVEを使用する
+    pub enable_delayed_insert: bool,
+    /// ### デフォルトで遅延SAVEを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_save_delayed: bool,
-    /// ### デフォルトで遅延UPDATEを使用する
+    pub enable_delayed_save: bool,
+    /// ### デフォルトで遅延UPDATEを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_update_delayed: bool,
-    /// ### デフォルトで遅延UPSERTを使用する
+    pub enable_delayed_update: bool,
+    /// ### デフォルトで遅延UPSERTを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub use_upsert_delayed: bool,
+    pub enable_delayed_upsert: bool,
     /// ### デフォルトで更新を無効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub disable_update: bool,
@@ -295,7 +299,7 @@ pub struct ConfigJson {
     pub use_label_as_sql_comment: bool,
     /// ### 強制的にdatetimeを使用する(MySQLのみ)
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub force_datetime_on_mysql: bool,
+    pub mysql_force_datetime: bool,
     /// ### created_atに別名を使用
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rename_created_at: Option<String>,
@@ -332,11 +336,12 @@ pub struct ConfigJson {
     /// ### versionのラベル
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label_of_version: Option<String>,
-    /// ### existsのNO_SEMIJOINを無効化(MySQLのみ)
-    /// SEMIJOINはexistsをanyに変換するため、existsとanyの区別ができなくなる。
-    /// 明示的にexistsとanyを区別するのではなく、MySQLに任せる場合にdisable_no_semijoinをtureにする。
+    /// ### existsのSEMIJOINを有効化(MySQLのみ)
+    /// MySQLのSEMIJOINはexistsをanyに変換するため、existsとanyの区別ができなくなる。
+    /// 多くの場合、高速化するが遅くなる場合もあるため、SenaxではNO_SEMIJOINでこの変換を無効化している。
+    /// 明示的にexistsとanyを区別するのではなく、MySQLに任せる場合に enable_semijoin をtureにする。
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub disable_no_semijoin: bool,
+    pub enable_semijoin: bool,
     /// ### モデルグループ
     pub groups: Vec<GroupJson>,
 }
@@ -348,10 +353,11 @@ impl From<ConfigDef> for ConfigJson {
             author: value.author,
             db_id: value.db_id,
             db: value.db,
+            skip_ddl: value.skip_ddl,
             ignore_foreign_key: value.ignore_foreign_key,
             disable_relation_index: value.disable_relation_index,
             plural_table_name: value.plural_table_name,
-            hidden_layer: value.hidden_layer,
+            hide_db_layer_name: value.hide_db_layer_name,
             timestampable: value.timestampable,
             output_time_zone: value.output_time_zone,
             timestamp_time_zone: value.timestamp_time_zone,
@@ -362,14 +368,14 @@ impl From<ConfigDef> for ConfigJson {
             use_cache: value.use_cache,
             use_fast_cache: value.use_fast_cache,
             use_storage_cache: value.use_storage_cache,
-            use_all_rows_cache: value.use_all_rows_cache,
+            enable_all_rows_cache: value.enable_all_rows_cache,
             force_disable_cache: value.force_disable_cache,
-            use_clear_whole_cache: value.use_clear_whole_cache,
-            use_update_notice: value.use_update_notice,
-            use_insert_delayed: value.use_insert_delayed,
-            use_save_delayed: value.use_save_delayed,
-            use_update_delayed: value.use_update_delayed,
-            use_upsert_delayed: value.use_upsert_delayed,
+            clear_all_cache_on_update: value.clear_all_cache_on_update,
+            enable_update_notice: value.enable_update_notice,
+            enable_delayed_insert: value.enable_delayed_insert,
+            enable_delayed_save: value.enable_delayed_save,
+            enable_delayed_update: value.enable_delayed_update,
+            enable_delayed_upsert: value.enable_delayed_upsert,
             disable_update: value.disable_update,
             disable_delete: value.disable_delete,
             use_sequence: value.use_sequence,
@@ -382,7 +388,7 @@ impl From<ConfigDef> for ConfigJson {
             preserve_column_order: value.preserve_column_order,
             exclude_from_domain: value.exclude_from_domain,
             use_label_as_sql_comment: value.use_label_as_sql_comment,
-            force_datetime_on_mysql: value.force_datetime_on_mysql,
+            mysql_force_datetime: value.mysql_force_datetime,
             rename_created_at: value.rename_created_at,
             label_of_created_at: value.label_of_created_at,
             rename_updated_at: value.rename_updated_at,
@@ -395,7 +401,7 @@ impl From<ConfigDef> for ConfigJson {
             label_of_aggregation_type: value.label_of_aggregation_type,
             rename_version: value.rename_version,
             label_of_version: value.label_of_version,
-            disable_no_semijoin: value.disable_no_semijoin,
+            enable_semijoin: value.enable_semijoin,
             groups: value
                 .groups
                 .into_iter()
@@ -417,10 +423,11 @@ impl From<ConfigJson> for ConfigDef {
             author: value.author,
             db_id: value.db_id,
             db: value.db,
+            skip_ddl: value.skip_ddl,
             ignore_foreign_key: value.ignore_foreign_key,
             disable_relation_index: value.disable_relation_index,
             plural_table_name: value.plural_table_name,
-            hidden_layer: value.hidden_layer,
+            hide_db_layer_name: value.hide_db_layer_name,
             timestampable: value.timestampable,
             output_time_zone: value.output_time_zone,
             timestamp_time_zone: value.timestamp_time_zone,
@@ -431,14 +438,14 @@ impl From<ConfigJson> for ConfigDef {
             use_cache: value.use_cache,
             use_fast_cache: value.use_fast_cache,
             use_storage_cache: value.use_storage_cache,
-            use_all_rows_cache: value.use_all_rows_cache,
+            enable_all_rows_cache: value.enable_all_rows_cache,
             force_disable_cache: value.force_disable_cache,
-            use_clear_whole_cache: value.use_clear_whole_cache,
-            use_update_notice: value.use_update_notice,
-            use_insert_delayed: value.use_insert_delayed,
-            use_save_delayed: value.use_save_delayed,
-            use_update_delayed: value.use_update_delayed,
-            use_upsert_delayed: value.use_upsert_delayed,
+            clear_all_cache_on_update: value.clear_all_cache_on_update,
+            enable_update_notice: value.enable_update_notice,
+            enable_delayed_insert: value.enable_delayed_insert,
+            enable_delayed_save: value.enable_delayed_save,
+            enable_delayed_update: value.enable_delayed_update,
+            enable_delayed_upsert: value.enable_delayed_upsert,
             disable_update: value.disable_update,
             disable_delete: value.disable_delete,
             use_sequence: value.use_sequence,
@@ -451,7 +458,7 @@ impl From<ConfigJson> for ConfigDef {
             preserve_column_order: value.preserve_column_order,
             exclude_from_domain: value.exclude_from_domain,
             use_label_as_sql_comment: value.use_label_as_sql_comment,
-            force_datetime_on_mysql: value.force_datetime_on_mysql,
+            mysql_force_datetime: value.mysql_force_datetime,
             rename_created_at: value.rename_created_at,
             label_of_created_at: value.label_of_created_at,
             rename_updated_at: value.rename_updated_at,
@@ -464,7 +471,7 @@ impl From<ConfigJson> for ConfigDef {
             label_of_aggregation_type: value.label_of_aggregation_type,
             rename_version: value.rename_version,
             label_of_version: value.label_of_version,
-            disable_no_semijoin: value.disable_no_semijoin,
+            enable_semijoin: value.enable_semijoin,
             groups: value
                 .groups
                 .into_iter()
@@ -604,7 +611,7 @@ impl ConfigDef {
 
     pub fn layer_name(&self, db: &str, group_name: &str) -> String {
         let mut name = String::new();
-        if !self.hidden_layer {
+        if !self.hide_db_layer_name {
             name.push_str(&db.to_pascal());
         }
         let group = self
@@ -613,14 +620,14 @@ impl ConfigDef {
             .cloned()
             .unwrap_or_default()
             .unwrap_or_default();
-        if !group.hidden_layer {
+        if !group.hide_group_layer_name {
             name.push_str(&group_name.to_pascal());
         }
         name
     }
 
-    pub fn disable_no_semijoin(&self) -> bool {
-        !self.is_mysql() || self.disable_no_semijoin
+    pub fn enable_semijoin(&self) -> bool {
+        !self.is_mysql() || self.enable_semijoin
     }
 }
 
@@ -634,9 +641,9 @@ pub struct GroupDef {
     /// ### テーブル名にグループ名を使用しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub exclude_group_from_table_name: bool,
-    /// ### この階層の名前を隠す
+    /// ### グループ階層の名前を隠す
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub hidden_layer: bool,
+    pub hide_group_layer_name: bool,
     /// モデル数が少ない場合はここにモデルを記述可能
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub models: IndexMap<String, ModelDef>,
@@ -658,9 +665,9 @@ pub struct GroupJson {
     /// ### テーブル名にグループ名を使用しない
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub exclude_group_from_table_name: bool,
-    /// ### この階層の名前を隠す
+    /// ### グループ階層の名前を隠す
     #[serde(default, skip_serializing_if = "super::is_false")]
-    pub hidden_layer: bool,
+    pub hide_group_layer_name: bool,
 }
 
 impl From<GroupDef> for GroupJson {
@@ -674,7 +681,7 @@ impl From<GroupDef> for GroupJson {
             _name: None,
             label: value.label,
             exclude_group_from_table_name: value.exclude_group_from_table_name,
-            hidden_layer: value.hidden_layer,
+            hide_group_layer_name: value.hide_group_layer_name,
         }
     }
 }
@@ -684,7 +691,7 @@ impl From<GroupJson> for GroupDef {
         Self {
             label: value.label,
             exclude_group_from_table_name: value.exclude_group_from_table_name,
-            hidden_layer: value.hidden_layer,
+            hide_group_layer_name: value.hide_group_layer_name,
             models: IndexMap::new(),
         }
     }

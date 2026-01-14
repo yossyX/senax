@@ -35,14 +35,14 @@ pub struct ApiConfigDef {
     /// ### GraphQLを無効化する
     /// (未実装)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub disable_gql: Option<bool>,
+    pub disable_graphql: Option<bool>,
     /// ### JSON APIを使用する
     /// (未実装)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_json_api: Option<bool>,
+    pub enable_json_api: Option<bool>,
     /// ### ストリーミング取得APIを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_streaming_api: Option<bool>,
+    pub enable_streaming_api: Option<bool>,
     /// ### 権限
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub roles: IndexMap<String, Option<ApiRoleDef>>,
@@ -73,14 +73,14 @@ pub struct ApiConfigJson {
     /// ### GraphQLを無効化する
     /// (未実装)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub disable_gql: Option<bool>,
+    pub disable_graphql: Option<bool>,
     /// ### JSON APIを使用する
     /// (未実装)
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_json_api: Option<bool>,
+    pub enable_json_api: Option<bool>,
     /// ### ストリーミング取得APIを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_streaming_api: Option<bool>,
+    pub enable_streaming_api: Option<bool>,
     /// ### 権限
     #[serde(default)]
     pub roles: Vec<ApiRoleJson>,
@@ -97,9 +97,9 @@ impl From<ApiConfigDef> for ApiConfigJson {
             with_comment: value.with_comment,
             hide_timestamp: value.hide_timestamp,
             selector_limit: value.selector_limit,
-            disable_gql: value.disable_gql,
-            use_json_api: value.use_json_api,
-            use_streaming_api: value.use_streaming_api,
+            disable_graphql: value.disable_graphql,
+            enable_json_api: value.enable_json_api,
+            enable_streaming_api: value.enable_streaming_api,
             roles: value
                 .roles
                 .into_iter()
@@ -122,9 +122,9 @@ impl From<ApiConfigJson> for ApiConfigDef {
             with_comment: value.with_comment,
             hide_timestamp: value.hide_timestamp,
             selector_limit: value.selector_limit,
-            disable_gql: value.disable_gql,
-            use_json_api: value.use_json_api,
-            use_streaming_api: value.use_streaming_api,
+            disable_graphql: value.disable_graphql,
+            enable_json_api: value.enable_json_api,
+            enable_streaming_api: value.enable_streaming_api,
             roles: value
                 .roles
                 .into_iter()
@@ -561,18 +561,18 @@ pub struct ApiModelDef {
     /// ### フィールド自動追加の無効化
     #[serde(default, skip_serializing_if = "is_false")]
     pub disable_auto_fields: bool,
-    /// ### 主キーでのfindを使用
+    /// ### 主キーでのfindを有効化
     #[serde(default, skip_serializing_if = "is_false")]
-    pub use_find_by_pk: bool,
-    /// ### 主キーでのdeleteを使用
+    pub enable_find_by_pk: bool,
+    /// ### 主キーでのdeleteを有効化
     #[serde(default, skip_serializing_if = "is_false")]
-    pub use_delete_by_pk: bool,
+    pub enable_delete_by_pk: bool,
     /// ### 登録、更新、削除を無効化
     #[serde(default, skip_serializing_if = "is_false")]
     pub disable_mutation: bool,
     /// ### インポートを使用
     #[serde(default, skip_serializing_if = "is_false")]
-    pub use_import: bool,
+    pub enable_import: bool,
     /// ### 閲覧権限
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub readable_roles: Vec<String>,
@@ -624,18 +624,18 @@ pub struct ApiModelJson {
     /// ### フィールド自動追加の無効化
     #[serde(default, skip_serializing_if = "is_false")]
     pub disable_auto_fields: bool,
-    /// ### 主キーでのfindを使用
+    /// ### 主キーでのfindを有効化
     #[serde(default, skip_serializing_if = "is_false")]
-    pub use_find_by_pk: bool,
-    /// ### 主キーでのdeleteを使用
+    pub enable_find_by_pk: bool,
+    /// ### 主キーでのdeleteを有効化
     #[serde(default, skip_serializing_if = "is_false")]
-    pub use_delete_by_pk: bool,
+    pub enable_delete_by_pk: bool,
     /// ### 登録、更新、削除を無効化
     #[serde(default, skip_serializing_if = "is_false")]
     pub disable_mutation: bool,
     /// ### インポートを使用
     #[serde(default, skip_serializing_if = "is_false")]
-    pub use_import: bool,
+    pub enable_import: bool,
     /// ### 閲覧権限
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub readable_roles: Vec<String>,
@@ -688,10 +688,10 @@ impl From<ApiModelDef> for ApiModelJson {
             name: String::new(),
             model: value.model,
             disable_auto_fields: value.disable_auto_fields,
-            use_find_by_pk: value.use_find_by_pk,
-            use_delete_by_pk: value.use_delete_by_pk,
+            enable_find_by_pk: value.enable_find_by_pk,
+            enable_delete_by_pk: value.enable_delete_by_pk,
             disable_mutation: value.disable_mutation,
-            use_import: value.use_import,
+            enable_import: value.enable_import,
             readable_roles: value.readable_roles,
             creatable_roles: value.creatable_roles,
             importable_roles: value.importable_roles,
@@ -736,10 +736,10 @@ impl TryFrom<ApiModelJson> for ApiModelDef {
         Ok(Self {
             model: value.model,
             disable_auto_fields: value.disable_auto_fields,
-            use_find_by_pk: value.use_find_by_pk,
-            use_delete_by_pk: value.use_delete_by_pk,
+            enable_find_by_pk: value.enable_find_by_pk,
+            enable_delete_by_pk: value.enable_delete_by_pk,
             disable_mutation: value.disable_mutation,
-            use_import: value.use_import,
+            enable_import: value.enable_import,
             readable_roles: value.readable_roles,
             creatable_roles: value.creatable_roles,
             importable_roles: value.importable_roles,
@@ -914,22 +914,22 @@ impl ApiModelDef {
         self.deletable_roles.retain(|v| roles.contains_key(v));
     }
     #[allow(dead_code)]
-    pub fn disable_gql(&self) -> bool {
+    pub fn disable_graphql(&self) -> bool {
         API_CONFIG
             .read()
             .unwrap()
             .as_ref()
             .unwrap()
-            .disable_gql
+            .disable_graphql
             .unwrap_or_default()
     }
-    pub fn use_json_api(&self) -> bool {
+    pub fn enable_json_api(&self) -> bool {
         API_CONFIG
             .read()
             .unwrap()
             .as_ref()
             .unwrap()
-            .use_json_api
+            .enable_json_api
             .unwrap_or_default()
     }
     pub fn readable_roles(&self, config: &ApiDbDef, group: &str) -> Vec<String> {
@@ -1247,21 +1247,21 @@ pub struct ApiSelectorDef {
     /// ### JavaScriptによる更新
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub js_updater: IndexMap<String, JsUpdaterDef>,
-    /// ### オペレータによる更新に使用する
+    /// ### オペレータによる更新を有効化する
     /// MongoDBの$currentDate, $inc, $min, $max, $mul, $rename, $set, $unset, $addToSet, $pop, $push, $pullAll, $bit相当に対応
     /// $currentDateはDateのみで、Timestampには対応していない。$pushの$sortには非対応
     /// ただし、オペレーターの "$" はすべて "_" に置き換える必要がある
     #[serde(default, skip_serializing_if = "crate::schema::is_false")]
-    pub use_for_update_by_operator: bool,
-    /// ### 削除に使用する
+    pub enable_update_by_operator: bool,
+    /// ### 削除を有効化する
     #[serde(default, skip_serializing_if = "crate::schema::is_false")]
-    pub use_for_delete: bool,
+    pub enable_delete_by_selector: bool,
     /// ### 取得数上限
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<u64>,
     /// ### ストリーミング取得APIを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_streaming_api: Option<bool>,
+    pub enable_streaming_api: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, JsonSchema, Validate)]
@@ -1275,21 +1275,21 @@ pub struct ApiSelectorJson {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[validate(nested)]
     pub js_updater: Vec<JsUpdaterJson>,
-    /// ### オペレータによる更新に使用する
+    /// ### オペレータによる更新を有効化する
     /// MongoDBの$currentDate, $inc, $min, $max, $mul, $rename, $set, $unset, $addToSet, $pop, $push, $pullAll, $bit相当に対応
     /// $currentDateはDateのみで、Timestampには対応していない。$pushの$sortには非対応
     /// ただし、オペレーターの "$" はすべて "_" に置き換える必要がある
     #[serde(default, skip_serializing_if = "crate::schema::is_false")]
-    pub use_for_update_by_operator: bool,
-    /// ### 削除に使用する
+    pub enable_update_by_operator: bool,
+    /// ### 削除を有効化する
     #[serde(default, skip_serializing_if = "crate::schema::is_false")]
-    pub use_for_delete: bool,
+    pub enable_delete_by_selector: bool,
     /// ### 取得数上限
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<u64>,
     /// ### ストリーミング取得APIを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_streaming_api: Option<bool>,
+    pub enable_streaming_api: Option<bool>,
 }
 impl From<ApiSelectorDef> for ApiSelectorJson {
     fn from(value: ApiSelectorDef) -> Self {
@@ -1304,10 +1304,10 @@ impl From<ApiSelectorDef> for ApiSelectorJson {
                     v
                 })
                 .collect(),
-            use_for_update_by_operator: value.use_for_update_by_operator,
-            use_for_delete: value.use_for_delete,
+            enable_update_by_operator: value.enable_update_by_operator,
+            enable_delete_by_selector: value.enable_delete_by_selector,
             limit: value.limit,
-            use_streaming_api: value.use_streaming_api,
+            enable_streaming_api: value.enable_streaming_api,
         }
     }
 }
@@ -1323,10 +1323,10 @@ impl From<ApiSelectorJson> for ApiSelectorDef {
                     (name, v)
                 })
                 .collect(),
-            use_for_update_by_operator: value.use_for_update_by_operator,
-            use_for_delete: value.use_for_delete,
+            enable_update_by_operator: value.enable_update_by_operator,
+            enable_delete_by_selector: value.enable_delete_by_selector,
             limit: value.limit,
-            use_streaming_api: value.use_streaming_api,
+            enable_streaming_api: value.enable_streaming_api,
         }
     }
 }
@@ -1365,13 +1365,13 @@ impl ApiSelectorDef {
             ""
         }
     }
-    pub fn use_streaming_api(&self) -> bool {
-        if let Some(use_streaming_api) = self.use_streaming_api {
-            return use_streaming_api;
+    pub fn enable_streaming_api(&self) -> bool {
+        if let Some(enable_streaming_api) = self.enable_streaming_api {
+            return enable_streaming_api;
         }
         let conf = API_CONFIG.read().unwrap();
-        if let Some(use_streaming_api) = conf.as_ref().unwrap().use_streaming_api {
-            return use_streaming_api;
+        if let Some(enable_streaming_api) = conf.as_ref().unwrap().enable_streaming_api {
+            return enable_streaming_api;
         }
         false
     }

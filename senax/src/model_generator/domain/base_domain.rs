@@ -1,13 +1,13 @@
 use crate::common::OVERWRITTEN_MSG;
 use crate::common::ToCase as _;
 use crate::schema::ConfigDef;
+use crate::schema::Joinable;
 use crate::schema::{_to_ident_name, GroupsDef};
 use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{
     common::fs_write,
     schema::{FieldDef, ModelDef, VALUE_OBJECTS, set_domain_mode, to_id_name},
 };
-use crate::schema::Joinable;
 use anyhow::{Result, ensure};
 use askama::Template;
 use regex::Regex;

@@ -9,9 +9,9 @@ use std::sync::Arc;
 
 use crate::common::ToCase as _;
 use crate::common::{OVERWRITTEN_MSG, fs_write};
+use crate::schema::Joinable;
 use crate::schema::{ConfigDef, GroupsDef, ModelDef, set_domain_mode};
 use crate::{SEPARATED_BASE_FILES, filters};
-use crate::schema::Joinable;
 
 pub fn write_impl_domain_rs(
     src_dir: &Path,

@@ -163,8 +163,8 @@ function EditModel() {
               <AutoField name="label" {...formData} />
               <AutoField name="comment" {...formData} textarea />
               <AutoField name="table_name" {...formData} />
-              <AutoField name="skip_ddl" {...formData} />
-              <AutoField name="dummy_always_joinable" {...formData} />
+              <AutoField name="skip_ddl" {...formData} hidden={!detail} />
+              <AutoField name="dummy_always_joinable" {...formData} hidden={!detail} />
               <AutoField name="upsert_conflict_target" {...formData} hidden={formData.additionalData.db_data.db == "mysql"}
                 autocomplete={formData.additionalData.selfModel.indexes?.filter((v: any) => v.type == "unique").map(
                   (v: any) => v.name,
@@ -188,20 +188,20 @@ function EditModel() {
               />
               <AutoField name="soft_delete" {...formData} />
               <AutoField name="versioned" {...formData} hidden={!detail} />
-              <AutoField name="counting" {...formData} hidden={!detail} />
+              <AutoField name="counter_field" {...formData} hidden={!detail} />
               <AutoField name="use_cache" {...formData} hidden={!detail} />
               <AutoField
-                name="use_all_rows_cache"
+                name="enable_all_rows_cache"
                 {...formData}
                 hidden={!detail}
               />
               <AutoField
-                name="use_filtered_row_cache"
+                name="enable_filtered_rows_cache"
                 {...formData}
                 hidden={!detail}
               />
               <AutoField
-                name="use_clear_whole_cache"
+                name="clear_all_cache_on_update"
                 {...formData}
                 hidden={!detail}
               />
@@ -211,27 +211,27 @@ function EditModel() {
                 hidden={!detail}
               />
               <AutoField
-                name="use_update_notice"
+                name="enable_update_notice"
                 {...formData}
                 hidden={!detail}
               />
               <AutoField
-                name="use_insert_delayed"
+                name="enable_delayed_insert"
                 {...formData}
                 hidden={!detail}
               />
               <AutoField
-                name="use_save_delayed"
+                name="enable_delayed_save"
                 {...formData}
                 hidden={!detail}
               />
               <AutoField
-                name="use_update_delayed"
+                name="enable_delayed_update"
                 {...formData}
                 hidden={!detail}
               />
               <AutoField
-                name="use_upsert_delayed"
+                name="enable_delayed_upsert"
                 {...formData}
                 hidden={!detail}
               />

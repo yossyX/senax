@@ -14,7 +14,7 @@ fn create_guard() -> impl async_graphql::Guard {
     @{ api_def.creatable_roles(config, group)|to_gql_guard }@
 }
 @%- if !def.disable_update() %@
-@%- if api_def.use_import %@
+@%- if api_def.enable_import %@
 
 fn import_guard() -> impl async_graphql::Guard {
     @{ api_def.importable_roles(config, group)|to_gql_guard }@
@@ -42,7 +42,7 @@ fn api_create_guard(auth: &AuthInfo) -> Option<bool> {
     auth.has_role(&[@{ api_def.creatable_roles(config, group)|to_api_guard }@])
 }
 @%- if !def.disable_update() %@
-@%- if api_def.use_import %@
+@%- if api_def.enable_import %@
 
 fn api_import_guard(auth: &AuthInfo) -> Option<bool> {
     auth.has_role(&[@{ api_def.importable_roles(config, group)|to_api_guard }@])

@@ -63,7 +63,7 @@ pub enum CacheOp {
     #[senax(id = 2)]
     Queued,
 @%- endif %@
-@%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
+@%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && !def.act_as_job_queue() %@
     #[senax(id = 3)]
     Insert {
         #[senax(id = 1)]
@@ -168,7 +168,7 @@ pub enum CacheOp {
 }
 
 impl CacheOp {
-    @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
+    @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && !def.act_as_job_queue() %@
     pub fn update(mut obj: CacheData, update: &Data, op: &OpData) -> CacheData {
         @{- def.cache_cols_except_primary()|fmt_join("
         Accessor{accessor_with_sep_type}::_set(op.{ident}, &mut obj.{ident}, &update.{ident});", "") }@

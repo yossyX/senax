@@ -238,7 +238,7 @@ impl SessionStore for _@{ pascal_name }@Store {
         let mut session = id.updater();
         session.mut_eol().set((data.eol() >> EOL_SHIFT) as @{ config.u32() }@);
         session.mut_@{ ConfigDef::updated_at() }@().mark_for_skip();
-        _@{ pascal_name }@_::update_delayed(&mut conn, session).await
+        _@{ pascal_name }@_::delayed_update(&mut conn, session).await
     }
 
     async fn delete(&self, session_key: &SessionKey) -> Result<()> {
@@ -247,7 +247,7 @@ impl SessionStore for _@{ pascal_name }@Store {
         let id: _@{ pascal_name }@Id = s_key.into();
         let mut session = id.updater();
         session.mut_eol().set(0);
-        _@{ pascal_name }@_::update_delayed(&mut conn, session).await
+        _@{ pascal_name }@_::delayed_update(&mut conn, session).await
     }
 
     async fn gc(&self, start_key: &SessionKey) -> Result<()> {

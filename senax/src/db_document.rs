@@ -18,7 +18,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
 use tera::Filter;
 use tera::{Context, Tera};
 

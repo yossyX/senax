@@ -132,10 +132,11 @@ function Config() {
               <AutoField name="title" {...formData} />
               <AutoField name="author" {...formData} />
               <AutoField name="db" {...formData} />
+              <AutoField name="skip_ddl" {...formData} />
               <AutoField name="ignore_foreign_key" {...formData} />
               <AutoField name="disable_relation_index" {...formData} />
               <AutoField name="plural_table_name" {...formData} />
-              <AutoField name="hidden_layer" {...formData} />
+              <AutoField name="hide_db_layer_name" {...formData} />
               <AutoField name="soft_delete" {...formData} />
               <AutoField
                 name="add_soft_delete_column_to_relation_index"
@@ -148,14 +149,14 @@ function Config() {
               <AutoField name="use_cache" {...formData} />
               <AutoField name="use_fast_cache" {...formData} />
               <AutoField name="use_storage_cache" {...formData} />
-              <AutoField name="use_all_rows_cache" {...formData} />
+              <AutoField name="enable_all_rows_cache" {...formData} />
               <AutoField name="force_disable_cache" {...formData} />
-              <AutoField name="use_clear_whole_cache" {...formData} />
-              <AutoField name="use_update_notice" {...formData} />
-              <AutoField name="use_insert_delayed" {...formData} />
-              <AutoField name="use_save_delayed" {...formData} />
-              <AutoField name="use_update_delayed" {...formData} />
-              <AutoField name="use_upsert_delayed" {...formData} />
+              <AutoField name="clear_all_cache_on_update" {...formData} />
+              <AutoField name="enable_update_notice" {...formData} />
+              <AutoField name="enable_delayed_insert" {...formData} />
+              <AutoField name="enable_delayed_save" {...formData} />
+              <AutoField name="enable_delayed_update" {...formData} />
+              <AutoField name="enable_delayed_upsert" {...formData} />
               <AutoField name="disable_update" {...formData} />
               <AutoField name="disable_delete" {...formData} />
               <AutoField name="use_sequence" {...formData} />
@@ -168,7 +169,7 @@ function Config() {
               <AutoField name="preserve_column_order" {...formData} hidden={db !== "mysql"} />
               <AutoField name="exclude_from_domain" {...formData} />
               <AutoField name="use_label_as_sql_comment" {...formData} />
-              <AutoField name="force_datetime_on_mysql" {...formData} hidden={db !== "mysql"} />
+              <AutoField name="mysql_force_datetime" {...formData} hidden={db !== "mysql"} />
               <AutoField
                 name="rename_created_at"
                 {...formData}
@@ -222,7 +223,7 @@ function Config() {
                 hidden={!detail}
               />
               <AutoField
-                name="disable_no_semijoin"
+                name="enable_semijoin"
                 {...formData}
                 hidden={!detail || db !== "mysql"}
               />
@@ -259,7 +260,7 @@ function Groups({ formData }: any) {
         <AutoField name="name" {...formData} />
         <AutoField name="label" {...formData} />
         <AutoField name="exclude_group_from_table_name" {...formData} />
-        <AutoField name="hidden_layer" {...formData} />
+        <AutoField name="hide_group_layer_name" {...formData} />
       </SpaceBetween>
     </>
   );

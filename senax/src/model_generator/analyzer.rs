@@ -53,6 +53,7 @@ impl GraphAnalyzer {
         self.groups.insert(group.name.clone(), group);
     }
 
+    #[allow(clippy::type_complexity)]
     fn mark_from_node(&self, start_group: &str, start_node: &str) -> Option<MarkResult> {
         if !self.groups.contains_key(start_group) {
             return None;
@@ -89,6 +90,8 @@ impl GraphAnalyzer {
         Some(MarkResult { node_marks })
     }
 
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::type_complexity)]
     fn dfs_mark(
         &self,
         current_group: &str,
@@ -130,7 +133,7 @@ impl GraphAnalyzer {
                 } else {
                     node_backrefs
                         .entry(key.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(rec_stack.clone());
                 }
             }
@@ -155,27 +158,27 @@ impl GraphAnalyzer {
 
         let mut is_in_start_cycle = false;
 
-        if let Some(group) = self.groups.get(current_group) {
-            if let Some(node) = group.nodes.iter().find(|n| n.name == current_node) {
-                for edge in &node.edges {
-                    let target_group = edge.group.as_deref().unwrap_or(current_group);
-                    let target_node = &edge.node;
+        if let Some(group) = self.groups.get(current_group)
+            && let Some(node) = group.nodes.iter().find(|n| n.name == current_node)
+        {
+            for edge in &node.edges {
+                let target_group = edge.group.as_deref().unwrap_or(current_group);
+                let target_node = &edge.node;
 
-                    let has_cycle_to_start = self.dfs_mark(
-                        target_group,
-                        target_node,
-                        start_key,
-                        visited,
-                        in_stack,
-                        rec_stack,
-                        node_marks,
-                        node_paths,
-                        node_backrefs,
-                    );
+                let has_cycle_to_start = self.dfs_mark(
+                    target_group,
+                    target_node,
+                    start_key,
+                    visited,
+                    in_stack,
+                    rec_stack,
+                    node_marks,
+                    node_paths,
+                    node_backrefs,
+                );
 
-                    if has_cycle_to_start {
-                        is_in_start_cycle = true;
-                    }
+                if has_cycle_to_start {
+                    is_in_start_cycle = true;
                 }
             }
         }
@@ -191,6 +194,8 @@ impl GraphAnalyzer {
         is_in_start_cycle
     }
 
+    #[allow(clippy::only_used_in_recursion)]
+    #[allow(clippy::type_complexity)]
     fn promote_to_include(
         &self,
         node_key: &(CompactString, CompactString),
@@ -219,16 +224,9 @@ impl GraphAnalyzer {
                 for stack_key in rec_stack.iter() {
                     if stack_key == node_key {
                         found = true;
-                    } else if found {
-                        if node_marks.get(stack_key) == Some(&Mark::Ref) {
-                            node_marks.insert(stack_key.clone(), Mark::Include);
-                            self.promote_to_include(
-                                stack_key,
-                                node_marks,
-                                node_paths,
-                                node_backrefs,
-                            );
-                        }
+                    } else if found && node_marks.get(stack_key) == Some(&Mark::Ref) {
+                        node_marks.insert(stack_key.clone(), Mark::Include);
+                        self.promote_to_include(stack_key, node_marks, node_paths, node_backrefs);
                     }
                 }
             }
@@ -265,23 +263,18 @@ impl GraphAnalyzer {
                     }
 
                     for ((g, n), mark) in &mark_result.node_marks {
-                        if *mark == Mark::Include {
-                            if let Some(group) = self.groups.get(g.as_str()) {
-                                if let Some(node) = group.nodes.iter().find(|node| &node.name == n)
-                                {
-                                    for edge in &node.edges {
-                                        let target_group =
-                                            edge.group.as_deref().unwrap_or(g.as_str());
-                                        let target_key = (target_group.into(), (&edge.node).into());
+                        if *mark == Mark::Include
+                            && let Some(group) = self.groups.get(g.as_str())
+                            && let Some(node) = group.nodes.iter().find(|node| node.name == n)
+                        {
+                            for edge in &node.edges {
+                                let target_group = edge.group.as_deref().unwrap_or(g.as_str());
+                                let target_key = (target_group.into(), (&edge.node).into());
 
-                                        if let Some(target_mark) =
-                                            mark_result.node_marks.get(&target_key)
-                                        {
-                                            if *target_mark == Mark::Ref {
-                                                nodes.insert(target_key, *target_mark);
-                                            }
-                                        }
-                                    }
+                                if let Some(target_mark) = mark_result.node_marks.get(&target_key)
+                                    && *target_mark == Mark::Ref
+                                {
+                                    nodes.insert(target_key, *target_mark);
                                 }
                             }
                         }
@@ -422,16 +415,16 @@ impl GraphAnalyzer {
                 &start_node_to_idx,
                 &mut visited,
                 &mut rec_stack,
-            ) {
-                if loop_indices.len() >= 2 {
-                    return Some((loop_indices[0], loop_indices[1]));
-                }
+            ) && loop_indices.len() >= 2
+            {
+                return Some((loop_indices[0], loop_indices[1]));
             }
         }
 
         None
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn find_ref_loop_with_path(
         &self,
         group_idx: usize,
@@ -453,16 +446,16 @@ impl GraphAnalyzer {
 
         let group = &unified_groups[group_idx];
         for ref_start_node in &group.ref_unified_groups {
-            if let Some(&target_idx) = start_node_to_idx.get(ref_start_node) {
-                if let Some(loop_indices) = self.find_ref_loop_with_path(
+            if let Some(&target_idx) = start_node_to_idx.get(ref_start_node)
+                && let Some(loop_indices) = self.find_ref_loop_with_path(
                     target_idx,
                     unified_groups,
                     start_node_to_idx,
                     visited,
                     rec_stack,
-                ) {
-                    return Some(loop_indices);
-                }
+                )
+            {
+                return Some(loop_indices);
             }
         }
 
@@ -508,7 +501,7 @@ impl GraphAnalyzer {
             .filter(|(_, size, incoming)| {
                 *size
                     < if *incoming > 0 {
-                        (max_include_count + 1) / 2
+                        max_include_count.div_ceil(2)
                     } else {
                         max_include_count
                     }
@@ -525,7 +518,7 @@ impl GraphAnalyzer {
 
                 if merged_include_count
                     <= if ref_i > 0 || ref_j > 0 {
-                        (max_include_count + 1) / 2
+                        max_include_count.div_ceil(2)
                     } else {
                         max_include_count
                     }
@@ -565,12 +558,11 @@ impl GraphAnalyzer {
         let mut overlap_count = 0;
 
         for (key, mark1) in nodes1 {
-            if *mark1 == Mark::Include {
-                if let Some(mark2) = nodes2.get(key) {
-                    if *mark2 == Mark::Include {
-                        overlap_count += 1;
-                    }
-                }
+            if *mark1 == Mark::Include
+                && let Some(mark2) = nodes2.get(key)
+                && *mark2 == Mark::Include
+            {
+                overlap_count += 1;
             }
         }
 
@@ -698,6 +690,7 @@ impl GraphAnalyzer {
         errors
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn detect_ref_loop(
         &self,
         group_idx: usize,
@@ -719,16 +712,16 @@ impl GraphAnalyzer {
 
         let group = &unified_groups[group_idx];
         for ref_start_node in &group.ref_unified_groups {
-            if let Some(&target_idx) = start_node_to_idx.get(ref_start_node) {
-                if self.detect_ref_loop(
+            if let Some(&target_idx) = start_node_to_idx.get(ref_start_node)
+                && self.detect_ref_loop(
                     target_idx,
                     unified_groups,
                     start_node_to_idx,
                     visited,
                     rec_stack,
-                ) {
-                    return true;
-                }
+                )
+            {
+                return true;
             }
         }
 

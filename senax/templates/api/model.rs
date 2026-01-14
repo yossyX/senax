@@ -120,7 +120,7 @@ impl GqlQuery@{ graphql_name }@ {
             permission.push("create");
         }
         @%- if !def.disable_update() %@
-        @%- if api_def.use_import %@
+        @%- if api_def.enable_import %@
         if import_guard().check(gql_ctx).await.is_ok() {
             permission.push("import");
         }
@@ -135,7 +135,7 @@ impl GqlQuery@{ graphql_name }@ {
         @%- endif %@
         Ok(permission)
     }
-    @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
+    @%- if def.enable_all_rows_cache() && !def.enable_filtered_rows_cache() %@
 
     #[graphql(guard = "query_guard()")]
     async fn all(
@@ -159,7 +159,7 @@ impl GqlQuery@{ graphql_name }@ {
         Ok(result?)
     }
     @%- endif %@
-    @%- if api_def.use_find_by_pk %@
+    @%- if api_def.enable_find_by_pk %@
 
     #[graphql(guard = "query_guard()")]
     async fn find_by_pk(
@@ -425,7 +425,7 @@ pub struct GqlMutation@{ graphql_name }@;
 impl GqlMutation@{ graphql_name }@ {
     @%- if !api_def.disable_mutation %@
     @%- if !def.disable_update() %@
-    @%- if api_def.use_find_by_pk %@
+    @%- if api_def.enable_find_by_pk %@
 
     #[graphql(guard = "update_guard()")]
     async fn find_for_update_by_pk(
@@ -476,7 +476,7 @@ impl GqlMutation@{ graphql_name }@ {
         Ok(ResObj::try_from_(&*obj, None)?)
     }
     @%- if !def.disable_update() %@
-    @%- if api_def.use_import %@
+    @%- if api_def.enable_import %@
 
     #[graphql(guard = "import_guard()")]
     async fn import(
@@ -502,6 +502,7 @@ impl GqlMutation@{ graphql_name }@ {
         @%- if def.has_auto_primary() %@
         let mut create_list = Vec::new();
         for (idx, data) in list.into_iter().enumerate() {
+            #[allow(clippy::manual_map)]
             let primary: Option<_domain_::@{ pascal_name }@Primary> = if let Some(_id) = &data._id {
                 Some(_id.try_into()?)
             } else if @{ def.primaries()|fmt_join_auto_or_not("let Some({ident}) = data.{ident}{clone}", "let {ident} = data.{ident}{clone}", " && ") }@ {
@@ -690,7 +691,7 @@ impl GqlMutation@{ graphql_name }@ {
         Ok(result)
     }
     @%- endfor %@
-    @%- if api_selector_def.use_for_update_by_operator %@
+    @%- if api_selector_def.enable_update_by_operator %@
 
     #[graphql(guard = "update_guard()")]
     async fn update_by_@{ selector }@(
@@ -746,7 +747,7 @@ impl GqlMutation@{ graphql_name }@ {
         Ok(result)
     }
     @%- endif %@
-    @%- if api_selector_def.use_for_delete %@
+    @%- if api_selector_def.enable_delete_by_selector %@
 
     #[graphql(guard = "delete_guard()")]
     async fn delete_by_@{ selector }@(
@@ -798,7 +799,7 @@ impl GqlMutation@{ graphql_name }@ {
     @%- endif %@
     @%- endif %@
     @%- if !def.disable_delete() %@
-    @%- if api_def.use_delete_by_pk %@
+    @%- if api_def.enable_delete_by_pk %@
 
     #[graphql(guard = "delete_guard()")]
     async fn delete_by_pk(
@@ -857,10 +858,10 @@ impl GqlMutation@{ graphql_name }@ {
 pub fn route_config(_cfg: &mut utoipa_actix_web::service_config::ServiceConfig) {
     @%- for (selector, selector_def) in def.selectors %@
     @%- for api_selector_def in api_def.selector(selector) %@
-    @%- if api_selector_def.use_streaming_api() || api_def.use_json_api() %@
+    @%- if api_selector_def.enable_streaming_api() || api_def.enable_json_api() %@
     _cfg.service(@{ selector }@_handler);
     @%- endif %@
-    @%- if api_def.use_json_api() %@
+    @%- if api_def.enable_json_api() %@
     _cfg.service(count_@{ selector }@_handler);
     @%- endif %@
     @%- endfor %@
@@ -868,7 +869,7 @@ pub fn route_config(_cfg: &mut utoipa_actix_web::service_config::ServiceConfig) 
 }
 @%- for (selector, selector_def) in def.selectors %@
 @%- for api_selector_def in api_def.selector(selector) %@
-@%- if api_selector_def.use_streaming_api() || api_def.use_json_api() %@
+@%- if api_selector_def.enable_streaming_api() || api_def.enable_json_api() %@
 
 #[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct @{ selector|pascal }@Request {
@@ -981,7 +982,7 @@ async fn @{ selector }@_handler(
     crate::response::json_stream_response(result, &ctx, ndjson)
 }
 @%- endif %@
-@%- if api_def.use_json_api() %@
+@%- if api_def.enable_json_api() %@
 
 #[utoipa::path(
     responses(

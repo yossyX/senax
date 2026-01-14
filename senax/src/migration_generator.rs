@@ -112,7 +112,7 @@ pub fn make_table_def(
         name: table_name.clone(),
         old_name: def._before_rename_name.clone(),
         engine: def.engine.clone().or_else(|| config.engine.clone()),
-        skip_ddl: def.skip_ddl,
+        skip_ddl: def.skip_ddl(),
         ..Default::default()
     };
     let old_soft_delete = def._soft_delete.as_ref().and_then(|v| {

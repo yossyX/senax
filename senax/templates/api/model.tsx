@@ -7,11 +7,11 @@ import { graphql } from '../../../gql';
 
 export const @{ graphql_name }@Fragment = graphql(`fragment @{ graphql_name }@ on Res@{ graphql_name }@{@{ gql_fields }@}`);
 
-@%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
+@%- if def.enable_all_rows_cache() && !def.enable_filtered_rows_cache() %@
 
 export const All@{ model_route|pascal }@Query = graphql(`query all_@{ path }@{@{ curly_begin }@{all{...@{ graphql_name }@}}@{ curly_end }@}`);
 @%- endif %@
-@%- if api_def.use_find_by_pk %@
+@%- if api_def.enable_find_by_pk %@
 
 export const FindByPk@{ model_route|pascal }@Query = graphql(`query find_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${ident}:{gql_type}", ",") }@){@{ curly_begin }@{findByPk(@{ def.primaries()|fmt_join("{ident}: ${ident}", ",") }@){...@{ graphql_name }@}}@{ curly_end }@}`);
 @%- endif %@
@@ -28,7 +28,7 @@ export const Count@{ selector|pascal }@@{ model_route|pascal }@Query = graphql(`
 @%- if !api_def.disable_mutation %@
 @#-
 @%- if !def.disable_update() %@
-@%- if api_def.use_find_by_pk %@
+@%- if api_def.enable_find_by_pk %@
 
 export const FindForUpdateByPk@{ model_route|pascal }@Query = graphql(`mutation find_for_update_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${ident}:{gql_type}", ",") }@){@{ curly_begin }@{findForUpdateByPk(@{ def.primaries()|fmt_join("{ident}: ${ident}", ",") }@){...@{ graphql_name }@}}@{ curly_end }@}`);
 @%- endif %@
@@ -39,7 +39,7 @@ export const FindForUpdate@{ model_route|pascal }@Query = graphql(`mutation find
 
 export const Create@{ model_route|pascal }@Query = graphql(`mutation create_@{ path }@($data:Req@{ graphql_name }@!){@{ curly_begin }@{create(data:$data){...@{ graphql_name }@}}@{ curly_end }@}`);
 @%- if !def.disable_update() %@
-@%- if api_def.use_import %@
+@%- if api_def.enable_import %@
 
 export const Import@{ model_route|pascal }@Query = graphql(`mutation import_@{ path }@($list:[Req@{ graphql_name }@!]!){@{ curly_begin }@{import(list:$list)}@{ curly_end }@}`);
 @%- endif %@
@@ -47,7 +47,7 @@ export const Import@{ model_route|pascal }@Query = graphql(`mutation import_@{ p
 export const Update@{ model_route|pascal }@Query = graphql(`mutation update_@{ path }@($data:Req@{ graphql_name }@!){@{ curly_begin }@{update(data:$data){...@{ graphql_name }@}}@{ curly_end }@}`);
 
 export const Delete@{ model_route|pascal }@Query = graphql(`mutation delete_@{ path }@($_id:ID!){@{ curly_begin }@{delete(_id:$_id)}@{ curly_end }@}`);
-@%- if api_def.use_delete_by_pk %@
+@%- if api_def.enable_delete_by_pk %@
 
 export const DeleteByPk@{ model_route|pascal }@Query = graphql(`mutation delete_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${ident}:{gql_type}", ",") }@){@{ curly_begin }@{deleteByPk(@{ def.primaries()|fmt_join("{ident}: ${ident}", ",") }@)}@{ curly_end }@}`);
 @%- endif %@
@@ -56,10 +56,10 @@ export const DeleteByPk@{ model_route|pascal }@Query = graphql(`mutation delete_
 @% for (js_name, js_def) in api_selector_def.js_updater %@
 export const Update@{ js_name|pascal }@@{ model_route|pascal }@Query = graphql(`mutation update_@{ js_name }@_@{ path }@($filter: @{ pascal_name }@Query@{ selector|pascal }@Filter!, $value: JSON!){@{ curly_begin }@{update@{ js_name|gql_pascal }@(filter: $filter, value: $value){...@{ graphql_name }@}}@{ curly_end }@}`);
 @%- endfor %@
-@%- if api_selector_def.use_for_update_by_operator %@
+@%- if api_selector_def.enable_update_by_operator %@
 export const UpdateBy@{ selector|pascal }@@{ model_route|pascal }@Query = graphql(`mutation update_by_@{ selector }@_@{ path }@($filter: @{ pascal_name }@Query@{ selector|pascal }@Filter!, $operator: JSON!){@{ curly_begin }@{updateBy@{ selector|gql_pascal }@(filter: $filter, operator: $operator){...@{ graphql_name }@}}@{ curly_end }@}`);
 @%- endif %@
-@%- if api_selector_def.use_for_delete %@
+@%- if api_selector_def.enable_delete_by_selector %@
 
 export const DeleteBy@{ selector|pascal }@@{ model_route|pascal }@Query = graphql(`mutation delete_by_@{ selector }@_@{ path }@($filter: @{ pascal_name }@Query@{ selector|pascal }@Filter!){@{ curly_begin }@{deleteBy@{ selector|gql_pascal }@(filter: $filter)}@{ curly_end }@}`);
 @%- endif %@

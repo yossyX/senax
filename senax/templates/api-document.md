@@ -64,7 +64,7 @@ SOBO-WEBの業務DBの GraphQL API 定義を記載する。
 {%- if model.has_all_query %}
 * 全行取得：{ {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { all { <a href="#{{model.gql_name | lower}}">{{model.gql_name}}</a> } } } } }
 {%- endif %}
-{%- if api_def.use_find_by_pk %}
+{%- if api_def.enable_find_by_pk %}
 * 主キー検索：{ {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { findByPk({{model.pk}}) { <a href="#{{model.gql_name | lower}}">{{model.gql_name}}</a> } } } } }
 {%- endif %}
 * GraphQL ID検索：{ {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { find(_id: ID!) { <a href="#{{model.gql_name | lower}}">{{model.gql_name}}</a> } } } } }
@@ -77,22 +77,22 @@ SOBO-WEBの業務DBの GraphQL API 定義を記載する。
 #### Mutation
 * 登録：mutation { {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { create(data: <a href="#{{model.gql_name | lower}}">{{model.gql_name}}</a>) } } } }
 {%- if not def.disable_update %}
-{%- if api_def.use_import %}
+{%- if api_def.enable_import %}
 * インポート：{ {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { import(list: [<a href="#{{model.gql_name | lower}}">{{model.gql_name}}</a>]) } } } }
 {%- endif %}
 * 更新：mutation { {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { update(data: <a href="#{{model.gql_name | lower}}">{{model.gql_name}}</a>) } } } }
 * 削除：mutation { {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { delete(_id: ID!) } } } }
-{%- if api_def.use_delete_by_pk %}
+{%- if api_def.enable_delete_by_pk %}
 * 主キーでの削除：{ {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { deleteByPk({{model.pk}}) } } } }
 {%- endif %}
 {%- for selector_def in model.selectors %}
 {% for js_name, js_def in selector_def.js_updater %}
 * 更新：mutation { {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { update{{js_name | gql_pascal}}(filter: <a href="#{{model.gql_name | lower}}query{{selector_def.name | lower}}filter">{{model.gql_name}}Query{{selector_def.name | pascal}}Filter</a>, value: JSON!) } } } }
 {%- endfor %}
-{%- if selector_def.use_for_update_by_operator %}
+{%- if selector_def.enable_update_by_operator %}
 * 更新：mutation { {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { updateBy{{selector_def.name | gql_pascal}}(filter: <a href="#{{model.gql_name | lower}}query{{selector_def.name | lower}}filter">{{model.gql_name}}Query{{selector_def.name | pascal}}Filter</a>, operator: JSON!) } } } }
 {%- endif %}
-{%- if selector_def.use_for_delete %}
+{%- if selector_def.enable_delete_by_selector %}
 * 削除：mutation { {{api_def.cased_db_name}} { {{group.cased_name}} { {{model.cased_name}} { deleteBy{{selector_def.name | gql_pascal}}(filter: <a href="#{{model.gql_name | lower}}query{{selector_def.name | lower}}filter">{{model.gql_name}}Query{{selector_def.name | pascal}}Filter</a>) } } } }
 {%- endif %}
 {%- endfor %}

@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::api_generator::schema::{ApiFieldDef, ApiRelationDef};
-use crate::common::{AtomicLoad as _, hash, if_then_else, to_plural, yaml_value_to_str};
+use crate::common::{hash, if_then_else, to_plural, yaml_value_to_str};
 use crate::schema::_to_ident_name;
 
 use super::*;
@@ -169,6 +169,8 @@ pub struct ModelDef {
     #[serde(skip)]
     pub name: String,
     #[serde(default, skip)]
+    pub no_table: bool,
+    #[serde(default, skip)]
     pub exclude_group_from_table_name: Option<bool>,
     #[serde(default, skip)]
     pub cache_owners: Vec<(String, String, String, u64)>,
@@ -200,8 +202,8 @@ pub struct ModelDef {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table_name: Option<String>,
     /// ### DDL定義を出力しない
-    #[serde(default, skip_serializing_if = "super::is_false")]
-    pub skip_ddl: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skip_ddl: Option<bool>,
     /// ### 主キー以外で結合する多対多リレーション用ダミーテーブル
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub dummy_always_joinable: bool,
@@ -223,44 +225,44 @@ pub struct ModelDef {
     /// ### 論理削除設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub soft_delete: Option<SoftDelete>,
-    /// ### バージョンを使用する
+    /// ### バージョンを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub versioned: bool,
-    /// ### save_delayed のカウンターに使用するフィールド
+    /// ### delayed_save のカウンターに使用するフィールド
     /// versioned との同時使用は不可
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub counting: Option<String>,
+    pub counter_field: Option<String>,
     /// ### キャッシュを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_cache: Option<bool>,
-    /// ### 全行キャッシュを使用する
+    /// ### 全行キャッシュを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_all_rows_cache: Option<bool>,
-    /// ### 条件付き全行キャッシュを使用する
+    pub enable_all_rows_cache: Option<bool>,
+    /// ### 条件付き全行キャッシュを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_filtered_row_cache: Option<bool>,
+    pub enable_filtered_rows_cache: Option<bool>,
     /// ### 更新時に常にすべてのキャッシュをクリアする
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_clear_whole_cache: Option<bool>,
+    pub clear_all_cache_on_update: Option<bool>,
     /// ### リレーションとして登録される場合に上書きする
     // 多対多テーブルで論理削除の場合、必要になる。リレーション以外のユニークキーがあると意図しない結果になるので注意が必要。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overwrite_on_relation_save: Option<bool>,
-    /// ### 更新通知を使用する
+    /// ### 更新通知を有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_update_notice: Option<bool>,
-    /// ### 遅延INSERTを使用する
+    pub enable_update_notice: Option<bool>,
+    /// ### 遅延INSERTを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_insert_delayed: Option<bool>,
-    /// ### 遅延SAVEを使用する
+    pub enable_delayed_insert: Option<bool>,
+    /// ### 遅延SAVEを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_save_delayed: Option<bool>,
-    /// ### 遅延UPDATEを使用する
+    pub enable_delayed_save: Option<bool>,
+    /// ### 遅延UPDATEを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_update_delayed: Option<bool>,
-    /// ### 遅延UPSERTを使用する
+    pub enable_delayed_update: Option<bool>,
+    /// ### 遅延UPSERTを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_upsert_delayed: Option<bool>,
+    pub enable_delayed_upsert: Option<bool>,
     /// ### 更新を無効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_update: Option<bool>,
@@ -275,13 +277,13 @@ pub struct ModelDef {
     #[serde(rename = "abstract")]
     pub abstract_mode: bool,
     /// ### 継承モード
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inheritance: Option<Inheritance>,
     /// ### ストレージエンジン(MySQLのみ)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine: Option<String>,
     /// ### 機能追加
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub act_as: Option<ActAs>,
     /// ### ER図のリレーションを非表示
     #[serde(default, skip_serializing_if = "super::is_false")]
@@ -350,8 +352,8 @@ pub struct ModelJson {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub table_name: Option<String>,
     /// ### DDL定義を出力しない
-    #[serde(default, skip_serializing_if = "super::is_false")]
-    pub skip_ddl: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skip_ddl: Option<bool>,
     /// ### 主キー以外で結合する多対多リレーション用ダミーテーブル
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub dummy_always_joinable: bool,
@@ -373,44 +375,44 @@ pub struct ModelJson {
     /// ### 論理削除設定
     #[serde(skip_serializing_if = "Option::is_none")]
     pub soft_delete: Option<SoftDelete>,
-    /// ### バージョンを使用する
+    /// ### バージョンを有効化する
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub versioned: bool,
-    /// ### save_delayed のカウンターに使用するフィールド
-    /// versionedとの同時使用は不可
+    /// ### delayed_save のカウンターに使用するフィールド
+    /// versioned との同時使用は不可
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub counting: Option<String>,
+    pub counter_field: Option<String>,
     /// ### キャッシュを使用する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_cache: Option<bool>,
-    /// ### 全行キャッシュを使用する
+    /// ### 全行キャッシュを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_all_rows_cache: Option<bool>,
-    /// ### 条件付き全行キャッシュを使用する
+    pub enable_all_rows_cache: Option<bool>,
+    /// ### 条件付き全行キャッシュを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_filtered_row_cache: Option<bool>,
+    pub enable_filtered_rows_cache: Option<bool>,
     /// ### 更新時に常にすべてのキャッシュをクリアする
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_clear_whole_cache: Option<bool>,
+    pub clear_all_cache_on_update: Option<bool>,
     /// ### リレーションとして登録される場合に上書きする
     // 多対多テーブルで論理削除の場合、必要になる。リレーション以外のユニークキーがあると意図しない結果になるので注意が必要。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overwrite_on_relation_save: Option<bool>,
-    /// ### 更新通知を使用する
+    /// ### 更新通知を有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_update_notice: Option<bool>,
-    /// ### 遅延INSERTを使用する
+    pub enable_update_notice: Option<bool>,
+    /// ### 遅延INSERTを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_insert_delayed: Option<bool>,
-    /// ### 遅延SAVEを使用する
+    pub enable_delayed_insert: Option<bool>,
+    /// ### 遅延SAVEを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_save_delayed: Option<bool>,
-    /// ### 遅延UPDATEを使用する
+    pub enable_delayed_save: Option<bool>,
+    /// ### 遅延UPDATEを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_update_delayed: Option<bool>,
-    /// ### 遅延UPSERTを使用する
+    pub enable_delayed_update: Option<bool>,
+    /// ### 遅延UPSERTを有効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_upsert_delayed: Option<bool>,
+    pub enable_delayed_upsert: Option<bool>,
     /// ### 更新を無効化する
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disable_update: Option<bool>,
@@ -490,17 +492,17 @@ impl From<ModelDef> for ModelJson {
             disable_updated_at: value.disable_updated_at,
             soft_delete: value.soft_delete,
             versioned: value.versioned,
-            counting: value.counting,
+            counter_field: value.counter_field,
             use_cache: value.use_cache,
-            use_all_rows_cache: value.use_all_rows_cache,
-            use_filtered_row_cache: value.use_filtered_row_cache,
-            use_clear_whole_cache: value.use_clear_whole_cache,
+            enable_all_rows_cache: value.enable_all_rows_cache,
+            enable_filtered_rows_cache: value.enable_filtered_rows_cache,
+            clear_all_cache_on_update: value.clear_all_cache_on_update,
             overwrite_on_relation_save: value.overwrite_on_relation_save,
-            use_update_notice: value.use_update_notice,
-            use_insert_delayed: value.use_insert_delayed,
-            use_save_delayed: value.use_save_delayed,
-            use_update_delayed: value.use_update_delayed,
-            use_upsert_delayed: value.use_upsert_delayed,
+            enable_update_notice: value.enable_update_notice,
+            enable_delayed_insert: value.enable_delayed_insert,
+            enable_delayed_save: value.enable_delayed_save,
+            enable_delayed_update: value.enable_delayed_update,
+            enable_delayed_upsert: value.enable_delayed_upsert,
             disable_update: value.disable_update,
             disable_delete: value.disable_delete,
             disable_insert_cache_propagation: value.disable_insert_cache_propagation,
@@ -589,6 +591,7 @@ impl TryFrom<ModelJson> for ModelDef {
             db: Default::default(),
             group_name: Default::default(),
             name: Default::default(),
+            no_table: false,
             exclude_group_from_table_name: None,
             cache_owners: Default::default(),
             merged_fields: Default::default(),
@@ -607,17 +610,17 @@ impl TryFrom<ModelJson> for ModelDef {
             disable_updated_at: value.disable_updated_at,
             soft_delete: value.soft_delete,
             versioned: value.versioned,
-            counting: value.counting,
+            counter_field: value.counter_field,
             use_cache: value.use_cache,
-            use_all_rows_cache: value.use_all_rows_cache,
-            use_filtered_row_cache: value.use_filtered_row_cache,
-            use_clear_whole_cache: value.use_clear_whole_cache,
+            enable_all_rows_cache: value.enable_all_rows_cache,
+            enable_filtered_rows_cache: value.enable_filtered_rows_cache,
+            clear_all_cache_on_update: value.clear_all_cache_on_update,
             overwrite_on_relation_save: value.overwrite_on_relation_save,
-            use_update_notice: value.use_update_notice,
-            use_insert_delayed: value.use_insert_delayed,
-            use_save_delayed: value.use_save_delayed,
-            use_update_delayed: value.use_update_delayed,
-            use_upsert_delayed: value.use_upsert_delayed,
+            enable_update_notice: value.enable_update_notice,
+            enable_delayed_insert: value.enable_delayed_insert,
+            enable_delayed_save: value.enable_delayed_save,
+            enable_delayed_update: value.enable_delayed_update,
+            enable_delayed_upsert: value.enable_delayed_upsert,
             disable_update: value.disable_update,
             disable_delete: value.disable_delete,
             disable_insert_cache_propagation: value.disable_insert_cache_propagation,
@@ -853,30 +856,40 @@ impl ModelDef {
         }
     }
 
+    pub fn skip_ddl(&self) -> bool {
+        self.skip_ddl
+            .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().skip_ddl)
+    }
+
     pub fn use_cache(&self) -> bool {
         self.use_cache
             .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_cache)
     }
 
-    pub fn use_all_rows_cache(&self) -> bool {
+    pub fn enable_all_rows_cache(&self) -> bool {
         self.use_cache()
-            && self
-                .use_all_rows_cache
-                .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_all_rows_cache)
+            && self.enable_all_rows_cache.unwrap_or(
+                CONFIG
+                    .read()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .enable_all_rows_cache,
+            )
     }
 
-    pub fn use_filtered_row_cache(&self) -> bool {
-        self.use_filtered_row_cache.unwrap_or(false)
+    pub fn enable_filtered_rows_cache(&self) -> bool {
+        self.enable_filtered_rows_cache.unwrap_or(false)
     }
 
-    pub fn use_clear_whole_cache(&self) -> bool {
-        self.use_clear_whole_cache.unwrap_or(
+    pub fn clear_all_cache_on_update(&self) -> bool {
+        self.clear_all_cache_on_update.unwrap_or(
             CONFIG
                 .read()
                 .unwrap()
                 .as_ref()
                 .unwrap()
-                .use_clear_whole_cache,
+                .clear_all_cache_on_update,
         )
     }
 
@@ -886,39 +899,61 @@ impl ModelDef {
         )
     }
 
-    pub fn use_update_notice(&self) -> bool {
-        self.use_update_notice
-            .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_update_notice)
+    pub fn enable_update_notice(&self) -> bool {
+        self.enable_update_notice.unwrap_or(
+            CONFIG
+                .read()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .enable_update_notice,
+        )
     }
 
-    pub fn use_insert_delayed(&self) -> bool {
-        self.use_insert_delayed
-            .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_insert_delayed)
+    pub fn enable_delayed_insert(&self) -> bool {
+        self.enable_delayed_insert.unwrap_or(
+            CONFIG
+                .read()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .enable_delayed_insert,
+        )
     }
 
     pub fn has_delayed_update(&self) -> bool {
-        self.use_save_delayed() || self.use_update_delayed() || self.use_upsert_delayed()
+        self.enable_delayed_save() || self.enable_delayed_update() || self.enable_delayed_upsert()
     }
 
-    pub fn use_save_delayed(&self) -> bool {
+    pub fn enable_delayed_save(&self) -> bool {
         !self.disable_update()
             && self
-                .use_save_delayed
-                .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_save_delayed)
+                .enable_delayed_save
+                .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().enable_delayed_save)
     }
 
-    pub fn use_update_delayed(&self) -> bool {
+    pub fn enable_delayed_update(&self) -> bool {
         !self.disable_update()
-            && self
-                .use_update_delayed
-                .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_update_delayed)
+            && self.enable_delayed_update.unwrap_or(
+                CONFIG
+                    .read()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .enable_delayed_update,
+            )
     }
 
-    pub fn use_upsert_delayed(&self) -> bool {
+    pub fn enable_delayed_upsert(&self) -> bool {
         !self.disable_update()
-            && self
-                .use_upsert_delayed
-                .unwrap_or(CONFIG.read().unwrap().as_ref().unwrap().use_upsert_delayed)
+            && self.enable_delayed_upsert.unwrap_or(
+                CONFIG
+                    .read()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .enable_delayed_upsert,
+            )
     }
 
     pub fn disable_update(&self) -> bool {
@@ -1050,18 +1085,18 @@ impl ModelDef {
         }
     }
 
-    pub fn get_counting(&self) -> &String {
-        self.counting.as_ref().unwrap()
+    pub fn get_counter_field(&self) -> &String {
+        self.counter_field.as_ref().unwrap()
     }
 
-    pub fn get_counting_col(&self) -> String {
+    pub fn get_counter_field_col(&self) -> String {
         if self.versioned {
             error_exit!(
-                "In the {} model, both versioned and counting cannot be set.",
+                "In the {} model, both versioned and counter_field cannot be set.",
                 &self.name
             )
         }
-        let name = self.counting.as_ref().unwrap();
+        let name = self.counter_field.as_ref().unwrap();
         self.merged_fields
             .get(name)
             .unwrap_or_else(|| {
@@ -1071,8 +1106,8 @@ impl ModelDef {
             .to_string()
     }
 
-    pub fn get_counting_type(&self) -> String {
-        let name = self.counting.as_ref().unwrap();
+    pub fn get_counter_field_type(&self) -> String {
+        let name = self.counter_field.as_ref().unwrap();
         self.merged_fields
             .get(name)
             .unwrap_or_else(|| {
@@ -1762,7 +1797,8 @@ impl ModelDef {
             .collect()
     }
     pub fn relations_one_and_belonging(
-        &self, joinable: Joinable,
+        &self,
+        joinable: Joinable,
         self_only: bool,
     ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
@@ -1773,7 +1809,11 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_belonging(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_belonging(
+        &self,
+        joinable: Joinable,
+        self_only: bool,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1783,7 +1823,11 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_belonging_cache(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_belonging_cache(
+        &self,
+        joinable: Joinable,
+        self_only: bool,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1793,7 +1837,8 @@ impl ModelDef {
             .collect()
     }
     pub fn relations_belonging_uncached(
-        &self, joinable: Joinable,
+        &self,
+        joinable: Joinable,
         self_only: bool,
     ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
@@ -1814,7 +1859,8 @@ impl ModelDef {
             .collect()
     }
     pub fn relations_belonging_outer_db(
-        &self, joinable: Joinable,
+        &self,
+        joinable: Joinable,
         self_only: bool,
     ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
@@ -1826,7 +1872,11 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_one_and_many(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_one_and_many(
+        &self,
+        joinable: Joinable,
+        self_only: bool,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1835,7 +1885,11 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_one(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_one(
+        &self,
+        joinable: Joinable,
+        self_only: bool,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1845,7 +1899,11 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_one_cache(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_one_cache(
+        &self,
+        joinable: Joinable,
+        self_only: bool,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1854,7 +1912,11 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_one_uncached(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_one_uncached(
+        &self,
+        joinable: Joinable,
+        self_only: bool,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1872,7 +1934,11 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many(
+        &self,
+        joinable: Joinable,
+        self_only: bool,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1882,7 +1948,10 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_without_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_without_limit(
+        &self,
+        joinable: Joinable,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1890,7 +1959,10 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_with_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_with_limit(
+        &self,
+        joinable: Joinable,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1898,7 +1970,11 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_cache(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_cache(
+        &self,
+        joinable: Joinable,
+        self_only: bool,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1907,7 +1983,10 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_cache_without_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_cache_without_limit(
+        &self,
+        joinable: Joinable,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1915,7 +1994,10 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_cache_with_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_cache_with_limit(
+        &self,
+        joinable: Joinable,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1923,7 +2005,11 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_uncached(&self, joinable: Joinable, self_only: bool) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_uncached(
+        &self,
+        joinable: Joinable,
+        self_only: bool,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1932,7 +2018,10 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_uncached_without_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_uncached_without_limit(
+        &self,
+        joinable: Joinable,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -1940,7 +2029,10 @@ impl ModelDef {
             .map(|v| (self, v.0, v.1))
             .collect()
     }
-    pub fn relations_many_uncached_with_limit(&self, joinable: Joinable) -> Vec<(&ModelDef, &String, &RelDef)> {
+    pub fn relations_many_uncached_with_limit(
+        &self,
+        joinable: Joinable,
+    ) -> Vec<(&ModelDef, &String, &RelDef)> {
         self.merged_relations
             .iter()
             .filter(|v| joinable.is(v.1.joinable))
@@ -2184,10 +2276,10 @@ pub enum Joinable {
     Join,
     Filter,
 }
-impl Joinable{
+impl Joinable {
     fn is(&self, target: bool) -> bool {
         match self {
-            Joinable::Join => target == true,
+            Joinable::Join => target,
             Joinable::Filter => true,
         }
     }

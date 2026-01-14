@@ -55,7 +55,7 @@ pub async fn start(
         ensure!(backup.is_dir(), "Specify a directory for backup");
         crate::common::BACKUP.set(backup).unwrap();
     }
-    crate::common::READ_ONLY.store(read_only, std::sync::atomic::Ordering::SeqCst);
+    crate::common::READ_ONLY.atomic_store(read_only);
 
     let compression_layer: CompressionLayer = CompressionLayer::new()
         .br(true)

@@ -519,7 +519,7 @@ pub fn hex_digest(v: &str) -> String {
 
 pub trait AtomicLoad<T> {
     fn relaxed_load(&self) -> T;
-    fn relaxed_store(&self, v: T);
+    fn atomic_store(&self, v: T);
 }
 
 impl AtomicLoad<bool> for AtomicBool {
@@ -527,8 +527,8 @@ impl AtomicLoad<bool> for AtomicBool {
         self.load(Ordering::Relaxed)
     }
 
-    fn relaxed_store(&self, v: bool) {
-        self.store(v, Ordering::Relaxed);
+    fn atomic_store(&self, v: bool) {
+        self.store(v, Ordering::SeqCst);
     }
 }
 
@@ -537,8 +537,8 @@ impl AtomicLoad<usize> for AtomicUsize {
         self.load(Ordering::Relaxed)
     }
 
-    fn relaxed_store(&self, v: usize) {
-        self.store(v, Ordering::Relaxed);
+    fn atomic_store(&self, v: usize) {
+        self.store(v, Ordering::SeqCst);
     }
 }
 

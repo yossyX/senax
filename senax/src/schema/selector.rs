@@ -20,7 +20,7 @@ pub enum FilterType {
     Exists,
     /// リレーション検索（内側から先に絞り込み）
     EqAny,
-    /// 全文検索
+    /// 全文検索(MySQLのみ)
     FullText,
     /// 数値配列検索
     ArrayInt,

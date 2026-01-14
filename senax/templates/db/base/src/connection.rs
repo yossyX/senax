@@ -587,7 +587,7 @@ pub struct DbConn {
     cache_internal_op_list: Vec<(ShardId, CacheOp)>,
     cache_op_list: Vec<(ShardId, CacheOp)>,
     callback_list: VecDeque<Box<dyn FnOnce() -> BoxFuture<'static, ()> + Send + Sync>>,
-    pub clear_whole_cache: bool,
+    pub clear_all_cache: bool,
     has_tx: bool,
     wo_tx: usize,
     has_read_tx: usize,
@@ -635,7 +635,7 @@ impl DbConn {
             cache_internal_op_list: Vec::new(),
             cache_op_list: Vec::new(),
             callback_list: VecDeque::new(),
-            clear_whole_cache: false,
+            clear_all_cache: false,
             has_tx: false,
             wo_tx: 0,
             has_read_tx: 0,
@@ -701,7 +701,7 @@ impl DbConn {
     }
 
     pub fn set_clear_all_cache(&mut self) {
-        self.clear_whole_cache = true;
+        self.clear_all_cache = true;
     }
     @%- endif %@
 
@@ -1036,11 +1036,11 @@ impl DbConn {
         for (shard_id, tx) in self.tx.drain() {
             let cache_internal_op_list = cache_internal_op_list.remove(&shard_id);
             let cache_op_list = cache_op_list.remove(&shard_id);
-            let clear_whole_cache = self.clear_whole_cache;
+            let clear_all_cache = self.clear_all_cache;
             // JoinSet is not used to prevent processing interruptions
             join_list.push(tokio::spawn(async move {
                 tx.commit().await?;
-                if !clear_whole_cache
+                if !clear_all_cache
                     && (cache_internal_op_list.is_some() || cache_op_list.is_some())
                 {
                     let sync = Self::inc_cache_sync(shard_id).await;
@@ -1062,8 +1062,8 @@ impl DbConn {
             join.await??;
         }
         self.lock_list.clear();
-        if self.clear_whole_cache {
-            crate::clear_whole_cache().await;
+        if self.clear_all_cache {
+            crate::clear_all_cache().await;
         }
         if !self.callback_list.is_empty() {
             let mut fut = Vec::new();
@@ -1364,7 +1364,7 @@ impl DbConn {
             }
         }
     }
-    @%- if config.use_update_notice %@
+    @%- if config.enable_update_notice %@
     pub async fn subscribe_update_notice(f: NotifyFn) {
         let mut receivers = NOTIFY_RECEIVER.write().await;
         receivers.push(f);

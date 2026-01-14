@@ -1,16 +1,15 @@
 use anyhow::{Context, Result, ensure};
 use askama::Template;
 use compact_str::CompactString;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use regex::Regex;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
 
+use crate::common::OVERWRITTEN_MSG;
 use crate::common::ToCase as _;
-use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
 use crate::schema::Joinable;
 use crate::schema::{_to_ident_name, ConfigDef, GroupsDef, Timestampable};
 use crate::{BASE_DOMAIN_PATH, DOMAIN_BASE_RELATIONS_PATH, DOMAIN_REPOSITORIES_PATH};
@@ -238,7 +237,10 @@ pub fn generate(
         pub unified_joinable: &'a Vec<String>,
     }
 
-    let unified_joinable = &unified_joinable_groups.iter().map(|g| g.unified_name()).collect();
+    let unified_joinable = &unified_joinable_groups
+        .iter()
+        .map(|g| g.unified_name())
+        .collect();
     let tpl = ModelsTemplate {
         config: &config,
         groups,
@@ -584,7 +586,7 @@ pub fn generate(
             &config,
             &unified_name,
             &repo_include_groups,
-            &unified_group,
+            unified_group,
             &unified_groups,
             &ref_db,
             force,
@@ -598,7 +600,7 @@ pub fn generate(
                 &config,
                 &unified_name,
                 &repo_include_groups,
-                &unified_group,
+                unified_group,
                 &unified_groups,
                 &ref_db,
                 force,
@@ -664,7 +666,7 @@ pub fn generate(
             &config,
             &unified_name,
             &repo_include_groups,
-            &unified_group,
+            unified_group,
             &unified_joinable_groups,
             filter_unified_map,
             filter_unified_names,

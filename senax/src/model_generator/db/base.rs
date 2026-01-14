@@ -86,7 +86,6 @@ pub fn write_files(
     struct ConnectionTemplate<'a> {
         pub db: &'a str,
         pub config: &'a ConfigDef,
-        pub groups: &'a GroupsDef,
         pub unified_joinable: &'a Vec<String>,
         pub tx_isolation: Option<&'a str>,
         pub read_tx_isolation: Option<&'a str>,
@@ -96,7 +95,6 @@ pub fn write_files(
     let tpl = ConnectionTemplate {
         db,
         config,
-        groups,
         unified_joinable,
         tx_isolation: config.tx_isolation.map(|v| v.as_str()),
         read_tx_isolation: config.read_tx_isolation.map(|v| v.as_str()),

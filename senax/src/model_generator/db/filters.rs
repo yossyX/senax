@@ -1,20 +1,18 @@
 use anyhow::Result;
 use askama::Template;
-use compact_str::CompactString;
-use indexmap::IndexMap;
 use regex::Regex;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeSet, HashSet},
     ffi::OsString,
     fs,
     path::Path,
     sync::Arc,
 };
 
-use crate::schema::Joinable;
 use crate::model_generator::analyzer::UnifiedGroup;
+use crate::schema::Joinable;
 use crate::schema::is_mysql_mode;
-use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray, Timestampable, to_id_name};
+use crate::schema::{ConfigDef, GroupsDef, ModelDef, StringOrArray};
 use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{
     common::{OVERWRITTEN_MSG, ToCase as _, fs_write},
@@ -29,7 +27,7 @@ pub fn write_base_group_files(
     unified_name: &str,
     groups: &GroupsDef,
     unified_group: &UnifiedGroup,
-    unified_groups: &Vec<UnifiedGroup>,
+    unified_groups: &[UnifiedGroup],
     ref_db: &BTreeSet<(String, String)>,
     force: bool,
     remove_files: &mut HashSet<OsString>,
@@ -95,25 +93,21 @@ pub fn write_base_group_files(
     if force || !file_path.exists() {
         #[derive(Template)]
         #[template(path = "db/base_filters/src/lib.rs", escape = "none")]
-        struct LibTemplate<'a> {
-            pub config: &'a ConfigDef,
-            pub groups: &'a GroupsDef,
-        }
+        struct LibTemplate;
 
-        let tpl = LibTemplate { config, groups };
+        let tpl = LibTemplate;
         fs_write(file_path, tpl.render()?)?;
     }
 
     #[derive(Template)]
     #[template(path = "db/base_filters/src/repositories.rs", escape = "none")]
     struct RepositoriesTemplate<'a> {
-        pub db: &'a str,
         pub groups: &'a GroupsDef,
     }
 
     let file_path = src_dir.join("repositories.rs");
     remove_files.remove(file_path.as_os_str());
-    let tpl = RepositoriesTemplate { db, groups };
+    let tpl = RepositoriesTemplate { groups };
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
@@ -134,11 +128,6 @@ pub fn write_base_group_files(
             .filter(|(_, d)| !d.abstract_mode)
             .map(|(_, d)| d.mod_name())
             .collect();
-        let entities_mod_names: BTreeSet<(String, &String)> = defs
-            .iter()
-            .filter(|(_, d)| !d.abstract_mode)
-            .map(|(model_name, def)| (def.mod_name(), model_name))
-            .collect();
         let unified_names: BTreeSet<(String, String)> = unified_group
             .nodes
             .iter()
@@ -154,7 +143,6 @@ pub fn write_base_group_files(
 
         let file_path = model_models_dir.join(format!("{}.rs", group_name.to_snake()));
         remove_files.remove(file_path.as_os_str());
-        let concrete_models = defs.iter().filter(|(_k, v)| !v.abstract_mode).collect();
 
         #[derive(Template)]
         #[template(path = "db/base_filters/src/group.rs", escape = "none")]
@@ -163,8 +151,6 @@ pub fn write_base_group_files(
             pub group_name: &'a str,
             pub mod_names: &'a BTreeSet<String>,
             pub unified_names: &'a BTreeSet<(String, String)>,
-            pub models: IndexMap<&'a String, &'a Arc<ModelDef>>,
-            pub config: &'a ConfigDef,
         }
 
         let tpl = GroupTemplate {
@@ -172,8 +158,6 @@ pub fn write_base_group_files(
             group_name,
             mod_names: &mod_names,
             unified_names: &unified_names,
-            models: concrete_models,
-            config,
         };
         fs_write(file_path, tpl.render()?)?;
 
@@ -218,25 +202,18 @@ pub fn write_base_group_files(
                 }
 
                 #[derive(Template)]
-                #[template(
-                    path = "db/base_filters/src/group/base/_table.rs",
-                    escape = "none"
-                )]
+                #[template(path = "db/base_filters/src/group/base/_table.rs", escape = "none")]
                 struct GroupBaseTableTemplate<'a> {
                     pub db: &'a str,
                     pub group_name: &'a str,
                     pub mod_name: &'a str,
                     pub model_name: &'a str,
                     pub pascal_name: &'a str,
-                    pub id_name: &'a str,
                     pub table_name: &'a str,
                     pub def: &'a Arc<ModelDef>,
-                    pub force_indexes: Vec<(String, String)>,
                     pub config: &'a ConfigDef,
-                    pub version_col: CompactString,
-                    pub is_mysql_str: &'a str,
                     pub unified_group: &'a UnifiedGroup,
-                    pub unified_groups: &'a Vec<UnifiedGroup>,
+                    pub unified_groups: &'a [UnifiedGroup],
                 }
 
                 let tpl = GroupBaseTableTemplate {
@@ -245,13 +222,9 @@ pub fn write_base_group_files(
                     mod_name,
                     model_name,
                     pascal_name: &model_name.to_pascal(),
-                    id_name: &to_id_name(model_name),
                     table_name: &table_name,
                     def,
-                    force_indexes,
                     config,
-                    version_col: ConfigDef::version(),
-                    is_mysql_str: if is_mysql_mode() { "true" } else { "false" },
                     unified_group,
                     unified_groups,
                 };

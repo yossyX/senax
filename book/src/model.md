@@ -36,16 +36,16 @@
 |force_delete_all||
 |force_delete_by_ids||
 |force_delete_relations||
-|insert_delayed||
+|delayed_insert||
 |insert_dummy_cache||
 |insert_ignore||
 |query||
 |restore||
 |save||
-|save_delayed||
+|delayed_save||
 |set||
 |update_many|指定された複数のIDに対して同一の更新を適用する|
-|upsert_delayed||
+|delayed_upsert||
 |_receive_update_notice||
 
 ## QueryBuilder

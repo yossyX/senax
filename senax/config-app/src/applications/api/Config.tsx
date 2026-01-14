@@ -107,9 +107,9 @@ function Config() {
               <AutoField name="with_comment" {...formData} />
               <AutoField name="hide_timestamp" {...formData} />
               <AutoField name="selector_limit" {...formData} />
-              <AutoField name="disable_gql" {...formData} />
-              <AutoField name="use_json_api" {...formData} />
-              <AutoField name="use_streaming_api" {...formData} />
+              <AutoField name="disable_graphql" {...formData} />
+              <AutoField name="enable_json_api" {...formData} />
+              <AutoField name="enable_streaming_api" {...formData} />
               <AutoField
                 name="roles"
                 {...formData}

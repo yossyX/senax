@@ -98,15 +98,13 @@ pub async fn seed(use_test: bool, file_path: Option<PathBuf>) -> Result<()> {
             }
         }
     }
-    if let Some(ref path) = file_path {
-        if path.is_file() {
-            yml_files.clear();
-            let data = fs::read_to_string(path).unwrap();
-            yml_files.insert(
-                path.file_name().unwrap().to_str().unwrap().to_string(),
-                data,
-            );
-        }
+    if let Some(ref path) = file_path && path.is_file() {
+        yml_files.clear();
+        let data = fs::read_to_string(path).unwrap();
+        yml_files.insert(
+            path.file_name().unwrap().to_str().unwrap().to_string(),
+            data,
+        );
     }
     if file_num.is_some() && yml_files.is_empty() {
         FILES.get().unwrap().write().unwrap().clear();

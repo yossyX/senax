@@ -66,9 +66,9 @@ pub trait _@{ pascal_name }@Repository: Send + Sync {
     #[deprecated(note = "This method should not be used outside the domain.")]
     async fn import(&self, list: Vec<Box<dyn _Updater>>, option: Option<base_domain::models::ImportOption>) -> anyhow::Result<()>;
 @%- endif %@
-@%- if def.use_insert_delayed() %@
+@%- if def.enable_delayed_insert() %@
     #[deprecated(note = "This method should not be used outside the domain.")]
-    async fn insert_delayed(&self, obj: Box<dyn _Updater>) -> anyhow::Result<()>;
+    async fn delayed_insert(&self, obj: Box<dyn _Updater>) -> anyhow::Result<()>;
 @%- endif %@
 @%- if !def.disable_delete() %@
     #[deprecated(note = "This method should not be used outside the domain.")]
@@ -214,7 +214,7 @@ pub trait _@{ pascal_name }@QueryFindBuilder: Send + Sync {
 
 #[async_trait]
 pub trait _@{ pascal_name }@QueryService: Send + Sync {
-    @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
+    @%- if def.enable_all_rows_cache() && !def.enable_filtered_rows_cache() %@
     async fn all(&self) -> anyhow::Result<Box<dyn base_domain::models::EntityIterator<dyn @{ pascal_name }@>>>;
     @%- endif %@
     @%- for (selector, selector_def) in def.selectors %@
@@ -345,9 +345,9 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
         Ok(())
     }
     @%- endif %@
-    @%- if def.use_insert_delayed() %@
+    @%- if def.enable_delayed_insert() %@
     #[allow(unused_mut)]
-    async fn insert_delayed(&self, obj: Box<dyn _Updater>) -> anyhow::Result<()> {
+    async fn delayed_insert(&self, obj: Box<dyn _Updater>) -> anyhow::Result<()> {
         let Ok(mut obj) = (obj as Box<dyn std::any::Any>).downcast::<@{ pascal_name }@Entity>() else {
             panic!("Only @{ pascal_name }@Entity is accepted.");
         };
@@ -511,7 +511,7 @@ fn _filter@{ filter_map.suffix }@(v: &impl base_domain::models::@{ filter_map.db
 #[cfg(any(feature = "mock", test))]
 #[async_trait]
 impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
-    @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
+    @%- if def.enable_all_rows_cache() && !def.enable_filtered_rows_cache() %@
     async fn all(&self) -> anyhow::Result<Box<dyn base_domain::models::EntityIterator<dyn @{ pascal_name }@>>> {
         struct V(std::collections::BTreeMap<@{- def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@, @{ pascal_name }@Entity>);
         impl base_domain::models::EntityIterator<dyn @{ pascal_name }@> for V {

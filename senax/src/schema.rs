@@ -9,7 +9,7 @@ use serde_yaml::Value;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
 
 pub mod column;
@@ -77,7 +77,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
         config.use_cache = false;
         config.use_fast_cache = false;
         config.use_storage_cache = false;
-        config.use_all_rows_cache = false;
+        config.enable_all_rows_cache = false;
     }
     config.fix_static_vars();
     set_mysql_mode(config.is_mysql());
@@ -140,10 +140,11 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
             def.group_name.clone_from(group_name);
             def.name = model_name.to_string();
             if def.dummy_always_joinable() {
-                if def.use_all_rows_cache.is_none() {
-                    def.use_all_rows_cache = Some(false);
+                if def.enable_all_rows_cache.is_none() {
+                    def.enable_all_rows_cache = Some(false);
                 }
-                def.skip_ddl = true;
+                def.no_table = true;
+                def.skip_ddl = Some(true);
             }
             for (name, _col) in def.fields.iter() {
                 crate::common::check_column_name(name);
@@ -241,9 +242,9 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 }
             }
             if def.versioned {
-                if def.counting.is_some() {
+                if def.counter_field.is_some() {
                     bail!(
-                        "Both versioned and counting cannot be set for {}.",
+                        "Both versioned and counter_field cannot be set for {}.",
                         def.name
                     );
                 }
@@ -337,7 +338,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                     column_def.overwrite(org, &postfix);
                 }
                 if is_mysql_mode()
-                    && config.force_datetime_on_mysql
+                    && config.mysql_force_datetime
                     && column_def.data_type == DataType::TimestampWithTimeZone
                 {
                     column_def.data_type = DataType::UtcDateTime;
@@ -409,8 +410,8 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
             }
             if config.force_disable_cache {
                 def.use_cache = Some(false);
-                def.use_all_rows_cache = Some(false);
-                def.use_filtered_row_cache = Some(false);
+                def.enable_all_rows_cache = Some(false);
+                def.enable_filtered_rows_cache = Some(false);
             }
             model_map.insert(model_name, RefCell::new(def));
         }
@@ -633,14 +634,12 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
         for (cur_model_name, def) in defs.iter() {
             let model = def.borrow();
             for (rel_name, rel_def) in model.merged_relations.iter() {
-                if rel_def.is_type_of_belongs_to() {
-                    if model.merged_fields.contains_key(rel_name) {
-                        error_exit!(
-                            "The same relation name as the {} field in the {} model cannot be used.",
-                            rel_name,
-                            model.name
-                        );
-                    }
+                if rel_def.is_type_of_belongs_to() && model.merged_fields.contains_key(rel_name) {
+                    error_exit!(
+                        "The same relation name as the {} field in the {} model cannot be used.",
+                        rel_name,
+                        model.name
+                    );
                 }
                 if rel_def.is_type_of_has() {
                     if model.merged_fields.contains_key(rel_name) {

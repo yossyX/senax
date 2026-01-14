@@ -35,8 +35,8 @@ use crate::repositories::@{ mod_name[0]|ident }@::_base::_@{ mod_name[1] }@ as r
 @%- endif %@
 @%- endfor %@
 pub const USE_CACHE: bool = @{ def.use_cache() }@;
-pub const USE_ALL_ROWS_CACHE: bool = @{ def.use_all_rows_cache() }@;
-pub const USE_UPDATE_NOTICE: bool = @{ def.use_update_notice() }@;
+pub const ENABLE_ALL_ROWS_CACHE: bool = @{ def.enable_all_rows_cache() }@;
+pub const ENABLE_UPDATE_NOTICE: bool = @{ def.enable_update_notice() }@;
 pub const TABLE_NAME: &str = "@{ table_name }@";
 pub const TRASHED_SQL: &str = r#"@{ def.inheritance_cond(" AND ") }@"#;
 pub const NOT_TRASHED_SQL: &str = r#"@{ def.soft_delete_tpl("","deleted_at IS NULL AND ","deleted = 0 AND ")}@@{ def.inheritance_cond(" AND ") }@"#;
@@ -1064,13 +1064,13 @@ pub fn write_belonging_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols
     if without_key {
         write!(buf, r#"SELECT {} FROM (SELECT {cols} as {}) as _t{} WHERE "#, Primary::cols(), Primary::cols_with_paren(), idx + 1).unwrap();
     } else {
-        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM (SELECT {cols} as {}) as _t{} WHERE "#, Primary::cols_with_paren(), idx + 1).unwrap();
+        write!(buf, r#"SELECT @%- if !config.enable_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM (SELECT {cols} as {}) as _t{} WHERE "#, Primary::cols_with_paren(), idx + 1).unwrap();
     }
     @%- else %@
     if without_key {
         write!(buf, r#"SELECT {} FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, Primary::cols(), idx + 1).unwrap();
     } else {
-        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, Primary::cols_with_paren(), cols).unwrap();
+        write!(buf, r#"SELECT @%- if !config.enable_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, Primary::cols_with_paren(), cols).unwrap();
     }
     @%- endif %@
     let mut trash_mode = TrashMode::Not;
@@ -1102,13 +1102,13 @@ pub fn write_having_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols1: 
     if without_key {
         write!(buf, r#"SELECT {} FROM (SELECT {cols3} as {cols1}) as _t{} WHERE "#, cols1, idx + 1).unwrap();
     } else {
-        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM (SELECT {cols3} as {cols1}) as _t{} WHERE "#, idx + 1).unwrap();
+        write!(buf, r#"SELECT @%- if !config.enable_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM (SELECT {cols3} as {cols1}) as _t{} WHERE "#, idx + 1).unwrap();
     }
     @%- else %@
     if without_key {
         write!(buf, r#"SELECT {} FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, cols1, idx + 1).unwrap();
     } else {
-        write!(buf, r#"SELECT @%- if !config.disable_no_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, cols2, cols3).unwrap();
+        write!(buf, r#"SELECT @%- if !config.enable_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, cols2, cols3).unwrap();
     }
     @%- endif %@
     let mut trash_mode = TrashMode::Not;

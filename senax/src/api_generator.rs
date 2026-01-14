@@ -9,13 +9,12 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 use crate::api_generator::schema::{
     API_CONFIG, ApiConfigDef, ApiDbDef, ApiFieldDef, ApiModelDef, Relations,
 };
 use crate::api_generator::template::{DbConfigTemplate, MutationRootTemplate, QueryRootTemplate};
-use crate::common::ToCase as _;
+use crate::common::{AtomicLoad as _, ToCase as _};
 use crate::common::{fs_write, parse_yml_file, simplify_yml};
 use crate::schema::{_to_ident_name, CONFIG, ConfigDef, GROUPS, Joinable, ModelDef, to_id_name};
 use crate::{API_SCHEMA_PATH, model_generator};
@@ -70,8 +69,8 @@ pub fn generate(
     }
     let mut db_config: ApiDbDef = parse_yml_file(&db_config_path)?;
     db_config.fix();
-    filters::SHOW_LABEL.store(db_config.with_label(), Ordering::SeqCst);
-    filters::SHOW_COMMNET.store(db_config.with_comment(), Ordering::SeqCst);
+    filters::SHOW_LABEL.atomic_store(db_config.with_label());
+    filters::SHOW_COMMNET.atomic_store(db_config.with_comment());
 
     let src_dir = server_dir.join("src");
     let base_src_dir = server_dir.join("base/src");
@@ -858,7 +857,11 @@ fn write_model_file(
             ),
             curly_end: format!(
                 "{}{}",
-                if api_db_config.promote_group_paths { "" } else { "}" },
+                if api_db_config.promote_group_paths {
+                    ""
+                } else {
+                    "}"
+                },
                 if api_db_config.promote_group_children(group_route) {
                     ""
                 } else {
@@ -900,7 +903,7 @@ fn inquire_relation(
     rel_list: &mut Vec<String>,
 ) -> Result<schema::Relations> {
     let mut items = Vec::new();
-    for (_, rel_name, _) in def.relations_one(Joinable::Filter,  false) {
+    for (_, rel_name, _) in def.relations_one(Joinable::Filter, false) {
         items.push(rel_name);
     }
     for (_, rel_name, _) in def.relations_many(Joinable::Filter, false) {
@@ -1033,7 +1036,7 @@ fn write_relation(
         ApiFieldDef::pop();
         relation_buf.push_str("\n}");
     }
-    for (_model, rel_name, rel) in def.relations_many(Joinable::Join,false) {
+    for (_model, rel_name, rel) in def.relations_many(Joinable::Join, false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
@@ -1084,7 +1087,7 @@ fn write_relation(
         ApiFieldDef::pop();
         relation_buf.push_str("\n}");
     }
-    for (_model, rel_name, rel) in def.relations_belonging(Joinable::Join,false) {
+    for (_model, rel_name, rel) in def.relations_belonging(Joinable::Join, false) {
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
@@ -1208,10 +1211,10 @@ fn traverse_relation(
 ) {
     for (rel_name, rel) in relation {
         let result = set_joinable(groups, group_name, model_name, rel_name);
-        if let Some(rel) = rel {
-            if let Some((group_name, model_name)) = result {
-                traverse_relation(groups, &group_name, &model_name, &rel.relations);
-            }
+        if let Some(rel) = rel
+            && let Some((group_name, model_name)) = result
+        {
+            traverse_relation(groups, &group_name, &model_name, &rel.relations);
         }
     }
 }
@@ -1222,53 +1225,59 @@ fn set_joinable(
     model_name: &str,
     rel: &str,
 ) -> Option<(String, String)> {
-    if let Some(models) = groups.borrow_mut().get_mut(group_name) {
-        if let Some(model) = models.get_mut(model_name) {
-            if let Some(r) = model.belongs_to.get_mut(rel) {
-                if let Some(r) = r {
-                    r.joinable = true;
-                    return Some((
-                        r.group.as_deref().unwrap_or(group_name).to_string(),
-                        r.model.as_deref().unwrap_or(rel).to_string(),
-                    ));
-                } else {
-                    let mut r = crate::schema::BelongsToDef::default();
-                    r.joinable = true;
-                    model.belongs_to.insert(rel.to_string(), Some(r));
-                    return Some((group_name.to_string(), rel.to_string()));
-                }
-            }
-            if let Some(r) = model.belongs_to_outer_db.get_mut(rel) {
+    if let Some(models) = groups.borrow_mut().get_mut(group_name)
+        && let Some(model) = models.get_mut(model_name)
+    {
+        if let Some(r) = model.belongs_to.get_mut(rel) {
+            if let Some(r) = r {
                 r.joinable = true;
-                return None;
+                return Some((
+                    r.group.as_deref().unwrap_or(group_name).to_string(),
+                    r.model.as_deref().unwrap_or(rel).to_string(),
+                ));
+            } else {
+                let r = crate::schema::BelongsToDef {
+                    joinable: true,
+                    ..Default::default()
+                };
+                model.belongs_to.insert(rel.to_string(), Some(r));
+                return Some((group_name.to_string(), rel.to_string()));
             }
-            if let Some(r) = model.has_one.get_mut(rel) {
-                if let Some(r) = r {
-                    r.joinable = true;
-                    return Some((
-                        r.group.as_deref().unwrap_or(group_name).to_string(),
-                        r.model.as_deref().unwrap_or(rel).to_string(),
-                    ));
-                } else {
-                    let mut r = crate::schema::HasOneDef::default();
-                    r.joinable = true;
-                    model.has_one.insert(rel.to_string(), Some(r));
-                    return Some((group_name.to_string(), rel.to_string()));
-                }
+        }
+        if let Some(r) = model.belongs_to_outer_db.get_mut(rel) {
+            r.joinable = true;
+            return None;
+        }
+        if let Some(r) = model.has_one.get_mut(rel) {
+            if let Some(r) = r {
+                r.joinable = true;
+                return Some((
+                    r.group.as_deref().unwrap_or(group_name).to_string(),
+                    r.model.as_deref().unwrap_or(rel).to_string(),
+                ));
+            } else {
+                let r = crate::schema::HasOneDef {
+                    joinable: true,
+                    ..Default::default()
+                };
+                model.has_one.insert(rel.to_string(), Some(r));
+                return Some((group_name.to_string(), rel.to_string()));
             }
-            if let Some(r) = model.has_many.get_mut(rel) {
-                if let Some(r) = r {
-                    r.joinable = true;
-                    return Some((
-                        r.group.as_deref().unwrap_or(group_name).to_string(),
-                        r.model.as_deref().unwrap_or(rel).to_string(),
-                    ));
-                } else {
-                    let mut r = crate::schema::HasManyDef::default();
-                    r.joinable = true;
-                    model.has_many.insert(rel.to_string(), Some(r));
-                    return Some((group_name.to_string(), rel.to_string()));
-                }
+        }
+        if let Some(r) = model.has_many.get_mut(rel) {
+            if let Some(r) = r {
+                r.joinable = true;
+                return Some((
+                    r.group.as_deref().unwrap_or(group_name).to_string(),
+                    r.model.as_deref().unwrap_or(rel).to_string(),
+                ));
+            } else {
+                let r = crate::schema::HasManyDef {
+                    joinable: true,
+                    ..Default::default()
+                };
+                model.has_many.insert(rel.to_string(), Some(r));
+                return Some((group_name.to_string(), rel.to_string()));
             }
         }
     }

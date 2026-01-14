@@ -17,9 +17,9 @@ pub async fn clear_local_cache() {
     // Do not modify this line. (DbClearLocalCache)
 }
 
-pub async fn clear_whole_cache() {
+pub async fn clear_all_cache() {
     @%- if session %@
-    _db_session::clear_whole_cache().await;
+    _db_session::clear_all_cache().await;
     @%- endif %@
     // Do not modify this line. (DbClearCache)
 }

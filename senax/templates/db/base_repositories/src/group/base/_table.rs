@@ -102,20 +102,20 @@ pub(crate) async fn init() -> Result<()> {
         ALL_ROWS_CACHE.set(DbConn::shard_num_range().map(|_| ArcSwapOption::const_empty()).collect()).unwrap();
         CACHE_RESET_SYNC.set(DbConn::shard_num_range().map(|_| RwLock::new(0)).collect()).unwrap();
         CACHE_RESET_SYNC_ALL_ROWS.set(DbConn::shard_num_range().map(|_| Mutex::new(0)).collect()).unwrap();
-        @%- if def.use_save_delayed() %@
-        SAVE_DELAYED_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
+        @%- if def.enable_delayed_save() %@
+        DELAYED_SAVE_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
         @%- endif %@
-        @%- if def.use_update_delayed() %@
-        UPDATE_DELAYED_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
+        @%- if def.enable_delayed_update() %@
+        DELAYED_UPDATE_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
         @%- endif %@
-        @%- if def.use_upsert_delayed() %@
-        UPSERT_DELAYED_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
+        @%- if def.enable_delayed_upsert() %@
+        DELAYED_UPSERT_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
         @%- endif %@
         BULK_FETCH_QUEUE.set(DbConn::shard_num_range().map(|_| SegQueue::new()).collect()).unwrap();
     }
 
     if !db::is_test_mode() {
-        @%- if def.use_insert_delayed() %@
+        @%- if def.enable_delayed_insert() %@
         tokio::spawn(async {
             while !db::is_stopped() {
                 DelayedActor::handle(DelayedMsg::InsertFromDisk);
@@ -134,7 +134,7 @@ pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
 }
 
 pub(crate) async fn init_db(path: &Path) -> Result<()> {
-    @%- if def.use_insert_delayed() %@
+    @%- if def.enable_delayed_insert() %@
     let path = path.join(TABLE_NAME);
     tokio::spawn(async move {
         loop {
@@ -142,7 +142,7 @@ pub(crate) async fn init_db(path: &Path) -> Result<()> {
             let db = sled::open(&path);
             match db {
                 Ok(db) => {
-                    INSERT_DELAYED_DB.set(db).unwrap();
+                    DELAYED_INSERT_DB.set(db).unwrap();
                     DelayedActor::handle(DelayedMsg::InsertFromMemory);
                     DelayedActor::handle(DelayedMsg::InsertFromDisk);
                     break;
@@ -157,7 +157,7 @@ pub(crate) async fn init_db(path: &Path) -> Result<()> {
 @%- if !config.force_disable_cache %@
 
 impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> for CacheOp {
-    @%- if !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
+    @%- if !def.clear_all_cache_on_update() && !def.act_as_job_queue() %@
     fn apply_to_obj(obj: &Option<Arc<CacheWrapper>>, msgs: &[CacheOp], shard_id: ShardId, time: MSec) -> Option<Arc<CacheWrapper>> {
         let mut obj = obj.as_ref().cloned();
         for msg in msgs {
@@ -282,7 +282,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     QUEUE_NOTIFIER.notify_waiters();
                 },
                 @%- endif %@
-                @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
+                @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && !def.act_as_job_queue() %@
                 CacheOp::Insert { overwrite, shard_id, data
                     @{- def.relations_one_cache(Joinable::Join, false)|fmt_rel_join(", _{rel_name}", "") -}@ 
                     @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join(", _{rel_name}", "") }@ } => {
@@ -290,7 +290,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     clear_all_rows_cache(shard_id, sync, false).await;
                     let mut cache = CacheWrapper::from_data(data.clone(), shard_id, time);
                     let id = InnerPrimary::from(&cache._inner);
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                    if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         let op = if overwrite {
                             db::models::NotifyOp::upsert
                         } else {
@@ -339,7 +339,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     for row in list {
                         let mut cache = CacheWrapper::from_data(row._data.clone(), shard_id, time);
                         let id = InnerPrimary::from(&cache._inner);
-                        if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                        if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                             DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, op, &id).await;
                         }
                         let id = PrimaryHasher(id, shard_id);
@@ -396,7 +396,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     @%- if def.has_auto_primary() %@
                     if overwrite {
                         __clear_cache(shard_id, sync, false).await;
-                        if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                        if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                             DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::invalidate_all, &serde_json::Value::Null).await;
                         }
                     }
@@ -407,7 +407,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     @{- def.relations_many_cache(Joinable::Join, false)|fmt_rel_join(", _{rel_name}", "") }@ } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                    if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::update, &id).await;
                     }
                     if USE_CACHE {
@@ -478,7 +478,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 CacheOp::UpdateMany { ids, shard_id, update, data_list, op } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                    if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
                             DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::update, id).await;
                         }
@@ -514,7 +514,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 CacheOp::BulkUpsert { shard_id, data_list, update, op } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                    if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for data in &data_list {
                             let id = InnerPrimary::from(data);
                             DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::upsert, &id).await;
@@ -543,7 +543,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 CacheOp::Delete { id, shard_id } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                    if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::delete, &id).await;
                     }
                     if USE_CACHE {
@@ -570,7 +570,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 CacheOp::DeleteMany { ids, shard_id } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                    if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
                             DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::delete, id).await;
                         }
@@ -601,14 +601,14 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 CacheOp::DeleteAll { shard_id } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     __clear_cache(shard_id, sync, false).await;
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                    if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::delete_all, &serde_json::Value::Null).await;
                     }
                 }
                 CacheOp::Cascade { ids, shard_id } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                    if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         for id in &ids {
                             DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::delete, id).await;
                         }
@@ -639,7 +639,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                 CacheOp::Invalidate { id, shard_id  } => {
                     let sync = *sync_map.get(&shard_id).unwrap();
                     clear_all_rows_cache(shard_id, sync, false).await;
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                    if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::invalidate, &id).await;
                     }
                     if USE_CACHE {
@@ -668,7 +668,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     for (shard_id, sync) in sync_map.iter() {
                         __clear_cache(*shard_id, *sync, false).await;
                     }
-                    if USE_UPDATE_NOTICE && DbConn::_has_update_notice() {
+                    if ENABLE_UPDATE_NOTICE && DbConn::_has_update_notice() {
                         DbConn::_push_update_notice(db::models::TableName::@{ table_name|ident }@, db::models::NotifyOp::invalidate_all, &serde_json::Value::Null).await;
                     }
                 }
@@ -684,7 +684,7 @@ async fn clear_all_rows_cache(shard_id: ShardId, sync: u64, clear_test: bool) {
     if clear_test {
         if let Some(ids) = GENERATED_IDS.get() { ids.write().unwrap().clear() }
     }", "") }@
-    if USE_ALL_ROWS_CACHE {
+    if ENABLE_ALL_ROWS_CACHE {
         if let Some(list) = CACHE_RESET_SYNC_ALL_ROWS.get() {
             if clear_test {
                 for shard in list {
@@ -716,37 +716,37 @@ pub(crate) async fn __clear_cache(_shard_id: ShardId, _sync: u64, _clear_test: b
     }
     @%- endif %@
 }
-@% if def.use_insert_delayed() %@
-static INSERT_DELAYED_QUEUE: Lazy<SegQueue<ForInsert>> = Lazy::new(SegQueue::new);
-static INSERT_DELAYED_DB: OnceCell<sled::Db> = OnceCell::new();
-static INSERT_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
+@% if def.enable_delayed_insert() %@
+static DELAYED_INSERT_QUEUE: Lazy<SegQueue<ForInsert>> = Lazy::new(SegQueue::new);
+static DELAYED_INSERT_DB: OnceCell<sled::Db> = OnceCell::new();
+static DELAYED_INSERT_WAITING: AtomicBool = AtomicBool::new(false);
 @%- endif %@
 static DELAYED_DB_NO: Lazy<AtomicU64> = Lazy::new(|| {
     let now = SystemTime::now();
     let time = now.duration_since(UNIX_EPOCH).unwrap();
     AtomicU64::new(time.as_secs() << 20)
 });
-@%- if def.use_save_delayed() %@
-static SAVE_DELAYED_QUEUE: OnceCell<Vec<SegQueue<__Updater__>>> = OnceCell::new();
-static SAVE_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
-static SAVE_DELAYED_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
+@%- if def.enable_delayed_save() %@
+static DELAYED_SAVE_QUEUE: OnceCell<Vec<SegQueue<__Updater__>>> = OnceCell::new();
+static DELAYED_SAVE_WAITING: AtomicBool = AtomicBool::new(false);
+static DELAYED_SAVE_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
 @%- endif %@
-@%- if def.use_update_delayed() %@
-static UPDATE_DELAYED_QUEUE: OnceCell<Vec<SegQueue<__Updater__>>> = OnceCell::new();
-static UPDATE_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
-static UPDATE_DELAYED_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
+@%- if def.enable_delayed_update() %@
+static DELAYED_UPDATE_QUEUE: OnceCell<Vec<SegQueue<__Updater__>>> = OnceCell::new();
+static DELAYED_UPDATE_WAITING: AtomicBool = AtomicBool::new(false);
+static DELAYED_UPDATE_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
 @%- endif %@
-@%- if def.use_upsert_delayed() %@
-static UPSERT_DELAYED_QUEUE: OnceCell<Vec<SegQueue<__Updater__>>> = OnceCell::new();
-static UPSERT_DELAYED_WAITING: AtomicBool = AtomicBool::new(false);
-static UPSERT_DELAYED_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
+@%- if def.enable_delayed_upsert() %@
+static DELAYED_UPSERT_QUEUE: OnceCell<Vec<SegQueue<__Updater__>>> = OnceCell::new();
+static DELAYED_UPSERT_WAITING: AtomicBool = AtomicBool::new(false);
+static DELAYED_UPSERT_SEMAPHORE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(1));
 @%- endif %@
 
 struct DelayedActor;
-@%- if def.use_insert_delayed() %@
+@%- if def.enable_delayed_insert() %@
 
-struct InsertDelayedBuf(Vec<ForInsert>);
-impl Drop for InsertDelayedBuf {
+struct DelayedInsertBuf(Vec<ForInsert>);
+impl Drop for DelayedInsertBuf {
     fn drop(&mut self) {
         if !self.0.is_empty() {
             if let Err(err) = push_delayed_db(&self.0) {
@@ -758,34 +758,34 @@ impl Drop for InsertDelayedBuf {
 @%- endif %@
 
 enum DelayedMsg {
-    @%- if def.use_insert_delayed() %@
+    @%- if def.enable_delayed_insert() %@
     InsertFromMemory,
     InsertFromDisk,
     @%- endif %@
-    @%- if def.use_save_delayed() %@
+    @%- if def.enable_delayed_save() %@
     Save,
     @%- endif %@
-    @%- if def.use_update_delayed() %@
+    @%- if def.enable_delayed_update() %@
     Update,
     @%- endif %@
-    @%- if def.use_upsert_delayed() %@
+    @%- if def.enable_delayed_upsert() %@
     Upsert,
     @%- endif %@
 }
 impl DelayedActor {
     fn handle(msg: DelayedMsg) {
         match msg {
-            @%- if def.use_insert_delayed() %@
+            @%- if def.enable_delayed_insert() %@
             DelayedMsg::InsertFromMemory => {
-                if INSERT_DELAYED_WAITING.load(Ordering::SeqCst) {
+                if DELAYED_INSERT_WAITING.load(Ordering::SeqCst) {
                     return;
                 }
                 tokio::spawn(
                     async move {
-                        INSERT_DELAYED_WAITING.store(true, Ordering::SeqCst);
+                        DELAYED_INSERT_WAITING.store(true, Ordering::SeqCst);
                         let _guard = db::get_shutdown_guard();
                         sleep(Duration::from_millis(100)).await;
-                        INSERT_DELAYED_WAITING.store(false, Ordering::SeqCst);
+                        DELAYED_INSERT_WAITING.store(false, Ordering::SeqCst);
                         handle_delayed_msg_insert_from_memory().await;
                     }
                 );
@@ -807,49 +807,49 @@ impl DelayedActor {
                 );
             }
             @%- endif %@
-            @%- if def.use_save_delayed() %@
+            @%- if def.enable_delayed_save() %@
             DelayedMsg::Save => {
-                if SAVE_DELAYED_WAITING.load(Ordering::SeqCst) {
+                if DELAYED_SAVE_WAITING.load(Ordering::SeqCst) {
                     return;
                 }
                 tokio::spawn(
                     async move {
-                        SAVE_DELAYED_WAITING.store(true, Ordering::SeqCst);
+                        DELAYED_SAVE_WAITING.store(true, Ordering::SeqCst);
                         let _guard = db::get_shutdown_guard();
-                        let _semaphore = SAVE_DELAYED_SEMAPHORE.acquire().await;
-                        SAVE_DELAYED_WAITING.store(false, Ordering::SeqCst);
+                        let _semaphore = DELAYED_SAVE_SEMAPHORE.acquire().await;
+                        DELAYED_SAVE_WAITING.store(false, Ordering::SeqCst);
                         handle_delayed_msg_save().await;
                     }
                 );
             }
             @%- endif %@
-            @%- if def.use_update_delayed() %@
+            @%- if def.enable_delayed_update() %@
             DelayedMsg::Update => {
-                if UPDATE_DELAYED_WAITING.load(Ordering::SeqCst) {
+                if DELAYED_UPDATE_WAITING.load(Ordering::SeqCst) {
                     return;
                 }
                 tokio::spawn(
                     async move {
-                        UPDATE_DELAYED_WAITING.store(true, Ordering::SeqCst);
+                        DELAYED_UPDATE_WAITING.store(true, Ordering::SeqCst);
                         let _guard = db::get_shutdown_guard();
-                        let _semaphore = UPDATE_DELAYED_SEMAPHORE.acquire().await;
-                        UPDATE_DELAYED_WAITING.store(false, Ordering::SeqCst);
+                        let _semaphore = DELAYED_UPDATE_SEMAPHORE.acquire().await;
+                        DELAYED_UPDATE_WAITING.store(false, Ordering::SeqCst);
                         handle_delayed_msg_update().await;
                     }
                 );
             }
             @%- endif %@
-            @%- if def.use_upsert_delayed() %@
+            @%- if def.enable_delayed_upsert() %@
             DelayedMsg::Upsert => {
-                if UPSERT_DELAYED_WAITING.load(Ordering::SeqCst) {
+                if DELAYED_UPSERT_WAITING.load(Ordering::SeqCst) {
                     return;
                 }
                 tokio::spawn(
                     async move {
-                        UPSERT_DELAYED_WAITING.store(true, Ordering::SeqCst);
+                        DELAYED_UPSERT_WAITING.store(true, Ordering::SeqCst);
                         let _guard = db::get_shutdown_guard();
-                        let _semaphore = UPSERT_DELAYED_SEMAPHORE.acquire().await;
-                        UPSERT_DELAYED_WAITING.store(false, Ordering::SeqCst);
+                        let _semaphore = DELAYED_UPSERT_SEMAPHORE.acquire().await;
+                        DELAYED_UPSERT_WAITING.store(false, Ordering::SeqCst);
                         handle_delayed_msg_upsert().await;
                     }
                 );
@@ -858,7 +858,7 @@ impl DelayedActor {
         }
     }
 }
-@%- if def.use_save_delayed() %@
+@%- if def.enable_delayed_save() %@
 
 async fn handle_delayed_msg_save() {
     let mut handles = Vec::new();
@@ -868,7 +868,7 @@ async fn handle_delayed_msg_save() {
     future::join_all(handles).await;
 }
 @%- endif %@
-@%- if def.use_update_delayed() %@
+@%- if def.enable_delayed_update() %@
 
 async fn handle_delayed_msg_update() {
     let mut handles = Vec::new();
@@ -878,7 +878,7 @@ async fn handle_delayed_msg_update() {
     future::join_all(handles).await;
 }
 @%- endif %@
-@%- if def.use_upsert_delayed() %@
+@%- if def.enable_delayed_upsert() %@
 
 async fn handle_delayed_msg_upsert() {
     let mut handles = Vec::new();
@@ -888,11 +888,11 @@ async fn handle_delayed_msg_upsert() {
     future::join_all(handles).await;
 }
 @%- endif %@
-@%- if def.use_insert_delayed() %@
+@%- if def.enable_delayed_insert() %@
 
 async fn handle_delayed_msg_insert_from_memory() {
-    let mut vec = Vec::with_capacity(INSERT_DELAYED_QUEUE.len() + 10);
-    while let Some(x) = INSERT_DELAYED_QUEUE.pop() {
+    let mut vec = Vec::with_capacity(DELAYED_INSERT_QUEUE.len() + 10);
+    while let Some(x) = DELAYED_INSERT_QUEUE.pop() {
         vec.push(x);
     }
     if vec.is_empty() {
@@ -928,7 +928,7 @@ async fn handle_delayed_msg_insert_from_memory() {
 }
 
 async fn _handle_delayed_msg_insert_from_memory(mut conn: DbConn, vec: Vec<ForInsert>) {
-    let mut buf = InsertDelayedBuf(vec);
+    let mut buf = DelayedInsertBuf(vec);
     let result = __bulk_insert(&mut conn, &buf.0, true, false, false).await;
     if let Err(err) = result {
         if let Some(err) = err.downcast_ref::<sqlx::Error>() {
@@ -965,7 +965,7 @@ async fn handle_delayed_msg_insert_from_disk(shard_id: ShardId) -> Result<()> {
     if db::is_stopped() {
         return Ok(());
     }
-    let db = match INSERT_DELAYED_DB.get() {
+    let db = match DELAYED_INSERT_DB.get() {
         Some(db) => db,
         None => {
             return Ok(());
@@ -1014,7 +1014,7 @@ async fn handle_delayed_msg_insert_from_disk(shard_id: ShardId) -> Result<()> {
 }
 
 fn push_delayed_db(list: &Vec<ForInsert>) -> Result<()> {
-    if let Some(db) = INSERT_DELAYED_DB.get() {
+    if let Some(db) = DELAYED_INSERT_DB.get() {
         let no = DELAYED_DB_NO.fetch_add(1, Ordering::SeqCst);
         let bytes = senax_encoder::pack(&list)?;
         let mut buf = encode_all(bytes.as_ref(), 3)?;
@@ -1025,17 +1025,17 @@ fn push_delayed_db(list: &Vec<ForInsert>) -> Result<()> {
         });
     } else {
         for data in list {
-            INSERT_DELAYED_QUEUE.push(data.clone());
+            DELAYED_INSERT_QUEUE.push(data.clone());
         }
     }
     Ok(())
 }
 @%- endif %@
-@%- if def.use_save_delayed() %@
+@%- if def.enable_delayed_save() %@
 
 async fn _handle_delayed_msg_save(shard_id: ShardId) {
     let mut map: BTreeMap<InnerPrimary, IndexMap<OpData, __Updater__>> = BTreeMap::new();
-    while let Some(x) = SAVE_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
+    while let Some(x) = DELAYED_SAVE_QUEUE.get().unwrap()[shard_id as usize].pop() {
         let inner_map = map.entry(InnerPrimary::from(&x)).or_default();
         if let Some(old) = inner_map.get_mut(&x._op) {
             aggregate_update(&x, old);
@@ -1087,14 +1087,14 @@ fn aggregate_update(x: &_@{ pascal_name }@Updater, old: &mut _@{ pascal_name }@U
     Accessor{accessor_with_sep_type}::_set(x._op.{ident}, &mut old._update.{ident}, &x._update.{ident});", "") }@
 }
 @%- endif %@
-@%- if def.use_update_delayed() %@
+@%- if def.enable_delayed_update() %@
 
 async fn _handle_delayed_msg_update(shard_id: ShardId) {
     @{- def.soft_delete_tpl2("","
     let deleted_at = Some(SystemTime::now().into());","","
     let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as {u32});")}@
     let mut map: BTreeMap<InnerPrimary, IndexMap<OpData, __Updater__>> = BTreeMap::new();
-    while let Some(mut x) = UPDATE_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
+    while let Some(mut x) = DELAYED_UPDATE_QUEUE.get().unwrap()[shard_id as usize].pop() {
         @{- def.soft_delete_tpl2("","
         if x.will_be_deleted() {
             x.mut_deleted_at().set(deleted_at);
@@ -1176,14 +1176,14 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
     while join_set.join_next().await.is_some() {};
 }
 @%- endif %@
-@%- if def.use_upsert_delayed() %@
+@%- if def.enable_delayed_upsert() %@
 
 async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
     @{- def.soft_delete_tpl2("","
     let deleted_at = Some(SystemTime::now().into());","","
     let deleted = cmp::max(1, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as {u32});")}@
     let mut map: BTreeMap<InnerPrimary, IndexMap<OpData, __Updater__>> = BTreeMap::new();
-    while let Some(mut x) = UPSERT_DELAYED_QUEUE.get().unwrap()[shard_id as usize].pop() {
+    while let Some(mut x) = DELAYED_UPSERT_QUEUE.get().unwrap()[shard_id as usize].pop() {
         @{- def.soft_delete_tpl2("","
         if x.will_be_deleted() {
             x.mut_deleted_at().set(deleted_at);
@@ -2503,7 +2503,7 @@ impl QueryBuilder {
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+        if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
         Ok(result.rows_affected())
@@ -2575,7 +2575,7 @@ impl QueryBuilder {
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+        if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
         Ok(result.rows_affected())
@@ -2800,9 +2800,9 @@ impl _@{ pascal_name }@Cache_ {
     where
         T: Into<Primary>,
     {
-        if USE_CACHE || USE_ALL_ROWS_CACHE {
+        if USE_CACHE || ENABLE_ALL_ROWS_CACHE {
             @%- if def.act_as_job_queue() %@
-            @%- else if def.use_clear_whole_cache() %@
+            @%- else if def.clear_all_cache_on_update() %@
             let sync = DbConn::inc_cache_sync(conn.shard_id()).await;
             let mut sync_map = FxHashMap::default();
             sync_map.insert(conn.shard_id(), sync);
@@ -2911,8 +2911,8 @@ impl _@{ pascal_name }@_ {
     }
 @%- endfor %@
 
-@%- if def.use_all_rows_cache() %@
-@%- if def.use_filtered_row_cache() %@
+@%- if def.enable_all_rows_cache() %@
+@%- if def.enable_filtered_rows_cache() %@
 
     #[allow(clippy::if_same_then_else)]
     pub async fn find_all_from_cache(
@@ -3043,7 +3043,7 @@ impl _@{ pascal_name }@_ {
 
     pub async fn clear_cache() -> Result<()> {
         @%- if def.act_as_job_queue() %@
-        @%- else if def.use_clear_whole_cache() %@
+        @%- else if def.clear_all_cache_on_update() %@
         let sync_map = DbConn::inc_all_cache_sync().await;
         CacheMsg(vec![crate::CacheOp::_AllClear], sync_map)
             .do_send()
@@ -3372,7 +3372,7 @@ impl _@{ pascal_name }@_ {
         Ok(obj)
     }
 @%- endfor %@
-@%- if !def.act_as_job_queue() && !def.use_clear_whole_cache() %@
+@%- if !def.act_as_job_queue() && !def.clear_all_cache_on_update() %@
 
     pub async fn insert_dummy_cache(conn: &DbConn, obj: _@{ pascal_name }@Updater) -> Result<()> {
         let _lock = db::models::CACHE_UPDATE_LOCK.write().await;
@@ -3450,10 +3450,10 @@ impl _@{ pascal_name }@_ {
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
         conn.push_cache_op(CacheOp::Queued.wrap()).await;
-        @%- else if def.use_clear_whole_cache() %@
-        conn.clear_whole_cache = true;
+        @%- else if def.clear_all_cache_on_update() %@
+        conn.clear_all_cache = true;
         @%- else %@
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+        if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
             let cache_msg = CacheOp::Insert {
                 overwrite: false,
                 shard_id: conn.shard_id(),
@@ -3467,18 +3467,18 @@ impl _@{ pascal_name }@_ {
         @%- endif %@
         Ok(Some(obj))
     }
-    @%- if def.use_insert_delayed() %@
+    @%- if def.enable_delayed_insert() %@
 
-    /// If insert_delayed is used, the data will be collectively registered later.
-    pub async fn insert_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
+    /// If delayed_insert is used, the data will be collectively registered later.
+    pub async fn delayed_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__validate()?;
         obj.__set_default_value(conn).await?;
-        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "insert_delayed", ctx = conn.ctx_no(); "{}", &obj);
+        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "delayed_insert", ctx = conn.ctx_no(); "{}", &obj);
         debug!("{:?}", &obj);
         conn.push_callback(Box::new(|| {
             async move {
-                INSERT_DELAYED_QUEUE.push(obj.into());
+                DELAYED_INSERT_QUEUE.push(obj.into());
                 if !db::is_test_mode() {
                     DelayedActor::handle(DelayedMsg::InsertFromMemory);
                 } else {
@@ -3489,11 +3489,11 @@ impl _@{ pascal_name }@_ {
         Ok(())
     }
     @%- endif %@
-    @%- if def.use_save_delayed() %@
+    @%- if def.enable_delayed_save() %@
 
     // The data will be updated collectively later.
-    // save_delayed does not support relational tables.
-    pub async fn save_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
+    // delayed_save does not support relational tables.
+    pub async fn delayed_save(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
         obj.__validate()?;
         obj.__set_default_value(conn).await?;
         if obj.will_be_deleted() {
@@ -3505,7 +3505,7 @@ impl _@{ pascal_name }@_ {
         let shard_id = conn.shard_id() as usize;
         conn.push_callback(Box::new(move || {
             async move {
-                SAVE_DELAYED_QUEUE.get().unwrap()[shard_id].push(obj);
+                DELAYED_SAVE_QUEUE.get().unwrap()[shard_id].push(obj);
                 if !db::is_test_mode() {
                     DelayedActor::handle(DelayedMsg::Save);
                 } else {
@@ -3516,11 +3516,11 @@ impl _@{ pascal_name }@_ {
         Ok(())
     }
     @%- endif %@
-    @%- if def.use_update_delayed() %@
+    @%- if def.enable_delayed_update() %@
 
     // The data will be updated collectively later.
-    // update_delayed does not support relational tables and version.
-    pub async fn update_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
+    // delayed_update does not support relational tables and version.
+    pub async fn delayed_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
         if obj.is_new() {
             panic!("INSERT is not supported.");
         }
@@ -3536,7 +3536,7 @@ impl _@{ pascal_name }@_ {
         let shard_id = conn.shard_id() as usize;
         conn.push_callback(Box::new(move || {
             async move {
-                UPDATE_DELAYED_QUEUE.get().unwrap()[shard_id].push(obj);
+                DELAYED_UPDATE_QUEUE.get().unwrap()[shard_id].push(obj);
                 if !db::is_test_mode() {
                     DelayedActor::handle(DelayedMsg::Update);
                 } else {
@@ -3547,11 +3547,11 @@ impl _@{ pascal_name }@_ {
         Ok(())
     }
     @%- endif %@
-    @%- if def.use_upsert_delayed() %@
+    @%- if def.enable_delayed_upsert() %@
 
     // The data will be updated collectively later.
-    // upsert_delayed does not support relational tables.
-    pub async fn upsert_delayed(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
+    // delayed_upsert does not support relational tables.
+    pub async fn delayed_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<()> {
         obj.__validate()?;
         @%- if def.soft_delete().is_none() %@
         if obj.will_be_deleted() {
@@ -3565,7 +3565,7 @@ impl _@{ pascal_name }@_ {
         let shard_id = conn.shard_id() as usize;
         conn.push_callback(Box::new(move || {
             async move {
-                UPSERT_DELAYED_QUEUE.get().unwrap()[shard_id].push(obj);
+                DELAYED_UPSERT_QUEUE.get().unwrap()[shard_id].push(obj);
                 if !db::is_test_mode() {
                     DelayedActor::handle(DelayedMsg::Upsert);
                 } else {
@@ -3688,10 +3688,10 @@ impl _@{ pascal_name }@_ {
             info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "delete_by_ids", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "");
             @%- if !config.force_disable_cache %@
             @%- if def.act_as_job_queue() %@
-            @%- else if def.use_clear_whole_cache() %@
-            conn.clear_whole_cache = true;
+            @%- else if def.clear_all_cache_on_update() %@
+            conn.clear_all_cache = true;
             @%- else %@
-            if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+            if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
                 let mut updater = _@{ pascal_name }@_::updater();
                 @{- def.soft_delete_tpl2("","
                 updater.mut_deleted_at().set(Some(deleted_at));","
@@ -3763,10 +3763,10 @@ impl _@{ pascal_name }@_ {
             info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "force_delete_by_ids", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "");
             @%- if !config.force_disable_cache %@
             @%- if def.act_as_job_queue() %@
-            @%- else if def.use_clear_whole_cache() %@
-            conn.clear_whole_cache = true;
+            @%- else if def.clear_all_cache_on_update() %@
+            conn.clear_all_cache = true;
             @%- else %@
-            if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+            if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
                 let shard_id = conn.shard_id();
                 conn.push_cache_op(CacheOp::DeleteMany { ids, shard_id }.wrap()).await;
                 @{- def.cache_owners|fmt_cache_owners("
@@ -3788,11 +3788,11 @@ impl _@{ pascal_name }@_ {
             obj.mut_@{ ConfigDef::updated_at() }@().set(@{(def.updated_at_conf().unwrap() == Timestampable::RealTime)|if_then_else_ref("SystemTime::now()","conn.time()")}@.into());
         }
         @%- endif %@
-        @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
-        if !conn.clear_whole_cache {
+        @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && def.cache_owners.len() > 0 %@
+        if !conn.clear_all_cache {
             @{- def.cache_owners|fmt_cache_owners("
             if let Some(v) = _base_filter_::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._data) {
-                if _base_filter_::repositories::{base_mod}::USE_CACHE || _base_filter_::repositories::{base_mod}::USE_ALL_ROWS_CACHE || _base_filter_::repositories::{base_mod}::USE_UPDATE_NOTICE {
+                if _base_filter_::repositories::{base_mod}::USE_CACHE || _base_filter_::repositories::{base_mod}::ENABLE_ALL_ROWS_CACHE || _base_filter_::repositories::{base_mod}::ENABLE_UPDATE_NOTICE {
                     let id: _base_filter_::repositories::{base_mod}::Primary = v.into();
                     let id: _base_filter_::repositories::{base_mod}::InnerPrimary = (&id).into();
                     conn.push_cache_op(_base_filter_::repositories::{base_mod}::CacheOp::Invalidate{id, shard_id: conn.shard_id()}.wrap()).await;
@@ -3803,10 +3803,10 @@ impl _@{ pascal_name }@_ {
         let cache_msg = __delete(conn, obj).await?;
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
-        @%- else if def.use_clear_whole_cache() %@
-        conn.clear_whole_cache = true;
+        @%- else if def.clear_all_cache_on_update() %@
+        conn.clear_all_cache = true;
         @%- else %@
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+        if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
             if let Some(cache_msg) = cache_msg {
                 conn.push_cache_op(cache_msg.wrap()).await;
             }
@@ -3824,8 +3824,8 @@ impl _@{ pascal_name }@_ {
         if !obj.has_been_deleted() {
             return Ok(obj.into());
         }
-        @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
-        if !conn.clear_whole_cache {
+        @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && def.cache_owners.len() > 0 %@
+        if !conn.clear_all_cache {
             @{- def.cache_owners|fmt_cache_owners("
             _invalidate_{raw_rel_name}(conn, &obj._data).await;") }@
         }
@@ -3843,10 +3843,10 @@ impl _@{ pascal_name }@_ {
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
         conn.push_cache_op(CacheOp::Queued.wrap()).await;
-        @%- else if def.use_clear_whole_cache() %@
-        conn.clear_whole_cache = true;
+        @%- else if def.clear_all_cache_on_update() %@
+        conn.clear_all_cache = true;
         @%- else %@
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+        if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
             if let Some(cache_msg) = cache_msg {
                 conn.push_cache_op(cache_msg.wrap()).await;
             }
@@ -3877,16 +3877,16 @@ impl _@{ pascal_name }@_ {
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "force_delete", ctx = conn.ctx_no(), id = id.to_string(); "{}", &obj);
 @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
-        @%- else if def.use_clear_whole_cache() %@
-        conn.clear_whole_cache = true;
+        @%- else if def.clear_all_cache_on_update() %@
+        conn.clear_all_cache = true;
         @%- else %@
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+        if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
             let shard_id = conn.shard_id();
             conn.push_cache_op(CacheOp::Delete { id, shard_id }.wrap()).await;
         }
         @%- endif %@
-        @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
-        if !conn.clear_whole_cache {
+        @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && def.cache_owners.len() > 0 %@
+        if !conn.clear_all_cache {
             @{- def.cache_owners|fmt_cache_owners("
             _invalidate_{raw_rel_name}(conn, &obj._data).await;") }@
         }
@@ -3907,10 +3907,10 @@ impl _@{ pascal_name }@_ {
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "force_delete_all", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
-        @%- else if def.use_clear_whole_cache() %@
-        conn.clear_whole_cache = true;
+        @%- else if def.clear_all_cache_on_update() %@
+        conn.clear_all_cache = true;
         @%- else %@
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+        if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::DeleteAll {
                 shard_id: conn.shard_id(),
             }.wrap()).await;
@@ -3929,10 +3929,10 @@ impl _@{ pascal_name }@_ {
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "truncate", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
-        @%- else if def.use_clear_whole_cache() %@
-        conn.clear_whole_cache = true;
+        @%- else if def.clear_all_cache_on_update() %@
+        conn.clear_all_cache = true;
         @%- else %@
-        if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+        if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::DeleteAll {
                 shard_id: conn.shard_id(),
             }.wrap()).await;
@@ -4351,10 +4351,10 @@ async fn __save(conn: &mut DbConn, obj: _@{ pascal_name }@Updater, rel_hash: u64
     if let Some(cache_msg) = cache_msg {
         conn.push_cache_op(cache_msg.wrap()).await;
     }
-    @%- else if def.use_clear_whole_cache() %@
-    conn.clear_whole_cache = true;
+    @%- else if def.clear_all_cache_on_update() %@
+    conn.clear_all_cache = true;
     @%- else %@
-    if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+    if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
         if let Some(cache_msg) = cache_msg {
             @%- if def.disable_insert_cache_propagation %@
             let internal = matches!(cache_msg, CacheOp::Insert { .. });
@@ -4377,8 +4377,8 @@ pub fn ___save(
 ) -> BoxFuture<'_, Result<(Option<_@{ pascal_name }@>, Option<CacheOp>)>>
 {
     async move {
-        @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
-        if !conn.clear_whole_cache {
+        @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && def.cache_owners.len() > 0 %@
+        if !conn.clear_all_cache {
             @{- def.cache_owners|fmt_cache_owners("
             if rel_hash != {rel_hash} {
                 _invalidate_{raw_rel_name}(conn, &obj._data).await;
@@ -4403,12 +4403,12 @@ pub fn ___save(
             Ok((Some(obj), Some(cache_msg)))
         } else {
             let (obj, cache_msg) = __save_update(conn, obj).await?;
-            @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
-            if !conn.clear_whole_cache {
+            @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && def.cache_owners.len() > 0 %@
+            if !conn.clear_all_cache {
                 @{- def.cache_owners|fmt_cache_owners("
                 if rel_hash != {rel_hash} {
                     if let Some(v) = _base_filter_::repositories::{base_mod}::RelFk{rel_name_pascal}::get_fk(&obj._inner) {
-                        if _base_filter_::repositories::{base_mod}::USE_CACHE || _base_filter_::repositories::{base_mod}::USE_ALL_ROWS_CACHE || _base_filter_::repositories::{base_mod}::USE_UPDATE_NOTICE {
+                        if _base_filter_::repositories::{base_mod}::USE_CACHE || _base_filter_::repositories::{base_mod}::ENABLE_ALL_ROWS_CACHE || _base_filter_::repositories::{base_mod}::ENABLE_UPDATE_NOTICE {
                             let id: _base_filter_::repositories::{base_mod}::Primary = v.into();
                             let id: _base_filter_::repositories::{base_mod}::InnerPrimary = (&id).into();
                             conn.push_cache_op(_base_filter_::repositories::{base_mod}::CacheOp::Invalidate{id, shard_id: conn.shard_id()}.wrap()).await;
@@ -4462,7 +4462,7 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, ov
     let cache_msg = CacheOp::Queued;
     @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
     @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("\n        save_{rel_name}(conn, &mut obj2, obj.{rel_name}, &mut update_cache).await?;", "") }@
-    @%- else if !config.force_disable_cache && !def.use_clear_whole_cache() %@
+    @%- else if !config.force_disable_cache && !def.clear_all_cache_on_update() %@
     let cache_msg = CacheOp::Insert {
         overwrite,
         shard_id: conn.shard_id(),
@@ -4498,8 +4498,8 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @%- if def.versioned %@
         vec.push(r#"@{ version_col|db_esc }@ = LAST_INSERT_ID(IF(@{ version_col|db_esc }@ < 4294967295, @{ version_col|db_esc }@ + 1, 0))"#.to_string());
         @%- endif %@
-        @%- if def.counting.is_some() %@
-        vec.push(r#"@{ def.get_counting_col()|db_esc }@ = LAST_INSERT_ID(@{ def.get_counting_col()|db_esc }@)"#.to_string());
+        @%- if def.counter_field.is_some() %@
+        vec.push(r#"@{ def.get_counter_field_col()|db_esc }@ = LAST_INSERT_ID(@{ def.get_counter_field_col()|db_esc }@)"#.to_string());
         @%- endif %@
         @%- else %@
         @%- if def.versioned %@
@@ -4507,9 +4507,9 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @%- endif %@
         @%- endif %@
         @%- if def.versioned %@
-        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ AND @{ version_col|db_esc }@=?@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,@{ version_col|db_esc }@@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,@{ def.get_counting_col()|db_esc }@@% endif %@@% endif %@;"#, &vec.join(","));
+        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@ AND @{ version_col|db_esc }@=?@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,@{ version_col|db_esc }@@% endif %@@% if def.counter_field.is_some() %@ RETURNING xmax,@{ def.get_counter_field_col()|db_esc }@@% endif %@@% endif %@;"#, &vec.join(","));
         @%- else %@
-        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,@{ version_col|db_esc }@@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,@{ def.get_counting_col()|db_esc }@@% endif %@@% endif %@;"#, &vec.join(","));
+        let sql = format!(r#"UPDATE @{ table_name|db_esc }@ SET {} WHERE @{ def.inheritance_cond(" AND ") }@@{ def.primaries()|fmt_join("{col_esc}={placeholder}", " AND ") }@@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,@{ version_col|db_esc }@@% endif %@@% if def.counter_field.is_some() %@ RETURNING xmax,@{ def.get_counter_field_col()|db_esc }@@% endif %@@% endif %@;"#, &vec.join(","));
         @%- endif %@
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
@@ -4535,10 +4535,10 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         obj._update.@{ version_col }@ = _last_insert_id as @{ config.u32() }@;
         obj._op.@{ version_col }@ = Op::Set;
         @%- endif %@
-        @%- if def.counting.is_some() %@
-        if obj._op.@{ def.get_counting() }@ == Op::Add {
-            obj._op.@{ def.get_counting() }@ = Op::Max;
-            obj._update.@{ def.get_counting() }@ = _last_insert_id.try_into().unwrap_or(@{ def.get_counting_type() }@::MAX);
+        @%- if def.counter_field.is_some() %@
+        if obj._op.@{ def.get_counter_field() }@ == Op::Add {
+            obj._op.@{ def.get_counter_field() }@ = Op::Max;
+            obj._update.@{ def.get_counter_field() }@ = _last_insert_id.try_into().unwrap_or(@{ def.get_counter_field_type() }@::MAX);
         }
         @%- endif %@
     }
@@ -4546,7 +4546,7 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     @{- def.non_primaries()|fmt_join_cache_or_not("", "
     obj._op.{ident} = Op::None;
     obj._update.{ident} = Default::default();", "") }@
-    @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
+    @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && !def.act_as_job_queue() %@
     let mut cache_msg = Some(CacheOp::Update {
         id,
         shard_id: conn.shard_id(),
@@ -4595,8 +4595,8 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     @%- if def.versioned %@
     vec.push(r#"@{ version_col|db_esc }@ = LAST_INSERT_ID(IF(@{ version_col|db_esc }@ < 4294967295, @{ version_col|db_esc }@ + 1, 0))"#.to_string());
     @%- endif %@
-    @%- if def.counting.is_some() %@
-    vec.push(r#"@{ def.get_counting_col()|db_esc }@ = LAST_INSERT_ID(@{ def.get_counting_col()|db_esc }@)"#.to_string());
+    @%- if def.counter_field.is_some() %@
+    vec.push(r#"@{ def.get_counter_field_col()|db_esc }@ = LAST_INSERT_ID(@{ def.get_counter_field_col()|db_esc }@)"#.to_string());
     @%- endif %@
     @%- else %@
     @%- if def.versioned %@
@@ -4605,14 +4605,14 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     @%- endif %@
     let sql = format!(r#"INSERT INTO @{ table_name|db_esc }@ 
         (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
-        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT ") }@@{ def.upsert_conflict_target() }@@{ config.db_type_switch("", " DO UPDATE SET") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,@{ version_col|db_esc }@@% endif %@@% if def.counting.is_some() %@ RETURNING xmax,@{ def.get_counting_col()|db_esc }@@% endif %@@% endif %@;"#, &vec.join(","));
+        VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) @{ config.db_type_switch("ON DUPLICATE KEY UPDATE", "ON CONFLICT ") }@@{ def.upsert_conflict_target() }@@{ config.db_type_switch("", " DO UPDATE SET") }@ {}@% if !config.is_mysql() %@@% if def.versioned %@ RETURNING xmax,@{ version_col|db_esc }@@% endif %@@% if def.counter_field.is_some() %@ RETURNING xmax,@{ def.get_counter_field_col()|db_esc }@@% endif %@@% endif %@;"#, &vec.join(","));
     @%- if !config.is_mysql() %@
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let query = bind_to_query(sqlx::query(&sql), &obj._data);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
     let query = bind_non_primaries(&obj, query, &sql);
-    let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned || def.counting.is_some() %@_with_last_insert_id@% endif %@(query).await?;
+    let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned || def.counter_field.is_some() %@_with_last_insert_id@% endif %@(query).await?;
     info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "upsert", ctx = conn.ctx_no(); "{}", &obj);
     debug!("{:?}", &obj);
     if rows_affected == 1 {
@@ -4621,7 +4621,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
             obj._data.{ident} = _last_insert_id as {inner};
         }", "") }@
         let mut obj2: _@{ pascal_name }@ = (obj._data.clone(), BTreeMap::default()).into();
-        @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
+        @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && !def.act_as_job_queue() %@
         let cache_msg = Some(CacheOp::Insert {
             overwrite: false,
             shard_id: conn.shard_id(),
@@ -4639,15 +4639,15 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         obj._update.@{ version_col }@ = _last_insert_id as @{ config.u32() }@;
         obj._op.@{ version_col }@ = Op::Set;
         @%- endif %@
-        @%- if def.counting.is_some() %@
-        if obj._op.@{ def.get_counting() }@ == Op::Add {
-            obj._op.@{ def.get_counting() }@ = Op::Max;
-            obj._update.@{ def.get_counting() }@ = _last_insert_id.try_into().unwrap_or(@{ def.get_counting_type() }@::MAX);
+        @%- if def.counter_field.is_some() %@
+        if obj._op.@{ def.get_counter_field() }@ == Op::Add {
+            obj._op.@{ def.get_counter_field() }@ = Op::Max;
+            obj._update.@{ def.get_counter_field() }@ = _last_insert_id.try_into().unwrap_or(@{ def.get_counter_field_type() }@::MAX);
         }
         @%- endif %@
         let id = InnerPrimary::from(&obj);
         let mut obj2: _@{ pascal_name }@ = (obj._data, BTreeMap::default()).into();
-        @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && !def.act_as_job_queue() %@
+        @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && !def.act_as_job_queue() %@
         let mut cache_msg = Some(CacheOp::Update {
             id,
             shard_id: conn.shard_id(),
@@ -4684,10 +4684,10 @@ async fn __update_many(conn: &mut DbConn, ids: Vec<InnerPrimary>, mut obj: __Upd
     debug!("{:?}", &obj);
     @%- if !config.force_disable_cache %@
     @%- if def.act_as_job_queue() %@
-    @%- else if def.use_clear_whole_cache() %@
-    conn.clear_whole_cache = true;
+    @%- else if def.clear_all_cache_on_update() %@
+    conn.clear_all_cache = true;
     @%- else %@
-    if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+    if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
         @{- def.non_primaries()|fmt_join_cache_or_not("", "
         obj._op.{ident} = Op::None;", "") }@
         let mut data_list = Vec::new();
@@ -4780,11 +4780,11 @@ async fn __bulk_insert(conn: &mut DbConn, list: &[ForInsert], ignore: bool, repl
     @%- if !config.force_disable_cache %@
     @%- if def.act_as_job_queue() %@
     conn.push_cache_op(CacheOp::Queued.wrap()).await;
-    @%- else if def.use_clear_whole_cache() %@
-    conn.clear_whole_cache = true;
+    @%- else if def.clear_all_cache_on_update() %@
+    conn.clear_all_cache = true;
     @%- else %@
-    @%- if !config.force_disable_cache && !def.use_clear_whole_cache() && def.cache_owners.len() > 0 %@
-    if !conn.clear_whole_cache {
+    @%- if !config.force_disable_cache && !def.clear_all_cache_on_update() && def.cache_owners.len() > 0 %@
+    if !conn.clear_all_cache {
         for list in &result {
             for obj in list.iter() {
                 @{- def.cache_owners|fmt_cache_owners("
@@ -4793,7 +4793,7 @@ async fn __bulk_insert(conn: &mut DbConn, list: &[ForInsert], ignore: bool, repl
         }
     }
     @%- endif %@
-    if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+    if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
         for list in result {
             let cache_msg = CacheOp::BulkInsert {
                 replace,
@@ -5047,10 +5047,10 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     }
     @%- if !config.force_disable_cache %@
     @%- if def.act_as_job_queue() %@
-    @%- else if def.use_clear_whole_cache() %@
-    conn.clear_whole_cache = true;
+    @%- else if def.clear_all_cache_on_update() %@
+    conn.clear_all_cache = true;
     @%- else %@
-    if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
+    if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
         let cache_msg = CacheOp::BulkUpsert {
             shard_id: conn.shard_id(),
             data_list: list.to_vec(),
@@ -5225,9 +5225,9 @@ fn _save_{rel_name}(
 @{- def.cache_owners|fmt_cache_owners("
 #[inline(never)]
 async fn _invalidate_{raw_rel_name}(conn: &mut DbConn, data: &Data) {
-    use _base_filter_::repositories::{base_mod}::{RelFk{rel_name_pascal}, USE_CACHE, USE_ALL_ROWS_CACHE, USE_UPDATE_NOTICE, Primary, CacheOp};
+    use _base_filter_::repositories::{base_mod}::{RelFk{rel_name_pascal}, USE_CACHE, ENABLE_ALL_ROWS_CACHE, ENABLE_UPDATE_NOTICE, Primary, CacheOp};
     if let Some(v) = RelFk{rel_name_pascal}::get_fk(data) {
-        if USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE {
+        if USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE {
             let id: Primary = v.into();
             conn.push_cache_op(CacheOp::Invalidate{id: (&id).into(), shard_id: conn.shard_id()}.wrap()).await;
         }

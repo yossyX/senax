@@ -1,12 +1,12 @@
+use crate::common::OVERWRITTEN_MSG;
 use crate::common::ToCase as _;
-use crate::common::{AtomicLoad as _, OVERWRITTEN_MSG};
+use crate::schema::Joinable;
 use crate::schema::{ConfigDef, GroupsDef};
 use crate::{SEPARATED_BASE_FILES, filters};
 use crate::{
     common::fs_write,
     schema::{ModelDef, set_domain_mode, to_id_name},
 };
-use crate::schema::Joinable;
 use anyhow::{Result, ensure};
 use askama::Template;
 use regex::Regex;
@@ -82,7 +82,6 @@ pub mod @{ name|snake|ident }@;
             escape = "none"
         )]
         struct ModTemplate<'a> {
-            pub db: &'a str,
             pub groups: &'a GroupsDef,
         }
 
@@ -92,7 +91,7 @@ pub mod @{ name|snake|ident }@;
             "File contents are invalid.: {:?}",
             &file_path
         );
-        let tpl = ModTemplate { db, groups }.render()?;
+        let tpl = ModTemplate { groups }.render()?;
         let tpl = tpl.trim_start();
         let content = re.replace(&content, tpl);
 
@@ -746,8 +745,8 @@ pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
         @%- if !def.disable_update() %@
         async fn import(&self, list: Vec<Box<dyn @{ pascal_name }@Updater>>, option: Option<domain::models::ImportOption>) -> anyhow::Result<()>;
         @%- endif %@
-        @%- if def.use_insert_delayed() %@
-        async fn insert_delayed(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()>;
+        @%- if def.enable_delayed_insert() %@
+        async fn delayed_insert(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()>;
         @%- endif %@
         @%- if !def.disable_delete() %@
         async fn delete(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<()>;
@@ -788,7 +787,7 @@ pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
     // Do not modify below this line. (QueryServiceMockStart)
     #[async_trait]
     impl _@{ pascal_name }@QueryService for QueryService_ {
-        @%- if def.use_all_rows_cache() && !def.use_filtered_row_cache() %@
+        @%- if def.enable_all_rows_cache() && !def.enable_filtered_rows_cache() %@
         async fn all(&self) -> anyhow::Result<Box<dyn base_domain::models::EntityIterator<dyn @{ pascal_name }@Cache>>>;
         @%- endif %@
         @%- for (selector, selector_def) in def.selectors %@
@@ -827,7 +826,6 @@ pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
         pub config: &'a ConfigDef,
         pub group_name: &'a str,
         pub mod_name: &'a str,
-        pub model_name: &'a str,
         pub pascal_name: &'a str,
         pub def: &'a Arc<ModelDef>,
     }
@@ -837,7 +835,6 @@ pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
         config,
         group_name,
         mod_name,
-        model_name,
         pascal_name,
         def,
     };
