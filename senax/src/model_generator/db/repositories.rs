@@ -68,7 +68,7 @@ pub fn write_base_group_files(
             content = content.replace(
                 "[dependencies]",
                 &format!(
-                    "[dependencies]\ndb_{} = {{ package = \"_db_{}\", path = \"../../../{}/base\" }}",
+                    "[dependencies]\ndb_{} = {{ package = \"_db_{}\", path = \"../../../_{}/base\" }}",
                     db, db, db
                 ),
             );
@@ -77,7 +77,7 @@ pub fn write_base_group_files(
         content = content.replace(
             "[dependencies]",
             &format!(
-                "[dependencies]\n_repo_{}_{} = {{ path = \"../../../{}/repositories/{}\" }}",
+                "[dependencies]\n_repo_{}_{} = {{ path = \"../../../_{}/repositories/{}\" }}",
                 db, group, db, group
             ),
         );

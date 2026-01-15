@@ -8,6 +8,7 @@ use serde_json::Value;
 use std::path::Path;
 use std::{env, path::PathBuf};
 
+use crate::common::ToCase as _;
 use crate::{schema::SchemaDef, schema_md::gen_schema_md};
 
 #[macro_export]
@@ -524,7 +525,7 @@ fn generate_seed_file(db: &str, description: &str) -> Result<()> {
             }
         })
         .collect();
-    let path = Path::new(DB_PATH).join(db).join("seeds");
+    let path = Path::new(DB_PATH).join(format!("_{}", db.to_snake())).join("seeds");
     let dt = Utc::now();
     let file_prefix = dt.format("%Y%m%d%H%M%S").to_string();
     let file_path = path.join(format!("{}_{}.yml", file_prefix, description));

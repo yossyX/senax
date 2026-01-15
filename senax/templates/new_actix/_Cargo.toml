@@ -13,7 +13,7 @@ graphiql = []
 
 [dependencies]
 @%- if session %@
-db_session = { path = "../2_db/session" }
+db_session = { path = "../2_db/_session" }
 @%- endif %@
 _@{ name }@ = { path = "base" }
 domain = { path = "../1_domain" }

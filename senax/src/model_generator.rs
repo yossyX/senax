@@ -41,7 +41,7 @@ pub fn generate(
     let exclude_from_domain = config.exclude_from_domain;
     let group_lock = GROUPS.read().unwrap();
     let groups = group_lock.as_ref().unwrap();
-    let model_dir = Path::new(DB_PATH).join(db.to_snake());
+    let model_dir = Path::new(DB_PATH).join(format!("_{}", db.to_snake()));
     let base_filters_dir = model_dir.join("base_filters");
     let base_repositories_dir = model_dir.join("base_repositories");
     let db_repositories_dir = model_dir.join("repositories");
@@ -161,7 +161,7 @@ pub fn generate(
         let db = &db.to_snake();
         content = content.replace(
             "[dependencies]",
-            &format!("[dependencies]\ndb_{} = {{ path = \"../{}\" }}", db, db),
+            &format!("[dependencies]\ndb_{} = {{ path = \"../_{}\" }}", db, db),
         );
     }
     fs_write(file_path, &*content)?;
@@ -270,7 +270,12 @@ pub fn generate(
         }
     }
     if !exclude_from_domain {
-        domain::base_domain::write_models_db_rs(&domain_models_dir, db, groups, force)?;
+        domain::base_domain::write_models_db_rs(
+            &domain_models_dir,
+            db,
+            groups,
+            force,
+        )?;
         domain::base_relations::write_cargo_toml(
             &domain_base_relations_dir,
             db,
@@ -725,7 +730,7 @@ pub fn generate(
 }
 
 pub fn check_version(db: &str) -> Result<()> {
-    let model_dir = Path::new(DB_PATH).join(db.to_snake());
+    let model_dir = Path::new(DB_PATH).join(format!("_{}", db.to_snake()));
     let model_src_dir = model_dir.join("src");
     let file_path = model_src_dir.join("models.rs");
     if file_path.exists() {

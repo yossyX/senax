@@ -464,7 +464,7 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                 if let Some(column_def) = model.merged_fields.get_mut(&main_primary) {
                     column_def.id_class = Some(IdClass {
                         outer_crate,
-                        db: db.to_string(),
+                        db: db.to_snake(),
                         group: group_name.to_snake(),
                         mod_name,
                         name: cur_model_name.to_pascal(),

@@ -97,7 +97,7 @@ pub fn generate(db_type: DbType, db: &str, exclude_from_domain: bool) -> Result<
             fs_write(file_path, &*content)?;
         }
 
-        repositories(&domain_path.join(DOMAIN_REPOSITORIES_PATH).join(db), db)?;
+        repositories(&domain_path.join(DOMAIN_REPOSITORIES_PATH).join(db.to_snake()), db)?;
     }
     Ok(())
 }

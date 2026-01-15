@@ -82,7 +82,7 @@ pub fn generate(
     });
     let locale = locale.split('.').collect::<Vec<_>>()[0];
 
-    let base_path = Path::new(DB_PATH).join(db);
+    let base_path = Path::new(DB_PATH).join(format!("_{}", db.to_snake()));
     let ddl_path = base_path.join("migrations");
     fn file_read(path: &PathBuf) -> Result<String> {
         let content = std::fs::read_to_string(path)

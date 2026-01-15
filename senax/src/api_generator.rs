@@ -249,7 +249,7 @@ pub fn generate(
             ),
         );
     }
-    let reg = Regex::new(&format!(r"(?m)^(_{}_{}_\w+)\s*=.+\n", name, db_route))?;
+    let reg = Regex::new(&format!(r"(?m)^(_{}_{}_\w+)\s*=.+\n", name, db_route.to_snake()))?;
     for (line, [dep]) in reg.captures_iter(&content.clone()).map(|c| c.extract()) {
         if deps.shift_remove(dep).is_none() {
             content = content.replace(line, "");

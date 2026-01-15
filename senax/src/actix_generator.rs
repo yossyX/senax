@@ -95,7 +95,7 @@ pub fn generate(
             content = content.replace(
                 "[dependencies]",
                 &format!(
-                    "[dependencies]\ndb_{} = {{ path = \"../2_db/{}\" }}",
+                    "[dependencies]\ndb_{} = {{ path = \"../2_db/_{}\" }}",
                     db, db
                 ),
             );
@@ -304,7 +304,7 @@ pub fn write_base_files(
             content = content.replace(
                 "[dependencies]",
                 &format!(
-                    "[dependencies]\n_db_{} = {{ path = \"../../2_db/{}/base\" }}",
+                    "[dependencies]\n_db_{} = {{ path = \"../../2_db/_{}/base\" }}",
                     db, db
                 ),
             );
