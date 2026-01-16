@@ -490,6 +490,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
 #[allow(unused_imports)]
 fn _filter@{ filter_map.suffix }@(v: &impl base_domain::models::@{ filter_map.db()|snake|ident }@::@{ filter_map.model_group()|snake|ident }@::@{ filter_map.model_name()|snake|ident }@::@{ filter_map.model_name()|pascal }@, filter: &@{ pascal_name }@Query@{ selector|pascal }@@{ filter_map.pascal_name }@Filter) -> bool {
     use base_domain::models::@{ filter_map.db()|snake|ident }@::@{ filter_map.model_group()|snake|ident }@::@{ filter_map.model_name()|snake|ident }@::*;
+    use crate::PartialOrdering_;
     @%- for (filter, filter_def) in filter_map.filters %@
     @{- filter_def.emu_str(filter, filter_map.model) }@
     @%- endfor %@
@@ -546,6 +547,7 @@ impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
         #[allow(unreachable_code)]
         fn _cursor(v: &@{ pascal_name }@Entity, cursor: &@{ pascal_name }@Query@{ selector|pascal }@Cursor) -> bool {
             @%- if !selector_def.orders.is_empty() %@
+            use crate::PartialOrdering_;
             match cursor {
                 @%- for (cursor, cursor_def) in selector_def.orders %@
                 @{ pascal_name }@Query@{ selector|pascal }@Cursor::@{ cursor|pascal }@(c) => {
@@ -599,7 +601,7 @@ impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
                 Ok(list)
             }
             async fn stream(self: Box<Self>, _single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@>>> + Send>>> {
-                use futures::StreamExt;
+                use futures::StreamExt as _;
                 let list = self.query().await?;
                 Ok(async_stream::stream! {
                     for obj in list {

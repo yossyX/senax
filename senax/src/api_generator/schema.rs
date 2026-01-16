@@ -1051,15 +1051,15 @@ impl ApiModelDef {
         }
         Ok(self.relations.clone())
     }
-    pub fn selector(&self, name: &str) -> Vec<ApiSelectorDef> {
+    pub fn selector(&self, name: &str) -> Option<ApiSelectorDef> {
         if let Some(def) = self.selector.get(name) {
             if let Some(def) = def {
-                vec![def.clone()]
+                Some(def.clone())
             } else {
-                vec![ApiSelectorDef::default()]
+                Some(ApiSelectorDef::default())
             }
         } else {
-            vec![]
+            None
         }
     }
 }

@@ -23,7 +23,7 @@ use crate::{SCHEMA_PATH, filters};
 use self::schema::{ApiRelationDef, RelationVisibility};
 
 pub mod schema;
-pub mod serialize;
+pub mod document;
 pub mod template;
 
 #[allow(clippy::too_many_arguments)]
@@ -742,6 +742,15 @@ fn write_model_file(
             ..Default::default()
         }
     };
+
+    for (name, _) in &api_def.selector {
+        anyhow::ensure!(
+            def.selectors.contains_key(name),
+            "There is no {} selector in the {} model.",
+            name,
+            def.name
+        );
+    }
 
     let mod_name = def.mod_name();
     let mod_name = &mod_name;

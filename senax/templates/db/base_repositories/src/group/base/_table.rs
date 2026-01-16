@@ -4,7 +4,7 @@ use ::arc_swap::ArcSwapOption;
 use ::async_trait::async_trait;
 use ::core::option::Option;
 use ::crossbeam::queue::SegQueue;
-use ::futures::stream::StreamExt;
+use ::futures::stream::StreamExt as _;
 use ::futures::{future, future::BoxFuture, Future, FutureExt, Stream, TryStreamExt};
 use ::fxhash::{FxHashMap, FxHashSet, FxHasher64};
 use ::indexmap::IndexMap;

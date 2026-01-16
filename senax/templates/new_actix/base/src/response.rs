@@ -31,7 +31,7 @@ pub enum ApiError {
 }
 
 #[allow(dead_code)]
-pub fn json_response<T: Serialize>(r: Result<T, anyhow::Error>, ctx: &Ctx) -> impl Responder {
+pub fn json_response<T: Serialize>(r: Result<T, anyhow::Error>, ctx: Ctx) -> impl Responder {
     match r {
         Ok(data) => {
             let mut writer = Vec::with_capacity(65536);
@@ -43,10 +43,10 @@ pub fn json_response<T: Serialize>(r: Result<T, anyhow::Error>, ctx: &Ctx) -> im
                         .content_type(mime::APPLICATION_JSON)
                         .body(response)
                 }
-                Err(err) => error_response(err.into(), ctx),
+                Err(err) => error_response(err.into(), &ctx),
             }
         }
-        Err(err) => error_response(err, ctx),
+        Err(err) => error_response(err, &ctx),
     }
 }
 
@@ -56,7 +56,7 @@ pub fn json_response<T: Serialize>(r: Result<T, anyhow::Error>, ctx: &Ctx) -> im
 /// If the stream is interrupted due to an error, there will be no newline, allowing the error to be detected.
 pub fn json_stream_response<T: Serialize>(
     result: Result<impl Stream<Item = Result<T, anyhow::Error>> + 'static, anyhow::Error>,
-    ctx: &Ctx,
+    ctx: Ctx,
     ndjson: bool,
 ) -> impl Responder {
     let (c1, c2, c3, content_type) = if ndjson {
@@ -103,7 +103,7 @@ pub fn json_stream_response<T: Serialize>(
                 .content_type(content_type)
                 .streaming(stream)
         }
-        Err(err) => error_response(err, ctx),
+        Err(err) => error_response(err, &ctx),
     }
 }
 

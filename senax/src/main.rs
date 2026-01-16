@@ -467,7 +467,7 @@ async fn exec(cli: Cli) -> Result<()> {
             template,
         } => {
             ensure!(db_re.is_match(db), "bad db name!");
-            let def = api_generator::serialize::generate(name, db, group)?;
+            let def = api_generator::document::generate_doc(name, db, group)?;
             api_document::generate(def, output, template)?;
         }
         Commands::GenSchemaFromDb {

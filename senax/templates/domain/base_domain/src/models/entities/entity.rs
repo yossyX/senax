@@ -87,7 +87,7 @@ impl @{ pascal_name }@Primary {
 #[allow(clippy::useless_conversion)]
 impl TryFrom<&async_graphql::ID> for @{ pascal_name }@Primary {
     type Error = anyhow::Error;
-    fn try_from(v: &async_graphql::ID) -> Result<Self, Self::Error> {
+    fn try_from(v: &async_graphql::ID) -> std::result::Result<Self, Self::Error> {
         use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
         let bytes = URL_SAFE_NO_PAD.decode(v.as_str())?;
         let (model_id, id): (u64, @{ def.primaries()|fmt_join_with_paren("{inner}", ", ") }@) = ciborium::from_reader(bytes.as_slice())?;

@@ -17,34 +17,34 @@ use crate::schema::{
 use super::schema::{ApiRelationDef, ApiRoleDef, JsUpdaterDef, RelationVisibility};
 
 #[derive(Debug, Serialize, Clone, Default)]
-pub struct ApiDef {
+pub struct ApiDoc {
     pub cased_db_name: String,
     pub db_name: String,
     pub roles: IndexMap<String, ApiRoleDef>,
     pub default_role: Option<String>,
-    pub groups: Vec<Group>,
+    pub groups: Vec<GroupDoc>,
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct Group {
+pub struct GroupDoc {
     pub name: String,
     pub cased_name: String,
     pub label: Option<String>,
-    pub models: Vec<DocModel>,
+    pub models: Vec<ModelDoc>,
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct Selector {
+pub struct SelectorDoc {
     pub name: String,
     pub js_updater: IndexMap<String, JsUpdaterDef>,
     pub enable_update_by_operator: bool,
     pub enable_delete_by_selector: bool,
-    pub filters: Vec<Filter>,
-    pub orders: IndexMap<String, Order>,
+    pub filters: Vec<FilterDoc>,
+    pub orders: IndexMap<String, OrderDoc>,
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct Filter {
+pub struct FilterDoc {
     pub name: String,
     pub indent: usize,
     #[serde(rename = "type")]
@@ -58,7 +58,7 @@ pub struct Filter {
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct Order {
+pub struct OrderDoc {
     pub fields: Vec<String>,
     pub direction: Option<FilterSortDirection>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -66,7 +66,7 @@ pub struct Order {
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct DocModel {
+pub struct ModelDoc {
     pub name: String,
     pub cased_name: String,
     pub gql_name: String,
@@ -86,15 +86,15 @@ pub struct DocModel {
     pub readable_filter: Option<String>,
     pub updatable_filter: Option<String>,
     pub deletable_filter: Option<String>,
-    pub selectors: Vec<Selector>,
-    pub fields: Vec<Field>,
-    pub relations: Vec<Arc<Relation>>,
-    pub all_fields: Vec<Field>,
-    pub all_relations: Vec<Arc<Relation>>,
+    pub selectors: Vec<SelectorDoc>,
+    pub fields: Vec<FieldDoc>,
+    pub relations: Vec<Arc<RelationDoc>>,
+    pub all_fields: Vec<FieldDoc>,
+    pub all_relations: Vec<Arc<RelationDoc>>,
 }
 
 #[derive(Debug, Serialize, Clone, Default)]
-pub struct Field {
+pub struct FieldDoc {
     pub name: String,
     pub cased_name: String,
     pub indent: usize,
@@ -116,7 +116,7 @@ pub struct Field {
 }
 
 #[derive(Debug, Serialize, Clone, Default)]
-pub struct Relation {
+pub struct RelationDoc {
     pub name: String,
     pub label: Option<String>,
     pub gql_name: String,
@@ -124,11 +124,11 @@ pub struct Relation {
     pub no_read: bool,
     pub no_update: bool,
     pub replace: bool,
-    pub fields: Vec<Field>,
-    pub relations: Vec<Arc<Relation>>,
+    pub fields: Vec<FieldDoc>,
+    pub relations: Vec<Arc<RelationDoc>>,
 }
 
-pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef> {
+pub fn generate_doc(server: &str, db: &str, group: &Option<String>) -> Result<ApiDoc> {
     let server_dir = Path::new(server);
     ensure!(
         server_dir.exists() && server_dir.is_dir(),
@@ -151,7 +151,7 @@ pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef
     let mut db_config: ApiDbDef = parse_yml_file(&db_config_path)?;
     db_config.fix();
 
-    let mut api_def = ApiDef {
+    let mut api_def = ApiDoc {
         cased_db_name: if db_config.camel_case() {
             db.to_camel()
         } else {
@@ -185,7 +185,7 @@ pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef
             .map(|(v, _)| v.clone())
             .collect()
     };
-    let mut api_groups: Vec<Group> = Vec::new();
+    let mut api_groups: Vec<GroupDoc> = Vec::new();
 
     for org_group_name in &group_names {
         let schema_path = schema_dir.join(format!("{org_group_name}.yml"));
@@ -208,7 +208,7 @@ pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef
         }
         let group_name = org_group_name.to_snake();
         let group_name = &group_name;
-        let mut api_models: Vec<DocModel> = Vec::new();
+        let mut api_models: Vec<ModelDoc> = Vec::new();
 
         let model_list: Vec<_> = group
             .iter()
@@ -234,7 +234,7 @@ pub fn generate(server: &str, db: &str, group: &Option<String>) -> Result<ApiDef
             .groups
             .get(org_group_name)
             .and_then(|v| v.as_ref().and_then(|v| v.label.clone()));
-        api_groups.push(Group {
+        api_groups.push(GroupDoc {
             name: org_group_name.clone(),
             cased_name: if db_config.camel_case() {
                 org_group_name.to_camel_case()
@@ -257,7 +257,7 @@ fn make_model(
     def: &Arc<ModelDef>,
     api_def: Option<ApiModelDef>,
     config: &ApiDbDef,
-) -> Result<DocModel> {
+) -> Result<ModelDoc> {
     let api_def = if let Some(api_def) = api_def {
         api_def.clone()
     } else {
@@ -292,7 +292,7 @@ fn make_model(
     ApiRelationDef::pop();
     ApiFieldDef::pop();
 
-    Ok(DocModel {
+    Ok(ModelDoc {
         name: def.name.clone(),
         cased_name: if config.camel_case() {
             def.name.to_camel_case()
@@ -320,10 +320,10 @@ fn make_model(
             .selectors
             .iter()
             .filter_map(|(n, def)| {
-                api_def.selector(n).pop().map(|v| {
+                api_def.selector(n).map(|v| {
                     let mut filters = Vec::new();
                     make_filters(&mut filters, 0, &def.filters);
-                    Selector {
+                    SelectorDoc {
                         name: n.to_string(),
                         js_updater: v.js_updater.clone(),
                         enable_delete_by_selector: v.enable_delete_by_selector,
@@ -335,7 +335,7 @@ fn make_model(
                             .map(|(n, v)| {
                                 (
                                     n.to_string(),
-                                    Order {
+                                    OrderDoc {
                                         fields: v
                                             .fields
                                             .iter()
@@ -358,9 +358,9 @@ fn make_model(
     })
 }
 
-fn make_filters(buf: &mut Vec<Filter>, indent: usize, filters: &IndexMap<String, FilterDef>) {
+fn make_filters(buf: &mut Vec<FilterDoc>, indent: usize, filters: &IndexMap<String, FilterDef>) {
     for (name, filter) in filters {
-        buf.push(Filter {
+        buf.push(FilterDoc {
             name: name.to_string(),
             indent,
             _type: filter._type,
@@ -379,13 +379,13 @@ fn make_filters(buf: &mut Vec<Filter>, indent: usize, filters: &IndexMap<String,
 fn make_relation(
     def: &Arc<ModelDef>,
     indent: usize,
-    all_fields: &mut Vec<Field>,
-    all_relations: &mut Vec<Arc<Relation>>,
+    all_fields: &mut Vec<FieldDoc>,
+    all_relations: &mut Vec<Arc<RelationDoc>>,
     gql_name: &str,
     camel_case: bool,
     no_read: bool,
     no_update: bool,
-) -> Result<Vec<Arc<Relation>>> {
+) -> Result<Vec<Arc<RelationDoc>>> {
     let mut relations = Vec::new();
     for (_model, rel_name, rel) in def.relations_one(Joinable::Join, false) {
         let rel_model = rel.get_foreign_model();
@@ -395,7 +395,7 @@ fn make_relation(
         ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_pascal());
         let index = all_relations.len();
-        all_fields.push(Field {
+        all_fields.push(FieldDoc {
             name: rel_name.to_string(),
             cased_name: if camel_case {
                 rel_name.to_camel_case()
@@ -429,7 +429,7 @@ fn make_relation(
             no_read,
             no_update,
         )?;
-        let relation = Arc::new(Relation {
+        let relation = Arc::new(RelationDoc {
             name: rel_name.to_string(),
             label: rel.label.clone(),
             gql_name,
@@ -453,7 +453,7 @@ fn make_relation(
         ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_pascal());
         let index = all_relations.len();
-        all_fields.push(Field {
+        all_fields.push(FieldDoc {
             name: rel_name.to_string(),
             cased_name: if camel_case {
                 rel_name.to_camel_case()
@@ -487,7 +487,7 @@ fn make_relation(
             no_read,
             no_update,
         )?;
-        let relation = Arc::new(Relation {
+        let relation = Arc::new(RelationDoc {
             name: rel_name.to_string(),
             label: rel.label.clone(),
             gql_name,
@@ -510,7 +510,7 @@ fn make_relation(
         ApiFieldDef::push(api_relation.fields(&rel_model, &[])?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_pascal());
         let index = all_relations.len();
-        all_fields.push(Field {
+        all_fields.push(FieldDoc {
             name: rel_name.to_string(),
             cased_name: if camel_case {
                 rel_name.to_camel_case()
@@ -544,7 +544,7 @@ fn make_relation(
             false,
             true,
         )?;
-        let relation = Arc::new(Relation {
+        let relation = Arc::new(RelationDoc {
             name: rel_name.to_string(),
             label: rel.label.clone(),
             gql_name,
@@ -563,7 +563,7 @@ fn make_relation(
     Ok(relations)
 }
 
-fn fields(def: &Arc<ModelDef>, indent: usize, camel_case: bool) -> Vec<Field> {
+fn fields(def: &Arc<ModelDef>, indent: usize, camel_case: bool) -> Vec<FieldDoc> {
     let mut fields = Vec::new();
     for (name, field) in def
         .merged_fields
@@ -575,7 +575,7 @@ fn fields(def: &Arc<ModelDef>, indent: usize, camel_case: bool) -> Vec<Field> {
         if !response.contains_key(name) && !request.contains_key(name) {
             continue;
         }
-        fields.push(Field {
+        fields.push(FieldDoc {
             name: name.to_string(),
             cased_name: if camel_case {
                 name.to_camel_case()

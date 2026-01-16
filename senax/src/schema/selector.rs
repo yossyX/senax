@@ -281,9 +281,9 @@ impl FilterDef {
 
                 let f = _to_ident_name(field);
                 let s = if self.fields.len() == 1 {
-                    format!("v.{}(){}{}.cmp(p)", f, unwrap, unwrap_arc)
+                    format!("PartialOrdering_::from(v.{}(){}{}.partial_cmp(p))", f, unwrap, unwrap_arc)
                 } else {
-                    format!("v.{}(){}{}.cmp(&p.{})", f, unwrap, unwrap_arc, f)
+                    format!("PartialOrdering_::from(v.{}(){}{}.partial_cmp(&p.{}))", f, unwrap, unwrap_arc, f)
                 };
                 if cmp.is_empty() {
                     cmp.push_str(&s);
@@ -316,27 +316,27 @@ impl FilterDef {
                     "
     {prefix}
         if let Some(p) = &f.eq {{
-            if {null_ng} || {cmp} != std::cmp::Ordering::Equal {{
+            if {null_ng} || {cmp} != PartialOrdering_::Equal {{
                 return false;
             }}
         }}
         if let Some(p) = &f.lt {{
-            if {null_ng} || {cmp} != std::cmp::Ordering::Less {{
+            if {null_ng} || {cmp} != PartialOrdering_::Less {{
                 return false;
             }}
         }}
         if let Some(p) = &f.lte {{
-            if {null_ng} || {cmp} == std::cmp::Ordering::Greater {{
+            if {null_ng} || {cmp} == PartialOrdering_::Greater {{
                 return false;
             }}
         }}
         if let Some(p) = &f.gt {{
-            if {null_ng} || {cmp} != std::cmp::Ordering::Greater {{
+            if {null_ng} || {cmp} != PartialOrdering_::Greater {{
                 return false;
             }}
         }}
         if let Some(p) = &f.gte {{
-            if {null_ng} || {cmp} == std::cmp::Ordering::Less {{
+            if {null_ng} || {cmp} == PartialOrdering_::Less {{
                 return false;
             }}
         }}
@@ -347,22 +347,22 @@ impl FilterDef {
             return false;
         }}
         if let Some(p) = &f.is_null_or_lt {{
-            if {null_ok} && {cmp} != std::cmp::Ordering::Less {{
+            if {null_ok} && {cmp} != PartialOrdering_::Less {{
                 return false;
             }}
         }}
         if let Some(p) = &f.is_null_or_lte {{
-            if {null_ok} && {cmp} == std::cmp::Ordering::Greater {{
+            if {null_ok} && {cmp} == PartialOrdering_::Greater {{
                 return false;
             }}
         }}
         if let Some(p) = &f.is_null_or_gt {{
-            if {null_ok} && {cmp} != std::cmp::Ordering::Greater {{
+            if {null_ok} && {cmp} != PartialOrdering_::Greater {{
                 return false;
             }}
         }}
         if let Some(p) = &f.is_null_or_gte {{
-            if {null_ok} && {cmp} == std::cmp::Ordering::Less {{
+            if {null_ok} && {cmp} == PartialOrdering_::Less {{
                 return false;
             }}
         }}
@@ -925,9 +925,9 @@ impl OrderDef {
 
             let f = _to_ident_name(field);
             let s = if self.fields.len() == 1 {
-                format!("v.{}(){}{}.cmp(f)", f, unwrap, unwrap_arc)
+                format!("PartialOrdering_::from(v.{}(){}{}.partial_cmp(f))", f, unwrap, unwrap_arc)
             } else {
-                format!("v.{}(){}{}.cmp(&f.{})", f, unwrap, unwrap_arc, idx)
+                format!("PartialOrdering_::from(v.{}(){}{}.partial_cmp(&f.{}))", f, unwrap, unwrap_arc, idx)
             };
             if cmp.is_empty() {
                 cmp.push_str(&s);
@@ -951,12 +951,12 @@ impl OrderDef {
             format!(
                 "
                         domain::models::Cursor::After(f) => {{{n_chk}
-                            if {cmp} != std::cmp::Ordering::Less {{
+                            if {cmp} != PartialOrdering_::Less {{
                                 return false;
                             }}
                         }}
                         domain::models::Cursor::Before(f) => {{{n_chk}
-                            if {cmp} != std::cmp::Ordering::Greater {{
+                            if {cmp} != PartialOrdering_::Greater {{
                                 return false;
                             }}
                         }}"
@@ -965,12 +965,12 @@ impl OrderDef {
             format!(
                 "
                         domain::models::Cursor::After(f) => {{{n_chk}
-                            if {cmp} != std::cmp::Ordering::Greater {{
+                            if {cmp} != PartialOrdering_::Greater {{
                                 return false;
                             }}
                         }}
                         domain::models::Cursor::Before(f) => {{{n_chk}
-                            if {cmp} != std::cmp::Ordering::Less {{
+                            if {cmp} != PartialOrdering_::Less {{
                                 return false;
                             }}
                         }}"
@@ -1283,8 +1283,8 @@ impl SelectorDef {
         for (field, _) in &order.fields {
             let f = _to_ident_name(field);
             let s = match order.direction {
-                Some(FilterSortDirection::Desc) => format!("b.{}().cmp(&a.{}())", f, f),
-                _ => format!("a.{}().cmp(&b.{}())", f, f),
+                Some(FilterSortDirection::Desc) => format!("b.{}().partial_cmp(&a.{}()).unwrap_or(std::cmp::Ordering::Equal)", f, f),
+                _ => format!("a.{}().partial_cmp(&b.{}()).unwrap_or(std::cmp::Ordering::Equal)", f, f),
             };
             if result.is_empty() {
                 result.push_str("{ list.sort_by(|a, b| {");

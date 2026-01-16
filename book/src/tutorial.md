@@ -309,7 +309,7 @@ async fn handler(
         })
     }
     .await;
-    json_response(result, &ctx)
+    json_response(result, ctx)
 }
 ```
 
@@ -383,7 +383,7 @@ async fn handler(
         })
     }
     .await;
-    json_response(result, &ctx)
+    json_response(result, ctx)
 }
 ```
 この例ではWHERE句の使用例のため、UPDATEクエリーで記述しています。

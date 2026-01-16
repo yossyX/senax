@@ -275,7 +275,7 @@ impl ColOne_ {
             _ => anyhow::bail!(""),
         }
     }
-    fn _check_cmp<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &T, order: std::cmp::Ordering, eq: bool) -> Result<bool, bool> {
+    fn _check_cmp<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &T, order: std::cmp::Ordering, eq: bool) -> std::result::Result<bool, bool> {
         let o = match self {
             @{- def.comparable_cache_fields_except_json()|fmt_join("
             ColOne_::{ident}(c) => _obj.{ident}(){filter_check_cmp},", "") }@
@@ -286,7 +286,7 @@ impl ColOne_ {
         };
         Ok(o == order || eq && o == std::cmp::Ordering::Equal)
     }
-    pub fn check_cmp<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &T, order: std::cmp::Ordering, eq: bool) -> anyhow::Result<Result<bool, bool>> {
+    pub fn check_cmp<T: @{ pascal_name }@ + ?Sized>(&self, _obj: &T, order: std::cmp::Ordering, eq: bool) -> anyhow::Result<std::result::Result<bool, bool>> {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self._check_cmp(_obj, order, eq))) {
             Ok(v) => Ok(v),
             Err(_) => anyhow::bail!(""),

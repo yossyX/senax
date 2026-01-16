@@ -901,7 +901,7 @@ async fn @{ selector }@_handler(
     data: actix_web::web::Json<@{ selector|pascal }@Request>,
     http_req: actix_web::HttpRequest,
 ) -> impl actix_web::Responder {
-    use crate::response::ApiError;
+    use _server::response::ApiError;
     use anyhow::Result;
     use futures::{Stream, StreamExt as _};
     use std::pin::Pin;
@@ -950,8 +950,7 @@ async fn @{ selector }@_handler(
             }
         }
         query = query.order_by(order);
-        use super::super::super::USE_SINGLE_TRANSACTION_FOR_STREAM;
-        query.stream(USE_SINGLE_TRANSACTION_FOR_STREAM).await
+        query.stream(_server::auto_api::USE_SINGLE_TRANSACTION_FOR_STREAM).await
     }
 
     let ctx = ::_server::context::Ctx::get(&http_req);
@@ -979,7 +978,7 @@ async fn @{ selector }@_handler(
         Ok::<_, anyhow::Error>(stream)
     }
     .await;
-    crate::response::json_stream_response(result, &ctx, ndjson)
+    _server::response::json_stream_response(result, ctx, ndjson)
 }
 @%- endif %@
 @%- if api_def.enable_json_api() %@
@@ -998,7 +997,7 @@ async fn count_@{ selector }@_handler(
     @%- endif %@
     http_req: actix_web::HttpRequest,
 ) -> impl actix_web::Responder {
-    use crate::response::ApiError;
+    use _server::response::ApiError;
 
     async fn _count(
         repo: &RepositoryImpl,
@@ -1044,7 +1043,7 @@ async fn count_@{ selector }@_handler(
         Ok(crate::api_selector!(_count(&repo, &auth, &filter), repo))
     }
     .await;
-    crate::response::json_response(result, &ctx)
+    crate::response::json_response(result, ctx)
 }
 @%- endif %@
 @%- endfor %@

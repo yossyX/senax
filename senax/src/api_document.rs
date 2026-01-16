@@ -7,7 +7,7 @@ use std::{collections::HashMap, env};
 use tera::{Context, Filter, Tera};
 
 pub fn generate(
-    api_def: crate::api_generator::serialize::ApiDef,
+    api_def: crate::api_generator::document::ApiDoc,
     output: &Option<PathBuf>,
     template: &Option<PathBuf>,
 ) -> Result<()> {
