@@ -462,6 +462,9 @@ pub fn reflect_migration_changes(db: &str) -> anyhow::Result<()> {
     for (group_name, group_def) in config.groups {
         let group_def = group_def.unwrap_or_default();
         let mut models = read_group_yml(db, &group_name)?;
+        if models.is_empty() {
+            continue;
+        }
         for (name, model) in models.iter_mut() {
             model.group_name.clone_from(&group_name);
             model.name.clone_from(name);

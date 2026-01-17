@@ -7,13 +7,12 @@ use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
 use domain::repository::Repository;
 #[allow(unused_imports)]
 use utoipa_actix_web::scope;
-@%- if session %@
-
+#[cfg(feature = "session")]
 #[allow(unused_imports)]
 pub use db_session::repositories::session::session::{_SessionStore, SESSION_ROLE};
+#[cfg(feature = "session")]
 #[allow(unused_imports)]
 pub use senax_actix_session::Session;
-@%- endif %@
 
 use crate::_base::auth::AuthInfo;
 use crate::_base::context::Ctx;
@@ -70,7 +69,7 @@ impl MutationRoot {
             &jsonwebtoken::EncodingKey::from_secret(crate::auth::SECRET.get().unwrap().as_bytes()),
         )?;
 
-        use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE};
         let v = serde_json::to_string(&auth)?;
         let v = URL_SAFE.encode(v);
         let cookie = Cookie::build("jwt", &v)
@@ -121,8 +120,12 @@ pub async fn graphql(
 pub async fn graphiql() -> Result<HttpResponse> {
     Ok(HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        .body(GraphiQLSource::build().endpoint("/gql").finish()
-        .replace("graphiql/graphiql.", "graphiql@3.9.0/graphiql.")))
+        .body(
+            GraphiQLSource::build()
+                .endpoint("/gql")
+                .finish()
+                .replace("graphiql/graphiql.", "graphiql@3.9.0/graphiql."),
+        ))
 }
 
 #[allow(unused_variables)]

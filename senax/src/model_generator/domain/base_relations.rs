@@ -10,8 +10,8 @@ use crate::{
 };
 use anyhow::{Result, ensure};
 use askama::Template;
-use indexmap::IndexMap;
 use regex::Regex;
+use std::collections::BTreeMap;
 use std::{
     collections::{BTreeSet, HashSet},
     ffi::OsString,
@@ -214,9 +214,9 @@ pub fn write_lib_rs(
         source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (group, models) in mods %@
-pub mod @{ group|snake|ident }@ {
-@%- for (model, unified) in models %@
-    pub use base_relations_@{ db|snake }@_@{ unified }@::relations::@{ group|snake|ident }@::@{ model|snake|ident }@ as @{ model|snake|ident }@;
+pub mod @{ group|ident }@ {
+@%- for (_, (unified, model)) in models %@
+    pub use base_relations_@{ db|snake }@_@{ unified }@::relations::@{ group|ident }@::@{ model|ident }@;
 @%- endfor %@
 }
 @%- endfor %@
@@ -224,22 +224,26 @@ pub mod @{ group|snake|ident }@ {
         ext = "txt",
         escape = "none"
     )]
+    #[allow(clippy::type_complexity)]
     pub struct ModTemplate<'a> {
         pub db: &'a str,
-        pub mods: IndexMap<String, IndexMap<String, String>>,
+        pub mods: BTreeMap<String, BTreeMap<((String, String), String), (String, String)>>,
     }
 
-    let mut mods = IndexMap::new();
+    let mut mods = BTreeMap::new();
     for (group_name, defs) in groups {
-        let mut models = IndexMap::new();
+        let mut models = BTreeMap::new();
         for (model_name, _) in defs {
             let unified = unified_groups.iter().find(|v| {
                 v.nodes
                     .contains_key(&(group_name.into(), model_name.into()))
             });
-            models.insert(model_name.clone(), unified.unwrap().unified_name());
+            models.insert(
+                (unified.unwrap().unified_tuple(), model_name.to_snake()),
+                (unified.unwrap().unified_name(), model_name.to_snake()),
+            );
         }
-        mods.insert(group_name.clone(), models);
+        mods.insert(group_name.to_snake(), models);
     }
 
     let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();

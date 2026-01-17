@@ -133,7 +133,7 @@ trait TryFrom_<T>: Sized {
 }
 
 impl TryFrom_<&dyn _domain_::@{ pascal_name }@> for ResObj {
-    fn try_from_(v: &dyn _domain_::@{ pascal_name }@,  _cursor: Option<String>) -> anyhow::Result<Self> {
+    fn try_from_(v: &dyn _domain_::@{ pascal_name }@, _cursor: Option<String>) -> anyhow::Result<Self> {
         Ok(Self {
             _id: v.into(),
             @{- def.for_api_response()|fmt_join("

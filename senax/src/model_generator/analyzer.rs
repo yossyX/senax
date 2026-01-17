@@ -748,6 +748,10 @@ impl UnifiedGroup {
 
         include_groups
     }
+    pub fn unified_tuple(&self) -> (String, String) {
+        use crate::common::ToCase;
+        (self.start_node.0.to_snake(), self.start_node.1.to_snake())
+    }
     pub fn unified_name(&self) -> String {
         use crate::common::ToCase;
         format!(

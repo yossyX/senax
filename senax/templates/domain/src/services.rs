@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-// An example of uses of services 
+// An example of uses of services
 #[cfg_attr(any(feature = "mock", test), mockall::automock)]
 #[async_trait]
 pub trait Notify {

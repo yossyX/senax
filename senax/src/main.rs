@@ -95,6 +95,8 @@ enum Commands {
         db: String,
         #[clap(long)]
         exclude_from_domain: bool,
+        #[clap(long)]
+        session: bool,
     },
     /// Generate an web server with actix.
     Actix {
@@ -235,9 +237,6 @@ enum Server {
         /// DB names
         #[clap(long)]
         db: String,
-        /// Session DB type
-        #[clap(long)]
-        session: Option<schema::DbType>,
         /// Force overwrite
         #[clap(short, long)]
         force: bool,
@@ -252,6 +251,8 @@ enum Server {
         /// Prepare to use API
         #[clap(long)]
         api: bool,
+        #[clap(long)]
+        session: bool,
     },
     /// generate API
     Api {
@@ -319,27 +320,24 @@ async fn exec(cli: Cli) -> Result<()> {
             db_type,
             db,
             exclude_from_domain,
+            session,
         } => {
             ensure!(db_re.is_match(db), "bad db name!");
-            db_generator::generate(*db_type, db, *exclude_from_domain)?;
+            db_generator::generate(*db_type, db, *exclude_from_domain, *session)?;
         }
         Commands::Actix { command } => match command {
-            Server::New {
+            Server::New { name, db, force } => {
+                let db_list: Vec<_> = db.split(',').map(|v| v.trim()).collect();
+                actix_generator::generate(name, &db_list, *force, true, false)?;
+            }
+            Server::UseDb {
                 name,
                 db,
+                api,
                 session,
-                force,
             } => {
-                if let Some(db_type) = session {
-                    init_generator::session(*db_type)?;
-                    model_generator::generate("session", false, false, false, None)?;
-                }
                 let db_list: Vec<_> = db.split(',').map(|v| v.trim()).collect();
-                actix_generator::generate(name, &db_list, session.is_some(), *force, true)?;
-            }
-            Server::UseDb { name, db, api } => {
-                let db_list: Vec<_> = db.split(',').map(|v| v.trim()).collect();
-                actix_generator::generate(name, &db_list, false, false, *api)?;
+                actix_generator::generate(name, &db_list, false, *api, *session)?;
             }
             Server::Api {
                 name,
@@ -525,7 +523,9 @@ fn generate_seed_file(db: &str, description: &str) -> Result<()> {
             }
         })
         .collect();
-    let path = Path::new(DB_PATH).join(format!("_{}", db.to_snake())).join("seeds");
+    let path = Path::new(DB_PATH)
+        .join(format!("_{}", db.to_snake()))
+        .join("seeds");
     let dt = Utc::now();
     let file_prefix = dt.format("%Y%m%d%H%M%S").to_string();
     let file_path = path.join(format!("{}_{}.yml", file_prefix, description));

@@ -74,7 +74,7 @@ pub async fn generate(
                 }
             })
             .collect();
-        let base_path = Path::new(DB_PATH).join(format!("_{db}"));
+        let base_path = Path::new(DB_PATH).join(format!("_{}", db.to_snake()));
         let ddl_path = base_path.join("migrations");
         let dt = Utc::now();
         let mut file_prefix: u64 = dt.format("%Y%m%d%H%M%S").to_string().parse().unwrap();

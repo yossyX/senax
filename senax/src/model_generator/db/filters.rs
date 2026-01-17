@@ -46,7 +46,7 @@ pub fn write_base_group_files(
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
-    let reg = Regex::new(r"(?m)^_base_repo_\w+\s*=.+\n")?;
+    let reg = Regex::new(r"(?m)^_base_filter_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();
     let reg = Regex::new(r"(?m)^_repo_\w+\s*=.+\n")?;
     content = reg.replace_all(&content, "").into_owned();

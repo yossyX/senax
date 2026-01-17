@@ -428,7 +428,7 @@ pub fn write_lib_rs(
         source = r###"
 // Do not modify below this line. (ModStart)
 @%- for (name, defs) in groups %@
-pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|ident }@ as @{ name|snake|ident }@;
+pub use repository_@{ db|snake }@_@{ name|snake }@::repositories::@{ name|snake|ident }@;
 @%- endfor %@
 // Do not modify above this line. (ModEnd)"###,
         ext = "txt",
@@ -682,8 +682,6 @@ pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@:
 pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Primary;
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::{_@{ pascal_name }@QueryFindBuilder, _@{ pascal_name }@RepositoryFindBuilder};
-#[cfg(any(feature = "mock", test))]
-pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Entity;
 @%- for (selector, selector_def) in def.selectors %@
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Repository@{ selector|pascal }@Builder;
@@ -692,10 +690,14 @@ pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Repository@{ selector|pa
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::{@{ pascal_name }@Query@{ selector|pascal }@Builder, @{ pascal_name }@Query@{ selector|pascal }@Cursor, @{ pascal_name }@Query@{ selector|pascal }@Filter, @{ pascal_name }@Query@{ selector|pascal }@Order};
 @%- endfor %@
+
 #[cfg(any(feature = "mock", test))]
+#[rustfmt::skip]
 pub use self::{MockQueryService_ as Mock@{ pascal_name }@QueryService, MockRepository_ as Mock@{ pascal_name }@Repository};
 #[cfg(any(feature = "mock", test))]
 pub use super::_base::_@{ mod_name }@::Emu@{ pascal_name }@Repository;
+#[cfg(any(feature = "mock", test))]
+pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::@{ pascal_name }@Entity;
 @{- def.relations(Joinable::Join)|fmt_rel_join("
 // pub use base_domain::models::--1--::{class_mod_path} as _{raw_rel_name}_model_;", "")|replace1(db|snake|ident) }@
 @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("

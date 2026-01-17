@@ -17,3 +17,4 @@ pub struct Sample {
     pub a: u64,
     pub b: u64,
 }
+@{-"\n"}@

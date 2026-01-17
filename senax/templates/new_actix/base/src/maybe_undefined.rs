@@ -206,3 +206,4 @@ impl_val_range!(i128);
 impl_val_range!(isize);
 impl_val_range!(f32);
 impl_val_range!(f64);
+@{-"\n"}@

@@ -387,7 +387,7 @@ impl GqlQuery@{ graphql_name }@ {
         @%- endif %@
         let repo = RepositoryImpl::new_with_ctx(gql_ctx.data()?);
         let auth: &AuthInfo = gql_ctx.data()?;
-        
+
         async fn _count(
             repo: &RepositoryImpl,
             auth: &AuthInfo,

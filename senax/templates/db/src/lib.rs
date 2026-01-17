@@ -3,15 +3,12 @@
 @% endif -%@
 #[allow(unused_imports)]
 use anyhow::{Context as _, Result};
-use std::{
-    path::Path,
-    sync::Weak,
-};
+use std::{path::Path, sync::Weak};
 #[allow(unused_imports)]
 use tokio::{
-    sync::{mpsc, Mutex, MutexGuard, Semaphore},
+    sync::{Mutex, MutexGuard, Semaphore, mpsc},
     task::LocalSet,
-    time::{sleep, Duration},
+    time::{Duration, sleep},
 };
 
 pub use _base::*;
@@ -45,7 +42,16 @@ pub async fn start(
     pw: &Option<String>,
     uuid_node: &Option<[u8; 6]>,
 ) -> Result<()> {
-    _base::_start(is_hot_deploy,exit_tx,guard,db_dir,linker_port,pw,uuid_node).await?;
+    _base::_start(
+        is_hot_deploy,
+        exit_tx,
+        guard,
+        db_dir,
+        linker_port,
+        pw,
+        uuid_node,
+    )
+    .await?;
     models::start(db_dir).await?;
     Ok(())
 }
@@ -80,10 +86,11 @@ pub async fn migrate(
     }
     let mut error = None;
     while let Some(res) = join_set.join_next().await {
-        if let Err(e) = res? 
-            && let Some(e) = error.replace(e) {
-                log::error!("{}", e);
-            }
+        if let Err(e) = res?
+            && let Some(e) = error.replace(e)
+        {
+            log::error!("{}", e);
+        }
     }
     if let Some(e) = error {
         return Err(e);

@@ -1,5 +1,5 @@
 use actix_web::web::{Bytes, BytesMut};
-use actix_web::{error, HttpRequest, HttpResponse, Responder};
+use actix_web::{HttpRequest, HttpResponse, Responder, error};
 use futures::{Stream, StreamExt};
 use serde::Serialize;
 
@@ -200,7 +200,9 @@ impl From<&ApiError> for actix_web::Error {
             ApiError::Forbidden => actix_web::error::ErrorForbidden("Forbidden"),
             ApiError::BadRequest(msg) => actix_web::error::ErrorBadRequest(msg.to_string()),
             ApiError::BadRequestJson(value) => actix_web::error::ErrorBadRequest(value.to_string()),
-            ApiError::ValidationError(errors) => actix_web::error::ErrorBadRequest(errors.to_string()),
+            ApiError::ValidationError(errors) => {
+                actix_web::error::ErrorBadRequest(errors.to_string())
+            }
             ApiError::InternalServerError(err) => {
                 error!(target: "server::internal_error", "{}", err);
                 actix_web::error::ErrorInternalServerError("Internal Server Error")

@@ -9,3 +9,4 @@ async-graphql.workspace = true
 schemars.workspace = true
 serde.workspace = true
 utoipa.workspace = true
+@{-"\n"}@

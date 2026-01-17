@@ -1143,9 +1143,6 @@ pub fn bind_for_rel_query(filter: Option<Box<Filter_>>, query: Query<'_, DbType,
 pub enum Filter_ {
     WithTrashed,
     OnlyTrashed,
-    Match(Vec<Col_>, String),
-    MatchBoolean(Vec<Col_>, String),
-    MatchExpansion(Vec<Col_>, String),
     IsNull(Col_),
     IsNotNull(Col_),
     Eq(ColOne_),
@@ -1201,9 +1198,6 @@ impl std::fmt::Display for Filter_ {
         match self {
             Filter_::WithTrashed => write!(f, "WithTrashed"),
             Filter_::OnlyTrashed => write!(f, "OnlyTrashed"),
-            Filter_::Match(cols, _) => write!(f, "Match:<{}>", cols.iter().map(|v| v._name()).collect::<Vec<_>>().join(",")),
-            Filter_::MatchBoolean(cols, _) => write!(f, "MatchBoolean:<{}>", cols.iter().map(|v| v._name()).collect::<Vec<_>>().join(",")),
-            Filter_::MatchExpansion(cols, _) => write!(f, "MatchExpansion:<{}>", cols.iter().map(|v| v._name()).collect::<Vec<_>>().join(",")),
             Filter_::IsNull(col) => write!(f, "IsNull:{}", col._name()),
             Filter_::IsNotNull(col) => write!(f, "IsNotNull:{}", col._name()),
             Filter_::Eq(col) => write!(f, "Eq:{}", col._name()),
@@ -1415,9 +1409,6 @@ macro_rules! @{ filter_macro_name }@ {
     (RAW $e:expr) => (@{ model_path }@::Filter_::Raw($e.to_string()));
     (RAW $e:expr , [$($p:expr),*] ) => (@{ model_path }@::Filter_::RawWithParam($e.to_string(), vec![ $( $p.to_string() ),* ]));
     (RAW $e:expr , $p:expr ) => (@{ model_path }@::Filter_::RawWithParam($e.to_string(), $p.iter().map(|v| v.to_string()).collect()));
-    (MATCH ( $($i:ident),+ ) AGAINST ($e:expr) IN BOOLEAN MODE) => (@{ model_path }@::Filter_::MatchBoolean(vec![ $( @{ model_path }@::filter_text!($i) ),* ], $e.to_string()));
-    (MATCH ( $($i:ident),+ ) AGAINST ($e:expr) WITH QUERY EXPANSION) => (@{ model_path }@::Filter_::MatchExpansion(vec![ $( @{ model_path }@::filter_text!($i) ),* ], $e.to_string()));
-    (MATCH ( $($i:ident),+ ) AGAINST ($e:expr)) => (@{ model_path }@::Filter_::Match(vec![ $( @{ model_path }@::filter_text!($i) ),* ], $e.to_string()));
     ($i:ident EXISTS) => (@{ model_path }@::Filter_::Exists(@{ model_path }@::filter_rel!($i)));
     ($i:ident EXISTS $t:tt) => (@{ model_path }@::Filter_::Exists(@{ model_path }@::filter_rel!($i $t)));
     ($i:ident NOT EXISTS) => (@{ model_path }@::Filter_::NotExists(@{ model_path }@::filter_rel!($i)));

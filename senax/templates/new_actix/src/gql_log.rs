@@ -1,9 +1,9 @@
 use async_graphql::{
+    PathSegment, Response, ServerError, ServerResult, ValidationResult, Variables,
     extensions::{
         Extension, ExtensionContext, ExtensionFactory, NextExecute, NextParseQuery, NextValidation,
     },
     parser::types::{ExecutableDocument, OperationType, Selection},
-    PathSegment, Response, ServerError, ServerResult, ValidationResult, Variables,
 };
 use std::{fmt::Write, sync::Arc};
 

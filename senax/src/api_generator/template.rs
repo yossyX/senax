@@ -9,7 +9,6 @@ use super::schema::{ApiDbDef, ApiModelDef};
 #[derive(Template)]
 #[template(
     source = r###"
-    #[allow(non_snake_case)]
     impl QueryRoot {
     #[graphql(name = "@{ db_route }@")]
     async fn @{ db_route|ident }@(&self) -> @{ db_route|snake|ident }@::GqlQuery@{ db_route|pascal }@ {
@@ -25,7 +24,6 @@ pub struct QueryRootTemplate<'a> {
 #[derive(Template)]
 #[template(
     source = r###"
-    #[allow(non_snake_case)]
     impl MutationRoot {
     #[graphql(name = "@{ db_route }@")]
     async fn @{ db_route|ident }@(&self) -> @{ db_route|snake|ident }@::GqlMutation@{ db_route|pascal }@ {

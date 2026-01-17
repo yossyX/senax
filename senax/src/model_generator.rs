@@ -270,12 +270,7 @@ pub fn generate(
         }
     }
     if !exclude_from_domain {
-        domain::base_domain::write_models_db_rs(
-            &domain_models_dir,
-            db,
-            groups,
-            force,
-        )?;
+        domain::base_domain::write_models_db_rs(&domain_models_dir, db, groups, force)?;
         domain::base_relations::write_cargo_toml(
             &domain_base_relations_dir,
             db,

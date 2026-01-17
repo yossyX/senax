@@ -13,7 +13,7 @@ use ::std::path::Path;
 use ::std::sync::Arc;
 use ::std::time::Duration;
 
-use db::{models::@{ group_name|snake|ident }@::CacheOp, DbConn, DELAYED_DB_DIR};
+use db::{DELAYED_DB_DIR, DbConn, models::@{ group_name|snake|ident }@::CacheOp};
 
 #[rustfmt::skip]
 #[allow(clippy::map_identity)]

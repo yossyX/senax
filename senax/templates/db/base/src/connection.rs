@@ -69,7 +69,7 @@ static USE_IPV4_ONLY: AtomicBool = AtomicBool::new(false);
 static USE_IPV6_ONLY: AtomicBool = AtomicBool::new(false);
 
 static WRITER: RwLock<Vec<Option<(SocketAddr, DbPool)>>> = RwLock::const_new(Vec::new());
-static SHARD_NUM: OnceCell<usize> = OnceCell::new();
+static SHARD_NUM: AtomicUsize = AtomicUsize::new(0);
 type AddrPoolMap = FxHashMap<SocketAddr, (Arc<PoolInfo>, Option<bool>)>;
 static READER: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
 static CACHE: OnceCell<Vec<Arc<RwLock<AddrPoolMap>>>> = OnceCell::new();
@@ -150,7 +150,7 @@ async fn config(etcd: &FxHashMap<String, String>, test_mode: bool) -> Result<()>
             .unwrap_or_default();
         CACHE_DB_USE_SOURCE.store(cache_use_source, Ordering::SeqCst);
     }
-    if SHARD_NUM.get().is_none() {
+    if SHARD_NUM.load(Ordering::SeqCst) == 0 {
         let s_url = DB_URL.read().await.to_owned();
         let mut v = Vec::new();
         for source in split_shard!(s_url) {
@@ -173,7 +173,7 @@ async fn config(etcd: &FxHashMap<String, String>, test_mode: bool) -> Result<()>
             source_len == replica_len,
             "Number of shards for source and replica are different."
         );
-        let _ = SHARD_NUM.set(source_len);
+        let _ = SHARD_NUM.store(source_len, Ordering::SeqCst);
         *WRITER.write().await = vec![None; source_len];
         let _ = READER.set(
             std::iter::repeat_with(|| Arc::new(RwLock::new(FxHashMap::default())))
@@ -511,9 +511,8 @@ pub async fn connect(
 
 #[rustfmt::skip]
 pub async fn init_test() -> Result<()> {
-    if let Some(source_len) = SHARD_NUM.get() {
-        *WRITER.write().await = vec![None; *source_len];
-    }
+    let source_len = SHARD_NUM.load(Ordering::Relaxed);
+    *WRITER.write().await = vec![None; source_len];
     if let Some(list) = READER.get() {
         for pool in list {
             pool.write().await.clear();
@@ -678,7 +677,7 @@ impl DbConn {
     }
 
     pub fn shard_num() -> usize {
-        *SHARD_NUM.get().unwrap()
+        SHARD_NUM.load(Ordering::Relaxed).max(1)
     }
 
     pub fn shard_num_range() -> std::ops::RangeInclusive<ShardId> {

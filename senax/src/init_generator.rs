@@ -7,8 +7,8 @@ use std::{
 };
 
 use crate::{
-    BASE_DOMAIN_PATH, DOMAIN_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE, USER_DEFINED_TYPES_PATH,
-    common::fs_write, schema::DbType,
+    BASE_DOMAIN_PATH, DB_PATH, DOMAIN_PATH, SCHEMA_PATH, SIMPLE_VALUE_OBJECTS_FILE,
+    USER_DEFINED_TYPES_PATH, common::fs_write,
 };
 
 pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
@@ -33,6 +33,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     struct EnvTemplate {
         pub tz: String,
         pub secret_key: String,
+        pub session_key: String,
     }
 
     let file_path = base_path.join(".env.example");
@@ -40,6 +41,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     let tpl = EnvTemplate {
         tz: std::env::var("TZ").unwrap_or_default(),
         secret_key: Alphanumeric.sample_string(&mut rng, 40),
+        session_key: Alphanumeric.sample_string(&mut rng, 80),
     };
     fs_write(file_path, tpl.render()?)?;
 
@@ -145,6 +147,24 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     let tpl = DomainEventsTemplate.render()?;
     fs_write(file_path, tpl)?;
 
+    let db_path = base_path.join(DB_PATH);
+
+    #[derive(Template)]
+    #[template(path = "init/2_db/_Cargo.toml", escape = "none")]
+    struct DbCargoTemplate;
+
+    let file_path = db_path.join("Cargo.toml");
+    let tpl = DbCargoTemplate;
+    fs_write(file_path, tpl.render()?)?;
+
+    #[derive(Template)]
+    #[template(path = "init/2_db/src/main.rs", escape = "none")]
+    struct DbMainTemplate;
+
+    let file_path = db_path.join("src/main.rs");
+    let tpl = DbMainTemplate;
+    fs_write(file_path, tpl.render()?)?;
+
     Ok(())
 }
 
@@ -203,30 +223,5 @@ fn user_defined_types(path: &Path) -> Result<()> {
     let tpl = DomainLibTemplate;
     fs_write(file_path, tpl.render()?)?;
 
-    Ok(())
-}
-
-pub fn session(db_type: DbType) -> Result<()> {
-    anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
-    let schema_path = Path::new(SCHEMA_PATH);
-
-    #[derive(Template)]
-    #[template(path = "init/schema/session.yml", escape = "none")]
-    struct SessionTemplate {
-        pub db_id: u64,
-        pub db_type: DbType,
-    }
-
-    let file_path = schema_path.join("session.yml");
-    if !file_path.exists() {
-        let tpl = SessionTemplate {
-            db_id: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_micros() as u64,
-            db_type,
-        };
-        fs_write(file_path, tpl.render()?)?;
-    }
     Ok(())
 }

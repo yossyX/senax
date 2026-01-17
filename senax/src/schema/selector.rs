@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use super::{_to_ident_name, FieldDef, ModelDef};
-use crate::common::ToCase as _;
+use crate::common::{ToCase as _, escape_db_identifier};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Copy, Clone, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -20,8 +20,10 @@ pub enum FilterType {
     Exists,
     /// リレーション検索（内側から先に絞り込み）
     EqAny,
-    /// 全文検索(MySQLのみ)
-    FullText,
+    /// MySQL全文検索
+    MysqlFulltext,
+    /// Like全文検索
+    LikeFulltext,
     /// 数値配列検索
     ArrayInt,
     /// 文字列配列検索
@@ -180,7 +182,8 @@ impl FilterDef {
         match self._type {
             FilterType::Exists if self.relation_fields.is_empty() => false,
             FilterType::EqAny if self.relation_fields.is_empty() => false,
-            FilterType::FullText => false,
+            FilterType::MysqlFulltext => false,
+            FilterType::LikeFulltext => false,
             FilterType::Geometry => false,
             FilterType::RawQuery if self.query_param_num() == 0 => false,
             _ => true,
@@ -225,7 +228,8 @@ impl FilterDef {
                 filter_name
             ),
             FilterType::EqAny => "bool".to_string(),
-            FilterType::FullText => "String".to_string(),
+            FilterType::MysqlFulltext => "String".to_string(),
+            FilterType::LikeFulltext => "String".to_string(),
             FilterType::ArrayInt => "domain::models::ArrayIntFilter".to_string(),
             FilterType::ArrayString => "domain::models::ArrayStringFilter".to_string(),
             FilterType::Json if self.json_path.is_none() => {
@@ -281,9 +285,15 @@ impl FilterDef {
 
                 let f = _to_ident_name(field);
                 let s = if self.fields.len() == 1 {
-                    format!("PartialOrdering_::from(v.{}(){}{}.partial_cmp(p))", f, unwrap, unwrap_arc)
+                    format!(
+                        "PartialOrdering_::from(v.{}(){}{}.partial_cmp(p))",
+                        f, unwrap, unwrap_arc
+                    )
                 } else {
-                    format!("PartialOrdering_::from(v.{}(){}{}.partial_cmp(&p.{}))", f, unwrap, unwrap_arc, f)
+                    format!(
+                        "PartialOrdering_::from(v.{}(){}{}.partial_cmp(&p.{}))",
+                        f, unwrap, unwrap_arc, f
+                    )
                 };
                 if cmp.is_empty() {
                     cmp.push_str(&s);
@@ -394,7 +404,7 @@ impl FilterDef {
             }
             FilterType::Exists => "\n    // TODO implement FilterType::Exists".to_string(), // TODO implement
             FilterType::EqAny => "\n    // TODO implement FilterType::EqAny".to_string(), // TODO implement
-            FilterType::FullText => {
+            FilterType::MysqlFulltext | FilterType::LikeFulltext => {
                 let mut v = Vec::new();
                 for (field, _) in &self.fields {
                     let t = model.merged_fields.get(field).unwrap_or_else(|| {
@@ -585,18 +595,66 @@ impl FilterDef {
             )
                 }
             }
-            FilterType::FullText => {
+            FilterType::MysqlFulltext => {
                 let mut v = Vec::new();
                 for (field, _) in &self.fields {
-                    v.push(field.to_string());
+                    v.push(escape_db_identifier(field));
                 }
                 format!(
                     r#"
     {prefix}
         let f = senax_common::fulltext::parse(f).db_query();
-        fltr = fltr.and(filter!(MATCH ({}) AGAINST (f) IN BOOLEAN MODE));
+        fltr = fltr.and(filter!(RAW "MATCH ({}) AGAINST (? IN BOOLEAN MODE)", [f]));
     }}"#,
-                    v.join(", ")
+                    v.join(", ").replace('"', "\\\"")
+                )
+            }
+            FilterType::LikeFulltext => {
+                let mut v = Vec::new();
+                for (field, _) in &self.fields {
+                    v.push(escape_db_identifier(field));
+                }
+                let v = if v.len() == 1 {
+                    v.pop().unwrap()
+                } else {
+                    format!("concat({})", v.join(", ' ', "))
+                }
+                .replace('"', "\\\"");
+                let raw = if crate::schema::is_mysql_mode() {
+                    format!("{v} LIKE ?")
+                } else {
+                    format!("UPPER({v}) LIKE UPPER(?)")
+                };
+                let not_raw = if crate::schema::is_mysql_mode() {
+                    format!("{v} NOT LIKE ?")
+                } else {
+                    format!("UPPER({v}) NOT LIKE UPPER(?)")
+                };
+                format!(
+                    r#"
+    {prefix}
+        let f = senax_common::fulltext::parse(f);
+        for f in f.0 {{
+            match f {{
+                senax_common::fulltext::Word::And(v) => {{
+                    let v = senax_common::fulltext::to_like_contains(&v);
+                    fltr = fltr.and(filter!(RAW "{raw}", [v]));
+                }}
+                senax_common::fulltext::Word::Not(v) => {{
+                    let v = senax_common::fulltext::to_like_contains(&v);
+                    fltr = fltr.and(filter!(RAW "{not_raw}", [v]));
+                }}
+                senax_common::fulltext::Word::Or(items) => {{
+                    let mut or = filter!();
+                    for v in items {{
+                        let v = senax_common::fulltext::to_like_contains(&v);
+                        or = or.or(filter!(RAW "{raw}", [v]));
+                    }}
+                    fltr = fltr.and(or);
+                }}
+            }}
+        }}
+    }}"#,
                 )
             }
             FilterType::Geometry => {
@@ -925,9 +983,15 @@ impl OrderDef {
 
             let f = _to_ident_name(field);
             let s = if self.fields.len() == 1 {
-                format!("PartialOrdering_::from(v.{}(){}{}.partial_cmp(f))", f, unwrap, unwrap_arc)
+                format!(
+                    "PartialOrdering_::from(v.{}(){}{}.partial_cmp(f))",
+                    f, unwrap, unwrap_arc
+                )
             } else {
-                format!("PartialOrdering_::from(v.{}(){}{}.partial_cmp(&f.{}))", f, unwrap, unwrap_arc, idx)
+                format!(
+                    "PartialOrdering_::from(v.{}(){}{}.partial_cmp(&f.{}))",
+                    f, unwrap, unwrap_arc, idx
+                )
             };
             if cmp.is_empty() {
                 cmp.push_str(&s);
@@ -1283,8 +1347,14 @@ impl SelectorDef {
         for (field, _) in &order.fields {
             let f = _to_ident_name(field);
             let s = match order.direction {
-                Some(FilterSortDirection::Desc) => format!("b.{}().partial_cmp(&a.{}()).unwrap_or(std::cmp::Ordering::Equal)", f, f),
-                _ => format!("a.{}().partial_cmp(&b.{}()).unwrap_or(std::cmp::Ordering::Equal)", f, f),
+                Some(FilterSortDirection::Desc) => format!(
+                    "b.{}().partial_cmp(&a.{}()).unwrap_or(std::cmp::Ordering::Equal)",
+                    f, f
+                ),
+                _ => format!(
+                    "a.{}().partial_cmp(&b.{}()).unwrap_or(std::cmp::Ordering::Equal)",
+                    f, f
+                ),
             };
             if result.is_empty() {
                 result.push_str("{ list.sort_by(|a, b| {");

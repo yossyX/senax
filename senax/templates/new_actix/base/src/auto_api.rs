@@ -131,7 +131,7 @@ impl async_graphql::Guard for NoGuard {
 }
 
 pub fn write_json_schema(file_path: &std::path::Path, schema: String) -> anyhow::Result<()> {
-    use anyhow::{ensure, Context};
+    use anyhow::{Context, ensure};
     use regex::Regex;
     ensure!(file_path.exists(), "File not found: {:?}", file_path);
     let contents = std::fs::read_to_string(file_path)
@@ -142,7 +142,10 @@ pub fn write_json_schema(file_path: &std::path::Path, schema: String) -> anyhow:
         "File contents are invalid.: {:?}",
         file_path
     );
-    let tpl = format!("// Do not modify below this line. (JsonSchemaStart)\nexport const JsonSchema = {};\n// Do not modify above this line. (JsonSchemaEnd)", schema);
+    let tpl = format!(
+        "// Do not modify below this line. (JsonSchemaStart)\nexport const JsonSchema = {};\n// Do not modify above this line. (JsonSchemaEnd)",
+        schema
+    );
     println!("{}", file_path.display());
     std::fs::write(file_path, &*re.replace(&contents, tpl))?;
     Ok(())

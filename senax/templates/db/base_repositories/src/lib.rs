@@ -4,6 +4,7 @@ use anyhow::Result;
 use senax_common::ShardId;
 use std::path::Path;
 
+#[rustfmt::skip]
 #[allow(clippy::module_inception)]
 pub mod repositories;
 #[rustfmt::skip]

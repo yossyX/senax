@@ -25,7 +25,12 @@ macro_rules! get_emu_table {
             let mut repo = self._repo.lock().unwrap();
             let repo = repo
                 .entry(::std::any::TypeId::of::<$i>())
-                .or_insert_with(|| Box::new(<$i>::new(::std::sync::Arc::clone(&self._repo), Default::default())));
+                .or_insert_with(|| {
+                    Box::new(<$i>::new(
+                        ::std::sync::Arc::clone(&self._repo),
+                        Default::default(),
+                    ))
+                });
             Box::new(repo.downcast_ref::<$i>().unwrap().clone())
         }
     };

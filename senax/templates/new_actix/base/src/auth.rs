@@ -1,9 +1,9 @@
+use actix_web::HttpRequest;
 #[allow(unused_imports)]
 use actix_web::cookie::Cookie;
-use actix_web::HttpRequest;
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
 use jsonwebtoken::{DecodingKey, Validation};
 use once_cell::sync::{Lazy, OnceCell};

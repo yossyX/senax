@@ -967,9 +967,13 @@ function Filter({ formData, definitions }: any) {
       types.push("identity")
     }
     if ([
+      "text_varchar",
       "text"
     ].includes(type)) {
-      types.push("full_text")
+      if (formData.additionalData.db_data.db == "mysql") {
+        types.push("mysql_fulltext")
+      }
+      types.push("like_fulltext")
     }
     if ([
       "array_int"

@@ -6,34 +6,34 @@ extern crate log;
 
 use actix_web::dev::Service as _;
 use actix_web::web::Data;
-use actix_web::{guard, middleware, web, App, HttpMessage, HttpServer};
-use anyhow::{ensure, Context, Result};
+use actix_web::{App, HttpMessage, HttpServer, guard, middleware, web};
+use anyhow::{Context, Result, ensure};
 use async_graphql::{EmptySubscription, Schema};
 use clap::{Parser, Subcommand};
-@%- if session %@
+#[cfg(feature = "session")]
 use db_session::repositories::session::session::_SessionStore;
-@%- endif %@
 use dotenvy::dotenv;
 use mimalloc::MiMalloc;
 use once_cell::sync::OnceCell;
-@%- if session %@
+#[cfg(feature = "session")]
 use sha2::{Digest, Sha512};
-@%- endif %@
 use std::collections::HashMap;
 use std::env;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use tokio::sync::mpsc;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 pub use _@{ name }@ as _base;
-use _base::context::Ctx;
+
 use _base::auth;
+use _base::context::Ctx;
 
 use crate::auto_api::{MutationRoot, QueryRoot};
 
 mod auto_api;
+#[rustfmt::skip]
 mod db;
 mod gql_log;
 mod routes {
@@ -50,11 +50,12 @@ const DEFAULT_WORK_DIR: &str = "temp";
 const LINKER_PORT: &str = "LINKER_PORT";
 const LINKER_PASSWORD: &str = "LINKER_PASSWORD";
 const SECRET_KEY: &str = "SECRET_KEY";
-@%- if session %@
+#[cfg(feature = "session")]
 const SESSION_SECRET_KEY: &str = "SESSION_SECRET_KEY";
-@%- endif %@
 // for Hot Deploy
 const SERVER_STARTER_PORT: &str = "SERVER_STARTER_PORT";
+static SERVER_STARTER_PORT_ENV: OnceCell<String> = OnceCell::new();
+static ENV: OnceCell<Vec<String>> = OnceCell::new();
 #[cfg(unix)]
 const KILL_PARENT: &str = "KILL_PARENT";
 
@@ -88,7 +89,7 @@ enum Command {
         clean: bool,
         /// Drop database before migrating in release environment
         #[clap(long)]
-        force_delete_all_db: bool,
+        force_drop_db: bool,
         /// ignore missing migration error
         #[clap(long)]
         ignore_missing: bool,
@@ -100,9 +101,6 @@ enum Command {
         #[clap(short, long)]
         test: bool,
     },
-    /// Generate a schema for the seed
-    /// Note: Enable seed_schema using --features "db_(database_name)/seed_schema"
-    GenSeedSchema,
     /// Import the database seed.
     Seed {
         #[clap(long)]
@@ -112,7 +110,7 @@ enum Command {
         clean: bool,
         /// Drop database before migrating in release environment
         #[clap(long)]
-        force_delete_all_db: bool,
+        force_drop_db: bool,
         /// ignore missing migration error
         #[clap(long)]
         ignore_missing: bool,
@@ -141,6 +139,11 @@ enum Command {
 
 #[actix_web::main]
 async fn main() -> Result<()> {
+    let env = std::env::vars()
+        .filter(|(key, _)| !key.eq(KILL_PARENT) && !key.eq(SERVER_STARTER_PORT))
+        .map(|(key, value)| format!("{key}={value}"))
+        .collect();
+    let _ = ENV.set(env);
     dotenv().ok();
     #[cfg(feature = "etcd")]
     senax_common::etcd::init().await?;
@@ -165,7 +168,7 @@ async fn main() -> Result<()> {
     };
 
     use utoipa::OpenApi;
-    use utoipa_actix_web::{scope, AppExt};
+    use utoipa_actix_web::{AppExt, scope};
     #[derive(OpenApi)]
     #[openapi(info(title = "Api title"))]
     struct Api;
@@ -174,13 +177,13 @@ async fn main() -> Result<()> {
             .into_utoipa_app()
             .openapi(Api::openapi())
             .service(scope("/api/data").configure(auto_api::route_config))
-            // .service(
-            //     web::scope("/api")
-            //         .app_data(
-            //             web::JsonConfig::default().error_handler(response::json_error_handler),
-            //         )
-            //         .configure(api::route_config),
-            // )
+        // .service(
+        //     web::scope("/api")
+        //         .app_data(
+        //             web::JsonConfig::default().error_handler(response::json_error_handler),
+        //         )
+        //         .configure(api::route_config),
+        // )
     };
 
     if let Some(command) = arg.command {
@@ -192,38 +195,48 @@ async fn main() -> Result<()> {
             Command::Migrate {
                 db,
                 clean,
-                force_delete_all_db,
+                force_drop_db,
                 ignore_missing,
                 remove_missing,
                 test,
             } => {
                 if clean {
                     ensure!(
-                        force_delete_all_db || cfg!(debug_assertions),
+                        force_drop_db || cfg!(debug_assertions),
                         "clean migrate is debug environment only"
                     );
                 }
-                db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing, remove_missing).await?;
-                return Ok(());
-            }
-            Command::GenSeedSchema => {
-                db::gen_seed_schema()?;
+                db::migrate(
+                    db.as_deref(),
+                    test,
+                    clean || force_drop_db,
+                    ignore_missing,
+                    remove_missing,
+                )
+                .await?;
                 return Ok(());
             }
             Command::Seed {
                 db,
                 clean,
-                force_delete_all_db,
+                force_drop_db,
                 ignore_missing,
                 remove_missing,
                 test,
             } => {
                 if clean {
                     ensure!(
-                        force_delete_all_db || cfg!(debug_assertions),
+                        force_drop_db || cfg!(debug_assertions),
                         "clean migrate is debug environment only"
                     );
-                    db::migrate(db.as_deref(), test, clean || force_delete_all_db, ignore_missing, remove_missing).await?;
+                    db::migrate(
+                        db.as_deref(),
+                        test,
+                        clean || force_drop_db,
+                        ignore_missing,
+                        remove_missing,
+                    )
+                    .await?;
                 }
                 db::seed(db.as_deref(), test).await?;
                 return Ok(());
@@ -256,7 +269,10 @@ async fn main() -> Result<()> {
             error!("{}", e);
             std::process::exit(1);
         }
-        info!("Migration was completed in {} seconds.", now.elapsed().as_secs());
+        info!(
+            "Migration was completed in {} seconds.",
+            now.elapsed().as_secs()
+        );
     }
     let port = env::var(HOST_PORT).unwrap_or_else(|_| DEFAULT_HOST_PORT.to_owned());
     info!("HOST_PORT: {:?}", port);
@@ -310,53 +326,57 @@ async fn main() -> Result<()> {
 
     tokio::spawn(handle_signals());
 
-    @%- if session %@
+    #[cfg(feature = "session")]
     tokio::spawn(async move {
         loop {
             senax_actix_session::SessionMiddleware::gc(_SessionStore, None).await;
             tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
         }
     });
+    #[cfg(feature = "session")]
     let session_secret_key = env::var(SESSION_SECRET_KEY)
         .map(|v| Sha512::digest(v).to_vec())
         .with_context(|| format!("{} required", SESSION_SECRET_KEY))?;
-    @%- endif %@
 
     let server = HttpServer::new(move || {
-        let app = make_app().into_app()
-            .wrap(
-                middleware::Logger::new(
-                    r#"%a (%{r}a) "%r" %s %b "%{Referer}i" "%{User-Agent}i" %{ctx}xi %{username}xi %T"#,
-                )
-                .log_target("access_log")
-                .custom_request_replace("ctx", |req| {
-                    let ctx = Ctx::get(req.request());
-                    format!("ctx={}", ctx.ctx_no())
-                })
-                .custom_request_replace("username", |req| {
-                    if let Some(auth) = req.request().extensions().get::<auth::AuthInfo>() {
-                        format!("username={}", auth.username())
-                    } else {
-                        String::new()
-                    }
-                }),
+        let app = make_app().into_app();
+        let app = app.wrap(
+            middleware::Logger::new(
+                r#"%a (%{r}a) "%r" %s %b "%{Referer}i" "%{User-Agent}i" %{ctx}xi %{username}xi %T"#,
             )
-            .wrap(middleware::Compress::default())
-            .wrap_fn(|req, srv| {
-                req.extensions_mut().insert(Ctx::new());
-                if let Some(auth) = auth::retrieve_auth(req.request()) {
-                    req.extensions_mut().insert(auth);
-                }
-                srv.call(req)
+            .log_target("access_log")
+            .custom_request_replace("ctx", |req| {
+                let ctx = Ctx::get(req.request());
+                format!("ctx={}", ctx.ctx_no())
             })
-            @%- if session %@
-            .wrap(
-                senax_actix_session::SessionMiddleware::builder(_SessionStore, &session_secret_key)
-                    .cookie_secure(!cfg!(debug_assertions))
-                    .cookie_name(if cfg!(debug_assertions) { "sid".into() } else { "__Host-sid".into() })
-                    .build(),
-            )
-            @%- endif %@
+            .custom_request_replace("username", |req| {
+                if let Some(auth) = req.request().extensions().get::<auth::AuthInfo>() {
+                    format!("username={}", auth.username())
+                } else {
+                    String::new()
+                }
+            }),
+        );
+        let app = app.wrap(middleware::Compress::default());
+        let app = app.wrap_fn(|req, srv| {
+            req.extensions_mut().insert(Ctx::new());
+            if let Some(auth) = auth::retrieve_auth(req.request()) {
+                req.extensions_mut().insert(auth);
+            }
+            srv.call(req)
+        });
+        #[cfg(feature = "session")]
+        let app = app.wrap(
+            senax_actix_session::SessionMiddleware::builder(_SessionStore, &session_secret_key)
+                .cookie_secure(!cfg!(debug_assertions))
+                .cookie_name(if cfg!(debug_assertions) {
+                    "sid".into()
+                } else {
+                    "__Host-sid".into()
+                })
+                .build(),
+        );
+        let app = app
             .configure(routes::root::route_config)
             .service(
                 web::resource("/gql")
@@ -373,14 +393,12 @@ async fn main() -> Result<()> {
                     .app_data(Data::new(schema.clone()))
                     .to(auto_api::graphiql),
             );
-            if cfg!(debug_assertions) {
-                app.service(
-                    utoipa_swagger_ui::SwaggerUi::new("/swagger-ui/{_:.*}")
-                        .url("/api-docs/openapi.json", make_app().split_for_parts().1)
-                )
-            } else {
-                app
-            }
+        #[cfg(debug_assertions)]
+        let app = app.service(
+            utoipa_swagger_ui::SwaggerUi::new("/swagger-ui/{_:.*}")
+                .url("/api-docs/openapi.json", make_app().split_for_parts().1),
+        );
+        app
     })
     .listen(listeners.remove(&port).unwrap())?;
 
@@ -458,9 +476,7 @@ fn take_listener(ports: &[&str]) -> Result<HashMap<String, TcpListener>> {
             env_str.push(format!("{}={}", port, fd));
         }
     }
-    unsafe {
-        env::set_var(SERVER_STARTER_PORT, env_str.join(";"));
-    }
+    let _ = SERVER_STARTER_PORT_ENV.set(env_str.join(";"));
     Ok(results)
 }
 
@@ -492,10 +508,21 @@ async fn handle_signals() {
                     let args = env::args()
                         .map(|arg| CString::new(arg).unwrap())
                         .collect::<Vec<CString>>();
-                    unsafe {
-                        env::set_var(KILL_PARENT, "true");
-                    }
-                    unistd::execv(&args[0], &args).expect("execution failed.");
+                    let mut env = ENV
+                        .get()
+                        .unwrap()
+                        .iter()
+                        .map(|v| CString::new(v.as_str()).unwrap())
+                        .collect::<Vec<CString>>();
+                    env.push(CString::new(format!("{KILL_PARENT}=true")).unwrap());
+                    env.push(
+                        CString::new(format!(
+                            "{SERVER_STARTER_PORT}={}",
+                            SERVER_STARTER_PORT_ENV.get().unwrap()
+                        ))
+                        .unwrap(),
+                    );
+                    unistd::execve(&args[0], &args, &env).expect("execution failed.");
                     unreachable!()
                 }
             },

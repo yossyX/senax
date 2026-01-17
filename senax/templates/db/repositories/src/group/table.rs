@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
 
 pub use _base_repo_@{ db|snake|ident }@_@{ unified_name }@ as base_repository;
-use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@;
 use anyhow::Result;
+use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@;
 use db::DbConn;
 use senax_common::ShardId;
 
@@ -36,8 +36,8 @@ pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ 
 pub const SESSION_ROLE: &str = "role";
 
 use senax_common::session::{
-    interface::{SaveError, SessionData, SessionStore},
     SessionKey,
+    interface::{SaveError, SessionData, SessionStore},
 };
 const EOL_SHIFT: usize = 3;
 
@@ -207,10 +207,7 @@ impl SessionStore for _@{ pascal_name }@Store {
                 new_list.push(x);
             } else {
                 let key: String = (&x.key).into();
-                update_map
-                    .entry(key.into())
-                    .or_default()
-                    .push(x);
+                update_map.entry(key.into()).or_default().push(x);
             }
         }
         if !contains {
@@ -218,10 +215,7 @@ impl SessionStore for _@{ pascal_name }@Store {
                 new_list.push(buf.clone());
             } else {
                 let key: String = (&buf.key).into();
-                update_map
-                    .entry(key.into())
-                    .or_default()
-                    .push(buf.clone());
+                update_map.entry(key.into()).or_default().push(buf.clone());
             }
         }
         save_data(vshard_id >> VSHARDING, update_map, new_list)

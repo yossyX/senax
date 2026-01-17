@@ -91,17 +91,18 @@ fn parse_not(i: &str) -> IResult<&str, Word> {
 fn parse_or(i: &str) -> IResult<&str, Word> {
     map(
         delimited(
-            char('('),
+            alt((char('('), char('（'))),
             many0(delimited(
                 space,
                 alt((
                     quoted,
                     delimited(char('('), take_until_unbalanced('(', ')'), char(')')),
+                    delimited(char('（'), take_until_unbalanced('（', '）'), char('）')),
                     word,
                 )),
                 space,
             )),
-            char(')'),
+            alt((char(')'), char('）'))),
         ),
         |w| Word::Or(w.iter().map(|v| v.to_string()).collect()),
     )
@@ -153,7 +154,7 @@ fn quoted(i: &str) -> IResult<&str, &str> {
 
 fn word(input: &str) -> IResult<&str, &str> {
     input.split_at_position1_complete(
-        |c| char::is_whitespace(c) || c == '"' || c == '(' || c == ')',
+        |c| char::is_whitespace(c) || c == '"' || c == '(' || c == ')' || c == '（' || c == '）',
         ErrorKind::AlphaNumeric,
     )
 }
@@ -164,6 +165,25 @@ fn quoted_word(input: &str) -> IResult<&str, &str> {
 
 fn space(input: &str) -> IResult<&str, &str> {
     input.split_at_position_complete(|c| !char::is_whitespace(c))
+}
+
+pub fn escape_like(input: &str) -> String {
+    let mut escaped = String::with_capacity(input.len());
+
+    for ch in input.chars() {
+        match ch {
+            '%' | '_' | '\\' => {
+                escaped.push('\\');
+                escaped.push(ch);
+            }
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
+}
+
+pub fn to_like_contains(input: &str) -> String {
+    format!("%{}%", escape_like(input))
 }
 
 #[cfg(test)]
@@ -187,5 +207,7 @@ mod tests {
             parse(r#"a "cc dd)\\" b"#).db_query(),
             r#"+"a" +"cc dd)" +"b""#
         );
+        assert_eq!(parse("a （b c）").db_query(), r#"+"a" +("b" "c")"#);
+        assert_eq!(parse("a（b （c d））").db_query(), r#"+"a" +("b" "c d")"#);
     }
 }

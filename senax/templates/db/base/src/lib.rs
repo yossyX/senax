@@ -9,15 +9,15 @@ use senax_common::linker;
 use std::{
     path::Path,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Weak,
+        atomic::{AtomicBool, Ordering},
     },
 };
 #[allow(unused_imports)]
 use tokio::{
-    sync::{mpsc, Mutex, MutexGuard, Semaphore},
+    sync::{Mutex, MutexGuard, Semaphore, mpsc},
     task::LocalSet,
-    time::{sleep, Duration},
+    time::{Duration, sleep},
 };
 
 #[rustfmt::skip]
@@ -50,8 +50,8 @@ pub mod misc;
 #[allow(clippy::too_many_arguments)]
 pub mod models;
 
-pub use models::{CacheMsg, CacheOp};
 pub use misc::Updater;
+pub use models::{CacheMsg, CacheOp};
 
 @% if !config.force_disable_cache -%@
 use cache::Cache;
@@ -126,7 +126,9 @@ pub async fn _start(
         let pw = pw.as_ref().with_context(|| "LINKER_PASSWORD required")?;
         let send_only = false;
         let (sender, mut receiver) = linker::link(DB_ID, port, pw, exit_tx.clone(), false)?;
-        LINKER_SENDER.set(sender).unwrap_or_else(|_| panic!("LINKER_SENDER failed"));
+        LINKER_SENDER
+            .set(sender)
+            .unwrap_or_else(|_| panic!("LINKER_SENDER failed"));
         tokio::spawn(async move {
             while let Some(data) = receiver.recv().await {
                 if let Some(data) = data {

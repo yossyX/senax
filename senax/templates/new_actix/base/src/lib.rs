@@ -6,8 +6,8 @@ extern crate log;
 
 pub mod auth;
 pub mod auto_api;
-pub mod common;
 pub mod context;
+#[rustfmt::skip]
 pub mod db;
 pub mod maybe_undefined;
 pub mod response;

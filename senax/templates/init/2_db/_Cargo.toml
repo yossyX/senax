@@ -1,0 +1,18 @@
+[package]
+name = "db"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+seed_schema = []
+
+[dependencies]
+
+anyhow.workspace = true
+clap.workspace = true
+dotenvy.workspace = true
+log.workspace = true
+mimalloc = "0.1"
+tokio.workspace = true
+@{-"\n"}@

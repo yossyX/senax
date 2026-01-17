@@ -17,9 +17,9 @@ use crate::{api_generator::template::DbConfigTemplate, schema::CONFIG};
 pub fn generate(
     name: &str,
     db_list: &[&str],
-    session: bool,
     force: bool,
     db_for_api: bool,
+    session: bool,
 ) -> Result<()> {
     anyhow::ensure!(Path::new("Cargo.toml").exists(), "Incorrect directory.");
     let non_snake_case = crate::common::check_non_snake_case()?;
@@ -46,16 +46,13 @@ pub fn generate(
         }
     }
 
-    let mut rng = rand::rng();
-    let session_key = Alphanumeric.sample_string(&mut rng, 80);
-
     let mut file_path = PathBuf::from("./.env");
     if !file_path.exists() {
         file_path = base_path.join(".env");
     }
     if file_path.exists() {
         let content = fs::read_to_string(&file_path)?.replace("\r\n", "\n");
-        fs_write(file_path, fix_env(&content, name, session, &session_key)?)?;
+        fs_write(file_path, fix_env(&content, name)?)?;
     }
 
     let mut file_path = PathBuf::from("./.env.example");
@@ -64,7 +61,7 @@ pub fn generate(
     }
     if file_path.exists() {
         let content = fs::read_to_string(&file_path)?.replace("\r\n", "\n");
-        fs_write(file_path, fix_env(&content, name, session, &session_key)?)?;
+        fs_write(file_path, fix_env(&content, name)?)?;
     }
 
     let file_path = Path::new("./build.sh");
@@ -73,18 +70,17 @@ pub fn generate(
         fs_write(file_path, fix_build_sh(&content, name)?)?;
     }
 
-    write_base_files(&base_path, name, db_list, session, force)?;
+    write_base_files(&base_path, name, db_list, force)?;
 
     #[derive(Template)]
     #[template(path = "new_actix/_Cargo.toml", escape = "none")]
     pub struct CargoTemplate<'a> {
         pub name: &'a str,
-        pub session: bool,
     }
 
     let file_path = base_path.join("Cargo.toml");
     let mut content = if force || !file_path.exists() {
-        CargoTemplate { name, session }.render()?
+        CargoTemplate { name }.render()?
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
@@ -127,13 +123,11 @@ pub fn generate(
 
     #[derive(Template)]
     #[template(path = "new_actix/src/db.rs", escape = "none")]
-    pub struct DbTemplate {
-        pub session: bool,
-    }
+    pub struct DbTemplate;
 
     let file_path = src_path.join("db.rs");
     let mut content = if force || !file_path.exists() {
-        DbTemplate { session }.render()?
+        DbTemplate.render()?
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
@@ -170,11 +164,6 @@ pub fn generate(
                 "// Do not modify this line. (migrate)",
                 tpl.render()?.trim_start(),
             );
-            let tpl = DbGenSeedSchemaTemplate { db };
-            content = content.replace(
-                "// Do not modify this line. (gen_seed_schema)",
-                tpl.render()?.trim_start(),
-            );
             let tpl = DbSeedTemplate { db };
             content = content.replace(
                 "// Do not modify this line. (seed)",
@@ -201,33 +190,40 @@ pub fn generate(
 
     #[derive(Template)]
     #[template(path = "new_actix/src/auto_api.rs", escape = "none")]
-    pub struct AutoApiTemplate {
-        pub session: bool,
-    }
+    pub struct AutoApiTemplate;
 
     let file_path = src_path.join("auto_api.rs");
-    if force || !file_path.exists() {
-        let tpl = AutoApiTemplate { session };
-        fs_write(&file_path, tpl.render()?)?;
+    let mut content = if force || !file_path.exists() {
+        AutoApiTemplate.render()?
+    } else {
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
+    };
+    if session && let Some(db) = db_list.first() {
+        content = content.replace("db_session::", &format!("db_{}::", db.to_snake()));
     }
+    fs_write(file_path, &*content)?;
 
     #[derive(Template)]
     #[template(path = "new_actix/src/main.rs", escape = "none")]
     pub struct MainTemplate<'a> {
         pub name: &'a str,
         pub non_snake_case: bool,
-        pub session: bool,
     }
 
     let file_path = src_path.join("main.rs");
-    if force || !file_path.exists() {
-        let tpl = MainTemplate {
+    let mut content = if force || !file_path.exists() {
+        MainTemplate {
             name,
             non_snake_case,
-            session,
-        };
-        fs_write(file_path, tpl.render()?)?;
+        }
+        .render()?
+    } else {
+        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
+    };
+    if session && let Some(db) = db_list.first() {
+        content = content.replace("db_session::", &format!("db_{}::", db.to_snake()));
     }
+    fs_write(file_path, &*content)?;
 
     #[derive(Template)]
     #[template(path = "new_actix/src/tasks.rs", escape = "none")]
@@ -274,13 +270,7 @@ pub fn generate(
     Ok(())
 }
 
-pub fn write_base_files(
-    base_path: &Path,
-    name: &str,
-    db_list: &[&str],
-    session: bool,
-    force: bool,
-) -> Result<()> {
+pub fn write_base_files(base_path: &Path, name: &str, db_list: &[&str], force: bool) -> Result<()> {
     let non_snake_case = crate::common::check_non_snake_case()?;
     let base_path = base_path.join("base");
 
@@ -288,12 +278,11 @@ pub fn write_base_files(
     #[template(path = "new_actix/base/_Cargo.toml", escape = "none")]
     pub struct CargoTemplate<'a> {
         pub name: &'a str,
-        pub session: bool,
     }
 
     let file_path = base_path.join("Cargo.toml");
     let mut content = if force || !file_path.exists() {
-        CargoTemplate { name, session }.render()?
+        CargoTemplate { name }.render()?
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
@@ -335,13 +324,11 @@ pub fn write_base_files(
 
     #[derive(Template)]
     #[template(path = "new_actix/base/src/db.rs", escape = "none")]
-    pub struct DbTemplate {
-        pub session: bool,
-    }
+    pub struct DbTemplate;
 
     let file_path = src_path.join("db.rs");
     let mut content = if force || !file_path.exists() {
-        DbTemplate { session }.render()?
+        DbTemplate.render()?
     } else {
         fs::read_to_string(&file_path)?.replace("\r\n", "\n")
     };
@@ -433,16 +420,6 @@ pub fn write_base_files(
     }
 
     #[derive(Template)]
-    #[template(path = "new_actix/base/src/common.rs", escape = "none")]
-    pub struct CommonTemplate;
-
-    let file_path = src_path.join("common.rs");
-    if !file_path.exists() {
-        let tpl = CommonTemplate;
-        fs_write(file_path, tpl.render()?)?;
-    }
-
-    #[derive(Template)]
     #[template(path = "new_actix/base/src/validator.rs", escape = "none")]
     pub struct ValidatorTemplate;
 
@@ -464,10 +441,9 @@ pub fn write_base_files(
     Ok(())
 }
 
-fn fix_env(content: &str, name: &str, session: bool, session_key: &str) -> Result<String> {
-    use std::fmt::Write;
+fn fix_env(content: &str, name: &str) -> Result<String> {
     let re = Regex::new(r"RUST_LOG(\s*)=(.+)").unwrap();
-    let mut content = if let Some(caps) = re.captures(content) {
+    let content = if let Some(caps) = re.captures(content) {
         let sp = caps.get(1).unwrap().as_str();
         let conf = caps.get(2).unwrap().as_str();
         if !conf.contains(&format!("{}=", name)) {
@@ -479,20 +455,6 @@ fn fix_env(content: &str, name: &str, session: bool, session_key: &str) -> Resul
     } else {
         content.to_owned()
     };
-    if session && !content.contains("SESSION_DB_URL") {
-        write!(
-            &mut content,
-            r#"
-SESSION_DB_URL=mysql://root:root@db/session
-SESSION_TEST_DB_URL=mysql://root:root@db/session_test
-SESSION_DB_MAX_CONNECTIONS_FOR_WRITE=10
-SESSION_DB_MAX_CONNECTIONS_FOR_READ=10
-SESSION_DB_MAX_CONNECTIONS_FOR_CACHE=10
-SESSION_SECRET_KEY={}
-"#,
-            session_key
-        )?;
-    }
     Ok(content)
 }
 
@@ -506,12 +468,10 @@ fn fix_build_sh(content: &str, name: &str) -> Result<String> {
             ),
         );
     }
-    if !content.contains(&format!("cargo run -p {name} -- gen-gql-schema")) {
+    if !content.contains(&format!("schema {name} \"${name}_client\"")) {
         content = content.replace(
-            "# Do not modify this line. (ApiClient)",
-            &format!(
-                "cargo run -p {name} -- gen-gql-schema ${name}_client\n# Do not modify this line. (ApiClient)",
-            ),
+            "# Do not modify this line. (Schema)",
+            &format!("schema {name} \"${name}_client\"\n# Do not modify this line. (Schema)",),
         );
     }
     Ok(content)
@@ -719,18 +679,6 @@ pub struct DbRepoImplRollbackTemplate<'a> {
     escape = "none"
 )]
 pub struct DbMigrateTemplate<'a> {
-    pub db: &'a str,
-}
-
-#[derive(Template)]
-#[template(
-    source = r###"
-    db_@{ db|snake }@::seeder::gen_seed_schema()?;
-    // Do not modify this line. (gen_seed_schema)"###,
-    ext = "txt",
-    escape = "none"
-)]
-pub struct DbGenSeedSchemaTemplate<'a> {
     pub db: &'a str,
 }
 

@@ -1,6 +1,6 @@
 use super::*;
 use crate::auto_api::{MutationRoot, QueryRoot};
-use actix_web::{test, App};
+use actix_web::{App, test};
 use async_graphql::{EmptySubscription, Schema};
 use dotenvy::dotenv;
 #[allow(unused_imports)]

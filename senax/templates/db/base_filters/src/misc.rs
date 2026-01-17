@@ -72,33 +72,6 @@ macro_rules! filter {
                 Filter_::OnlyTrashed => {
                     *trash_mode = TrashMode::Only;
                 }
-                Filter_::Match(cols, _v) => {
-                    buf.push_str(" MATCH (");
-                    for c in cols {
-                        buf.push_str(c.name());
-                        buf.push_str(",");
-                    }
-                    buf.truncate(buf.len() - 1);
-                    buf.push_str(") AGAINST (?) AND ");
-                }
-                Filter_::MatchBoolean(cols, _v) => {
-                    buf.push_str(" MATCH (");
-                    for c in cols {
-                        buf.push_str(c.name());
-                        buf.push_str(",");
-                    }
-                    buf.truncate(buf.len() - 1);
-                    buf.push_str(") AGAINST (?  IN BOOLEAN MODE) AND ");
-                }
-                Filter_::MatchExpansion(cols, _v) => {
-                    buf.push_str(" MATCH (");
-                    for c in cols {
-                        buf.push_str(c.name());
-                        buf.push_str(",");
-                    }
-                    buf.truncate(buf.len() - 1);
-                    buf.push_str(") AGAINST (?  WITH QUERY EXPANSION) AND ");
-                }
                 Filter_::IsNull(c) => {
                     buf.push_str(c.name());
                     buf.push_str(" IS NULL AND ");
@@ -432,9 +405,6 @@ macro_rules! filter {
             match self {
                 Filter_::WithTrashed => query,
                 Filter_::OnlyTrashed => query,
-                Filter_::Match(_c, v) => query.bind(v),
-                Filter_::MatchBoolean(_c, v) => query.bind(v),
-                Filter_::MatchExpansion(_c, v) => query.bind(v),
                 Filter_::IsNull(_c) => query,
                 Filter_::IsNotNull(_c) => query,
                 Filter_::Eq(c) => c.bind_to_query(query),
