@@ -58,7 +58,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             conn: std::sync::Arc<tokio::sync::Mutex<db::DbConn>>,
             id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@,
             filter: Option<Filter_>,
-            with_filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
+            filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -74,12 +74,12 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 #[allow(unused_mut)]
                 @%- if def.is_soft_delete() %@
                 let obj = if self.with_trashed {
-                    _@{ pascal_name }@_::find_for_update_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.with_filter_flag)).await?
+                    _@{ pascal_name }@_::find_for_update_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 } else {
-                    _@{ pascal_name }@_::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.with_filter_flag)).await?
+                    _@{ pascal_name }@_::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 };
                 @%- else %@
-                let obj = _@{ pascal_name }@_::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.with_filter_flag)).await?;
+                let obj = _@{ pascal_name }@_::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?;
                 @%- endif %@
                 Ok(Box::new(obj) as Box<dyn @{ pascal_name }@Updater>)
             }
@@ -88,12 +88,12 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 let conn = conn.deref_mut();
                 @%- if def.is_soft_delete() %@
                 let obj = if self.with_trashed {
-                    _@{ pascal_name }@_::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.with_filter_flag)).await?
+                    _@{ pascal_name }@_::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 } else {
-                    _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.with_filter_flag)).await?
+                    _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 };
                 @%- else %@
-                let obj = _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.with_filter_flag)).await?;
+                let obj = _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?;
                 @%- endif %@
                 if let Some(obj) = obj {
                     Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@>))
@@ -106,7 +106,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 self
             }
             fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _RepositoryFindBuilder> {
-                self.with_filter_flag.insert(name, filter);
+                self.filter_flag.insert(name, filter);
                 self
             }
             fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _RepositoryFindBuilder> {
@@ -131,7 +131,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             conn: self._conn.clone(),
             id,
             filter: None,
-            with_filter_flag: Default::default(),
+            filter_flag: Default::default(),
             @%- if def.is_soft_delete() %@
             with_trashed: false,
             @%- endif %@
@@ -206,7 +206,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             conn: std::sync::Arc<tokio::sync::Mutex<db::DbConn>>,
             selector_filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
             extra_filter: Option<Filter_>,
-            with_filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
+            filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -216,7 +216,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             fn _query(
                 selector_filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
                 extra_filter: Option<Filter_>,
-                with_filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
+                filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
                 @%- if def.is_soft_delete() %@
                 with_trashed: bool,
                 @%- endif %@
@@ -233,7 +233,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 }
                 query = query.filter(fltr);
                 query = query.join(joiner);
-                query = query.with_filter_flag(with_filter_flag);
+                query = query.with_filter_flag(filter_flag);
                 @%- if def.is_soft_delete() %@
                 query = query.when(with_trashed, |v| v.with_trashed());
                 @%- endif %@
@@ -247,13 +247,13 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             async fn query_for_update(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let query = Self::_query(self.selector_filter, self.extra_filter, self.with_filter_flag, @% if def.is_soft_delete() %@self.with_trashed, @% endif %@self.joiner)?;
+                let query = Self::_query(self.selector_filter, self.extra_filter, self.filter_flag, @% if def.is_soft_delete() %@self.with_trashed, @% endif %@self.joiner)?;
                 Ok(query.select_for_update(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@Updater>).collect())
             }
             async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let query = Self::_query(self.selector_filter, self.extra_filter, self.with_filter_flag, @% if def.is_soft_delete() %@self.with_trashed, @% endif %@self.joiner)?;
+                let query = Self::_query(self.selector_filter, self.extra_filter, self.filter_flag, @% if def.is_soft_delete() %@self.with_trashed, @% endif %@self.joiner)?;
                 Ok(query.select(conn).await?.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>).collect())
             }
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
@@ -267,7 +267,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 self
             }
             fn extra_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.extra_filter = Some(filter); self }
-            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.with_filter_flag.insert(name, filter); self }
+            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.filter_flag.insert(name, filter); self }
             fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> {
                 if condition {
                     self.with_filter_flag(name, filter)
@@ -287,7 +287,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
             conn: self._conn.clone(),
             selector_filter: None,
             extra_filter: None,
-            with_filter_flag: Default::default(),
+            filter_flag: Default::default(),
             @%- if def.is_soft_delete() %@
             with_trashed: false,
             @%- endif %@
@@ -355,7 +355,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             conn: std::sync::Arc<tokio::sync::Mutex<db::DbConn>>,
             selector_filter: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter>,
             extra_filter: Option<Filter_>,
-            with_filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
+            filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
             cursor: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Cursor>,
             order: Option<_@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order>,
             reverse: bool,
@@ -408,7 +408,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 }
                 query = query.filter(fltr);
                 query = query.join(self.joiner);
-                query = query.with_filter_flag(self.with_filter_flag);
+                query = query.with_filter_flag(self.filter_flag);
                 match self.order.unwrap_or_default() {
                     @%- for (order, fields) in selector_def.orders %@
                     _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Order::@{ order|pascal }@ => {
@@ -453,7 +453,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 @%- endif %@
             }
             /// Retrieve via stream
-            /// Streams do not support with_filter_flag.
+            /// Streams do not support filter_flag.
             async fn stream(self: Box<Self>, single_transaction: bool) -> anyhow::Result<std::pin::Pin<Box<dyn futures::Stream<Item=anyhow::Result<Box<dyn @{ pascal_name }@>>> + Send>>> {
                 let mut conn = self.conn.clone().lock_owned().await;
                 let conn = conn.deref_mut();
@@ -590,7 +590,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             }
             fn selector_filter(mut self: Box<Self>, filter: _@{ mod_name }@::@{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.selector_filter = Some(filter); self }
             fn extra_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.extra_filter = Some(filter); self }
-            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.with_filter_flag.insert(name, filter); self }
+            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.filter_flag.insert(name, filter); self }
             fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> {
                 if condition {
                     self.with_filter_flag(name, filter)
@@ -615,7 +615,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             conn: self._conn.clone(),
             selector_filter: None,
             extra_filter: None,
-            with_filter_flag: Default::default(),
+            filter_flag: Default::default(),
             cursor: None,
             order: None,
             reverse: false,
@@ -634,7 +634,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             conn: std::sync::Arc<tokio::sync::Mutex<db::DbConn>>,
             id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@,
             filter: Option<Filter_>,
-            with_filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
+            filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -652,7 +652,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 } else {
                     self.joiner
                 };
-                for filter in self.with_filter_flag.values() {
+                for filter in self.filter_flag.values() {
                     joiner = Joiner_::merge(joiner, filter.joiner_cache_only())
                 }
                 @%- if def.is_soft_delete() %@
@@ -670,7 +670,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                     if let Some(filter) = &self.filter {
                         check = filter.check(&obj as &dyn @{ pascal_name }@);
                     }
-                    for (name, filter) in &self.with_filter_flag {
+                    for (name, filter) in &self.filter_flag {
                         if let Ok(r) = filter.check(&obj as &dyn @{ pascal_name }@) {
                             obj._filter_flag.insert(name, r);
                         } else {
@@ -686,12 +686,12 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                         Err(_) => {
                             @%- if def.is_soft_delete() %@
                             let flags = if self.with_trashed {
-                                _@{ pascal_name }@_::exists_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.with_filter_flag)).await?
+                                _@{ pascal_name }@_::exists_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.filter_flag)).await?
                             } else {
-                                _@{ pascal_name }@_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.with_filter_flag)).await?
+                                _@{ pascal_name }@_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.filter_flag)).await?
                             };
                             @%- else %@
-                            let flags = _@{ pascal_name }@_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.with_filter_flag)).await?;
+                            let flags = _@{ pascal_name }@_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.filter_flag)).await?;
                             @%- endif %@
                             if let Some(mut flags) = flags {
                                 obj._filter_flag.append(&mut flags);
@@ -711,7 +711,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 self
             }
             fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _QueryFindBuilder> {
-                self.with_filter_flag.insert(name, filter);
+                self.filter_flag.insert(name, filter);
                 self
             }
             fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _QueryFindBuilder> {
@@ -736,7 +736,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             conn: self._conn.clone(),
             id,
             filter: None,
-            with_filter_flag: Default::default(),
+            filter_flag: Default::default(),
             @%- if def.is_soft_delete() %@
             with_trashed: false,
             @%- endif %@
@@ -749,7 +749,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             conn: std::sync::Arc<tokio::sync::Mutex<db::DbConn>>,
             id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@,
             filter: Option<Filter_>,
-            with_filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
+            filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -764,12 +764,12 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 let conn = conn.deref_mut();
                 @%- if def.is_soft_delete() %@
                 let obj = if self.with_trashed {
-                    _@{ pascal_name }@_::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.with_filter_flag)).await?
+                    _@{ pascal_name }@_::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 } else {
-                    _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.with_filter_flag)).await?
+                    _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 };
                 @%- else %@
-                let obj = _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.with_filter_flag)).await?;
+                let obj = _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?;
                 @%- endif %@
                 if let Some(obj) = obj {
                     Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@>))
@@ -782,7 +782,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 self
             }
             fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _QueryFindBuilder> {
-                self.with_filter_flag.insert(name, filter);
+                self.filter_flag.insert(name, filter);
                 self
             }
             fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _QueryFindBuilder> {
@@ -807,7 +807,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             conn: self._conn.clone(),
             id,
             filter: None,
-            with_filter_flag: Default::default(),
+            filter_flag: Default::default(),
             @%- if def.is_soft_delete() %@
             with_trashed: false,
             @%- endif %@

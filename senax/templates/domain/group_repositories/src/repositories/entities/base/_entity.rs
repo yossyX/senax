@@ -403,7 +403,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
             _list: Vec<@{ pascal_name }@Entity>,
             selector_filter: Option<@{ pascal_name }@Query@{ selector|pascal }@Filter>,
             extra_filter: Option<Filter_>,
-            with_filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
+            filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
             @%- if def.is_soft_delete() %@
             with_trashed: bool,
             @%- endif %@
@@ -466,7 +466,7 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
             }
             fn selector_filter(mut self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.selector_filter = Some(filter); self }
             fn extra_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.extra_filter = Some(filter); self }
-            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.with_filter_flag.insert(name, filter); self }
+            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> { self.filter_flag.insert(name, filter); self }
             fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _Repository@{ selector|pascal }@Builder> {
                 if condition {
                     self.with_filter_flag(name, filter)
@@ -533,7 +533,7 @@ impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
             _list: Vec<@{ pascal_name }@Entity>,
             selector_filter: Option<@{ pascal_name }@Query@{ selector|pascal }@Filter>,
             extra_filter: Option<Filter_>,
-            with_filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
+            filter_flag: std::collections::BTreeMap<&'static str, Filter_>,
             cursor: Option<@{ pascal_name }@Query@{ selector|pascal }@Cursor>,
             order: Option<@{ pascal_name }@Query@{ selector|pascal }@Order>,
             reverse: bool,
@@ -634,7 +634,7 @@ impl _@{ pascal_name }@QueryService for Emu@{ pascal_name }@Repository {
             }
             fn selector_filter(mut self: Box<Self>, filter: @{ pascal_name }@Query@{ selector|pascal }@Filter) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.selector_filter = Some(filter); self }
             fn extra_filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.extra_filter = Some(filter); self }
-            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.with_filter_flag.insert(name, filter); self }
+            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> { self.filter_flag.insert(name, filter); self }
             fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _Query@{ selector|pascal }@Builder> {
                 if condition {
                     self.with_filter_flag(name, filter)

@@ -147,8 +147,8 @@ impl TryFrom_<&dyn _domain_::@{ pascal_name }@> for ResObj {
             {rel_name}: v.{rel_name}().unwrap_or_default().map(|v| v.into()),", "") }@
             _cursor,
             @%- if !api_def.disable_mutation %@
-            _updatable: v.get_flag("_updatable"),
-            _deletable: v.get_flag("_deletable"),
+            _updatable: domain::models::FilterFlag::get_flag(v, "_updatable"),
+            _deletable: domain::models::FilterFlag::get_flag(v, "_deletable"),
             @%- endif %@
         })
     }

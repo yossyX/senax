@@ -86,7 +86,7 @@ async fn delete(
     query = query.with_filter_flag("_deletable", deletable_filter(auth)?);
     match query.query_for_update().await {
         Ok(obj) => {
-            if !obj.get_flag("_deletable").unwrap_or_default() {
+            if !domain::models::FilterFlag::get_flag(obj.as_ref(), "_deletable").unwrap_or_default() {
                 anyhow::bail!(GqlError::Forbidden);
             }
             _repository_::delete(repo.as_ref().into(), obj).await?;
@@ -514,7 +514,7 @@ impl GqlMutation@{ graphql_name }@ {
                 let query = @{ group|snake }@_repo.@{ mod_name|ident }@().find(primary.into_inner()).with_filter_flag("_updatable", updatable_filter(auth)?);
                 match query.join(updater_joiner()).query_for_update().await {
                     Ok(obj) => {
-                        if !obj.get_flag("_updatable").unwrap_or_default() {
+                        if !domain::models::FilterFlag::get_flag(obj.as_ref(), "_updatable").unwrap_or_default() {
                             let mut e = validator::ValidationErrors::new();
                             e.add("_id", validator::ValidationError::new("forbidden"));
                             errors.insert(idx + 1, e);
@@ -582,7 +582,7 @@ impl GqlMutation@{ graphql_name }@ {
             .query_for_update()
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
-        if !obj.get_flag("_updatable").unwrap_or_default() {
+        if !domain::models::FilterFlag::get_flag(obj.as_ref(), "_updatable").unwrap_or_default() {
             return Err(GqlError::Forbidden.extend());
         }
         @%- if def.versioned %@

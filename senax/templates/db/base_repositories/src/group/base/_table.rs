@@ -2030,7 +2030,7 @@ pub use join_@{ fetch_macro_name }@ as join;
 #[derive(Debug, Clone, Default)]
 pub struct QueryBuilder {
     filter: Option<Filter_>,
-    with_filter_flag: BTreeMap<&'static str, Filter_>,
+    filter_flag: BTreeMap<&'static str, Filter_>,
     order: Option<Vec<Order_>>,
     raw_order: Option<String>,
     limit: Option<usize>,
@@ -2047,8 +2047,8 @@ impl QueryBuilder {
         self.filter = Some(filter);
         self
     }
-    pub fn with_filter_flag(mut self, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Self {
-        self.with_filter_flag = with_filter_flag;
+    pub fn with_filter_flag(mut self, filter_flag: BTreeMap<&'static str, Filter_>) -> Self {
+        self.filter_flag = filter_flag;
         self
     }
     pub fn order_by(mut self, order: Vec<Order_>) -> Self {
@@ -2132,7 +2132,7 @@ impl QueryBuilder {
     async fn __select(self, sql_cols: &str, conn: &mut DbConn) -> Result<Vec<(DbRow, BTreeMap<&'static str, bool>)>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
-        let filter_flag_names: Vec<_> = self.with_filter_flag.keys().cloned().collect();
+        let filter_flag_names: Vec<_> = self.filter_flag.keys().cloned().collect();
         let sql = self._sql(sql_cols, false, conn.shard_id(), &filter_digest);
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
@@ -2161,7 +2161,7 @@ impl QueryBuilder {
     #[allow(clippy::if_same_then_else)]
     fn _sql(&self, sql_cols: &str, for_update: bool, shard_id: ShardId, filter_digest: &str) -> String {
         let force_indexes = make_force_indexes(filter_digest);
-        let sql_cols = write_filter_flag(sql_cols, &self.with_filter_flag, shard_id);
+        let sql_cols = write_filter_flag(sql_cols, &self.filter_flag, shard_id);
         let mut sql = format!(
             r#"SELECT {}{} FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             if !force_indexes.is_empty() {
@@ -2197,9 +2197,9 @@ impl QueryBuilder {
         sql
     }
 
-    fn _bind(self, mut query: Query<DbType, DbArguments>, with_filter_flag: bool) -> Query<DbType, DbArguments> {
-        if with_filter_flag {
-            for (_name, filter) in self.with_filter_flag {
+    fn _bind(self, mut query: Query<DbType, DbArguments>, filter_flag: bool) -> Query<DbType, DbArguments> {
+        if filter_flag {
+            for (_name, filter) in self.filter_flag {
                 query = filter.bind_to_query(query);
             }
         }
@@ -2216,7 +2216,7 @@ impl QueryBuilder {
     async fn _select_stream(self, sql_cols: &str, conn: &mut DbConn) -> Result<mpsc::Receiver<(DbRow, BTreeMap<&'static str, bool>)>> {
         let ctx_no = conn.ctx_no();
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        let filter_flag_names: Vec<_> = self.with_filter_flag.keys().cloned().collect();
+        let filter_flag_names: Vec<_> = self.filter_flag.keys().cloned().collect();
         debug!(ctx = ctx_no; "filter digest:{}", filter_digest);
         let sql = self._sql(sql_cols, false, conn.shard_id(), &filter_digest);
         @%- if !config.is_mysql() %@
@@ -2257,8 +2257,8 @@ impl QueryBuilder {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
-        let filter_flag_names: Vec<_> = self.with_filter_flag.keys().cloned().collect();
-        let sql_cols = write_filter_flag(r#"@{ def.primaries()|fmt_join("{col_query}", ", ") }@"#, &self.with_filter_flag, conn.shard_id());
+        let filter_flag_names: Vec<_> = self.filter_flag.keys().cloned().collect();
+        let sql_cols = write_filter_flag(r#"@{ def.primaries()|fmt_join("{col_query}", ", ") }@"#, &self.filter_flag, conn.shard_id());
         let mut sql = format!(
             r#"SELECT {}{sql_cols} FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
             if !force_indexes.is_empty() {
@@ -2316,7 +2316,7 @@ impl QueryBuilder {
     pub async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
-        let filter_flag_names: Vec<_> = self.with_filter_flag.keys().cloned().collect();
+        let filter_flag_names: Vec<_> = self.filter_flag.keys().cloned().collect();
         let sql = self._sql(Data::_sql_cols(@{ is_mysql_str }@), !conn.wo_tx(), conn.shard_id(), &filter_digest);
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
@@ -2588,10 +2588,10 @@ impl QueryBuilder {
 }
 
 #[inline(never)]
-fn write_filter_flag(cols: &str, with_filter_flag: &BTreeMap<&'static str, Filter_>, shard_id: ShardId) -> String {
+fn write_filter_flag(cols: &str, filter_flag: &BTreeMap<&'static str, Filter_>, shard_id: ShardId) -> String {
     let mut buf = String::with_capacity(1000);
     buf.push_str(cols);
-    for (name, filter) in with_filter_flag {
+    for (name, filter) in filter_flag {
         let mut trash_mode: TrashMode = Default::default();
         buf.push_str(", (");
         filter.write(&mut buf, 1, &mut trash_mode, shard_id, false);
@@ -2918,7 +2918,7 @@ impl _@{ pascal_name }@_ {
     pub async fn find_all_from_cache(
         conn: &DbConn,
         filter: Option<Filter_>,
-        with_filter_flag: BTreeMap<&'static str, Filter_>,
+        filter_flag: BTreeMap<&'static str, Filter_>,
         order: Option<Vec<Order_>>,
         limit: Option<usize>,
     ) -> Result<Arc<Vec<_@{ pascal_name }@Cache>>> {
@@ -3058,23 +3058,23 @@ impl _@{ pascal_name }@_ {
     }
     @%- endif %@
 
-    pub async fn find<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@>
+    pub async fn find<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@>
     where
         T: Into<Primary>,
     {
         let id: Primary = id.into();
-        Self::find_optional(conn, id.clone(), joiner, filter, with_filter_flag)
+        Self::find_optional(conn, id.clone(), joiner, filter, filter_flag)
             .await?
             .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&(&id).into())))
     }
     @%- if def.is_soft_delete() %@
 
-    pub async fn find_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@>
+    pub async fn find_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@>
     where
         T: Into<Primary>,
     {
         let id: Primary = id.into();
-        Self::find_optional_with_trashed(conn, id.clone(), joiner, filter, with_filter_flag)
+        Self::find_optional_with_trashed(conn, id.clone(), joiner, filter, filter_flag)
             .await?
             .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&(&id).into())))
     }
@@ -3133,25 +3133,25 @@ impl _@{ pascal_name }@_ {
         map
     }
 
-    pub async fn find_many<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@>>
+    pub async fn find_many<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        let mut list = __find_many(conn, &ids, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?.into_iter().map(|v| v.into()).collect();
+        let mut list = __find_many(conn, &ids, TrashMode::Not, filter, filter_flag.unwrap_or_default()).await?.into_iter().map(|v| v.into()).collect();
         _@{ pascal_name }@Joiner::join(&mut list, conn, joiner).await?;
         Ok(list)
     }
     @%- if def.is_soft_delete() %@
 
-    pub async fn find_many_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@>>
+    pub async fn find_many_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        let mut list = __find_many(conn, &ids, TrashMode::With, filter, with_filter_flag.unwrap_or_default()).await?.into_iter().map(|v| v.into()).collect();
+        let mut list = __find_many(conn, &ids, TrashMode::With, filter, filter_flag.unwrap_or_default()).await?.into_iter().map(|v| v.into()).collect();
         _@{ pascal_name }@Joiner::join(&mut list, conn, joiner).await?;
         Ok(list)
     }
@@ -3179,7 +3179,7 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- endif %@
 
-    pub async fn find_optional<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<_@{ pascal_name }@>>
+    pub async fn find_optional<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<_@{ pascal_name }@>>
     where
         T: Into<Primary>,
     {
@@ -3191,7 +3191,7 @@ impl _@{ pascal_name }@_ {
             ..Default::default()
         }, Default::default()));
         @%- else %@
-        let data: Option<_> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?.map(|(v, f)| Data::from_row(&v).map(|v| (v, f))).transpose()?;
+        let data: Option<_> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter, filter_flag.unwrap_or_default()).await?.map(|(v, f)| Data::from_row(&v).map(|v| (v, f))).transpose()?;
         @%- endif %@
         let mut obj = data.map(_@{ pascal_name }@::from);
         if let Some(obj) = obj.as_mut() {
@@ -3200,7 +3200,7 @@ impl _@{ pascal_name }@_ {
         Ok(obj)
     }
 
-    pub async fn exists<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<BTreeMap<&'static str, bool>>>
+    pub async fn exists<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<BTreeMap<&'static str, bool>>>
     where
         T: Into<Primary>,
     {
@@ -3208,18 +3208,18 @@ impl _@{ pascal_name }@_ {
         @%- if def.dummy_always_joinable() %@
         Ok(Default::default())
         @%- else %@
-        let data: Option<_> = __find_optional(conn, Exists::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?.map(|(_, f)| f);
+        let data: Option<_> = __find_optional(conn, Exists::_sql_cols(@{ is_mysql_str }@), id, TrashMode::Not, filter, filter_flag.unwrap_or_default()).await?.map(|(_, f)| f);
         Ok(data)
         @%- endif %@
     }
     @%- if !def.disable_update() %@
 
-    pub async fn find_optional_for_update<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<_@{ pascal_name }@Updater>>
+    pub async fn find_optional_for_update<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<_@{ pascal_name }@Updater>>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        let result = __find_for_update(conn, &id, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?;
+        let result = __find_for_update(conn, &id, TrashMode::Not, filter, filter_flag.unwrap_or_default()).await?;
         let mut obj = result.map(__Updater__::from);
         if let Some(obj) = obj.as_mut() {
             _@{ pascal_name }@Joiner::join(obj, conn, joiner).await?;
@@ -3229,7 +3229,7 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- if def.is_soft_delete() %@
 
-    pub async fn find_optional_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<_@{ pascal_name }@>>
+    pub async fn find_optional_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<_@{ pascal_name }@>>
     where
         T: Into<Primary>,
     {
@@ -3241,7 +3241,7 @@ impl _@{ pascal_name }@_ {
             ..Default::default()
         });
         @%- else %@
-        let data: Option<_> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter, with_filter_flag.unwrap_or_default()).await?.map(|(v, f)| Data::from_row(&v).map(|v| (v, f))).transpose()?;
+        let data: Option<_> = __find_optional(conn, Data::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter, filter_flag.unwrap_or_default()).await?.map(|(v, f)| Data::from_row(&v).map(|v| (v, f))).transpose()?;
         @%- endif %@
         let mut obj = data.map(_@{ pascal_name }@::from);
         if let Some(obj) = obj.as_mut() {
@@ -3250,7 +3250,7 @@ impl _@{ pascal_name }@_ {
         Ok(obj)
     }
 
-    pub async fn exists_with_trashed<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<BTreeMap<&'static str, bool>>>
+    pub async fn exists_with_trashed<T>(conn: &mut DbConn, id: T, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Option<BTreeMap<&'static str, bool>>>
     where
         T: Into<Primary>,
     {
@@ -3258,7 +3258,7 @@ impl _@{ pascal_name }@_ {
         @%- if def.dummy_always_joinable() %@
         Ok(Default::default())
         @%- else %@
-        let data: Option<_> = __find_optional(conn, Exists::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter, with_filter_flag.unwrap_or_default()).await?.map(|(_, f)| f);
+        let data: Option<_> = __find_optional(conn, Exists::_sql_cols(@{ is_mysql_str }@), id, TrashMode::With, filter, filter_flag.unwrap_or_default()).await?.map(|(_, f)| f);
         Ok(data)
         @%- endif %@
     }
@@ -3286,12 +3286,12 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- if !def.disable_update() %@
 
-    pub async fn find_for_update<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@Updater>
+    pub async fn find_for_update<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@Updater>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        let result = __find_for_update(conn, &id, TrashMode::Not, filter, with_filter_flag.unwrap_or_default()).await?@{ def.soft_delete_tpl("",".filter(|(data, _)| data.deleted_at.is_none())",".filter(|(data, _)| data.deleted == 0)")}@;
+        let result = __find_for_update(conn, &id, TrashMode::Not, filter, filter_flag.unwrap_or_default()).await?@{ def.soft_delete_tpl("",".filter(|(data, _)| data.deleted_at.is_none())",".filter(|(data, _)| data.deleted == 0)")}@;
         let data = result.with_context(|| err::RowNotFound::new("@{ table_name }@", id.to_string()))?;
         let mut obj = __Updater__::from(data);
         _@{ pascal_name }@Joiner::join(&mut obj, conn, joiner).await?;
@@ -3300,12 +3300,12 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
     @%- if !def.disable_update() && def.is_soft_delete() %@
 
-    pub async fn find_for_update_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@Updater>
+    pub async fn find_for_update_with_trashed<T>(conn: &mut DbConn, id: T, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<_@{ pascal_name }@Updater>
     where
         T: Into<Primary>,
     {
         let id: InnerPrimary = (&id.into()).into();
-        let result = __find_for_update(conn, &id, TrashMode::With, filter, with_filter_flag.unwrap_or_default()).await?;
+        let result = __find_for_update(conn, &id, TrashMode::With, filter, filter_flag.unwrap_or_default()).await?;
         let data = result.with_context(|| err::RowNotFound::new("@{ table_name }@", id.to_string()))?;
         let mut obj = __Updater__::from(data);
         _@{ pascal_name }@Joiner::join(&mut obj, conn, joiner).await?;
@@ -3314,22 +3314,22 @@ impl _@{ pascal_name }@_ {
     @%- endif %@
 @%- if !def.disable_update() %@
 
-    pub async fn find_many_for_update<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@Updater>>
+    pub async fn find_many_for_update<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@Updater>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        __find_many_for_update(conn, &ids, TrashMode::Not, joiner, filter, with_filter_flag.unwrap_or_default()).await
+        __find_many_for_update(conn, &ids, TrashMode::Not, joiner, filter, filter_flag.unwrap_or_default()).await
     }
 
-    pub async fn find_many_for_update_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@Updater>>
+    pub async fn find_many_for_update_with_trashed<I, T>(conn: &mut DbConn, ids: I, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: Option<BTreeMap<&'static str, Filter_>>) -> Result<Vec<_@{ pascal_name }@Updater>>
     where
         I: IntoIterator<Item = T>,
         T: Into<Primary>,
     {
         let ids: Vec<InnerPrimary> = ids.into_iter().map(|id| (&id.into()).into()).collect();
-        __find_many_for_update(conn, &ids, TrashMode::With, joiner, filter, with_filter_flag.unwrap_or_default()).await
+        __find_many_for_update(conn, &ids, TrashMode::With, joiner, filter, filter_flag.unwrap_or_default()).await
     }
 @%- endif %@
 @%- for (index_name, index) in def.unique_index() %@
@@ -3950,7 +3950,7 @@ async fn __find_many(
     ids: &[InnerPrimary],
     trash_mode: TrashMode,
     filter: Option<Filter_>,
-    with_filter_flag: BTreeMap<&'static str, Filter_>,
+    filter_flag: BTreeMap<&'static str, Filter_>,
 ) -> Result<Vec<(Data, BTreeMap<&'static str, bool>)>> {
     if ids.is_empty() {
         return Ok(Vec::new());
@@ -3972,7 +3972,7 @@ async fn __find_many(
             .collect();
         list.append(&mut v);
         @%- else %@
-        let v = ___find_many(conn, Data::_sql_cols(@{ is_mysql_str }@), ids, trash_mode, filter.clone(), with_filter_flag.clone()).await?;
+        let v = ___find_many(conn, Data::_sql_cols(@{ is_mysql_str }@), ids, trash_mode, filter.clone(), filter_flag.clone()).await?;
         let mut v: sqlx::Result<Vec<_>> = v.into_iter().map(|(v, f)| Data::from_row(&v).map(|v| (v, f))).collect();
         list.append(&mut v?);
         @%- endif %@
@@ -3980,13 +3980,13 @@ async fn __find_many(
     Ok(list)
 }
 #[allow(clippy::needless_borrow)]
-async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], trash_mode: TrashMode, filter: Option<Filter_>, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Vec<(DbRow, BTreeMap<&'static str, bool>)>>
+async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], trash_mode: TrashMode, filter: Option<Filter_>, filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Vec<(DbRow, BTreeMap<&'static str, bool>)>>
 {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
-    let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
-    let sql_cols = write_filter_flag(sql_cols, &with_filter_flag, conn.shard_id());
+    let filter_flag_names: Vec<_> = filter_flag.keys().cloned().collect();
+    let sql_cols = write_filter_flag(sql_cols, &filter_flag, conn.shard_id());
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {
         filter_str = "WHERE".to_string();
@@ -4004,7 +4004,7 @@ async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], t
     @%- endif %@
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-    for (_name, filter) in with_filter_flag {
+    for (_name, filter) in filter_flag {
         query = filter.bind_to_query(query);
     }
     if let Some(c) = filter {
@@ -4198,10 +4198,10 @@ async fn ___find_many_from_cache(conn: &mut DbConn, ids: Vec<PrimaryHasher>, joi
 @%- endif %@
 
 #[allow(clippy::needless_borrow)]
-async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Option<(DbRow, BTreeMap<&'static str, bool>)>>
+async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>, filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Option<(DbRow, BTreeMap<&'static str, bool>)>>
 {
-    let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
-    let sql_cols = write_filter_flag(sql_cols, &with_filter_flag, conn.shard_id());
+    let filter_flag_names: Vec<_> = filter_flag.keys().cloned().collect();
+    let sql_cols = write_filter_flag(sql_cols, &filter_flag, conn.shard_id());
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {
         filter_str = "WHERE".to_string();
@@ -4214,7 +4214,7 @@ async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, tr
     @%- endif %@
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-    for (_name, filter) in with_filter_flag {
+    for (_name, filter) in filter_flag {
         query = filter.bind_to_query(query);
     }
     if let Some(c) = filter {
@@ -4246,9 +4246,9 @@ where
 @%- if !def.disable_update() %@
 
 #[allow(clippy::needless_borrow)]
-async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Option<(Data, BTreeMap<&'static str, bool>)>> {
-    let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
-    let sql_cols = write_filter_flag(Data::_sql_cols(@{ is_mysql_str }@), &with_filter_flag, conn.shard_id());
+async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: TrashMode, filter: Option<Filter_>, filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Option<(Data, BTreeMap<&'static str, bool>)>> {
+    let filter_flag_names: Vec<_> = filter_flag.keys().cloned().collect();
+    let sql_cols = write_filter_flag(Data::_sql_cols(@{ is_mysql_str }@), &filter_flag, conn.shard_id());
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {
         filter_str = "WHERE".to_string();
@@ -4261,7 +4261,7 @@ async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: Tra
     @%- endif %@
     let mut query = sqlx::query(&sql);
     let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-    for (_name, filter) in with_filter_flag {
+    for (_name, filter) in filter_flag {
         query = filter.bind_to_query(query);
     }
     if let Some(c) = filter {
@@ -4285,13 +4285,13 @@ async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: Tra
 }
 
 #[allow(clippy::needless_borrow)]
-async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_mode: TrashMode, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, with_filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
+async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_mode: TrashMode, joiner: Option<Box<Joiner_>>, filter: Option<Filter_>, filter_flag: BTreeMap<&'static str, Filter_>) -> Result<Vec<_@{ pascal_name }@Updater>>
 {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
-    let filter_flag_names: Vec<_> = with_filter_flag.keys().cloned().collect();
-    let sql_cols = write_filter_flag(Data::_sql_cols(@{ is_mysql_str }@), &with_filter_flag, conn.shard_id());
+    let filter_flag_names: Vec<_> = filter_flag.keys().cloned().collect();
+    let sql_cols = write_filter_flag(Data::_sql_cols(@{ is_mysql_str }@), &filter_flag, conn.shard_id());
     let mut list: Vec<__Updater__> = Vec::with_capacity(ids.len());
     let mut filter_str = Filter_::write_where(&filter, trash_mode, TRASHED_SQL, NOT_TRASHED_SQL, ONLY_TRASHED_SQL, conn.shard_id());
     if filter_str.is_empty() {
@@ -4312,7 +4312,7 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
         @%- endif %@
         let mut query = sqlx::query(&sql);
         let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
-        for (_name, filter) in with_filter_flag.clone() {
+        for (_name, filter) in filter_flag.clone() {
             query = filter.bind_to_query(query);
         }
         if let Some(c) = filter.clone() {

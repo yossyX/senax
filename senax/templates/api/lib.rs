@@ -4,7 +4,7 @@ macro_rules! gql_find {
         match $f$p.await {
             Ok(obj) => {
                 let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
-                if !obj.get_flag("_readable").unwrap_or_default() {
+                if !domain::models::FilterFlag::get_flag(obj.as_ref(), "_readable").unwrap_or_default() {
                     return Err(GqlError::Forbidden.extend());
                 }
                 Ok(ResObj::try_from_(&*obj, None)?)
@@ -16,7 +16,7 @@ macro_rules! gql_find {
                         .await
                         .map_err(|e| GqlError::server_error($gql_ctx, e))?;
                     let obj = obj.ok_or_else(|| GqlError::NotFound.extend())?;
-                    if !obj.get_flag("_readable").unwrap_or_default() {
+                    if !domain::models::FilterFlag::get_flag(obj.as_ref(), "_readable").unwrap_or_default() {
                         return Err(GqlError::Forbidden.extend());
                     }
                     Ok(ResObj::try_from_(&*obj, None)?)
