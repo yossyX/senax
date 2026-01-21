@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=../senax-schema.json#definitions/ConfigDef
 
-title: 
-author: 
+title:
+author:
 db_id: @{ db_id }@
 db: @{ db_type }@
 ignore_foreign_key: true

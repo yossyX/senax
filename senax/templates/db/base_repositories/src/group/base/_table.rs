@@ -128,8 +128,9 @@ pub(crate) async fn init() -> Result<()> {
 }
 
 pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
+    use anyhow::Context;
     let mut conn = DbConn::_new(shard_id);
-    _@{ pascal_name }@_::query().limit(0).select(&mut conn).await?;
+    _@{ pascal_name }@_::query().limit(0).select(&mut conn).await.context("Unknown column found in the @{ model_name }@ model.")?;
     Ok(())
 }
 
@@ -266,6 +267,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
     fn handle_cache_msg(self, sync_map: Arc<FxHashMap<ShardId, u64>>) -> BoxFuture<'static, ()> {
         async move {
             let time = MSec::now();
+            @%- if !config.force_disable_cache %@
             for (shard_id, sync) in sync_map.iter() {
                 if *sync == 0 {
                     let shard_id = *shard_id;
@@ -275,6 +277,7 @@ impl CacheOpTr<CacheOp, OpData, Data, CacheWrapper, CacheData, PrimaryHasher> fo
                     });
                 }
             }
+            @%- endif %@
             match self {
                 CacheOp::None => {},
                 @%- if def.act_as_job_queue() %@
@@ -2503,9 +2506,11 @@ impl QueryBuilder {
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
+        @%- if !config.force_disable_cache %@
         if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
+        @%- endif %@
         Ok(result.rows_affected())
     }
     @%- endif %@
@@ -2575,9 +2580,11 @@ impl QueryBuilder {
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
+        @%- if !config.force_disable_cache %@
         if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
+        @%- endif %@
         Ok(result.rows_affected())
     }
     @%- else %@

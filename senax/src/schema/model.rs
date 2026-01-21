@@ -249,6 +249,7 @@ pub struct ModelDef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overwrite_on_relation_save: Option<bool>,
     /// ### 更新通知を有効化する
+    /// force_disable_cacheとの同時設定不可
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enable_update_notice: Option<bool>,
     /// ### 遅延INSERTを有効化する
@@ -399,6 +400,7 @@ pub struct ModelJson {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overwrite_on_relation_save: Option<bool>,
     /// ### 更新通知を有効化する
+    /// force_disable_cacheとの同時設定不可
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enable_update_notice: Option<bool>,
     /// ### 遅延INSERTを有効化する

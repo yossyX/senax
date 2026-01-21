@@ -31,25 +31,20 @@ pub fn write_group_files(
     unified_group: &UnifiedGroup,
     unified_groups: &[UnifiedGroup],
     ref_db: &BTreeSet<(String, String)>,
-    force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
     let base_dir = domain_base_relations_dir.join(unified_name);
     let file_path = base_dir.join("Cargo.toml");
     remove_files.remove(file_path.as_os_str());
-    let mut content = if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(path = "domain/base_relations/groups/_Cargo.toml", escape = "none")]
-        struct Template<'a> {
-            db: &'a str,
-            unified_name: &'a str,
-        }
-        Template { db, unified_name }.render()?
-    } else {
-        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
-    };
-    let reg = Regex::new(r"(?m)^base_relations_\w+\s*=.+\n")?;
-    content = reg.replace_all(&content, "").into_owned();
+
+    #[derive(Template)]
+    #[template(path = "domain/base_relations/groups/_Cargo.toml", escape = "none")]
+    struct Template<'a> {
+        db: &'a str,
+        unified_name: &'a str,
+    }
+
+    let mut content = Template { db, unified_name }.render()?;
     let mut done = Vec::new();
     for (db, group) in ref_db {
         let db = &db.to_snake();
@@ -82,55 +77,14 @@ pub fn write_group_files(
     let src_dir = base_dir.join("src");
     let file_path = src_dir.join("lib.rs");
     remove_files.remove(file_path.as_os_str());
-    if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(path = "domain/base_relations/groups/src/lib.rs", escape = "none")]
-        struct Template;
-        let content = Template.render()?;
-        fs_write(file_path, &*content)?;
-    }
 
-    let file_path = src_dir.join("relations.rs");
-    remove_files.remove(file_path.as_os_str());
-    let content = if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(
-            path = "domain/base_relations/groups/src/relations.rs",
-            escape = "none"
-        )]
-        struct Template;
-        Template.render()?
-    } else {
-        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
-    };
-    {
-        #[derive(Template)]
-        #[template(
-            source = r###"
-// Do not modify below this line. (ModStart)
-@%- for (name, defs) in groups %@
-pub mod @{ name|snake|ident }@;
-@%- endfor %@
-// Do not modify above this line. (ModEnd)"###,
-            ext = "txt",
-            escape = "none"
-        )]
-        struct ModTemplate<'a> {
+    #[derive(Template)]
+    #[template(path = "domain/base_relations/groups/src/lib.rs", escape = "none")]
+    struct LibTemplate<'a> {
             pub groups: &'a GroupsDef,
         }
-
-        let re = Regex::new(r"(?s)// Do not modify below this line. \(ModStart\).+// Do not modify above this line. \(ModEnd\)").unwrap();
-        ensure!(
-            re.is_match(&content),
-            "File contents are invalid.: {:?}",
-            &file_path
-        );
-        let tpl = ModTemplate { groups }.render()?;
-        let tpl = tpl.trim_start();
-        let content = re.replace(&content, tpl);
-
-        fs_write(file_path, &*content)?;
-    }
+    let content = LibTemplate{ groups }.render()?;
+    fs_write(file_path, &*content)?;
 
     let repositories_dir = src_dir.join("relations");
     for (group_name, defs) in groups {

@@ -86,7 +86,7 @@ pub fn generate(
     let ddl_path = base_path.join("migrations");
     fn file_read(path: &PathBuf) -> Result<String> {
         let content = std::fs::read_to_string(path)
-            .with_context(|| format!("Cannot read file: {:?}", path))?;
+            .with_context(|| format!("Cannot read file: {:?}", path))?.replace("\r\n", "\n");
         let mut result = String::new();
         for line in content.split('\n') {
             match line.strip_prefix("-- ") {

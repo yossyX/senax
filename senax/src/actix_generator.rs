@@ -33,7 +33,7 @@ pub fn generate(
 
     let file_path = Path::new("./Cargo.toml");
     if file_path.exists() {
-        let content = fs::read_to_string(file_path)?;
+        let content = fs::read_to_string(file_path)?.replace("\r\n", "\n");
         let re = Regex::new(r"members\s*=\s*\[([^\]]*)\]").unwrap();
         let caps = re
             .captures(&content)
@@ -66,7 +66,7 @@ pub fn generate(
 
     let file_path = Path::new("./build.sh");
     if file_path.exists() {
-        let content = fs::read_to_string(file_path)?;
+        let content = fs::read_to_string(file_path)?.replace("\r\n", "\n");
         fs_write(file_path, fix_build_sh(&content, name)?)?;
     }
 

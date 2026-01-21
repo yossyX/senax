@@ -1363,7 +1363,7 @@ impl DbConn {
             }
         }
     }
-    @%- if config.enable_update_notice %@
+    @%- if !config.force_disable_cache && config.enable_update_notice %@
     pub async fn subscribe_update_notice(f: NotifyFn) {
         let mut receivers = NOTIFY_RECEIVER.write().await;
         receivers.push(f);

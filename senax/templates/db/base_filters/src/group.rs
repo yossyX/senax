@@ -27,6 +27,8 @@ pub mod _base {
 @%- endfor %@
 }
 @%- else %@
-pub mod _base;
+pub mod _base {
+@{ base_output }@
+}
 @%- endif %@
 @{-"\n"}@

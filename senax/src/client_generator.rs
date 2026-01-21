@@ -23,7 +23,7 @@ pub fn generate(name: &str, server: &str, _force: bool) -> Result<()> {
 
     let file_path = Path::new("./build.sh");
     if file_path.exists() {
-        let content = fs::read_to_string(file_path)?;
+        let content = fs::read_to_string(file_path)?.replace("\r\n", "\n");
         fs_write(file_path, fix_build_sh(&content, name, server)?)?;
     }
 

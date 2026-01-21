@@ -1,10 +1,8 @@
 use anyhow::Result;
 use askama::Template;
-use regex::Regex;
 use std::{
     collections::{BTreeSet, HashSet},
     ffi::OsString,
-    fs,
     path::Path,
     sync::Arc,
 };
@@ -29,29 +27,20 @@ pub fn write_base_group_files(
     unified_group: &UnifiedGroup,
     unified_groups: &[UnifiedGroup],
     ref_db: &BTreeSet<(String, String)>,
-    force: bool,
     remove_files: &mut HashSet<OsString>,
 ) -> Result<()> {
     let base_dir = db_repositories_dir.join(unified_name);
     let file_path = base_dir.join("Cargo.toml");
     remove_files.remove(file_path.as_os_str());
-    let mut content = if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(path = "db/base_filters/_Cargo.toml", escape = "none")]
-        struct Template<'a> {
-            db: &'a str,
-            unified_name: &'a str,
-        }
-        Template { db, unified_name }.render()?
-    } else {
-        fs::read_to_string(&file_path)?.replace("\r\n", "\n")
-    };
-    let reg = Regex::new(r"(?m)^_base_filter_\w+\s*=.+\n")?;
-    content = reg.replace_all(&content, "").into_owned();
-    let reg = Regex::new(r"(?m)^_repo_\w+\s*=.+\n")?;
-    content = reg.replace_all(&content, "").into_owned();
-    let reg = Regex::new(r"(?m)^db_\w+\s*=.+\n")?;
-    content = reg.replace_all(&content, "").into_owned();
+
+    #[derive(Template)]
+    #[template(path = "db/base_filters/_Cargo.toml", escape = "none")]
+    struct Template<'a> {
+        db: &'a str,
+        unified_name: &'a str,
+    }
+
+    let mut content = Template { db, unified_name }.render()?;
     let mut db_chk = HashSet::new();
     for (db, group) in ref_db {
         let db = &db.to_snake();
@@ -90,35 +79,14 @@ pub fn write_base_group_files(
     let src_dir = base_dir.join("src");
     let file_path = src_dir.join("lib.rs");
     remove_files.remove(file_path.as_os_str());
-    if force || !file_path.exists() {
-        #[derive(Template)]
-        #[template(path = "db/base_filters/src/lib.rs", escape = "none")]
-        struct LibTemplate;
-
-        let tpl = LibTemplate;
-        fs_write(file_path, tpl.render()?)?;
-    }
-
     #[derive(Template)]
-    #[template(path = "db/base_filters/src/repositories.rs", escape = "none")]
-    struct RepositoriesTemplate<'a> {
+    #[template(path = "db/base_filters/src/lib.rs", escape = "none")]
+    struct LibTemplate<'a> {
+        pub config: &'a ConfigDef,
         pub groups: &'a GroupsDef,
     }
 
-    let file_path = src_dir.join("repositories.rs");
-    remove_files.remove(file_path.as_os_str());
-    let tpl = RepositoriesTemplate { groups };
-    fs_write(file_path, tpl.render()?)?;
-
-    #[derive(Template)]
-    #[template(path = "db/base_filters/src/misc.rs", escape = "none")]
-    struct MiscTemplate<'a> {
-        pub config: &'a ConfigDef,
-    }
-
-    let file_path = src_dir.join("misc.rs");
-    remove_files.remove(file_path.as_os_str());
-    let tpl = MiscTemplate { config };
+    let tpl = LibTemplate { config, groups };
     fs_write(file_path, tpl.render()?)?;
 
     let model_models_dir = src_dir.join("repositories");
@@ -141,31 +109,7 @@ pub fn write_base_group_files(
             })
             .collect();
 
-        let file_path = model_models_dir.join(format!("{}.rs", group_name.to_snake()));
-        remove_files.remove(file_path.as_os_str());
-
-        #[derive(Template)]
-        #[template(path = "db/base_filters/src/group.rs", escape = "none")]
-        struct GroupTemplate<'a> {
-            pub db: &'a str,
-            pub group_name: &'a str,
-            pub mod_names: &'a BTreeSet<String>,
-            pub unified_names: &'a BTreeSet<(String, String)>,
-        }
-
-        let tpl = GroupTemplate {
-            db,
-            group_name,
-            mod_names: &mod_names,
-            unified_names: &unified_names,
-        };
-        fs_write(file_path, tpl.render()?)?;
-
-        let mut impl_output = String::new();
-        impl_output.push_str(OVERWRITTEN_MSG);
-
-        let mut output = String::new();
-        output.push_str(OVERWRITTEN_MSG);
+        let mut base_output = String::new();
 
         let model_group_dir = model_models_dir.join(group_name.to_snake());
         let model_group_base_dir = model_group_dir.join("_base");
@@ -234,15 +178,32 @@ pub fn write_base_group_files(
                     remove_files.remove(file_path.as_os_str());
                     fs_write(file_path, format!("{}{}", OVERWRITTEN_MSG, ret))?;
                 } else {
-                    output.push_str(&format!("pub mod _{} {{\n{}}}\n", mod_name, ret));
+                    base_output.push_str(&format!("pub mod _{} {{\n{}}}\n", mod_name, ret));
                 }
             }
         }
-        if !SEPARATED_BASE_FILES {
-            let file_path = model_group_dir.join("_base.rs");
-            remove_files.remove(file_path.as_os_str());
-            fs_write(file_path, output)?;
+
+        let file_path = model_models_dir.join(format!("{}.rs", group_name.to_snake()));
+        remove_files.remove(file_path.as_os_str());
+
+        #[derive(Template)]
+        #[template(path = "db/base_filters/src/group.rs", escape = "none")]
+        struct GroupTemplate<'a> {
+            pub db: &'a str,
+            pub group_name: &'a str,
+            pub mod_names: &'a BTreeSet<String>,
+            pub unified_names: &'a BTreeSet<(String, String)>,
+            pub base_output: String,
         }
+
+        let tpl = GroupTemplate {
+            db,
+            group_name,
+            mod_names: &mod_names,
+            unified_names: &unified_names,
+            base_output
+        };
+        fs_write(file_path, tpl.render()?)?;
     }
     Ok(())
 }

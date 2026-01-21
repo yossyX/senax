@@ -379,8 +379,8 @@ pub fn write_simple_vo_yml(data: &IndexMap<String, FieldDef>) -> anyhow::Result<
         && path.exists()
     {
         let content = fs::read_to_string(&path)?;
-        let dir = bk.join(format!("vo-{}.yml", Local::now()));
-        fs::write(dir, content)?;
+        let bk_path = bk.join(format!("vo-{}.yml", Local::now()));
+        fs::write(bk_path, content)?;
     }
     let mut buf =
         "# yaml-language-server: $schema=../senax-schema.json#properties/simple_value_object\n\n"

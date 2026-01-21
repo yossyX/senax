@@ -77,13 +77,13 @@ pub fn generate(db_type: DbType, db: &str, exclude_from_domain: bool, session: b
 
     let file_path = Path::new("./.env");
     if file_path.exists() {
-        let content = fs::read_to_string(file_path)?;
+        let content = fs::read_to_string(file_path)?.replace("\r\n", "\n");
         fs_write(file_path, fix_env(&content, db, db_type)?)?;
     }
 
     let file_path = Path::new("./.env.example");
     if file_path.exists() {
-        let content = fs::read_to_string(file_path)?;
+        let content = fs::read_to_string(file_path)?.replace("\r\n", "\n");
         fs_write(file_path, fix_env(&content, db, db_type)?)?;
     }
 

@@ -545,8 +545,17 @@ pub fn generate(
         let include_groups = unified_group.include_groups();
         let repo_include_groups: GroupsDef = groups
             .iter()
+            .filter(|(group_name, models)| {
+                models
+                    .iter()
+                    .any(|(model_name, _)| {
+                        unified_group
+                            .nodes
+                            .contains_key(&((*group_name).into(), (**model_name).into()))
+                    })
+            })
             .map(|(group_name, models)| {
-                let v2: IndexMap<String, Arc<ModelDef>> = models
+                let m: IndexMap<String, Arc<ModelDef>> = models
                     .iter()
                     .filter(|(model_name, _)| {
                         unified_group
@@ -556,7 +565,7 @@ pub fn generate(
                     })
                     .map(|(n, v)| (n.to_string(), v.clone()))
                     .collect();
-                (group_name.to_string(), v2)
+                (group_name.to_string(), m)
             })
             .collect();
         let ref_db: BTreeSet<(String, String)> = groups
@@ -589,7 +598,6 @@ pub fn generate(
             unified_group,
             &unified_groups,
             &ref_db,
-            force,
             &mut remove_files,
         )?;
 
@@ -603,7 +611,6 @@ pub fn generate(
                 unified_group,
                 &unified_groups,
                 &ref_db,
-                force,
                 &mut remove_files,
             )?;
         }
@@ -612,8 +619,17 @@ pub fn generate(
         let include_groups = unified_group.include_groups();
         let repo_include_groups: GroupsDef = groups
             .iter()
+            .filter(|(group_name, models)| {
+                models
+                    .iter()
+                    .any(|(model_name, _)| {
+                        unified_group
+                            .nodes
+                            .contains_key(&((*group_name).into(), (**model_name).into()))
+                    })
+            })
             .map(|(group_name, models)| {
-                let v2: IndexMap<String, Arc<ModelDef>> = models
+                let m: IndexMap<String, Arc<ModelDef>> = models
                     .iter()
                     .filter(|(model_name, _)| {
                         unified_group
@@ -623,7 +639,7 @@ pub fn generate(
                     })
                     .map(|(n, v)| (n.to_string(), v.clone()))
                     .collect();
-                (group_name.to_string(), v2)
+                (group_name.to_string(), m)
             })
             .collect();
         let ref_db: BTreeSet<(String, String)> = groups
@@ -671,7 +687,6 @@ pub fn generate(
             filter_unified_map,
             filter_unified_names,
             &ref_db,
-            force,
             &mut remove_files,
         )?;
     }
@@ -730,7 +745,7 @@ pub fn check_version(db: &str) -> Result<()> {
     let file_path = model_src_dir.join("models.rs");
     if file_path.exists() {
         let content = fs::read_to_string(&file_path)?;
-        let re = Regex::new(r"(?m)^// Senax v(.+)$").unwrap();
+        let re = Regex::new(r"(?mR)^// Senax v(.+)$").unwrap();
         let caps = re
             .captures(&content)
             .with_context(|| format!("Illegal file content:{}", &file_path.to_string_lossy()))?;
