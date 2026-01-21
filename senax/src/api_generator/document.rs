@@ -84,6 +84,7 @@ pub struct ModelDoc {
     pub updatable_roles: Vec<String>,
     pub deletable_roles: Vec<String>,
     pub readable_filter: Option<String>,
+    pub creatable_filter: Option<String>,
     pub updatable_filter: Option<String>,
     pub deletable_filter: Option<String>,
     pub selectors: Vec<SelectorDoc>,
@@ -314,6 +315,7 @@ fn make_model(
         updatable_roles: api_def.updatable_roles(config, group),
         deletable_roles: api_def.deletable_roles(config, group),
         readable_filter: api_def.readable_filter.clone(),
+        creatable_filter: api_def.creatable_filter.clone(),
         updatable_filter: api_def.updatable_filter.clone(),
         deletable_filter: api_def.deletable_filter.clone(),
         selectors: def

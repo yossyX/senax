@@ -37,14 +37,14 @@ export const FindForUpdate@{ model_route|pascal }@Query = graphql(`mutation find
 @%- endif %@
 #@
 
-export const Create@{ model_route|pascal }@Query = graphql(`mutation create_@{ path }@($data:Req@{ graphql_name }@!){@{ curly_begin }@{create(data:$data){...@{ graphql_name }@}}@{ curly_end }@}`);
+export const Create@{ model_route|pascal }@Query = graphql(`mutation create_@{ path }@($data:Req@{ graphql_name }@!, $checkOnly:Boolean){@{ curly_begin }@{create(data:$data, checkOnly:$checkOnly){...@{ graphql_name }@}}@{ curly_end }@}`);
 @%- if !def.disable_update() %@
 @%- if api_def.enable_import %@
 
-export const Import@{ model_route|pascal }@Query = graphql(`mutation import_@{ path }@($list:[Req@{ graphql_name }@!]!){@{ curly_begin }@{import(list:$list)}@{ curly_end }@}`);
+export const Import@{ model_route|pascal }@Query = graphql(`mutation import_@{ path }@($list:[Req@{ graphql_name }@!]!@% if !def.has_auto_primary() %@, $option: ImportOption@% endif %@, $checkOnly:Boolean){@{ curly_begin }@{import(list:$list@% if !def.has_auto_primary() %@, , option:$option@% endif %@, checkOnly:$checkOnly)}@{ curly_end }@}`);
 @%- endif %@
 
-export const Update@{ model_route|pascal }@Query = graphql(`mutation update_@{ path }@($data:Req@{ graphql_name }@!){@{ curly_begin }@{update(data:$data){...@{ graphql_name }@}}@{ curly_end }@}`);
+export const Update@{ model_route|pascal }@Query = graphql(`mutation update_@{ path }@($data:Req@{ graphql_name }@!, $checkOnly:Boolean){@{ curly_begin }@{update(data:$data, checkOnly:$checkOnly){...@{ graphql_name }@}}@{ curly_end }@}`);
 
 export const Delete@{ model_route|pascal }@Query = graphql(`mutation delete_@{ path }@($_id:ID!){@{ curly_begin }@{delete(_id:$_id)}@{ curly_end }@}`);
 @%- if api_def.enable_delete_by_pk %@

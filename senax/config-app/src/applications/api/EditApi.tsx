@@ -234,6 +234,12 @@ function EditApi() {
               />
               <AutoField name="readable_filter" {...formData} textarea />
               <AutoField
+                name="creatable_filter"
+                {...formData}
+                textarea
+                hidden={disable_mutation}
+              />
+              <AutoField
                 name="updatable_filter"
                 {...formData}
                 textarea

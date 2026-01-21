@@ -105,13 +105,13 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 self.filter = Some(filter);
                 self
             }
-            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _RepositoryFindBuilder> {
-                self.filter_flag.insert(name, filter);
+            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter_flag: Filter_) -> Box<dyn _RepositoryFindBuilder> {
+                self.filter_flag.insert(name, filter_flag);
                 self
             }
-            fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _RepositoryFindBuilder> {
+            fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter_flag: Filter_) -> Box<dyn _RepositoryFindBuilder> {
                 if condition {
-                    self.with_filter_flag(name, filter)
+                    self.with_filter_flag(name, filter_flag)
                 } else {
                     self
                 }
@@ -139,6 +139,19 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         })
     }
     @%- endif %@
+    async fn query_virtual_row(&self, obj: &Box<dyn @{ pascal_name }@Updater>, filter_flag: Filter_) -> anyhow::Result<bool> {
+        let Some(obj) = (obj.deref() as &dyn std::any::Any).downcast_ref::<_@{ pascal_name }@Updater>() else {
+            panic!("Only _@{ pascal_name }@Updater is accepted.");
+        };
+        use domain::models::Check_ as _;
+        if let Ok(flag) = filter_flag.check(obj) {
+            return Ok(flag)
+        }
+        let mut filters = std::collections::BTreeMap::new();
+        filters.insert("flag", filter_flag);
+        let result = _@{ pascal_name }@_::select_virtual_row(self._conn.lock().await.deref_mut(), obj, filters).await?;
+        Ok(*result.get("flag").unwrap())
+    }
     fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn @{ pascal_name }@Updater> {
         Box::new(updater_from_factory(factory))
     }

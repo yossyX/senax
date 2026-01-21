@@ -742,6 +742,7 @@ pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@:
         @%- if !def.disable_update() %@
         fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn _@{ pascal_name }@RepositoryFindBuilder>;
         @%- endif %@
+        async fn query_virtual_row(&self, obj: &Box<dyn @{ pascal_name }@Updater>, filter_flag: Filter_) -> anyhow::Result<bool>;
         fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn @{ pascal_name }@Updater>;
         async fn save(&self, obj: Box<dyn @{ pascal_name }@Updater>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>>;
         @%- if !def.disable_update() %@

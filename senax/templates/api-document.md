@@ -37,13 +37,19 @@ SOBO-WEBの業務DBの GraphQL API 定義を記載する。
 更新：{{ model.updatable_roles | join(sep=", ") }}  
 削除：{{ model.deletable_roles | join(sep=", ") }}  
 
-{%- if model.readable_filter or model.updatable_filter or model.deletable_filter %}
+{%- if model.readable_filter or model.creatable_filter or model.updatable_filter or model.deletable_filter %}
 
 #### フィルタ設定
 {%- if model.readable_filter %}
 参照
 ```
 {{model.readable_filter}}
+```  
+{%- endif %}
+{%- if model.creatable_filter %}
+登録
+```
+{{model.creatable_filter}}
 ```  
 {%- endif %}
 {%- if model.updatable_filter %}

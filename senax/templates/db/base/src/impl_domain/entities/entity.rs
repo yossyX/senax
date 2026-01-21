@@ -277,15 +277,15 @@ impl @{ pascal_name }@ for _@{ pascal_name }@Updater {
     }", "") }@
 @{- def.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
-        unimplemented!()
+        anyhow::bail!(\"not loaded\")
     }", "") }@
 @{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
-        unimplemented!()
+        anyhow::bail!(\"not loaded\")
     }", "") }@
 @{- def.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
-        unimplemented!()
+        anyhow::bail!(\"not loaded\")
     }", "") }@
 }
 impl domain::models::FilterFlag for _@{ pascal_name }@Updater {

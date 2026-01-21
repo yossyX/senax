@@ -67,6 +67,11 @@ pub fn readable_filter(auth: &AuthInfo) -> anyhow::Result<_repository_::Filter_>
 @%- if !api_def.disable_mutation %@
 
 #[allow(unused_variables)]
+pub fn creatable_filter(auth: &AuthInfo) -> anyhow::Result<_repository_::Filter_> {
+    Ok(_repository_::filter!(@{ api_def.creatable_filter() }@))
+}
+
+#[allow(unused_variables)]
 pub fn updatable_filter(auth: &AuthInfo) -> anyhow::Result<_repository_::Filter_> {
     Ok(_repository_::filter!(@{ api_def.updatable_filter() }@))
 }

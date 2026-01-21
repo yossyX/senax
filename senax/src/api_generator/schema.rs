@@ -591,6 +591,9 @@ pub struct ApiModelDef {
     /// ### 閲覧権限フィルタ式
     #[serde(skip_serializing_if = "Option::is_none")]
     pub readable_filter: Option<String>,
+    /// ### 登録権限フィルタ式
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creatable_filter: Option<String>,
     /// ### 更新権限フィルタ式
     /// 省略時は閲覧権限フィルタ式が適用される
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -655,6 +658,9 @@ pub struct ApiModelJson {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[validate(custom(function = "validate_filter"))]
     pub readable_filter: Option<String>,
+    /// ### 登録権限フィルタ式
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creatable_filter: Option<String>,
     /// ### 更新権限フィルタ式
     /// 省略時は閲覧権限フィルタ式が適用される
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -698,6 +704,7 @@ impl From<ApiModelDef> for ApiModelJson {
             updatable_roles: value.updatable_roles,
             deletable_roles: value.deletable_roles,
             readable_filter: value.readable_filter,
+            creatable_filter: value.creatable_filter,
             updatable_filter: value.updatable_filter,
             deletable_filter: value.deletable_filter,
             fields: value
@@ -746,6 +753,7 @@ impl TryFrom<ApiModelJson> for ApiModelDef {
             updatable_roles: value.updatable_roles,
             deletable_roles: value.deletable_roles,
             readable_filter: value.readable_filter,
+            creatable_filter: value.creatable_filter,
             updatable_filter: value.updatable_filter,
             deletable_filter: value.deletable_filter,
             fields: value
@@ -989,6 +997,12 @@ impl ApiModelDef {
     }
     pub fn readable_filter(&self) -> &str {
         self.readable_filter
+            .as_ref()
+            .map(|v| v.trim())
+            .unwrap_or("")
+    }
+    pub fn creatable_filter(&self) -> &str {
+        self.creatable_filter
             .as_ref()
             .map(|v| v.trim())
             .unwrap_or("")

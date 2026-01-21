@@ -78,6 +78,12 @@ impl<T: InputType> InputType for MaybeUndefined<T> {
     }
 }
 
+impl<T: Default> Default for MaybeUndefined<T> {
+    fn default() -> Self {
+        Self::Value(Default::default())
+    }
+}
+
 impl<T: Serialize> Serialize for MaybeUndefined<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {

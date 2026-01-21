@@ -46,8 +46,8 @@ pub trait _@{ pascal_name }@RepositoryFindBuilder: Send + Sync {
     async fn query_for_update(self: Box<Self>) -> anyhow::Result<Box<dyn _Updater>>;
     async fn query(self: Box<Self>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>>;
     fn filter(self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindBuilder>;
-    fn with_filter_flag(self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _RepositoryFindBuilder>;
-    fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _RepositoryFindBuilder>;
+    fn with_filter_flag(self: Box<Self>, name: &'static str, filter_flag: Filter_) -> Box<dyn _RepositoryFindBuilder>;
+    fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter_flag: Filter_) -> Box<dyn _RepositoryFindBuilder>;
     @%- if def.is_soft_delete() %@
     fn with_trashed(self: Box<Self>, mode: bool) -> Box<dyn _RepositoryFindBuilder>;
     @%- endif %@
@@ -59,6 +59,7 @@ pub trait _@{ pascal_name }@Repository: Send + Sync {
 @%- if !def.disable_update() %@
     fn find(&self, id: @{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@) -> Box<dyn _@{ pascal_name }@RepositoryFindBuilder>;
 @%- endif %@
+    async fn query_virtual_row(&self, obj: &Box<dyn _Updater>, filter_flag: Filter_) -> anyhow::Result<bool>;
     fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn _Updater>;
     #[deprecated(note = "This method should not be used outside the domain.")]
     async fn save(&self, obj: Box<dyn _Updater>) -> anyhow::Result<Option<Box<dyn @{ pascal_name }@>>>;
@@ -259,13 +260,13 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
                 Ok(self.0.filter(|v| filter.map(|f| f.check(v as &dyn @{ pascal_name }@)).unwrap_or(Ok(true)).unwrap())@{- def.soft_delete_tpl2("",".filter(|v| self.3 || v.deleted_at.is_none())",".filter(|v| self.3 || !v.deleted)",".filter(|v| self.3 || v.deleted == 0)")}@.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
             }
             fn filter(mut self: Box<Self>, filter: Filter_) -> Box<dyn _RepositoryFindBuilder> { self.1 = Some(filter); self }
-            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter: Filter_) -> Box<dyn _RepositoryFindBuilder> {
-                self.2.insert(name, filter);
+            fn with_filter_flag(mut self: Box<Self>, name: &'static str, filter_flag: Filter_) -> Box<dyn _RepositoryFindBuilder> {
+                self.2.insert(name, filter_flag);
                 self
             }
-            fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter: Filter_) -> Box<dyn _RepositoryFindBuilder> {
+            fn with_filter_flag_when(self: Box<Self>, condition: bool, name: &'static str, filter_flag: Filter_) -> Box<dyn _RepositoryFindBuilder> {
                 if condition {
-                    self.with_filter_flag(name, filter)
+                    self.with_filter_flag(name, filter_flag)
                 } else {
                     self
                 }
@@ -279,6 +280,13 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
         Box::new(V(map.get(&id).cloned(), None, Default::default()@% if def.is_soft_delete() %@, false@% endif %@))
     }
     @%- endif %@
+    async fn query_virtual_row(&self, obj: &Box<dyn _Updater>, filter_flag: Filter_) -> anyhow::Result<bool> {
+        use domain::models::Check_ as _;
+        if let Ok(flag) = filter_flag.check(&**obj as &dyn @{ pascal_name }@) {
+            return Ok(flag)
+        }
+        unimplemented!();
+    }
     fn convert_factory(&self, _factory: @{ pascal_name }@Factory) -> Box<dyn _Updater> {
         #[allow(unused_imports)]
         use base_domain::models::ToRawValue as _;

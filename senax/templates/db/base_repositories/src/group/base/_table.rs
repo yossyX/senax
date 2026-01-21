@@ -3943,6 +3943,29 @@ impl _@{ pascal_name }@_ {
         @%- endif %@
         Ok(())
     }
+
+    pub async fn select_virtual_row(conn: &mut DbConn, obj: &_@{ pascal_name }@Updater, filter_flag: BTreeMap<&'static str, Filter_>) -> Result<BTreeMap<&'static str, bool>>
+    {
+        let filter_flag_names: Vec<_> = filter_flag.keys().cloned().collect();
+        let sql_cols = write_filter_flag("0", &filter_flag, conn.shard_id());
+        let sql = format!(r#"SELECT {} FROM (SELECT @{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("? as {col_esc}", ", ") }@) as _t1"#, sql_cols);
+        @%- if !config.is_mysql() %@
+        let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
+        @%- endif %@
+        let mut query = sqlx::query(&sql);
+        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        for (_name, filter) in filter_flag {
+            query = filter.bind_to_query(query);
+        }
+        let query = bind_to_query(query, &obj._data);
+        let row = crate::misc::fetch!(conn, query, fetch_one);
+        use sqlx::Row;
+        let mut flags = BTreeMap::new();
+        for name in filter_flag_names.clone() {
+            flags.insert(name, row.get(name));
+        }
+        Ok(flags)
+    }
 }
 
 async fn __find_many(

@@ -464,13 +464,25 @@ impl GqlMutation@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         data: ReqObj,
+        check_only: Option<bool>,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
         let auth: &AuthInfo = gql_ctx.data()?;
         data.validate()
             .map_err(|e| GqlError::ValidationError(e).extend())?;
-        let obj = _repository_::create(@{ group|snake }@_repo.as_ref().into(), create_entity(data, @{ group|snake }@_repo.as_ref(), auth))
+        let entity = create_entity(data, @{ group|snake }@_repo.as_ref(), auth);
+        let creatable = @{ group|snake }@_repo.@{ mod_name|ident }@()
+            .query_virtual_row(&entity, creatable_filter(auth)?)
+            .await
+            .map_err(|e| GqlError::server_error(gql_ctx, e))?;
+        if !creatable {
+            return Err(GqlError::Forbidden.extend());
+        }
+        if check_only.unwrap_or_default() {
+            return Ok(ResObj::try_from_(&*entity, None)?);
+        }
+        let obj = _repository_::create(@{ group|snake }@_repo.as_ref().into(), entity)
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(ResObj::try_from_(&*obj, None)?)
@@ -486,6 +498,7 @@ impl GqlMutation@{ graphql_name }@ {
         @%- if !def.has_auto_primary() %@
         option: Option<domain::models::ImportOption>,
         @%- endif %@
+        check_only: Option<bool>,
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
@@ -516,7 +529,7 @@ impl GqlMutation@{ graphql_name }@ {
                     Ok(obj) => {
                         if !domain::models::FilterFlag::get_flag(obj.as_ref(), "_updatable").unwrap_or_default() {
                             let mut e = validator::ValidationErrors::new();
-                            e.add("_id", validator::ValidationError::new("forbidden"));
+                            e.add("_", validator::ValidationError::new("forbidden"));
                             errors.insert(idx + 1, e);
                         } else {
                             _repository_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
@@ -527,7 +540,7 @@ impl GqlMutation@{ graphql_name }@ {
                     Err(e) => {
                         if e.is::<senax_common::err::RowNotFound>() {
                             let mut e = validator::ValidationErrors::new();
-                            e.add("_id", validator::ValidationError::new("not_found"));
+                            e.add("_", validator::ValidationError::new("not_found"));
                             errors.insert(idx + 1, e);
                         } else {
                             return Err(GqlError::server_error(gql_ctx, e));
@@ -535,18 +548,50 @@ impl GqlMutation@{ graphql_name }@ {
                     }
                 }
             } else {
-                create_list.push(create_entity(data, @{ group|snake }@_repo.as_ref(), auth));
+                let entity = create_entity(data, @{ group|snake }@_repo.as_ref(), auth);
+                let creatable = @{ group|snake }@_repo.@{ mod_name|ident }@()
+                    .query_virtual_row(&entity, creatable_filter(auth)?)
+                    .await
+                    .map_err(|e| GqlError::server_error(gql_ctx, e))?;
+                if creatable {
+                    create_list.push(entity);
+                } else {
+                    let mut e = validator::ValidationErrors::new();
+                    e.add("_", validator::ValidationError::new("forbidden"));
+                    errors.insert(idx + 1, e);
+                }
             }
         }
         if !errors.is_empty() {
             return Err(GqlError::ValidationErrorList(errors).extend());
+        }
+        if check_only.unwrap_or_default() {
+            return Ok(true);
         }
         if !create_list.is_empty() {
             _repository_::import(@{ group|snake }@_repo.as_ref().into(), create_list, None).await
                 .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         }
         @%- else %@
-        _repository_::import(@{ group|snake }@_repo.as_ref().into(), create_list(list, @{ group|snake }@_repo.as_ref(), auth), option)
+        let list = create_list(list, @{ group|snake }@_repo.as_ref(), auth);
+        for (idx, entity) in list.iter().enumerate() {
+            let creatable = @{ group|snake }@_repo.@{ mod_name|ident }@()
+                .query_virtual_row(&entity, creatable_filter(auth)?)
+                .await
+                .map_err(|e| GqlError::server_error(gql_ctx, e))?;
+            if !creatable {
+                let mut e = validator::ValidationErrors::new();
+                e.add("_", validator::ValidationError::new("forbidden"));
+                errors.insert(idx + 1, e);
+            }
+        }
+        if !errors.is_empty() {
+            return Err(GqlError::ValidationErrorList(errors).extend());
+        }
+        if check_only.unwrap_or_default() {
+            return Ok(true);
+        }
+        _repository_::import(@{ group|snake }@_repo.as_ref().into(), list, option)
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
         @%- endif %@
@@ -559,6 +604,7 @@ impl GqlMutation@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         data: ReqObj,
+        check_only: Option<bool>,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
@@ -590,6 +636,9 @@ impl GqlMutation@{ graphql_name }@ {
             return Err(GqlError::VersionMismatch.extend());
         }
         @%- endif %@
+        if check_only.unwrap_or_default() {
+            return Ok(ResObj::try_from_(&*obj, None)?);
+        }
         let obj = _repository_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
             .await
             .map_err(|e| GqlError::server_error(gql_ctx, e))?;
