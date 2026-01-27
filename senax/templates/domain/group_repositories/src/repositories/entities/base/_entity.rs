@@ -314,9 +314,9 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
                 obj.@{ name|ident }@ = (map.iter().map(|(_k, v)| @{ column_def.get_inner_type(true, false) }@::from(v.@{ name|ident }@)).max().unwrap_or_default() + 1).into();
             }
             @%- endfor %@
-            @%- for (name, column_def) in def.auto_uuid() %@
+            @%- for (name, column_def) in def.auto_any_uuid() %@
             if obj.@{ name|ident }@.is_nil() {
-                obj.@{ name|ident }@ = uuid::Uuid::new_v4().into();
+                obj.@{ name|ident }@ = uuid::Uuid::now_v6(&[0; 6]).into();
             }
             @%- endfor %@
             map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{ident}{clone}", ", ") }@, *obj.clone());
@@ -342,9 +342,9 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
                     obj.@{ name|ident }@ = (map.iter().map(|(_k, v)| @{ column_def.get_inner_type(true, false) }@::from(v.@{ name|ident }@)).max().unwrap_or_default() + 1).into();
                 }
                 @%- endfor %@
-                @%- for (name, column_def) in def.auto_uuid() %@
+                @%- for (name, column_def) in def.auto_any_uuid() %@
                 if obj.@{ name|ident }@.is_nil() {
-                    obj.@{ name|ident }@ = uuid::Uuid::new_v4().into();
+                    obj.@{ name|ident }@ = uuid::Uuid::now_v6(&[0; 6]).into();
                 }
                 @%- endfor %@
                 map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{ident}{clone}", ", ") }@, *obj.clone());
@@ -365,9 +365,9 @@ impl _@{ pascal_name }@Repository for Emu@{ pascal_name }@Repository {
             obj.@{ name|ident }@ = (map.iter().map(|(_k, v)| @{ column_def.get_inner_type(true, false) }@::from(v.@{ name|ident }@)).max().unwrap_or_default() + 1).into();
         }
         @%- endfor %@
-        @%- for (name, column_def) in def.auto_uuid() %@
+        @%- for (name, column_def) in def.auto_any_uuid() %@
         if obj.@{ name|ident }@.is_nil() {
-            obj.@{ name|ident }@ = uuid::Uuid::new_v4().into();
+            obj.@{ name|ident }@ = uuid::Uuid::now_v6(&[0; 6]).into();
         }
         @%- endfor %@
         map.insert(@{- def.primaries()|fmt_join_with_paren("obj.{ident}{clone}", ", ") }@, *obj.clone());

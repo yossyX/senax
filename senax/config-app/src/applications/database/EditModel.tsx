@@ -562,6 +562,7 @@ function BelongsTo({ formData }: any) {
             (v: any) => v.name,
           )}
         />
+        <AutoField name="non_equijoin" {...formData} />
         <AutoField name="joinable" {...formData} />
         <AutoField name="with_trashed" {...formData} />
         <AutoField name="disable_index" {...formData} />
@@ -640,6 +641,7 @@ function BelongsToOuterDb({ formData }: any) {
             (v: any) => v.name,
           )}
         />
+        <AutoField name="non_equijoin" {...formData} />
         <AutoField name="joinable" {...formData} />
         <AutoField name="with_trashed" {...formData} />
         <AutoField name="disable_index" {...formData} />
@@ -695,6 +697,7 @@ function HasOne({ formData }: any) {
           {...formData}
           autocomplete={foreign?.fields?.map((v: any) => v.name)}
         />
+        <AutoField name="non_equijoin" {...formData} />
         <AutoField name="joinable" {...formData} />
         <AutoField name="disable_cache" {...formData} />
       </SpaceBetween>
@@ -749,6 +752,7 @@ function HasMany({ formData }: any) {
           {...formData}
           autocomplete={foreign?.fields?.map((v: any) => v.name)}
         />
+        <AutoField name="non_equijoin" {...formData} />
         <AutoField name="joinable" {...formData} />
         <AutoField name="disable_cache" {...formData} />
         <AutoField name="additional_filter" {...formData} />

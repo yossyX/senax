@@ -181,7 +181,7 @@ pub struct ReqObj@{ rel_name|pascal }@ {
 @%- endif %@
 }
 
-@{- def.fields_with_default()|fmt_join("
+@{- def.fields_with_default_except(rel_id)|fmt_join("
 fn default_{raw_name}() -> {req_api_type} {
     {api_default}
 }", "") }@

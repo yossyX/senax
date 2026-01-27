@@ -650,29 +650,31 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                         );
                     }
                     let foreign_ids = rel_def.get_foreign_id(&model);
-                    if model.full_name().eq(&rel_def.model) {
-                        ensure!(
-                            model.merged_relations.iter().any(|(k, v)| {
-                                v.is_type_of_belongs_to()
-                                    && v.model == model.full_name()
-                                    && v.get_local_id(k, &model) == foreign_ids
-                            }),
-                            "The {} relation in the {} model requires a corresponding belongs_to.",
-                            rel_name,
-                            cur_model_name,
-                        );
-                    } else {
-                        let rel_model = get_model(&rel_def.model, cur_group_name, &groups).borrow();
-                        ensure!(
-                            rel_model.merged_relations.iter().any(|(k, v)| {
-                                v.is_type_of_belongs_to()
-                                    && v.model == model.full_name()
-                                    && v.get_local_id(k, &rel_model) == foreign_ids
-                            }),
-                            "The {} relation in the {} model requires a corresponding belongs_to.",
-                            rel_name,
-                            cur_model_name,
-                        );
+                    if !foreign_ids.is_empty() {
+                        if model.full_name().eq(&rel_def.model) {
+                            ensure!(
+                                model.merged_relations.iter().any(|(k, v)| {
+                                    v.is_type_of_belongs_to()
+                                        && v.model == model.full_name()
+                                        && v.get_local_id(k, &model) == foreign_ids
+                                }),
+                                "The {} relation in the {} model requires a corresponding belongs_to.",
+                                rel_name,
+                                cur_model_name,
+                            );
+                        } else {
+                            let rel_model = get_model(&rel_def.model, cur_group_name, &groups).borrow();
+                            ensure!(
+                                rel_model.merged_relations.iter().any(|(k, v)| {
+                                    v.is_type_of_belongs_to()
+                                        && v.model == model.full_name()
+                                        && v.get_local_id(k, &rel_model) == foreign_ids
+                                }),
+                                "The {} relation in the {} model requires a corresponding belongs_to.",
+                                rel_name,
+                                cur_model_name,
+                            );
+                        }
                     }
                 }
             }

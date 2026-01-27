@@ -308,8 +308,10 @@ pub enum AutoGeneration {
     AutoIncrement,
     /// ### シーケンス
     Sequence,
-    /// ### UUID
-    Uuid,
+    /// ### UUID v6
+    UuidV6,
+    /// ### UUID v7
+    UuidV7,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, JsonSchema)]

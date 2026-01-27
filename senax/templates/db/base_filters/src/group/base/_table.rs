@@ -61,18 +61,30 @@ pub trait RelPk@{ rel_name|pascal }@ {
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+        @%- endif %@
     }
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+        @%- endif %@
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
     fn primary(&self) -> Option<rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+        @%- endif %@
     }
 }
 @%- endif %@
@@ -93,18 +105,30 @@ pub trait RelPk@{ rel_name|pascal }@ {
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@ {
     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+        @%- endif %@
     }
 }
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Updater {
     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+        @%- endif %@
     }
 }
 @%- if !config.force_disable_cache %@
 impl RelPk@{ rel_name|pascal }@ for _@{ pascal_name }@Cache {
     fn primary(&self) -> Option<rel_@{ rel.db()|snake }@_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_local_cols(rel_name, def)|fmt_join_with_paren("self._{raw_name}(){null_question}", ", ") }@.into())
+        @%- endif %@
     }
 }
 @%- endif %@
@@ -281,7 +305,11 @@ pub trait RelFk@{ rel_name|pascal }@ {
 }
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Data {
     fn get_fk(&self) -> Option<Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
+        @%- endif %@
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
@@ -292,7 +320,11 @@ impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.
 @%- if !config.force_disable_cache %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::CacheData {
     fn get_fk(&self) -> Option<Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
+        @%- endif %@
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
@@ -303,7 +335,11 @@ impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.
 @%- endif %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::ForInsert {
     fn get_fk(&self) -> Option<Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_name}{null_question}{clone}", ", ") }@.into())
+        @%- endif %@
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
@@ -484,7 +520,11 @@ pub trait RelFk@{ rel_name|pascal }@ {
 }
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::Data {
     fn get_fk(&self) -> Option<Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
+        @%- endif %@
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
@@ -495,7 +535,11 @@ impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.
 @%- if !config.force_disable_cache %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::CacheData {
     fn get_fk(&self) -> Option<Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self.{raw_name}{null_question}{clone}", ", ") }@.into())
+        @%- endif %@
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
@@ -506,7 +550,11 @@ impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.
 @%- endif %@
 impl RelFk@{ rel_name|pascal }@ for rel_@{ rel.get_group_name()|snake }@_@{ rel.get_mod_name() }@::ForInsert {
     fn get_fk(&self) -> Option<Primary> {
+        @%- if rel.non_equijoin %@
+        None
+        @%- else %@
         Some(@{ rel.get_foreign_cols(def)|fmt_join_foreign_with_paren("self._data.{raw_name}{null_question}{clone}", ", ") }@.into())
+        @%- endif %@
     }
     fn set_fk(&mut self, pk: InnerPrimary) {
         @{- rel.get_foreign_cols(def)|fmt_join_foreign_not_null_or_null("
@@ -1069,8 +1117,10 @@ pub fn write_belonging_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols
     @%- else %@
     if without_key {
         write!(buf, r#"SELECT {} FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, Primary::cols(), idx + 1).unwrap();
-    } else {
+    } else if !cols.is_empty() {
         write!(buf, r#"SELECT @%- if !config.enable_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, Primary::cols_with_paren(), cols).unwrap();
+    } else {
+        write!(buf, r#"SELECT @%- if !config.enable_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, idx + 1).unwrap();
     }
     @%- endif %@
     let mut trash_mode = TrashMode::Not;
@@ -1087,7 +1137,7 @@ pub fn write_belonging_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols
     if buf.ends_with(" AND ") {
         buf.truncate(buf.len() - " AND ".len());
     }
-    if without_key && buf.ends_with(" WHERE ") {
+    if buf.ends_with(" WHERE ") {
         buf.truncate(buf.len() - " WHERE ".len());
     }
 }
@@ -1107,8 +1157,10 @@ pub fn write_having_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols1: 
     @%- else %@
     if without_key {
         write!(buf, r#"SELECT {} FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, cols1, idx + 1).unwrap();
-    } else {
+    } else if !cols3.is_empty() {
         write!(buf, r#"SELECT @%- if !config.enable_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE {}={} AND "#, idx + 1, cols2, cols3).unwrap();
+    } else {
+        write!(buf, r#"SELECT @%- if !config.enable_semijoin() %@ /*+ NO_SEMIJOIN() */@%- endif %@ * FROM {db}@{ table_name|db_esc }@ as _t{} WHERE "#, idx + 1).unwrap();
     }
     @%- endif %@
     let mut trash_mode = TrashMode::Not;
@@ -1125,7 +1177,7 @@ pub fn write_having_rel(buf: &mut String, filter: &Option<Box<Filter_>>, cols1: 
     if buf.ends_with(" AND ") {
         buf.truncate(buf.len() - " AND ".len());
     }
-    if without_key && buf.ends_with(" WHERE ") {
+    if buf.ends_with(" WHERE ") {
         buf.truncate(buf.len() - " WHERE ".len());
     }
 }

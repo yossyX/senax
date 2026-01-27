@@ -1609,7 +1609,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
             let filter = RelFil{rel_name_pascal}::in_filter(chunk){additional_filter};
             let list = repo_{class_mod}::{class}_::query().filter(filter).join(joiner.clone()).select(conn).await?;
             for row in list {
-                if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
+                if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
                     map.entry(id).or_default().push(row);
                 }
             }
@@ -1633,7 +1633,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@> {
         repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
         for row in list {
-            if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
+            if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
                 map.entry(id).or_default().push(row);
             }
         }
@@ -1894,7 +1894,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
             let filter = RelFil{rel_name_pascal}::in_filter(chunk){additional_filter};
             let list = repo_{class_mod}::{class}_::query().filter(filter).join(joiner.clone()).select(conn).await?;
             for row in list {
-                if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
+                if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
                     map.entry(id).or_default().push(row);
                 }
             }
@@ -1918,7 +1918,7 @@ impl _@{ pascal_name }@Joiner for Vec<_@{ pascal_name }@Cache> {
         repo_{class_mod}::{class}Joiner::join(&mut list, conn, joiner).await?;
         let mut map: AHashMap<_, Vec<_>> = AHashMap::default();
         for row in list {
-            if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner){
+            if let Some(id) = RelFk{rel_name_pascal}::get_fk(&row._inner) {
                 map.entry(id).or_default().push(row);
             }
         }
@@ -2154,7 +2154,7 @@ impl QueryBuilder {
                 use sqlx::Row;
                 let mut flags = BTreeMap::new();
                 for name in filter_flag_names.clone() {
-                    flags.insert(name, row.get(name));
+                    flags.insert(name, row.get::<Option<bool>, &str>(name).unwrap_or_default());
                 }
                 (row, flags)
             })
@@ -2297,7 +2297,7 @@ impl QueryBuilder {
                 use sqlx::Row;
                 let mut flags: BTreeMap<&str, bool> = BTreeMap::new();
                 for name in filter_flag_names.clone() {
-                    flags.insert(name, row.get(name));
+                    flags.insert(name, row.get::<Option<bool>, &str>(name).unwrap_or_default());
                 }
                 InnerPrimary::from_row(row).map(|v| (v, flags))
             })
@@ -2341,7 +2341,7 @@ impl QueryBuilder {
             use sqlx::Row;
             let mut flags = BTreeMap::new();
             for name in filter_flag_names.clone() {
-                flags.insert(name, row.get(name));
+                flags.insert(name, row.get::<Option<bool>, &str>(name).unwrap_or_default());
             }            
             Data::from_row(&row).map(|v| (v, flags))}).collect();
         let mut list: Vec<__Updater__> = result?
@@ -3969,7 +3969,7 @@ impl _@{ pascal_name }@_ {
         use sqlx::Row;
         let mut flags = BTreeMap::new();
         for name in filter_flag_names.clone() {
-            flags.insert(name, row.get(name));
+            flags.insert(name, row.get::<Option<bool>, &str>(name).unwrap_or_default());
         }
         Ok(flags)
     }
@@ -4050,7 +4050,7 @@ async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], t
             use sqlx::Row;
             let mut flags = BTreeMap::new();
             for name in filter_flag_names.clone() {
-                flags.insert(name, row.get(name));
+                flags.insert(name, row.get::<Option<bool>, &str>(name).unwrap_or_default());
             }
             (row, flags)
         })
@@ -4257,7 +4257,7 @@ async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, tr
             use sqlx::Row;
             let mut flags = BTreeMap::new();
             for name in filter_flag_names.clone() {
-                flags.insert(name, row.get(name));
+                flags.insert(name, row.get::<Option<bool>, &str>(name).unwrap_or_default());
             }
             (row, flags)
         }))
@@ -4308,7 +4308,7 @@ async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: Tra
         use sqlx::Row;
         let mut flags = BTreeMap::new();
         for name in filter_flag_names.clone() {
-            flags.insert(name, row.get(name));
+            flags.insert(name, row.get::<Option<bool>, &str>(name).unwrap_or_default());
         }
         Data::from_row(&row).map(|v| (v, flags))
     }).transpose()?)
@@ -4361,7 +4361,7 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
             use sqlx::Row;
             let mut flags = BTreeMap::new();
             for name in filter_flag_names.clone() {
-                flags.insert(name, row.get(name));
+                flags.insert(name, row.get::<Option<bool>, &str>(name).unwrap_or_default());
             }            
             Data::from_row(&row).map(|v| (v, flags))}).collect();
         result?
@@ -4998,16 +4998,18 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         @{- def.relations_one(Joinable::Join, false)|fmt_rel_join("
         let mut _{rel_name} = repo_{class_mod}::___bulk_insert(conn, &_{rel_name}, ignore, replace, overwrite).await?.into_iter().fold(FxHashMap::default(), |mut map, v| {
             for v in v {
-                map.insert(RelFk{rel_name_pascal}::get_fk(&v._data).unwrap(), v);
+                if let Some(id) = RelFk{rel_name_pascal}::get_fk(&v._data) {
+                    map.insert(id, v);
+                }
             }
             map
         });", "") }@
         @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
         let mut _{rel_name} = repo_{class_mod}::___bulk_insert(conn, &_{rel_name}, ignore, replace, overwrite).await?.into_iter().fold(FxHashMap::default(), |mut map: FxHashMap<_, Vec<_>>, v| {
             for v in v {
-                map.entry(RelFk{rel_name_pascal}::get_fk(&v._data).unwrap())
-                    .or_default()
-                    .push(v);
+                if let Some(id) = RelFk{rel_name_pascal}::get_fk(&v._data) {
+                    map.entry(id).or_default().push(v);
+                }
             }
             map
         });", "") }@

@@ -1189,7 +1189,7 @@ impl ModelDef {
         self.merged_fields
             .iter()
             .filter(|(_k, v)| {
-                v.main_primary && (v.auto.is_none() || v.auto == Some(AutoGeneration::Uuid))
+                v.main_primary && (v.auto.is_none() || v.auto == Some(AutoGeneration::UuidV6) || v.auto == Some(AutoGeneration::UuidV7))
             })
             .collect()
     }
@@ -1551,10 +1551,22 @@ impl ModelDef {
             .filter(|(_k, v)| v.auto == Some(AutoGeneration::Sequence))
             .collect()
     }
-    pub fn auto_uuid(&self) -> Vec<(&String, &FieldDef)> {
+    pub fn auto_any_uuid(&self) -> Vec<(&String, &FieldDef)> {
         self.merged_fields
             .iter()
-            .filter(|(_k, v)| v.auto == Some(AutoGeneration::Uuid))
+            .filter(|(_k, v)| v.auto == Some(AutoGeneration::UuidV6) || v.auto == Some(AutoGeneration::UuidV7))
+            .collect()
+    }
+    pub fn auto_uuid_v6(&self) -> Vec<(&String, &FieldDef)> {
+        self.merged_fields
+            .iter()
+            .filter(|(_k, v)| v.auto == Some(AutoGeneration::UuidV6))
+            .collect()
+    }
+    pub fn auto_uuid_v7(&self) -> Vec<(&String, &FieldDef)> {
+        self.merged_fields
+            .iter()
+            .filter(|(_k, v)| v.auto == Some(AutoGeneration::UuidV7))
             .collect()
     }
     #[allow(dead_code)]
@@ -1639,12 +1651,19 @@ impl ModelDef {
     ) -> Vec<(&String, &FieldDef)> {
         self.for_api_request()
             .into_iter()
+            .filter(|(_, v)| !v.skip_factory())
             .filter(|(k, _v)| !except.contains(*k))
             .filter(|(_, v)| !v.primary)
             .collect()
     }
     pub fn fields_with_default(&self) -> Vec<(&String, &FieldDef)> {
         self.for_api_request()
+            .into_iter()
+            .filter(|(k, field)| ApiFieldDef::default(k, field).is_some())
+            .collect()
+    }
+    pub fn fields_with_default_except(&self, except: &[String]) -> Vec<(&String, &FieldDef)> {
+        self.for_api_request_except(except)
             .into_iter()
             .filter(|(k, field)| ApiFieldDef::default(k, field).is_some())
             .collect()
