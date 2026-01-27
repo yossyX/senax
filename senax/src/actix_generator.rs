@@ -424,7 +424,7 @@ pub fn write_base_files(base_path: &Path, name: &str, db_list: &[&str], force: b
     pub struct ValidatorTemplate;
 
     let file_path = src_path.join("validator.rs");
-    if !file_path.exists() {
+    if force || !file_path.exists() {
         let tpl = ValidatorTemplate;
         fs_write(file_path, tpl.render()?)?;
     }
@@ -434,7 +434,7 @@ pub fn write_base_files(base_path: &Path, name: &str, db_list: &[&str], force: b
     pub struct MaybeUndefinedTemplate;
 
     let file_path = src_path.join("maybe_undefined.rs");
-    if !file_path.exists() {
+    if force || !file_path.exists() {
         let tpl = MaybeUndefinedTemplate;
         fs_write(file_path, tpl.render()?)?;
     }

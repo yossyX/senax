@@ -233,9 +233,9 @@ pub struct ReqObj {
     pub _id: Option<async_graphql::ID>,
 @%- if camel_case %@
 @{- def.auto_primary()|fmt_join("
-{label_wo_hash}{graphql_secret}{api_validate}{api_default_attribute}    pub {ident}: {req_api_option_type},", "") }@
+{label_wo_hash}{graphql_secret}{api_validate}    pub {ident}: {req_api_option_type},", "") }@
 @{- def.for_api_request()|fmt_join("
-{label_wo_hash}{graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {ident}: {req_api_type},", "") }@
+{label_wo_hash}{graphql_secret}{api_validate}{req_api_schema}    pub {ident}: {req_api_type},", "") }@
 @{- def.for_api_response_not_in_request()|fmt_join("
     #[graphql(visible = false)]
     #[serde(skip)]
@@ -247,10 +247,10 @@ pub struct ReqObj {
 @%- else %@
 @{- def.auto_primary()|fmt_join("
     #[graphql(name = \"{raw_name}\")]
-{graphql_secret}{api_validate}{api_default_attribute}    pub {ident}: {req_api_option_type},", "") }@
+{graphql_secret}{api_validate}    pub {ident}: {req_api_option_type},", "") }@
 @{- def.for_api_request()|fmt_join("
 {label_wo_hash}    #[graphql(name = \"{raw_name}\")]
-{graphql_secret}{api_validate}{api_default_attribute}{req_api_schema}    pub {ident}: {req_api_type},", "") }@
+{graphql_secret}{api_validate}{req_api_schema}    pub {ident}: {req_api_type},", "") }@
 @{- def.for_api_response_not_in_request()|fmt_join("
     #[graphql(name = \"{raw_name}\", visible = false)]
     #[serde(skip)]
@@ -273,11 +273,6 @@ pub struct ReqObj {
     pub _deletable: Option<bool>,
 }
 
-@{- def.fields_with_default()|fmt_join("
-fn default_{raw_name}() -> {req_api_type} {
-    {api_default}
-}", "") }@
-
 #[allow(clippy::useless_conversion)]
 #[allow(clippy::redundant_closure_call)]
 impl From<&mut dyn _domain_::@{ pascal_name }@Updater> for ReqObj {
@@ -286,9 +281,10 @@ impl From<&mut dyn _domain_::@{ pascal_name }@Updater> for ReqObj {
             _id: Some((&*v).into()),
             @{- def.auto_primary()|fmt_join("
             {ident}: Some(v.{ident}(){to_req_api_type}),", "") }@
-            @{- def.for_api_request()|fmt_join_not_null_or_null("
+            @{- def.for_api_request()|fmt_join_not_null_or_null_or_default("
             {ident}: v.{ident}(){to_req_api_type},", "
-            {ident}: Some(v.{ident}(){to_req_api_type}).into(),", "") }@
+            {ident}: Some(v.{ident}(){to_req_api_type}).into(),", "
+            {ident}: Some(Some(v.{ident}(){to_req_api_type})).into(),", "") }@
             @{- def.for_api_response_not_in_request()|fmt_join("
             {ident}: None,", "") }@
             @{- def.relations_one_for_api_request()|fmt_rel_join("
@@ -339,9 +335,12 @@ pub fn create_list(
 #[rustfmt::skip]
 #[allow(unused_variables)]
 fn update_updater(updater: &mut dyn _domain_::@{ pascal_name }@Updater, input: ReqObj, repo: &dyn _Repository, auth: &AuthInfo) -> anyhow::Result<()> {
-@{- def.for_api_update_updater()|fmt_join_not_null_or_null("
+@{- def.for_api_update_updater()|fmt_join_not_null_or_null_or_default("
     updater.set_{raw_name}({from_api_type_for_update});", "
     if !input.{ident}.is_undefined() {
+        updater.set_{raw_name}({from_api_type_for_update});
+    }", "
+    if input.{ident}.is_value() {
         updater.set_{raw_name}({from_api_type_for_update});
     }", "") }@
 @{- def.relations_one_for_api_request_with_replace_type(true)|fmt_rel_join("

@@ -546,13 +546,11 @@ pub fn generate(
         let repo_include_groups: GroupsDef = groups
             .iter()
             .filter(|(group_name, models)| {
-                models
-                    .iter()
-                    .any(|(model_name, _)| {
-                        unified_group
-                            .nodes
-                            .contains_key(&((*group_name).into(), (**model_name).into()))
-                    })
+                models.iter().any(|(model_name, _)| {
+                    unified_group
+                        .nodes
+                        .contains_key(&((*group_name).into(), (**model_name).into()))
+                })
             })
             .map(|(group_name, models)| {
                 let m: IndexMap<String, Arc<ModelDef>> = models
@@ -620,13 +618,11 @@ pub fn generate(
         let repo_include_groups: GroupsDef = groups
             .iter()
             .filter(|(group_name, models)| {
-                models
-                    .iter()
-                    .any(|(model_name, _)| {
-                        unified_group
-                            .nodes
-                            .contains_key(&((*group_name).into(), (**model_name).into()))
-                    })
+                models.iter().any(|(model_name, _)| {
+                    unified_group
+                        .nodes
+                        .contains_key(&((*group_name).into(), (**model_name).into()))
+                })
             })
             .map(|(group_name, models)| {
                 let m: IndexMap<String, Arc<ModelDef>> = models

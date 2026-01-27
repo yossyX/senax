@@ -531,7 +531,10 @@ impl From<BelongsToJson> for BelongsToDef {
 
 impl From<&BelongsToDef> for RelDef {
     fn from(value: &BelongsToDef) -> Self {
-        assert!(!value.non_equijoin || !value.joinable, "Non-equijoin belongs_to relations cannot be marked as joinable.");
+        assert!(
+            !value.non_equijoin || !value.joinable,
+            "Non-equijoin belongs_to relations cannot be marked as joinable."
+        );
         Self {
             label: value.label.clone(),
             comment: value.comment.clone(),
@@ -690,7 +693,10 @@ impl From<BelongsToOuterDbJson> for BelongsToOuterDbDef {
 }
 impl From<&BelongsToOuterDbDef> for RelDef {
     fn from(value: &BelongsToOuterDbDef) -> Self {
-        assert!(!value.non_equijoin || !value.joinable, "Non-equijoin belongs_to_outer_db relations cannot be marked as joinable.");
+        assert!(
+            !value.non_equijoin || !value.joinable,
+            "Non-equijoin belongs_to_outer_db relations cannot be marked as joinable."
+        );
         Self {
             label: value.label.clone(),
             comment: value.comment.clone(),

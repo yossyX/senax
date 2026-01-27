@@ -201,7 +201,7 @@ pub fn write_base_group_files(
             group_name,
             mod_names: &mod_names,
             unified_names: &unified_names,
-            base_output
+            base_output,
         };
         fs_write(file_path, tpl.render()?)?;
     }

@@ -76,7 +76,8 @@ pub fn generate(
     let base_src_dir = server_dir.join("base/src");
     let file_path = src_dir.join("auto_api.rs");
     let mut content = fs::read_to_string(&file_path)
-        .with_context(|| format!("Cannot read file: {:?}", &file_path))?.replace("\r\n", "\n");
+        .with_context(|| format!("Cannot read file: {:?}", &file_path))?
+        .replace("\r\n", "\n");
     let db_snake = db_route.to_snake();
     let db_ident_name = _to_ident_name(&db_snake);
     let reg = Regex::new(&format!(r"pub mod {};", db_ident_name))?;
@@ -132,7 +133,8 @@ pub fn generate(
 
     let file_path = base_src_dir.join("auth.rs");
     let content = fs::read_to_string(&file_path)
-        .with_context(|| format!("Cannot read file: {:?}", &file_path))?.replace("\r\n", "\n");
+        .with_context(|| format!("Cannot read file: {:?}", &file_path))?
+        .replace("\r\n", "\n");
     let re = Regex::new(r"(?s)// Do not modify below this line. \(RoleStart\).+// Do not modify above this line. \(RoleEnd\)").unwrap();
     ensure!(
         re.is_match(&content),
@@ -235,7 +237,8 @@ pub fn generate(
 
     let file_path = server_dir.join("Cargo.toml");
     let mut content = fs::read_to_string(&file_path)
-        .with_context(|| format!("Cannot read file: {:?}", &file_path))?.replace("\r\n", "\n");
+        .with_context(|| format!("Cannot read file: {:?}", &file_path))?
+        .replace("\r\n", "\n");
     let name = server.to_snake();
     let mut deps = IndexMap::new();
     for group_route in group_routes.iter().rev() {

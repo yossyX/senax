@@ -238,7 +238,8 @@ pub fn write_base_group_files(
 
         let file_path = model_models_dir.join(format!("{}.rs", group_name.to_snake()));
         remove_files.remove(file_path.as_os_str());
-        let concrete_models: IndexMap<&String, &Arc<ModelDef>> = defs.iter().filter(|(_k, v)| !v.abstract_mode).collect();
+        let concrete_models: IndexMap<&String, &Arc<ModelDef>> =
+            defs.iter().filter(|(_k, v)| !v.abstract_mode).collect();
 
         #[derive(Template)]
         #[template(path = "db/base_repositories/src/group.rs", escape = "none")]

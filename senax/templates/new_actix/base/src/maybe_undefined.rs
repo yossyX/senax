@@ -34,6 +34,13 @@ impl<T> MaybeUndefined<T> {
             _ => None,
         }
     }
+    pub fn take_or_default(self, default: T) -> Option<T> {
+        match self {
+            MaybeUndefined::Value(value) => Some(value),
+            MaybeUndefined::Undefined => Some(default),
+            _ => None,
+        }
+    }
 }
 
 impl<T: InputType> InputType for MaybeUndefined<T> {

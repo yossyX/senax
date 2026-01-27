@@ -663,7 +663,8 @@ pub fn parse(db: &str, outer_crate: bool, config_only: bool) -> Result<(), anyho
                                 cur_model_name,
                             );
                         } else {
-                            let rel_model = get_model(&rel_def.model, cur_group_name, &groups).borrow();
+                            let rel_model =
+                                get_model(&rel_def.model, cur_group_name, &groups).borrow();
                             ensure!(
                                 rel_model.merged_relations.iter().any(|(k, v)| {
                                     v.is_type_of_belongs_to()

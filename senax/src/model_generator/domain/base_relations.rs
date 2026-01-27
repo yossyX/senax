@@ -81,9 +81,9 @@ pub fn write_group_files(
     #[derive(Template)]
     #[template(path = "domain/base_relations/groups/src/lib.rs", escape = "none")]
     struct LibTemplate<'a> {
-            pub groups: &'a GroupsDef,
-        }
-    let content = LibTemplate{ groups }.render()?;
+        pub groups: &'a GroupsDef,
+    }
+    let content = LibTemplate { groups }.render()?;
     fs_write(file_path, &*content)?;
 
     let repositories_dir = src_dir.join("relations");

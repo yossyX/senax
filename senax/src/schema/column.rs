@@ -1131,7 +1131,7 @@ impl FieldDef {
         }
     }
 
-    pub fn get_api_default(&self, name: &str, field: &FieldDef) -> String {
+    pub fn get_api_default(&self, name: &str) -> String {
         let conv = |value| -> String {
             let result = match self.data_type {
                 DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
@@ -1172,13 +1172,9 @@ impl FieldDef {
             // if self.value_object.is_some() {
             //     result.push_str(".into()")
             // }
-            if self.not_null {
-                result
-            } else {
-                format!("Some(Some({})).into()", &result)
-            }
+            result
         };
-        if let Some(value) = ApiFieldDef::default(name, field) {
+        if let Some(value) = ApiFieldDef::default(name, self) {
             conv(&value)
         } else {
             "Default::default()".to_string()
@@ -1507,7 +1503,7 @@ impl FieldDef {
     pub fn api_required(&self, name: &str) -> bool {
         (ApiFieldDef::required(name) || self.required || self.not_null) && self.auto.is_none()
     }
-    pub fn get_api_validate(&self, name: &str) -> String {
+    pub fn get_api_validate(&self, name: &str, has_default: bool) -> String {
         let mut validators = Vec::new();
         if !self.primary && (ApiFieldDef::required(name) || self.required) && !self.not_null {
             validators.push("required".to_string());
@@ -1520,7 +1516,7 @@ impl FieldDef {
         match self.data_type {
             DataType::Char | DataType::IdVarchar | DataType::TextVarchar => {
                 if !has_custom {
-                    if self.not_null {
+                    if self.not_null && !has_default {
                         validators.push(
                             "custom(function = \"_server_::validator::validate_varchar\")"
                                 .to_string(),
@@ -1537,7 +1533,7 @@ impl FieldDef {
             }
             DataType::Text => {
                 if !has_custom {
-                    if self.not_null {
+                    if self.not_null && !has_default {
                         validators.push(
                             "custom(function = \"_server_::validator::validate_text\")".to_string(),
                         );
@@ -1554,7 +1550,7 @@ impl FieldDef {
             }
             DataType::ArrayString => {
                 if !has_custom {
-                    if self.not_null {
+                    if self.not_null && !has_default {
                         validators.push(
                             "custom(function = \"_server_::validator::validate_array_of_varchar\")"
                                 .to_string(),
@@ -1589,7 +1585,7 @@ impl FieldDef {
                 validators.push("range(min = 0.0)".to_string());
             }
             DataType::Decimal if !self.signed => {
-                if self.not_null {
+                if self.not_null && !has_default {
                     validators.push(
                         "custom(function = \"_server_::validator::validate_unsigned_decimal\")"
                             .to_string(),
@@ -1604,7 +1600,7 @@ impl FieldDef {
             DataType::Json | DataType::Jsonb | DataType::Geometry
                 if self.user_defined_json_type.is_none() =>
             {
-                if self.not_null {
+                if self.not_null && !has_default {
                     validators.push(
                         "custom(function = \"_server_::validator::validate_json_object\")"
                             .to_string(),
@@ -1629,18 +1625,6 @@ impl FieldDef {
             "    #[graphql(secret)]\n"
         } else {
             ""
-        }
-    }
-
-    pub fn get_api_default_attribute(&self, name: &str, field: &FieldDef) -> String {
-        if ApiFieldDef::default(name, field).is_some() {
-            format!(
-                "    #[serde(default = \"default_{}\")]\n    #[graphql(default_with = {:?})]\n",
-                name,
-                self.get_api_default(name, field)
-            )
-        } else {
-            "".to_string()
         }
     }
     #[allow(clippy::match_like_matches_macro)]
@@ -2209,21 +2193,27 @@ impl FieldDef {
         }
     }
 
-    pub fn get_api_type(&self, option: bool, req: bool) -> String {
+    pub fn get_api_type(&self, option: bool, req: bool, has_default: bool) -> String {
         let typ = self._get_api_type(req);
         let option = option || req && self.is_version;
-        if self.not_null && !option {
-            typ
-        } else if option || !req {
+        if option {
             format!("Option<{}>", typ)
+        } else if req {
+            if self.not_null && !has_default {
+                typ
+            } else {
+                format!("_server_::MaybeUndefined<{}>", typ)
+            }
+        } else if self.not_null {
+            typ
         } else {
-            format!("_server_::MaybeUndefined<{}>", typ)
+            format!("Option<{}>", typ)
         }
     }
 
-    pub fn get_api_schema(&self) -> String {
+    pub fn get_api_schema(&self, has_default: bool) -> String {
         let typ = self._get_api_type(true);
-        if self.not_null {
+        if self.not_null && !has_default {
             String::new()
         } else {
             format!(
@@ -2547,25 +2537,58 @@ impl FieldDef {
                 }
             }
         }
+        let has_default = ApiFieldDef::default(name, self).is_some();
+        let default = self.get_api_default(name);
         if self.enum_class.is_some() {
-            if !self.not_null {
+            if !for_update && has_default {
+                if self.not_null {
+                    return format!("input.{ident}.take().unwrap_or({default})");
+                } else {
+                    return format!("input.{ident}.take_or_default({default})");
+                }
+            } else if has_default && self.not_null {
+                return format!("input.{ident}.take().unwrap()");
+            } else if !self.not_null {
                 return format!("input.{ident}.take()");
             } else {
                 return format!("input.{ident}");
             }
         }
         if self.id_class.is_some() || self.rel.is_some() || self.outer_db_rel.is_some() {
-            if !self.not_null {
+            if !for_update && has_default {
+                if self.not_null {
+                    return format!("input.{ident}.take().unwrap_or({default}).into()");
+                } else {
+                    return format!("input.{ident}.take_or_default({default}).into()");
+                }
+            } else if has_default && self.not_null {
+                return format!("input.{ident}.take().unwrap().into()");
+            } else if !self.not_null {
                 return format!("input.{ident}.take().map(|v| v.into())");
             } else {
                 return format!("input.{ident}.into()");
             }
         }
         if self.value_object.is_some() {
-            if !self.not_null {
+            if !for_update && has_default {
+                if self.not_null {
+                    return format!("input.{ident}.take().unwrap_or({default}).into()");
+                } else {
+                    return format!("input.{ident}.take_or_default({default}).into()");
+                }
+            } else if has_default && self.not_null {
+                return format!("input.{ident}.take().unwrap().into()");
+            } else if !self.not_null {
                 return format!("input.{ident}.take().map(|v| v.into())");
             } else {
                 return format!("input.{ident}.into()");
+            }
+        }
+        if !for_update && has_default {
+            if self.not_null {
+                return format!("input.{ident}.take().unwrap_or({default})");
+            } else {
+                return format!("input.{ident}.take_or_default({default})");
             }
         }
         match self.data_type {
@@ -2575,6 +2598,7 @@ impl FieldDef {
             DataType::Binary | DataType::Varbinary | DataType::Blob => {
                 format!("input.{ident}.to_vec()")
             }
+            _ if has_default && self.not_null => format!("input.{ident}.take().unwrap()"),
             _ if !self.not_null => format!("input.{ident}.take()"),
             _ => format!("input.{ident}"),
         }
