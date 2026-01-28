@@ -891,7 +891,11 @@ impl RelDef {
                     .get_key_value(id)
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .unwrap_or_else(|| {
-                        error_exit!("{} is not defined in the {} model", id, target_model.name)
+                        error_exit!(
+                            "The {} field is not defined in the {} model",
+                            id,
+                            target_model.name
+                        )
                     }),
             )
         }
@@ -946,7 +950,7 @@ fn get_model(group_name: &str, stem_name: &str) -> Arc<ModelDef> {
         .as_ref()
         .unwrap()
         .get(group_name)
-        .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
+        .unwrap_or_else(|| error_exit!("The {} group is not defined.", group_name))
         .get(stem_name)
     {
         return model.clone();
@@ -958,9 +962,15 @@ fn get_model(group_name: &str, stem_name: &str) -> Arc<ModelDef> {
         .as_ref()
         .unwrap()
         .get(group_name)
-        .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
+        .unwrap_or_else(|| error_exit!("The {} group is not defined.", group_name))
         .get(&singular_name)
-        .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name))
+        .unwrap_or_else(|| {
+            error_exit!(
+                "The {} model is not defined in the {} group.",
+                stem_name,
+                group_name
+            )
+        })
         .clone()
 }
 
@@ -971,7 +981,7 @@ fn get_model_name(group_name: &str, stem_name: &str) -> String {
         .as_ref()
         .unwrap()
         .get(group_name)
-        .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
+        .unwrap_or_else(|| error_exit!("The {} group is not defined.", group_name))
         .get(stem_name)
     {
         return model.name.clone();
@@ -982,8 +992,14 @@ fn get_model_name(group_name: &str, stem_name: &str) -> String {
         .as_ref()
         .unwrap()
         .get(group_name)
-        .unwrap_or_else(|| error_exit!("{} group is not defined", group_name))
+        .unwrap_or_else(|| error_exit!("The {} group is not defined.", group_name))
         .get(&singular_name)
-        .unwrap_or_else(|| error_exit!("{} model is not defined", stem_name));
+        .unwrap_or_else(|| {
+            error_exit!(
+                "The {} model is not defined in the {} group.",
+                stem_name,
+                group_name
+            )
+        });
     model.name.clone()
 }

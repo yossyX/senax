@@ -29,6 +29,9 @@ pub mod _base {
 @%- else %@
 pub mod _base {
 @{ base_output }@
+@%- for (u, m) in unified_names %@
+pub use _base_filter_@{ db|snake }@_@{ u }@::repositories::@{ group_name|snake|ident }@::_base::_@{ m }@;
+@%- endfor %@
 }
 @%- endif %@
 @{-"\n"}@

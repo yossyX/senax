@@ -74,12 +74,12 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 #[allow(unused_mut)]
                 @%- if def.is_soft_delete() %@
                 let obj = if self.with_trashed {
-                    _@{ pascal_name }@_::find_for_update_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
+                    _repo_::find_for_update_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 } else {
-                    _@{ pascal_name }@_::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
+                    _repo_::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 };
                 @%- else %@
-                let obj = _@{ pascal_name }@_::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?;
+                let obj = _repo_::find_for_update(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?;
                 @%- endif %@
                 Ok(Box::new(obj) as Box<dyn @{ pascal_name }@Updater>)
             }
@@ -88,12 +88,12 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 let conn = conn.deref_mut();
                 @%- if def.is_soft_delete() %@
                 let obj = if self.with_trashed {
-                    _@{ pascal_name }@_::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
+                    _repo_::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 } else {
-                    _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
+                    _repo_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 };
                 @%- else %@
-                let obj = _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?;
+                let obj = _repo_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?;
                 @%- endif %@
                 if let Some(obj) = obj {
                     Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@>))
@@ -149,7 +149,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         }
         let mut filters = std::collections::BTreeMap::new();
         filters.insert("flag", filter_flag);
-        let result = _@{ pascal_name }@_::select_virtual_row(self._conn.lock().await.deref_mut(), obj, filters).await?;
+        let result = _repo_::select_virtual_row(self._conn.lock().await.deref_mut(), obj, filters).await?;
         Ok(*result.get("flag").unwrap())
     }
     fn convert_factory(&self, factory: @{ pascal_name }@Factory) -> Box<dyn @{ pascal_name }@Updater> {
@@ -160,7 +160,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         let Ok(obj) = (obj as Box<dyn std::any::Any>).downcast::<_@{ pascal_name }@Updater>() else {
             panic!("Only _@{ pascal_name }@Updater is accepted.");
         };
-        Ok(_@{ pascal_name }@_::save(self._conn.lock().await.deref_mut(), *obj).await?.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
+        Ok(_repo_::save(self._conn.lock().await.deref_mut(), *obj).await?.map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
     }
     @%- if !def.disable_update() %@
     async fn import(&self, list: Vec<Box<dyn @{ pascal_name }@Updater>>, option: Option<domain::models::ImportOption>) -> anyhow::Result<()> {
@@ -172,11 +172,11 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         }).collect();
         let option = option.unwrap_or_default();
         if option.replace.unwrap_or_default() {
-            _@{ pascal_name }@_::bulk_replace(self._conn.lock().await.deref_mut(), list).await?;
+            _repo_::bulk_replace(self._conn.lock().await.deref_mut(), list).await?;
         } else if option.overwrite.unwrap_or_default() {
-            _@{ pascal_name }@_::bulk_overwrite(self._conn.lock().await.deref_mut(), list).await?;
+            _repo_::bulk_overwrite(self._conn.lock().await.deref_mut(), list).await?;
         } else {
-            _@{ pascal_name }@_::bulk_insert(self._conn.lock().await.deref_mut(), list, option.ignore.unwrap_or_default()).await?;
+            _repo_::bulk_insert(self._conn.lock().await.deref_mut(), list, option.ignore.unwrap_or_default()).await?;
         }
         Ok(())
     }
@@ -186,7 +186,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         let Ok(obj) = (obj as Box<dyn std::any::Any>).downcast::<_@{ pascal_name }@Updater>() else {
             panic!("Only _@{ pascal_name }@Updater is accepted.");
         };
-        _@{ pascal_name }@_::delayed_insert(self._conn.lock().await.deref_mut(), *obj).await?;
+        _repo_::delayed_insert(self._conn.lock().await.deref_mut(), *obj).await?;
         Ok(())
     }
     @%- endif %@
@@ -195,21 +195,21 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
         let Ok(obj) = (obj as Box<dyn std::any::Any>).downcast::<_@{ pascal_name }@Updater>() else {
             panic!("Only _@{ pascal_name }@Updater is accepted.");
         };
-        _@{ pascal_name }@_::delete(self._conn.lock().await.deref_mut(), *obj).await
+        _repo_::delete(self._conn.lock().await.deref_mut(), *obj).await
     }
     @%- if def.primaries().len() == 1 %@
     async fn delete_by_ids(&self, ids: &[@{ def.primaries()|fmt_join_with_paren("{domain_outer_owned}", ", ") }@]) -> anyhow::Result<u64> {
-        _@{ pascal_name }@_::delete_by_ids(self._conn.lock().await.deref_mut(), ids.iter().map(|v| @{ def.primaries()|fmt_join_with_paren2("v{convert_from_entity}", "v.{index}{convert_from_entity}", ", ") }@)).await
+        _repo_::delete_by_ids(self._conn.lock().await.deref_mut(), ids.iter().map(|v| @{ def.primaries()|fmt_join_with_paren2("v{convert_from_entity}", "v.{index}{convert_from_entity}", ", ") }@)).await
     }
     @%- endif %@
     async fn delete_all(&self) -> anyhow::Result<()> {
-        _@{ pascal_name }@_::query().delete(self._conn.lock().await.deref_mut()).await?;
+        _repo_::query().delete(self._conn.lock().await.deref_mut()).await?;
         Ok(())
     }
     @%- endif %@
     @%- if def.act_as_job_queue() %@
     async fn fetch(&self, limit: usize) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@Updater>>> {
-        let list = _@{ pascal_name }@_::query().order_by(order!(@{ def.primaries()|fmt_join_with_paren("{raw_name}", ", ") }@)).limit(limit).skip_locked().select_for_update(self._conn.lock().await.deref_mut()).await?;
+        let list = _repo_::query().order_by(order!(@{ def.primaries()|fmt_join_with_paren("{raw_name}", ", ") }@)).limit(limit).skip_locked().select_for_update(self._conn.lock().await.deref_mut()).await?;
         Ok(list.into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@Updater>).collect())
     }
     @%- endif %@
@@ -235,7 +235,7 @@ impl _@{ pascal_name }@Repository for @{ pascal_name }@RepositoryImpl {
                 @%- endif %@
                 joiner: Option<Box<Joiner_>>,
             ) -> anyhow::Result<base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::QueryBuilder> {
-                let mut query = _@{ pascal_name }@_::query();
+                let mut query = _repo_::query();
                 let mut fltr = if let Some(filter) = selector_filter {
                     _filter_@{ selector }@(&filter)?
                 } else {
@@ -359,7 +359,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 Box::new(Vec::clone(&self.0).into_iter().map(|v| Box::new(v) as Box<dyn @{ pascal_name }@>))
             }
         }
-        Ok(Box::new(V(_@{ pascal_name }@_::find_all_from_cache(self._conn.lock().await.deref(), None).await?)))
+        Ok(Box::new(V(_repo_::find_all_from_cache(self._conn.lock().await.deref(), None).await?)))
     }
     @%- endif %@
     @%- for (selector, selector_def) in def.selectors %@
@@ -404,7 +404,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             async fn query(self: Box<Self>) -> anyhow::Result<Vec<Box<dyn @{ pascal_name }@>>> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let mut query = _@{ pascal_name }@_::query();
+                let mut query = _repo_::query();
                 let mut fltr = if let Some(filter) = self.selector_filter {
                     _filter_@{ selector }@(&filter)?
                 } else {
@@ -471,7 +471,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 let mut conn = self.conn.clone().lock_owned().await;
                 let conn = conn.deref_mut();
                 conn.begin_read_tx().await?;
-                let mut query = _@{ pascal_name }@_::query();
+                let mut query = _repo_::query();
                 let mut fltr = if let Some(filter) = self.selector_filter {
                     _filter_@{ selector }@(&filter)?
                 } else {
@@ -523,7 +523,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                         let handle = tokio::spawn(async move {
                             async fn func(conn: &mut db::DbConn, pks: &Vec<_InnerPrimary_>, joiner: Option<Box<Joiner_>>) -> anyhow::Result<Vec<_@{ pascal_name }@@% if def.use_cache() %@Cache@% endif %@>> {
                                 conn.begin_read_tx().await?;
-                                let list = _@{ pascal_name }@_::find_many@% if def.use_cache() %@_from_cache@% endif %@@% if def.is_soft_delete() %@_with_trashed@% endif %@(conn, pks, joiner@% if !def.use_cache() %@, None, None@% endif %@).await?;
+                                let list = _repo_::find_many@% if def.use_cache() %@_from_cache@% endif %@@% if def.is_soft_delete() %@_with_trashed@% endif %@(conn, pks, joiner@% if !def.use_cache() %@, None, None@% endif %@).await?;
                                 conn.release_read_tx()?;
                                 let mut map: ahash::HashMap<_InnerPrimary_, _>  = list.into_iter().map(|v| ((&v).into(), v)).collect();
                                 let mut ret = vec![];
@@ -583,7 +583,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
             async fn count(self: Box<Self>) -> anyhow::Result<i64> {
                 let mut conn = self.conn.lock().await;
                 let conn = conn.deref_mut();
-                let mut query = _@{ pascal_name }@_::query();
+                let mut query = _repo_::query();
                 let mut fltr = if let Some(filter) = self.selector_filter {
                     _filter_@{ selector }@(&filter)?
                 } else {
@@ -670,12 +670,12 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 }
                 @%- if def.is_soft_delete() %@
                 let obj = if self.with_trashed {
-                    _@{ pascal_name }@_::find_optional_from_cache_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, joiner).await?
+                    _repo_::find_optional_from_cache_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, joiner).await?
                 } else {
-                    _@{ pascal_name }@_::find_optional_from_cache(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, joiner).await?
+                    _repo_::find_optional_from_cache(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, joiner).await?
                 };
                 @%- else %@
-                let obj = _@{ pascal_name }@_::find_optional_from_cache(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, joiner).await?;
+                let obj = _repo_::find_optional_from_cache(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, joiner).await?;
                 @%- endif %@
                 if let Some(mut obj) = obj {
                     let mut check = Ok(true);
@@ -699,12 +699,12 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                         Err(_) => {
                             @%- if def.is_soft_delete() %@
                             let flags = if self.with_trashed {
-                                _@{ pascal_name }@_::exists_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.filter_flag)).await?
+                                _repo_::exists_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.filter_flag)).await?
                             } else {
-                                _@{ pascal_name }@_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.filter_flag)).await?
+                                _repo_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.filter_flag)).await?
                             };
                             @%- else %@
-                            let flags = _@{ pascal_name }@_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.filter_flag)).await?;
+                            let flags = _repo_::exists(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}.clone()", "self.id.{index}.clone(){convert_from_entity}", ", ") }@, self.filter, Some(self.filter_flag)).await?;
                             @%- endif %@
                             if let Some(mut flags) = flags {
                                 obj._filter_flag.append(&mut flags);
@@ -777,12 +777,12 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                 let conn = conn.deref_mut();
                 @%- if def.is_soft_delete() %@
                 let obj = if self.with_trashed {
-                    _@{ pascal_name }@_::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
+                    _repo_::find_optional_with_trashed(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 } else {
-                    _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
+                    _repo_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?
                 };
                 @%- else %@
-                let obj = _@{ pascal_name }@_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?;
+                let obj = _repo_::find_optional(conn, @{ def.primaries()|fmt_join_with_paren2("self.id{convert_from_entity}", "self.id.{index}{convert_from_entity}", ", ") }@, self.joiner, self.filter, Some(self.filter_flag)).await?;
                 @%- endif %@
                 if let Some(obj) = obj {
                     Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@>))

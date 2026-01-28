@@ -46,10 +46,10 @@ export const Import@{ model_route|pascal }@Query = graphql(`mutation import_@{ p
 
 export const Update@{ model_route|pascal }@Query = graphql(`mutation update_@{ path }@($data:Req@{ graphql_name }@!, $checkOnly:Boolean){@{ curly_begin }@{update(data:$data, checkOnly:$checkOnly){...@{ graphql_name }@}}@{ curly_end }@}`);
 
-export const Delete@{ model_route|pascal }@Query = graphql(`mutation delete_@{ path }@($_id:ID!){@{ curly_begin }@{delete(_id:$_id)}@{ curly_end }@}`);
+export const Delete@{ model_route|pascal }@Query = graphql(`mutation delete_@{ path }@($_id:ID!, $ignoreNotFound:Boolean){@{ curly_begin }@{delete(_id:$_id, ignoreNotFound:$ignoreNotFound)}@{ curly_end }@}`);
 @%- if api_def.enable_delete_by_pk %@
 
-export const DeleteByPk@{ model_route|pascal }@Query = graphql(`mutation delete_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${ident}:{gql_type}", ",") }@){@{ curly_begin }@{deleteByPk(@{ def.primaries()|fmt_join("{ident}: ${ident}", ",") }@)}@{ curly_end }@}`);
+export const DeleteByPk@{ model_route|pascal }@Query = graphql(`mutation delete_by_pk_@{ path }@(@{ def.primaries()|fmt_join("${ident}:{gql_type}", ",") }@, $ignoreNotFound:Boolean){@{ curly_begin }@{deleteByPk(@{ def.primaries()|fmt_join("{ident}: ${ident}", ",") }@, ignoreNotFound:$ignoreNotFound)}@{ curly_end }@}`);
 @%- endif %@
 @%- for (selector, selector_def) in def.selectors %@
 @%- for api_selector_def in api_def.selector(selector) %@

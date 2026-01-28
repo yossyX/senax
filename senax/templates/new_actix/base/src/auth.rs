@@ -131,7 +131,7 @@ pub fn retrieve_auth(http_req: &HttpRequest) -> Option<AuthInfo> {
             if let Ok(v) = URL_SAFE.decode(&v)
                 && let Ok(v) = String::from_utf8(v)
             {
-                return Some(serde_json::from_str(&v).unwrap());
+                return serde_json::from_str(&v).ok();
             }
         }
     }

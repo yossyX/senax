@@ -80,6 +80,7 @@ async fn delete(
     repo: Box<dyn _Repository>,
     auth: &AuthInfo,
     primary: _domain_::@{ mod_name|pascal }@Primary,
+    ignore_not_found: Option<bool>,
 ) -> anyhow::Result<()> {
     let @{ mod_name }@_repo = repo.@{ mod_name|ident }@();
     let mut query = @{ mod_name }@_repo.find(primary.into_inner());
@@ -92,7 +93,7 @@ async fn delete(
             _repository_::delete(repo.as_ref().into(), obj).await?;
         }
         Err(e) => {
-            if !e.is::<senax_common::err::RowNotFound>() {
+            if !ignore_not_found.unwrap_or_default() || !e.is::<senax_common::err::RowNotFound>() {
                 return Err(e);
             }
         }
@@ -861,10 +862,11 @@ impl GqlMutation@{ graphql_name }@ {
         @{- def.primaries()|fmt_join("
         #[graphql(name = \"{raw_name}\")] {ident}: {inner},", "") }@
         @%- endif %@
+        ignore_not_found: Option<bool>,
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        delete(repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, @{ def.primaries()|fmt_join_with_paren("{ident}", ", ") }@.into())
+        delete(repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, @{ def.primaries()|fmt_join_with_paren("{ident}", ", ") }@.into(), ignore_not_found)
             .await
             .map_err(|e| {
                 if let Some(e) = e.downcast_ref::<GqlError>() {
@@ -882,10 +884,11 @@ impl GqlMutation@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         #[graphql(name = "_id")] _id: async_graphql::ID,
+        ignore_not_found: Option<bool>,
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
-        delete(repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, (&_id).try_into()?)
+        delete(repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, (&_id).try_into()?, ignore_not_found)
             .await
             .map_err(|e| {
                 if let Some(e) = e.downcast_ref::<GqlError>() {

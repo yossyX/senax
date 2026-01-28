@@ -733,7 +733,11 @@ fn fix_inheritance(
             if let Some(mut def2) = merged_fields.get(name).cloned() {
                 def2.in_abstract = def1.in_abstract;
                 if !def2.eq(def1) {
-                    bail!("{} column is already defined in {}.", name, cur_model_name);
+                    bail!(
+                        "The {} column is already defined in the {} model.",
+                        name,
+                        cur_model_name
+                    );
                 }
             } else {
                 merged_fields.insert(name.clone(), def1.clone());
@@ -746,7 +750,11 @@ fn fix_inheritance(
             for (name, def) in &model.fields {
                 if let Some(base) = base_model.merged_fields.get(name) {
                     if !base.eq(&def.exact()) {
-                        bail!("{} column is already defined in {}.", name, cur_model_name);
+                        bail!(
+                            "The {} column is already defined in the {} model.",
+                            name,
+                            cur_model_name
+                        );
                     }
                 } else {
                     base_model.merged_fields.insert(name.clone(), def.exact());
@@ -763,7 +771,7 @@ fn fix_inheritance(
             if let Some(mut def2) = merged_relations.get(name).cloned() {
                 def2.in_abstract = def1.in_abstract;
                 if !def2.eq(def1) {
-                    bail!("{} relation is already defined.", name);
+                    bail!("The {} relation is already defined.", name);
                 }
             } else {
                 merged_relations.insert(name.clone(), def1.clone());
@@ -775,7 +783,7 @@ fn fix_inheritance(
             for (name, def) in &model.relations {
                 if let Some(base) = base_model.merged_relations.get(name) {
                     if !base.eq(def) {
-                        bail!("{} relation is already defined.", name);
+                        bail!("The {} relation is already defined.", name);
                     }
                 } else {
                     base_model
@@ -796,7 +804,7 @@ fn fix_inheritance(
         for (name, def1) in &model.merged_indexes {
             if let Some(def2) = merged_indexes.get(name) {
                 if !def2.eq(def1) {
-                    bail!("{} index is already defined.", name);
+                    bail!("The {} index is already defined.", name);
                 }
             } else {
                 merged_indexes.insert(name.clone(), def1.clone());
@@ -808,7 +816,7 @@ fn fix_inheritance(
             for (name, index) in &model.indexes {
                 if let Some(base) = base_model.merged_indexes.get(name) {
                     if !base.eq(&index.clone().unwrap_or_default()) {
-                        bail!("{} index is already defined.", name);
+                        bail!("The {} index is already defined.", name);
                     }
                 } else {
                     base_model
@@ -839,15 +847,19 @@ pub fn get_model<'a>(
     };
     let group = groups
         .get(&group_name)
-        .unwrap_or_else(|| error_exit!("{} group is not defined", group_name));
+        .unwrap_or_else(|| error_exit!("The {} group is not defined.", group_name));
 
     if let Some(model) = group.get(&stem_name) {
         return model;
     }
     let singular_name = to_singular(&stem_name);
-    group
-        .get(&singular_name)
-        .unwrap_or_else(|| error_exit!("{} {} model is not defined", group_name, stem_name))
+    group.get(&singular_name).unwrap_or_else(|| {
+        error_exit!(
+            "The {} model is not defined in the {} group.",
+            stem_name,
+            group_name
+        )
+    })
 }
 
 pub fn set_domain_mode(mode: bool) -> bool {

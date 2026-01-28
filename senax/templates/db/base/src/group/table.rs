@@ -766,16 +766,6 @@ impl fmt::Display for ForInsert {
     }
 }
 
-pub trait _@{ pascal_name }@Getter: Send + Sync + 'static {
-@{ def.all_fields()|fmt_join("{label}{comment}    fn _{raw_name}(&self) -> {outer};
-", "") -}@
-@{ def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
-", "") -}@
-@{ def.relations_many(Joinable::Join, false)|fmt_rel_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>>;
-", "") -}@
-@{ def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("{label}{comment}    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>>;
-", "") -}@
-}
 @#
 @%- for (model, rel_name, rel) in def.relations_one(Joinable::Join, false) %@
 struct RelCol@{ rel_name|pascal }@;
@@ -1026,21 +1016,21 @@ impl fmt::Display for InnerPrimary {
     }
 }
 
-impl _@{ pascal_name }@Getter for _@{ pascal_name }@ {
+impl _@{ pascal_name }@ {
     @{- def.all_fields()|fmt_join("
-    fn _{raw_name}(&self) -> {outer} {
+    pub fn _{raw_name}(&self) -> {outer} {
         {convert_outer_prefix}self._inner.{ident}{clone_for_outer}{convert_outer}
     }", "") }@
     @{- def.relations_one_and_belonging(Joinable::Join, false)|fmt_rel_join("
-    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
+    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
     @{- def.relations_many(Joinable::Join, false)|fmt_rel_join("
-    fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
+    pub fn _{raw_rel_name}(&self) -> Result<&Vec<rel_{class_mod}::{class}>> {
         self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")
     }", "") }@
     @{- def.relations_belonging_outer_db(Joinable::Join, false)|fmt_rel_outer_db_join("
-    fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
+    pub fn _{raw_rel_name}(&self) -> Result<Option<&rel_{class_mod}::{class}>> {
         Ok(self.{rel_name}.as_ref().context(\"{raw_rel_name} is not loaded\")?.as_ref().map(|b| &**b))
     }", "") }@
 }

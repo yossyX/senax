@@ -24,7 +24,6 @@ use domain::models::@{ db|snake|ident }@ as _model_;
 use domain::models::@{ rel_def.db()|snake|ident }@ as _@{ rel_def.db()|snake }@_model_;
 @%- endfor %@
 
-type __Getter__ = dyn crate::models::@{ group_name|snake|ident }@::@{ mod_name|ident }@::_@{ pascal_name }@Getter;
 @%- if !config.force_disable_cache %@
 type __Cache__ = _@{ pascal_name }@Cache;
 @%- endif %@
@@ -57,30 +56,30 @@ impl From<&_@{ pascal_name }@Id> for @{ pascal_name }@Id {
 impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ parent.name|ident }@::@{ parent.name|pascal }@ for _@{ pascal_name }@ {
 @{- parent.primaries()|fmt_join("
     fn _{raw_name}(&self) -> {inner} {
-        __Getter__::_{raw_name}(self){clone}{convert_impl_domain_inner}
+        self._{raw_name}(){clone}{convert_impl_domain_inner}
     }", "") }@
 @{- parent.only_version()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
-        __Getter__::_{raw_name}(self)
+        self._{raw_name}()
     }", "") }@
 @{- parent.cols_except_primaries_and_invisibles()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
-        __Getter__::_{raw_name}(self){convert_impl_domain_outer}
+        self._{raw_name}(){convert_impl_domain_outer}
     }", "") }@
 @{- parent.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
-        Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _model_::{class_mod_path}::{class}))
+        Ok(self._{raw_rel_name}()?.map(|v| v as &dyn _model_::{class_mod_path}::{class}))
     }", "") }@
 @{- parent.relations_many(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
-        Ok(Box::new(__Getter__::_{raw_rel_name}(self)?.iter().map(|v| v as &dyn _model_::{class_mod_path}::{class})))
+        Ok(Box::new(self._{raw_rel_name}()?.iter().map(|v| v as &dyn _model_::{class_mod_path}::{class})))
     }", "") }@
 @{- parent.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
-        Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
+        Ok(self._{raw_rel_name}()?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
     }", "") }@
 }
 @%- if !config.force_disable_cache %@
@@ -188,30 +187,30 @@ impl domain::models::@{ db|snake|ident }@::@{ parent.group_name|ident }@::@{ par
 impl @{ pascal_name }@ for _@{ pascal_name }@ {
 @{- def.primaries()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
-        __Getter__::_{raw_name}(self){convert_impl_domain_outer}
+        self._{raw_name}(){convert_impl_domain_outer}
     }", "") }@
 @{- def.only_version()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
-        __Getter__::_{raw_name}(self)
+        self._{raw_name}()
     }", "") }@
 @{- def.cols_except_primaries_and_invisibles()|fmt_join("
     fn {ident}(&self) -> {domain_outer} {
-        __Getter__::_{raw_name}(self){convert_impl_domain_outer}
+        self._{raw_name}(){convert_impl_domain_outer}
     }", "") }@
 @{- def.relations_one_and_belonging(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _model_::{class_mod_path}::{class}>> {
-        Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _model_::{class_mod_path}::{class}))
+        Ok(self._{raw_rel_name}()?.map(|v| v as &dyn _model_::{class_mod_path}::{class}))
     }", "") }@
 @{- def.relations_many(Joinable::Join, true)|fmt_rel_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Box<dyn Iterator<Item = &dyn _model_::{class_mod_path}::{class}> + '_>> {
-        Ok(Box::new(__Getter__::_{raw_rel_name}(self)?.iter().map(|v| v as &dyn _model_::{class_mod_path}::{class})))
+        Ok(Box::new(self._{raw_rel_name}()?.iter().map(|v| v as &dyn _model_::{class_mod_path}::{class})))
     }", "") }@
 @{- def.relations_belonging_outer_db(Joinable::Join, true)|fmt_rel_outer_db_join("
     #[allow(clippy::question_mark)]
     fn {rel_name}(&self) -> anyhow::Result<Option<&dyn _{db_snake}_model_::{class_mod_path}::{class}>> {
-        Ok(__Getter__::_{raw_rel_name}(self)?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
+        Ok(self._{raw_rel_name}()?.map(|v| v as &dyn _{db_snake}_model_::{class_mod_path}::{class}))
     }", "") }@
 }
 

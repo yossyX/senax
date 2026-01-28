@@ -135,7 +135,7 @@ impl From<_@{ name|pascal }@> for @{ column_def.get_filter_type(true) }@ {
 @% endfor -%@
 @{ def.label|label0 -}@
 @{ def.comment|comment0 -}@
-pub trait _@{ pascal_name }@Getter: Send + Sync {
+pub trait _@{ pascal_name }@Getter: Send + Sync + 'static {
 @{- def.primaries()|fmt_join("
 {label}{comment}    fn _{raw_name}(&self) -> &{inner};", "") -}@
 @{- def.non_primaries()|fmt_join("

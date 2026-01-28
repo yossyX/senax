@@ -2,7 +2,6 @@
 
 pub use _base_repo_@{ db|snake|ident }@_@{ unified_name }@ as base_repository;
 use anyhow::Result;
-use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@;
 use db::DbConn;
 use senax_common::ShardId;
 
@@ -14,8 +13,8 @@ pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ 
 @% endfor -%@
 #[rustfmt::skip]
 pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{
-    _@{ pascal_name }@, _@{ pascal_name }@_,@% if !config.force_disable_cache %@ _@{ pascal_name }@Cache, _@{ pascal_name }@Cache_,@% endif %@ _@{ pascal_name }@Factory, _@{ pascal_name }@Updater,
-    @% for id in def.id() %@@{ id_name }@, @% endfor %@_@{ pascal_name }@Joiner, _@{ pascal_name }@Getter, UnionBuilder as _@{ pascal_name }@UnionBuilder, Filter_
+    _repo_::{self, *}, _@{ pascal_name }@,@% if !config.force_disable_cache %@ _@{ pascal_name }@Cache, _@{ pascal_name }@Cache_,@% endif %@ _@{ pascal_name }@Factory, _@{ pascal_name }@Updater,
+    @% for id in def.id() %@@{ id_name }@, @% endfor %@_@{ pascal_name }@Joiner, UnionBuilder as _@{ pascal_name }@UnionBuilder, Filter_
 };
 @%- if config.exclude_from_domain %@
 pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{Joiner_, join};
@@ -63,12 +62,12 @@ async fn save_data(
     let update_ids: Vec<&_@{ pascal_name }@Id> = update_map.keys().collect();
     let mut conn = DbConn::_new(shard_id as ShardId);
     conn.begin().await?;
-    let list = _@{ pascal_name }@_::query()
+    let list = query()
         .filter(filter!(key IN update_ids))
         .skip_locked()
         .select_for_update(&mut conn)
         .await?;
-    let mut updater_map = _@{ pascal_name }@_::updater_list_to_map(list);
+    let mut updater_map = updater_list_to_map(list);
     let mut save_list = Vec::new();
     let mut update_list = Vec::new();
     for (id, mut l) in update_map.into_iter() {
@@ -124,7 +123,7 @@ async fn save_data(
         conn.rollback().await?;
         return Ok(());
     }
-    _@{ pascal_name }@_::bulk_overwrite(&mut conn, save_list).await?;
+    bulk_overwrite(&mut conn, save_list).await?;
     conn.commit().await?;
     for data in new_list {
         data.result.lock().unwrap().replace(Ok(data.key.clone()));
@@ -150,7 +149,7 @@ impl SessionStore for _@{ pascal_name }@Store {
     async fn load(&self, session_key: &SessionKey) -> Result<Option<SessionData>> {
         let mut conn = DbConn::_new(calc_shard_id(session_key) as ShardId);
         let id: String = session_key.into();
-        let session = _@{ pascal_name }@_::find_optional_from_cache(&mut conn, id, None)
+        let session = find_optional_from_cache(&mut conn, id, None)
             .await?
             .map(|s| SessionData::new(s._data(), (s._eol() as u64) << EOL_SHIFT, s._@{ ConfigDef::version() }@()));
         Ok(session)
@@ -159,7 +158,7 @@ impl SessionStore for _@{ pascal_name }@Store {
     async fn reload(&self, session_key: &SessionKey) -> Result<Option<SessionData>> {
         let mut conn = DbConn::_new(calc_shard_id(session_key) as ShardId);
         let id: String = session_key.into();
-        let session = _@{ pascal_name }@_::find_optional(&mut conn, id, None, None, None)
+        let session = find_optional(&mut conn, id, None, None, None)
             .await?
             .map(|s| SessionData::new(s._data(), (s._eol() as u64) << EOL_SHIFT, s._@{ ConfigDef::version() }@()));
         Ok(session)
@@ -232,7 +231,7 @@ impl SessionStore for _@{ pascal_name }@Store {
         let mut session = id.updater();
         session.mut_eol().set((data.eol() >> EOL_SHIFT) as @{ config.u32() }@);
         session.mut_@{ ConfigDef::updated_at() }@().mark_for_skip();
-        _@{ pascal_name }@_::delayed_update(&mut conn, session).await
+        delayed_update(&mut conn, session).await
     }
 
     async fn delete(&self, session_key: &SessionKey) -> Result<()> {
@@ -241,7 +240,7 @@ impl SessionStore for _@{ pascal_name }@Store {
         let id: _@{ pascal_name }@Id = s_key.into();
         let mut session = id.updater();
         session.mut_eol().set(0);
-        _@{ pascal_name }@_::delayed_update(&mut conn, session).await
+        delayed_update(&mut conn, session).await
     }
 
     async fn gc(&self, start_key: &SessionKey) -> Result<()> {
@@ -269,7 +268,7 @@ async fn gc(shard_id: ShardId, start_key: SessionKey) -> Result<()> {
     let filter = filter!((key < s_key) AND (eol < eol));
     const LIMIT: usize = 1000;
     loop {
-        if _@{ pascal_name }@_::query()
+        if query()
             .filter(filter.clone())
             .limit(LIMIT)
             .force_delete(&mut conn)

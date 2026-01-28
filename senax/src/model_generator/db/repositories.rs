@@ -226,14 +226,6 @@ pub fn write_base_group_files(
             }
         }
 
-        for (u, m) in &unified_names {
-            base_output.push_str(&format!(
-                "pub use _base_repo_{}_{u}::repositories::{}::_base::_{m};\n",
-                db.to_snake(),
-                group_name.to_snake().to_ident()
-            ));
-        }
-
         let file_path = model_models_dir.join(format!("{}.rs", group_name.to_snake()));
         remove_files.remove(file_path.as_os_str());
         let concrete_models: IndexMap<&String, &Arc<ModelDef>> =
