@@ -41,7 +41,7 @@ use ::db::cache::Cache;
 @% endif %@
 use ::db::connection::{DbArguments, DbConn, DbRow, DbType};
 use crate::misc::{ToBindableJson as _};
-use crate::repositories::{CacheOpTr, IdFetcher, IdFetcherWithCache};
+use crate::repositories::CacheOpTr;
 use ::db::misc::{BindValue, Count, Exists, Updater, Size, TrashMode, UpdaterForInner as _};
 use ::db::models::USE_FAST_CACHE;
 use ::db::{accessor::*, CacheMsg, BULK_INSERT_MAX_SIZE, IN_CONDITION_LIMIT};
@@ -2718,71 +2718,6 @@ impl _UnionBuilder for Vec<QueryBuilder> {
     }
 }
 @%- endif %@
-
-@% for (name, column_def) in def.id() -%@
-@%- if def.primaries().len() == 1 %@
-impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% if def.use_cache() %@_@{pascal_name}@Cache,@% endif %@ _@{pascal_name}@Updater, Joiner_> for @{ id_name }@ {
-    async fn fetch(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@>> {
-        _@{ pascal_name }@_::find_optional(conn, self, joiner, None, None).await
-    }
-@%- if def.is_soft_delete() %@
-    async fn fetch_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@>> {
-        _@{ pascal_name }@_::find_optional_with_trashed(conn, self, joiner, None, None).await
-    }
-@%- endif %@
-@%- if def.use_cache() %@
-    async fn fetch_from_cache(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
-        _@{ pascal_name }@_::find_optional_from_cache(conn, self, joiner).await
-    }
-@%- if def.is_soft_delete() %@
-    async fn fetch_from_cache_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
-        _@{ pascal_name }@_::find_optional_from_cache_with_trashed(conn, self, joiner).await
-    }
-@%- endif %@
-@%- endif %@
-@%- if !def.disable_update() %@
-    async fn fetch_for_update(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Updater> {
-        _@{ pascal_name }@_::find_for_update(conn, self, joiner, None, None).await
-    }
-@%- if def.is_soft_delete() %@
-    async fn fetch_for_update_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<_@{ pascal_name }@Updater> {
-        _@{ pascal_name }@_::find_for_update_with_trashed(conn, self, joiner, None, None).await
-    }
-@%- endif %@
-@%- endif %@
-}
-
-impl IdFetcher@% if def.use_cache() %@WithCache@% endif %@<_@{pascal_name}@,@% if def.use_cache() %@_@{pascal_name}@Cache,@% endif %@ _@{pascal_name}@Updater, Joiner_> for Option<@{ id_name }@> {
-    async fn fetch(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@>> {
-        if let Some(id) = self {
-            _@{ pascal_name }@_::find_optional(conn, id, joiner, None, None).await
-        } else {
-            Ok(None)
-        }
-    }
-@%- if def.use_cache() %@
-    async fn fetch_from_cache(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
-        if let Some(id) = self {
-            _@{ pascal_name }@_::find_optional_from_cache(conn, id, joiner).await
-        } else {
-            Ok(None)
-        }
-    }
-    @%- if def.is_soft_delete() %@
-    async fn fetch_from_cache_with_trashed(&self, conn: &mut DbConn, joiner: Option<Box<Joiner_>>) -> Result<Option<_@{ pascal_name }@Cache>> {
-        if let Some(id) = self {
-            _@{ pascal_name }@_::find_from_cache_with_trashed(conn, id, joiner)
-                .await
-                .map(Some)
-        } else {
-            Ok(None)
-        }
-    }
-    @%- endif %@
-@%- endif %@
-}
-@%- endif %@
-@%- endfor %@
 
 fn id_to_string(id: &InnerPrimary) -> String {
     format!("@{ def.primaries()|fmt_join("{col}={disp}", ", ") }@"@{ def.primaries()|fmt_join(", id.{index}", "") }@)
