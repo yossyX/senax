@@ -3,11 +3,18 @@
 /// This function efficiently converts MySQL-style question mark placeholders to PostgreSQL-style
 /// numbered placeholders while respecting SQL string literals and comments.
 ///
+/// # Escape Sequences
+///
+/// - `\?` is converted to `?` (not a placeholder)
+/// - `??` is converted to `?` (not a placeholder)
+/// - Single `?` is converted to `$1`, `$2`, etc.
+///
 /// # Examples
 ///
 /// ```rust
-/// use senax_common::convert_mysql_placeholders_to_postgresql;
+/// use senax_pgsql_parser::convert_mysql_placeholders_to_postgresql;
 ///
+/// // Basic placeholder conversion
 /// let mysql_sql = "SELECT * FROM users WHERE id = ? AND name = ?";
 /// let postgresql_sql = convert_mysql_placeholders_to_postgresql(mysql_sql);
 /// assert_eq!(postgresql_sql, "SELECT * FROM users WHERE id = $1 AND name = $2");
@@ -16,6 +23,21 @@
 /// let mysql_sql = "SELECT * FROM users WHERE name = 'user?' AND id = ?";
 /// let postgresql_sql = convert_mysql_placeholders_to_postgresql(mysql_sql);
 /// assert_eq!(postgresql_sql, "SELECT * FROM users WHERE name = 'user?' AND id = $1");
+///
+/// // Escaped \? is converted to ? (useful for PostgreSQL JSON operators)
+/// let mysql_sql = r"SELECT * FROM users WHERE json_data \? 'key' AND id = ?";
+/// let postgresql_sql = convert_mysql_placeholders_to_postgresql(mysql_sql);
+/// assert_eq!(postgresql_sql, "SELECT * FROM users WHERE json_data ? 'key' AND id = $1");
+///
+/// // Double ?? is converted to ? (useful for PostgreSQL JSON operators)
+/// let mysql_sql = "SELECT * FROM users WHERE json_data ?? 'key' AND id = ?";
+/// let postgresql_sql = convert_mysql_placeholders_to_postgresql(mysql_sql);
+/// assert_eq!(postgresql_sql, "SELECT * FROM users WHERE json_data ? 'key' AND id = $1");
+///
+/// // Combined usage
+/// let mysql_sql = r"SELECT \? as escaped, ?? as double, ? as param";
+/// let postgresql_sql = convert_mysql_placeholders_to_postgresql(mysql_sql);
+/// assert_eq!(postgresql_sql, "SELECT ? as escaped, ? as double, $1 as param");
 /// ```
 pub fn convert_mysql_placeholders_to_postgresql(sql: &str) -> String {
     let mut result = String::with_capacity(sql.len() + 32); // Pre-allocate with extra space for placeholders
@@ -82,15 +104,36 @@ pub fn convert_mysql_placeholders_to_postgresql(sql: &str) -> String {
                 }
             }
 
+            // Handle \? outside string literals - convert to ?
+            '\\' if !in_single_quote
+                && !in_double_quote
+                && !in_line_comment
+                && !in_block_comment =>
+            {
+                if chars.peek() == Some(&'?') {
+                    chars.next(); // consume '?'
+                    result.push('?'); // Just push '?' without converting to placeholder
+                } else {
+                    result.push(ch);
+                }
+            }
+
             // Handle placeholder conversion
             '?' if !in_single_quote
                 && !in_double_quote
                 && !in_line_comment
                 && !in_block_comment =>
             {
-                placeholder_count += 1;
-                result.push('$');
-                result.push_str(&placeholder_count.to_string());
+                // Handle ?? - convert to single ?
+                if chars.peek() == Some(&'?') {
+                    chars.next(); // consume second '?'
+                    result.push('?'); // Just push single '?' without converting to placeholder
+                } else {
+                    // Convert ? to $N
+                    placeholder_count += 1;
+                    result.push('$');
+                    result.push_str(&placeholder_count.to_string());
+                }
             }
 
             // Default case: just push the character
