@@ -2,6 +2,9 @@
 resolver = "2"
 members = ["1_domain", "2_db"]
 
+[profile.dev]
+codegen-units = 1
+
 [profile.release]
 strip = true
 lto = "thin"
@@ -10,7 +13,7 @@ codegen-units = 1
 [workspace.dependencies]
 ahash = "0.8"
 anyhow = "1.0"
-async-graphql = { version = "7.0", features = ["apollo_persisted_queries", "chrono", "uuid", "decimal", "log", "raw_value"] }
+async-graphql = { version = "7.0", features = ["apollo_persisted_queries", "chrono", "uuid", "decimal", "log", "raw_value", "boxed-trait"] }
 async-graphql-actix-web = "7.0"
 async-graphql-axum = "7.0"
 async-stream = "0.3"

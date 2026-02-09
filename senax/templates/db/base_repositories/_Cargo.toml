@@ -33,7 +33,6 @@ serde_yaml.workspace = true
 sled = "0.34"
 sqlx.workspace = true
 tokio.workspace = true
-tracing.workspace = true
 uuid.workspace = true
 validator.workspace = true
 zstd = "0.13"

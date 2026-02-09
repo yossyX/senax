@@ -51,7 +51,6 @@ strum.workspace = true
 strum_macros.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-tracing.workspace = true
 url = "2.2.2"
 uuid.workspace = true
 validator.workspace = true

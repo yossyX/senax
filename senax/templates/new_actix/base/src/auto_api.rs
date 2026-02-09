@@ -111,6 +111,7 @@ impl ErrorExtensions for GqlError {
 
 pub struct RoleGuard(Role);
 
+#[async_trait::async_trait]
 impl async_graphql::Guard for RoleGuard {
     async fn check(&self, _gql_ctx: &async_graphql::Context<'_>) -> async_graphql::Result<()> {
         let auth: &AuthInfo = _gql_ctx.data()?;
@@ -124,6 +125,7 @@ impl async_graphql::Guard for RoleGuard {
 
 pub struct NoGuard;
 
+#[async_trait::async_trait]
 impl async_graphql::Guard for NoGuard {
     async fn check(&self, _gql_ctx: &async_graphql::Context<'_>) -> async_graphql::Result<()> {
         Ok(())

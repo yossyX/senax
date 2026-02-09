@@ -80,7 +80,7 @@ async fn delete(
     repo: Box<dyn _Repository>,
     auth: &AuthInfo,
     primary: _domain_::@{ mod_name|pascal }@Primary,
-    ignore_not_found: Option<bool>,
+    ignore_not_found: bool,
 ) -> anyhow::Result<()> {
     let @{ mod_name }@_repo = repo.@{ mod_name|ident }@();
     let mut query = @{ mod_name }@_repo.find(primary.into_inner());
@@ -93,7 +93,7 @@ async fn delete(
             _repository_::delete(repo.as_ref().into(), obj).await?;
         }
         Err(e) => {
-            if !ignore_not_found.unwrap_or_default() || !e.is::<senax_common::err::RowNotFound>() {
+            if !ignore_not_found || !e.is::<senax_common::err::RowNotFound>() {
                 return Err(e);
             }
         }
@@ -465,7 +465,7 @@ impl GqlMutation@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         data: ReqObj,
-        check_only: Option<bool>,
+        #[graphql(default = false)] check_only: bool,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
@@ -480,7 +480,7 @@ impl GqlMutation@{ graphql_name }@ {
         if !creatable {
             return Err(GqlError::Forbidden.extend());
         }
-        if check_only.unwrap_or_default() {
+        if check_only {
             return Ok(ResObj::try_from_(&*entity, None)?);
         }
         let obj = _repository_::create(@{ group|snake }@_repo.as_ref().into(), entity)
@@ -499,7 +499,7 @@ impl GqlMutation@{ graphql_name }@ {
         @%- if !def.has_auto_primary() %@
         option: Option<domain::models::ImportOption>,
         @%- endif %@
-        check_only: Option<bool>,
+        #[graphql(default = false)] check_only: bool,
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
@@ -566,7 +566,7 @@ impl GqlMutation@{ graphql_name }@ {
         if !errors.is_empty() {
             return Err(GqlError::ValidationErrorList(errors).extend());
         }
-        if check_only.unwrap_or_default() {
+        if check_only {
             return Ok(true);
         }
         if !create_list.is_empty() {
@@ -589,7 +589,7 @@ impl GqlMutation@{ graphql_name }@ {
         if !errors.is_empty() {
             return Err(GqlError::ValidationErrorList(errors).extend());
         }
-        if check_only.unwrap_or_default() {
+        if check_only {
             return Ok(true);
         }
         _repository_::import(@{ group|snake }@_repo.as_ref().into(), list, option)
@@ -605,7 +605,7 @@ impl GqlMutation@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         data: ReqObj,
-        check_only: Option<bool>,
+        #[graphql(default = false)] check_only: bool,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
@@ -637,7 +637,7 @@ impl GqlMutation@{ graphql_name }@ {
             return Err(GqlError::VersionMismatch.extend());
         }
         @%- endif %@
-        if check_only.unwrap_or_default() {
+        if check_only {
             return Ok(ResObj::try_from_(&*obj, None)?);
         }
         let obj = _repository_::update(@{ group|snake }@_repo.as_ref().into(), obj, |obj| update_updater(&mut *obj, data, @{ group|snake }@_repo.as_ref(), auth))
@@ -862,7 +862,7 @@ impl GqlMutation@{ graphql_name }@ {
         @{- def.primaries()|fmt_join("
         #[graphql(name = \"{raw_name}\")] {ident}: {inner},", "") }@
         @%- endif %@
-        ignore_not_found: Option<bool>,
+        #[graphql(default = false)] ignore_not_found: bool,
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;
@@ -884,7 +884,7 @@ impl GqlMutation@{ graphql_name }@ {
         &self,
         gql_ctx: &async_graphql::Context<'_>,
         #[graphql(name = "_id")] _id: async_graphql::ID,
-        ignore_not_found: Option<bool>,
+        #[graphql(default = false)] ignore_not_found: bool,
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
         let auth: &AuthInfo = gql_ctx.data()?;

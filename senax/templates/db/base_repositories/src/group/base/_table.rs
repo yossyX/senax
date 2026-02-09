@@ -32,7 +32,6 @@ use ::std::vec::Vec;
 use ::std::{cmp, fmt};
 use ::tokio::sync::{mpsc, Mutex, RwLock, Semaphore};
 use ::tokio::time::{sleep, Duration};
-use ::tracing::debug_span;
 use ::zstd::{decode_all, encode_all};
 @%- if !config.force_disable_cache %@
 
@@ -2141,7 +2140,7 @@ impl QueryBuilder {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         query = self._bind(query, true);
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
@@ -2229,7 +2228,7 @@ impl QueryBuilder {
         let mut executor = conn.acquire_reader().await?;
         tokio::spawn(async move {
             let mut query = sqlx::query(&sql);
-            let _span = debug_span!("query", sql = &query.sql(), ctx = ctx_no);
+            debug!(ctx = ctx_no, sql = &query.sql(); "query");
             query = self._bind(query, true);
             let now = std::time::Instant::now();
             let mut result = query.fetch(executor.as_mut());
@@ -2283,7 +2282,7 @@ impl QueryBuilder {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         let joiner = self.joiner.take();
         query = self._bind(query, true);
         let now = std::time::Instant::now();
@@ -2325,7 +2324,7 @@ impl QueryBuilder {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         let joiner = self.joiner.take();
         query = self._bind(query, true);
         let now = std::time::Instant::now();
@@ -2484,7 +2483,7 @@ impl QueryBuilder {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         @{- def.non_primaries_except_read_only()|fmt_join("
         for _n in 0..obj._op.{ident}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{ident}{bind_as});
@@ -2563,7 +2562,7 @@ impl QueryBuilder {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "delete_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "");
         if let Some(c) = self.filter {
             query = c.bind_to_query(query);
@@ -2651,7 +2650,7 @@ async fn _union(
             let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
             @%- endif %@
             let mut query = sqlx::query(&sql);
-            let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+            debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
             for builder in chunk {
                 query = builder._bind(query, true);
             }
@@ -2678,7 +2677,7 @@ async fn _union(
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         for builder in list {
             query = builder._bind(query, true);
         }
@@ -2905,7 +2904,7 @@ pub mod _repo_ {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         if let Some(c) = filter {
             query = c.bind_to_query(query);
         }
@@ -2961,7 +2960,7 @@ pub mod _repo_ {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         let result = crate::misc::fetch!(conn, query, fetch_all);
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
@@ -3377,7 +3376,7 @@ pub mod _repo_ {
         let sql = &senax_common::convert_mysql_placeholders_to_postgresql(sql);
         @%- endif %@
         let query = bind_to_query(sqlx::query(sql), &obj._data);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
         if rows_affected == 0 {
             return Ok(None);
@@ -3610,7 +3609,7 @@ pub mod _repo_ {
                 let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
                 @%- endif %@
                 let mut query = sqlx::query(&sql);
-                let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+                debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
     @{- def.soft_delete_tpl2("","
                 query = query.bind(deleted_at);","","
                 query = query.bind(deleted);")}@
@@ -3691,7 +3690,7 @@ pub mod _repo_ {
                 let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
                 @%- endif %@
                 let mut query = sqlx::query(&sql);
-                let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+                debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
                 for id in ids {
                     @{- def.primaries()|fmt_join("
                     query = query.bind(id.{index}{bind_as});", "") }@
@@ -3809,7 +3808,7 @@ pub mod _repo_ {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
         if conn.wo_tx() {
@@ -3841,7 +3840,7 @@ pub mod _repo_ {
 
     pub async fn force_delete_all(conn: &mut DbConn) -> Result<()> {
         let query = sqlx::query(r#"DELETE FROM @{ table_name|db_esc }@"#);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await?;
         } else {
@@ -3867,7 +3866,7 @@ pub mod _repo_ {
 
     pub async fn truncate(conn: &mut DbConn) -> Result<()> {
         let query = sqlx::query(r#"TRUNCATE TABLE @{ table_name|db_esc }@"#);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         query.execute(conn.acquire_writer().await?.as_mut()).await?;
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "truncate", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
@@ -3896,7 +3895,7 @@ pub mod _repo_ {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         for (_name, filter) in filter_flag {
             query = filter.bind_to_query(query);
         }
@@ -3969,7 +3968,7 @@ async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], t
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let mut query = sqlx::query(&sql);
-    let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
     for (_name, filter) in filter_flag {
         query = filter.bind_to_query(query);
     }
@@ -4179,7 +4178,7 @@ async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, tr
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let mut query = sqlx::query(&sql);
-    let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
     for (_name, filter) in filter_flag {
         query = filter.bind_to_query(query);
     }
@@ -4226,7 +4225,7 @@ async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: Tra
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let mut query = sqlx::query(&sql);
-    let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
     for (_name, filter) in filter_flag {
         query = filter.bind_to_query(query);
     }
@@ -4277,7 +4276,7 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         for (_name, filter) in filter_flag.clone() {
             query = filter.bind_to_query(query);
         }
@@ -4411,7 +4410,7 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, ov
     let sql = &senax_common::convert_mysql_placeholders_to_postgresql(sql);
     @%- endif %@
     let query = bind_to_query(sqlx::query(sql), &obj._data);
-    let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
     let (_, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
 @{- def.auto_inc()|fmt_join("
     if obj._data.{ident} == 0 {
@@ -4481,7 +4480,7 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         @{- def.non_primaries_except_invisible_and_read_only(false)|fmt_join("
         for _n in 0..obj._op.{ident}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{ident}{bind_as});
@@ -4576,7 +4575,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let query = bind_to_query(sqlx::query(&sql), &obj._data);
-    let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
     let query = bind_non_primaries(&obj, query, &sql);
     let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned || def.counter_field.is_some() %@_with_last_insert_id@% endif %@(query).await?;
     info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "upsert", ctx = conn.ctx_no(); "{}", &obj);
@@ -4715,7 +4714,7 @@ async fn ___update_many(conn: &mut DbConn, ids: &[InnerPrimary], obj: &__Updater
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let query = sqlx::query(&sql);
-    let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
     let mut query = bind_non_primaries(&obj, query, &sql);
     for id in ids {
         @{- def.primaries()|fmt_join("
@@ -4857,7 +4856,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         for data in list {
             query = bind_to_query(query, &data._data);
         }
@@ -5000,7 +4999,7 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let mut query = sqlx::query(&sql);
-    let _span = debug_span!("query", sql = &query.sql(), ctx = conn.ctx_no());
+    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
     for data in list {
         query = bind_to_query(query, data);
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "bulk_upsert", ctx = conn.ctx_no(); "{}", &data);

@@ -408,7 +408,6 @@ macro_rules! filter {
                 }
             };
         }
-        #[inline(never)]
         fn bind_to_query(
             self,
             mut query: sqlx::query::Query<'_, DbType, DbArguments>,

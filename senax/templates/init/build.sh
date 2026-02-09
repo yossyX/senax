@@ -5,7 +5,7 @@
 # Do not modify this line. (Api)
 
 senax model -c
-cargo check
+cargo build
 
 cargo run -p db -- migrate -t -c
 senax gen-migrate auto --skip-empty --use-test-db

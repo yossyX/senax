@@ -29,7 +29,6 @@ const config: CodegenConfig = {
     'introspection.json': {
       plugins: ['introspection'],
       config: {
-        minify: true,
         descriptions: false
       },
     },
