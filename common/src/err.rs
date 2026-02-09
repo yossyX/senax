@@ -16,6 +16,16 @@ impl std::fmt::Display for RowNotFound {
 impl std::error::Error for RowNotFound {}
 
 #[derive(Debug)]
+pub struct ErrorTable(pub &'static str);
+
+impl std::fmt::Display for ErrorTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "table: {}", self.0)
+    }
+}
+impl std::error::Error for ErrorTable {}
+
+#[derive(Debug)]
 pub struct LockFailed {
     pub name: String,
 }
