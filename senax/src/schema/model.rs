@@ -1623,7 +1623,6 @@ impl ModelDef {
                     && v.auto.is_none()
                     && ApiFieldDef::has(k)
                     && ApiFieldDef::check(k, true)
-                    && (v.primary || !v.is_cascade_on_delete())
             })
             .collect()
     }
@@ -1639,7 +1638,6 @@ impl ModelDef {
                     && ApiFieldDef::has(k)
                     && ApiFieldDef::check(k, true)
                     && !ApiFieldDef::disable_update(k)
-                    && !v.is_cascade_on_delete()
                     && !v.primary
             })
             .collect()

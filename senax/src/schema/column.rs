@@ -2495,10 +2495,6 @@ impl FieldDef {
         }
     }
 
-    pub fn ignore_request(&self, name: &str) -> bool {
-        !ApiFieldDef::check(name, true) || self.is_cascade_on_delete()
-    }
-
     pub fn get_from_api_type(
         &self,
         name: &str,
@@ -2521,7 +2517,7 @@ impl FieldDef {
                 return "0".to_owned();
             }
         }
-        if (rel && foreign.iter().any(|e| e == name)) || self.ignore_request(name) {
+        if (rel && foreign.iter().any(|e| e == name)) || !ApiFieldDef::check(name, true) {
             if !self.not_null {
                 return "None".to_owned();
             }
@@ -4007,13 +4003,5 @@ impl FieldDef {
                 true
             };
         if copyable { "" } else { ".clone()" }
-    }
-
-    pub fn is_cascade_on_delete(&self) -> bool {
-        if let Some((_, rel)) = &self.rel {
-            rel.on_delete == Some(super::ReferenceOption::Cascade)
-        } else {
-            false
-        }
     }
 }

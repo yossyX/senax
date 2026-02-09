@@ -2498,9 +2498,9 @@ impl QueryBuilder {
         }
         let now = std::time::Instant::now();
         let result = if conn.wo_tx() {
-            query.execute(conn.acquire_writer().await?.as_mut()).await?
+            query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
         } else {
-            query.execute(conn.get_tx().await?.as_mut()).await?
+            query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
@@ -2572,9 +2572,9 @@ impl QueryBuilder {
         }
         let now = std::time::Instant::now();
         let result = if conn.wo_tx() {
-            query.execute(conn.acquire_writer().await?.as_mut()).await?
+            query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
         } else {
-            query.execute(conn.get_tx().await?.as_mut()).await?
+            query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
@@ -3007,7 +3007,7 @@ pub mod _repo_ {
         let id: Primary = id.into();
         find_optional(conn, id.clone(), joiner, filter, filter_flag)
             .await?
-            .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&(&id).into())))
+            .with_context(|| err::RowNotFound::new(TABLE_NAME, id_to_string(&(&id).into())))
     }
     @%- if def.is_soft_delete() %@
 
@@ -3018,7 +3018,7 @@ pub mod _repo_ {
         let id: Primary = id.into();
         find_optional_with_trashed(conn, id.clone(), joiner, filter, filter_flag)
             .await?
-            .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&(&id).into())))
+            .with_context(|| err::RowNotFound::new(TABLE_NAME, id_to_string(&(&id).into())))
     }
     @%- endif %@
     @%- if def.use_cache() %@
@@ -3033,7 +3033,7 @@ pub mod _repo_ {
 @{- def.soft_delete_tpl("","
             .filter(|data| data._wrapper._inner.deleted_at.is_none())","
             .filter(|data| data._wrapper._inner.deleted == 0)")}@
-            .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&id)))
+            .with_context(|| err::RowNotFound::new(TABLE_NAME, id_to_string(&id)))
     }
     @%- if def.is_soft_delete() %@
 
@@ -3044,7 +3044,7 @@ pub mod _repo_ {
         let id: InnerPrimary = (&id.into()).into();
         __find_optional_from_cache(conn, id.clone(), joiner)
             .await?
-            .with_context(|| err::RowNotFound::new("@{ table_name }@", id_to_string(&id)))
+            .with_context(|| err::RowNotFound::new(TABLE_NAME, id_to_string(&id)))
     }
     @%- endif %@
     @%- endif %@
@@ -3234,7 +3234,7 @@ pub mod _repo_ {
     {
         let id: InnerPrimary = (&id.into()).into();
         let result = __find_for_update(conn, &id, TrashMode::Not, filter, filter_flag.unwrap_or_default()).await?@{ def.soft_delete_tpl("",".filter(|(data, _)| data.deleted_at.is_none())",".filter(|(data, _)| data.deleted == 0)")}@;
-        let data = result.with_context(|| err::RowNotFound::new("@{ table_name }@", id.to_string()))?;
+        let data = result.with_context(|| err::RowNotFound::new(TABLE_NAME, id.to_string()))?;
         let mut obj = __Updater__::from(data);
         _@{ pascal_name }@Joiner::join(&mut obj, conn, joiner).await?;
         Ok(obj)
@@ -3248,7 +3248,7 @@ pub mod _repo_ {
     {
         let id: InnerPrimary = (&id.into()).into();
         let result = __find_for_update(conn, &id, TrashMode::With, filter, filter_flag.unwrap_or_default()).await?;
-        let data = result.with_context(|| err::RowNotFound::new("@{ table_name }@", id.to_string()))?;
+        let data = result.with_context(|| err::RowNotFound::new(TABLE_NAME, id.to_string()))?;
         let mut obj = __Updater__::from(data);
         _@{ pascal_name }@Joiner::join(&mut obj, conn, joiner).await?;
         Ok(obj)
@@ -3284,7 +3284,7 @@ pub mod _repo_ {
         let val{index}: {filter_type} = _{name}.into();", "") }@
         let filter = Filter_::And(vec![@{- index.fields(index_name, def)|fmt_index_col("Filter_::EqKey(ColKey_::{ident}(val{index}.clone().into()))", ", ") }@]);
         query().filter(filter).join(joiner).select(conn).await?.pop()
-            .with_context(|| err::RowNotFound::new("@{ table_name }@", format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("val{index}", ", ") }@)))
+            .with_context(|| err::RowNotFound::new(TABLE_NAME, format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("val{index}", ", ") }@)))
     }
 @%- endfor %@
 @%- if def.use_cache() %@
@@ -3308,7 +3308,7 @@ pub mod _repo_ {
         let mut conn = DbConn::_new_with_ctx(conn.ctx_no(), conn.shard_id());
         conn.begin_cache_tx().await?;
         let obj = query().filter(filter).join(joiner).select_from_cache(&mut conn).await?.pop()
-            .with_context(|| err::RowNotFound::new("@{ table_name }@", format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("c{index}", ", ") }@)))?;
+            .with_context(|| err::RowNotFound::new(TABLE_NAME, format!("@{ index.fields(index_name, def)|fmt_index_col("{col_name}={}", ", ") }@", @{ index.fields(index_name, def)|fmt_index_col("c{index}", ", ") }@)))?;
         let id = PrimaryWrapper(InnerPrimary::from(&obj), conn.shard_id(), MSec::now());
         Cache::insert_long(&key, Arc::new(id), true).await;
         Ok(obj)
@@ -3377,7 +3377,7 @@ pub mod _repo_ {
         @%- endif %@
         let query = bind_to_query(sqlx::query(sql), &obj._data);
         debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
-        let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
+        let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await.context(err::ErrorTable(TABLE_NAME))?;
         if rows_affected == 0 {
             return Ok(None);
         }
@@ -3621,9 +3621,9 @@ pub mod _repo_ {
                     query = query.bind(id.{index}{bind_as});", "") }@
                 }
                 let result = if conn.wo_tx() {
-                    query.execute(conn.acquire_writer().await?.as_mut()).await?
+                    query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
                 } else {
-                    query.execute(conn.get_tx().await?.as_mut()).await?
+                    query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
                 };
                 rows_affected += result.rows_affected();
             }
@@ -3696,9 +3696,9 @@ pub mod _repo_ {
                     query = query.bind(id.{index}{bind_as});", "") }@
                 }
                 let result = if conn.wo_tx() {
-                    query.execute(conn.acquire_writer().await?.as_mut()).await?
+                    query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
                 } else {
-                    query.execute(conn.get_tx().await?.as_mut()).await?
+                    query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
                 };
                 rows_affected += result.rows_affected();
             }
@@ -3812,9 +3812,9 @@ pub mod _repo_ {
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
         if conn.wo_tx() {
-            query.execute(conn.acquire_writer().await?.as_mut()).await?;
+            query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
         } else {
-            query.execute(conn.get_tx().await?.as_mut()).await?;
+            query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
         }
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "force_delete", ctx = conn.ctx_no(), id = id.to_string(); "{}", &obj);
 @%- if !config.force_disable_cache %@
@@ -3842,9 +3842,9 @@ pub mod _repo_ {
         let query = sqlx::query(r#"DELETE FROM @{ table_name|db_esc }@"#);
         debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
         if conn.wo_tx() {
-            query.execute(conn.acquire_writer().await?.as_mut()).await?;
+            query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
         } else {
-            query.execute(conn.get_tx().await?.as_mut()).await?;
+            query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
         }
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "force_delete_all", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
@@ -3867,7 +3867,7 @@ pub mod _repo_ {
     pub async fn truncate(conn: &mut DbConn) -> Result<()> {
         let query = sqlx::query(r#"TRUNCATE TABLE @{ table_name|db_esc }@"#);
         debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
-        query.execute(conn.acquire_writer().await?.as_mut()).await?;
+        query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "truncate", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
@@ -4411,7 +4411,7 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, ov
     @%- endif %@
     let query = bind_to_query(sqlx::query(sql), &obj._data);
     debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
-    let (_, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await?;
+    let (_, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await.context(err::ErrorTable(TABLE_NAME))?;
 @{- def.auto_inc()|fmt_join("
     if obj._data.{ident} == 0 {
         obj._data.{ident} = _last_insert_id as {inner};
@@ -4491,9 +4491,9 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @%- endif %@
         info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "update", ctx = conn.ctx_no(); "{}", &obj);
         debug!("{:?}", &obj);
-        let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned %@_with_last_insert_id@% endif %@(query).await?;
+        let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned %@_with_last_insert_id@% endif %@(query).await.context(err::ErrorTable(TABLE_NAME))?;
         if rows_affected == 0 {
-            anyhow::bail!(err::RowNotFound::new("@{ table_name }@", id.to_string()));
+            anyhow::bail!(err::RowNotFound::new(TABLE_NAME, id.to_string()));
         }
         @%- if def.versioned %@
         obj._data.@{ version_col }@ = _last_insert_id as @{ config.u32() }@;
@@ -4577,7 +4577,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     let query = bind_to_query(sqlx::query(&sql), &obj._data);
     debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
     let query = bind_non_primaries(&obj, query, &sql);
-    let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned || def.counter_field.is_some() %@_with_last_insert_id@% endif %@(query).await?;
+    let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned || def.counter_field.is_some() %@_with_last_insert_id@% endif %@(query).await.context(err::ErrorTable(TABLE_NAME))?;
     info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "upsert", ctx = conn.ctx_no(); "{}", &obj);
     debug!("{:?}", &obj);
     if rows_affected == 1 {
@@ -4721,9 +4721,9 @@ async fn ___update_many(conn: &mut DbConn, ids: &[InnerPrimary], obj: &__Updater
         query = query.bind(id.{index}{bind_as});", "") }@
     }
     let result = if conn.wo_tx() {
-        query.execute(conn.acquire_writer().await?.as_mut()).await?
+        query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
     } else {
-        query.execute(conn.get_tx().await?.as_mut()).await?
+        query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
     };
     Ok(result.rows_affected())
 }
@@ -4862,17 +4862,17 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         }
     @%- if config.is_mysql() %@
         let result = if conn.wo_tx() {
-            query.execute(conn.acquire_writer().await?.as_mut()).await?
+            query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
         } else {
-            query.execute(conn.get_tx().await?.as_mut()).await?
+            query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
         };
         @{- def.auto_inc()|fmt_join("
         let mut id = result.last_insert_id() as {inner};", "") }@
     @%- else %@
         let result = if conn.wo_tx() {
-            query.@% if def.is_auto_inc() %@fetch_all@% else %@execute@% endif %@(conn.acquire_writer().await?.as_mut()).await?
+            query.@% if def.is_auto_inc() %@fetch_all@% else %@execute@% endif %@(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
         } else {
-            query.@% if def.is_auto_inc() %@fetch_all@% else %@execute@% endif %@(conn.get_tx().await?.as_mut()).await?
+            query.@% if def.is_auto_inc() %@fetch_all@% else %@execute@% endif %@(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
         };
         @{- def.auto_inc()|fmt_join("
         use sqlx::Row;
@@ -5008,9 +5008,9 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "bulk_upsert_updater", ctx = conn.ctx_no(); "{}", obj);
     let query = bind_non_primaries(&obj, query, &sql);
     if conn.wo_tx() {
-        query.execute(conn.acquire_writer().await?.as_mut()).await?;
+        query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
     } else {
-        query.execute(conn.get_tx().await?.as_mut()).await?;
+        query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
     }
     @%- if !config.force_disable_cache %@
     @%- if def.act_as_job_queue() %@

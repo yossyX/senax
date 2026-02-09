@@ -29,8 +29,8 @@ pub enum GqlError {
     #[error("Bad Request")]
     BadRequest,
 
-    #[error("Conflict")]
-    Conflict,
+    #[error("Conflict: {0}")]
+    Conflict(&'static str),
 
     #[error("Version Mismatch")]
     VersionMismatch,
@@ -45,6 +45,7 @@ impl GqlError {
         reason: anyhow::Error,
     ) -> async_graphql::Error {
         let ctx = gql_ctx.data::<Ctx>().unwrap();
+        let table = reason.downcast_ref::<senax_common::err::ErrorTable>().map(|v| v.0).unwrap_or_default();
         if let Some(e) = reason.downcast_ref::<senax_common::err::RowNotFound>() {
             warn!(target: "server::row_not_found", ctx = ctx.ctx_no(), table = e.table; "{}", e.id);
             GqlError::NotFound.extend()
@@ -56,7 +57,7 @@ impl GqlError {
                 sqlx::Error::Database(e) => match e.kind() {
                     ErrorKind::UniqueViolation => {
                         warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", reason);
-                        GqlError::Conflict.extend()
+                        GqlError::Conflict(table).extend()
                     }
                     ErrorKind::Other => {
                         error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", reason);
@@ -89,12 +90,17 @@ impl ErrorExtensions for GqlError {
             GqlError::NotFound => e.set("code", "NOT_FOUND"),
             GqlError::Unauthorized => e.set("code", "UNAUTHORIZED"),
             GqlError::Forbidden => e.set("code", "FORBIDDEN"),
-            GqlError::ValidationError(reason) => e.set(
-                "validation",
-                async_graphql::Value::from_json(serde_json::to_value(reason.errors()).unwrap())
-                    .unwrap(),
-            ),
+            GqlError::ValidationError(reason) => {
+                e.set("code", "VALIDATION");
+                e.set(
+                    "validation",
+                    async_graphql::Value::from_json(serde_json::to_value(reason.errors()).unwrap())
+                        .unwrap(),
+                )
+            }
+            ,
             GqlError::ValidationErrorList(reason) => {
+                e.set("code", "VALIDATION");
                 let errors: BTreeMap<_, _> = reason.iter().map(|(k, v)| (k, v.errors())).collect();
                 e.set(
                     "validation",
@@ -102,7 +108,10 @@ impl ErrorExtensions for GqlError {
                 )
             }
             GqlError::BadRequest => e.set("code", "BAD_REQUEST"),
-            GqlError::Conflict => e.set("code", "CONFLICT"),
+            GqlError::Conflict(table) => {
+                e.set("code", "CONFLICT");
+                e.set("table", *table);
+            },
             GqlError::VersionMismatch => e.set("code", "VERSION_MISMATCH"),
             GqlError::ServerError => e.set("code", "SERVER_ERROR"),
         })
