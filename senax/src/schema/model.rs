@@ -244,6 +244,7 @@ pub struct ModelDef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_auto_replace: Option<bool>,
     /// ### 更新通知を使用する
+    /// force_disable_cacheとの同時設定不可
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_update_notice: Option<bool>,
     /// ### 遅延INSERTを使用する
@@ -395,6 +396,7 @@ pub struct ModelJson {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_auto_replace: Option<bool>,
     /// ### 更新通知を使用する
+    /// force_disable_cacheとの同時設定不可
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_update_notice: Option<bool>,
     /// ### 遅延INSERTを使用する

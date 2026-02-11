@@ -71,6 +71,7 @@ pub struct ConfigDef {
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_clear_whole_cache: bool,
     /// ### デフォルトで更新通知を使用する
+    /// force_disable_cacheとの同時設定不可
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_update_notice: bool,
     /// ### デフォルトで遅延INSERTを使用する
@@ -227,6 +228,7 @@ pub struct ConfigJson {
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_clear_whole_cache: bool,
     /// ### デフォルトで更新通知を使用する
+    /// force_disable_cacheとの同時設定不可
     #[serde(default, skip_serializing_if = "super::is_false")]
     pub use_update_notice: bool,
     /// ### デフォルトで遅延INSERTを使用する

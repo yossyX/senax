@@ -1062,7 +1062,7 @@ impl ApiRelationDef {
             true
         }
     }
-    pub fn fields(&self, model: &ModelDef, rel_id: &[String]) -> anyhow::Result<Fields> {
+    pub fn fields(&self, model: &ModelDef, rel_id: &[String], hide_timestamp: bool) -> anyhow::Result<Fields> {
         for (k, _) in &self.fields {
             anyhow::ensure!(
                 model.merged_fields.contains_key(k),
@@ -1078,7 +1078,7 @@ impl ApiRelationDef {
                 .merged_fields
                 .iter()
                 .filter(|(k, v)| {
-                    !v.hidden.unwrap_or_default() && !v.is_timestamp && !rel_id.contains(*k)
+                    !v.hidden.unwrap_or_default() && (!v.is_timestamp || !hide_timestamp) && !rel_id.contains(*k)
                 })
                 .map(|(k, _)| ((*k).clone(), None))
                 .collect();

@@ -285,6 +285,7 @@ fn make_model(
         config.camel_case(),
         false,
         false,
+        config.hide_timestamp(),
     )?;
     ApiRelationDef::pop();
     ApiFieldDef::pop();
@@ -386,6 +387,7 @@ fn make_relation(
     camel_case: bool,
     no_read: bool,
     no_update: bool,
+    hide_timestamp: bool,
 ) -> Result<Vec<Arc<Relation>>> {
     let mut relations = Vec::new();
     for (_model, rel_name, rel) in def.relations_one(false) {
@@ -393,7 +395,7 @@ fn make_relation(
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id, hide_timestamp)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
         let index = all_relations.len();
         all_fields.push(Field {
@@ -429,6 +431,7 @@ fn make_relation(
             camel_case,
             no_read,
             no_update,
+            hide_timestamp,
         )?;
         let relation = Arc::new(Relation {
             name: rel_name.to_string(),
@@ -451,7 +454,7 @@ fn make_relation(
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id, hide_timestamp)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
         let index = all_relations.len();
         all_fields.push(Field {
@@ -487,6 +490,7 @@ fn make_relation(
             camel_case,
             no_read,
             no_update,
+            hide_timestamp,
         )?;
         let relation = Arc::new(Relation {
             name: rel_name.to_string(),
@@ -508,7 +512,7 @@ fn make_relation(
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, &[])?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, &[], hide_timestamp)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_case(Case::Pascal));
         let index = all_relations.len();
         all_fields.push(Field {
@@ -544,6 +548,7 @@ fn make_relation(
             camel_case,
             false,
             true,
+            hide_timestamp,
         )?;
         let relation = Arc::new(Relation {
             name: rel_name.to_string(),

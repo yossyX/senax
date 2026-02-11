@@ -397,6 +397,7 @@ impl CacheOp {
         async move {
             let time = MSec::now();
             _@{pascal_name}@::_receive_update_notice(&self).await;
+            @%- if !config.force_disable_cache %@
             for (shard_id, sync) in sync_map.iter() {
                 if *sync == 0 {
                     let shard_id = *shard_id;
@@ -406,6 +407,7 @@ impl CacheOp {
                     });
                 }
             }
+            @%- endif %@
             match self {
                 CacheOp::None => {},
                 @%- if def.act_as_job_queue() %@
@@ -4625,9 +4627,11 @@ impl QueryBuilder {
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
+        @%- if !config.force_disable_cache %@
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
+        @%- endif %@
         Ok(result.rows_affected())
     }
     @%- endif %@
@@ -4707,9 +4711,11 @@ impl QueryBuilder {
         if now.elapsed() > std::time::Duration::from_secs(1) {
             warn!("[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
+        @%- if !config.force_disable_cache %@
         if !conn.clear_whole_cache && (USE_CACHE || USE_ALL_ROWS_CACHE || USE_UPDATE_NOTICE) {
             conn.push_cache_op(CacheOp::InvalidateAll.wrap()).await;
         }
+        @%- endif %@
         Ok(result.rows_affected())
         @%- else %@
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
