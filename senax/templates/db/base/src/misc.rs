@@ -3,7 +3,7 @@
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
 use rust_decimal::Decimal;
 use senax_common::cache::calc_mem_size;
-use ::senax_encoder::{Decode, Encode, Pack, Unpack};
+use senax_encoder::{Decode, Encode, Pack, Unpack};
 use serde_json::Value;
 use sqlx::query::Query;
 use std::convert::TryFrom;
@@ -78,9 +78,9 @@ pub trait Updater {
     fn will_be_deleted(&self) -> bool;
     fn mark_for_upsert(&mut self);
     fn is_updated(&self) -> bool;
-    fn overwrite_except_skip(&mut self, updater: Self);
-    fn overwrite_only_set(&mut self, updater: Self);
-    fn overwrite_with(&mut self, updater: Self, set_only: bool);
+    // fn overwrite_except_skip(&mut self, updater: Self);
+    // fn overwrite_only_set(&mut self, updater: Self);
+    // fn overwrite_with(&mut self, updater: Self, set_only: bool);
 }
 
 #[async_trait::async_trait]
@@ -300,7 +300,7 @@ pub mod option_arc_bytes {
 }
 
 #[allow(dead_code)]
-#[cfg(feature="seed_schema")]
+#[cfg(feature = "seed_schema")]
 pub(crate) fn id_schema(_: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
     use schemars::schema::{InstanceType, Schema, SchemaObject, SingleOrVec};
     let schema = SchemaObject {

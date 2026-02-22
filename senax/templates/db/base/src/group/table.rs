@@ -364,10 +364,10 @@ impl Data {
 impl sqlx::FromRow<'_, DbRow> for Data {
     fn from_row(row: &DbRow) -> sqlx::Result<Self> {
         use sqlx::Row;
-        Ok(Data {
-            @{ def.all_fields()|fmt_join("{ident}: {from_row},", "
-            ") }@
-        })
+        let mut data = Data::default();
+        @{ def.cache_cols()|fmt_join("data.{ident} = {from_row};", "
+        ") }@
+        Ok(data)
     }
 }
 
@@ -419,10 +419,10 @@ pub struct CacheData {
 impl sqlx::FromRow<'_, DbRow> for CacheData {
     fn from_row(row: &DbRow) -> sqlx::Result<Self> {
         use sqlx::Row;
-        Ok(CacheData {
-            @{ def.cache_cols()|fmt_join("{ident}: {from_row},", "
-            ") }@
-        })
+        let mut data = CacheData::default();
+        @{ def.cache_cols()|fmt_join("data.{ident} = {from_row};", "
+        ") }@
+        Ok(data)
     }
 }
 @%- endif %@
@@ -1180,22 +1180,22 @@ impl Updater for _@{ pascal_name }@Updater {
         || self._op.{ident} != Op::None && self._op.{ident} != Op::Skip", "") }@
         @%- endif %@
     }
-    fn overwrite_except_skip(&mut self, updater: Self) {
-        self.overwrite_with(updater, false)
-    }
-    fn overwrite_only_set(&mut self, updater: Self) {
-        self.overwrite_with(updater, true)
-    }
-    fn overwrite_with(&mut self, updater: Self, set_only: bool) {
-        @%- if !def.disable_update() %@
-        @{- def.for_cmp()|fmt_join("
-        if (if set_only { updater._op.{ident} == Op::Set } else { updater._op.{ident} != Op::Skip }) && self._data.{ident} != updater._data.{ident} {
-            self._op.{ident} = Op::Set;
-            self._data.{ident} = updater._data.{ident}.clone();
-            self._update.{ident} = updater._data.{ident};
-        }", "") }@
-        @%- endif %@
-    }
+    // fn overwrite_except_skip(&mut self, updater: Self) {
+    //     self.overwrite_with(updater, false)
+    // }
+    // fn overwrite_only_set(&mut self, updater: Self) {
+    //     self.overwrite_with(updater, true)
+    // }
+    // fn overwrite_with(&mut self, updater: Self, set_only: bool) {
+    //     @%- if !def.disable_update() %@
+    //     @{- def.for_cmp()|fmt_join("
+    //     if (if set_only { updater._op.{ident} == Op::Set } else { updater._op.{ident} != Op::Skip }) && self._data.{ident} != updater._data.{ident} {
+    //         self._op.{ident} = Op::Set;
+    //         self._data.{ident} = updater._data.{ident}.clone();
+    //         self._update.{ident} = updater._data.{ident};
+    //     }", "") }@
+    //     @%- endif %@
+    // }
 }
 
 #[allow(non_snake_case)]

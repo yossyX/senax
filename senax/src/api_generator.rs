@@ -820,6 +820,7 @@ fn write_model_file(
         0,
         false,
         false,
+        api_db_config.hide_timestamp(),
         &mut gql_fields,
         &api_def,
     )?;
@@ -997,6 +998,7 @@ fn write_relation(
     indent: usize,
     no_read: bool,
     no_update: bool,
+    hide_timestamp: bool,
     gql_fields: &mut Vec<String>,
     api_def: &ApiModelDef,
 ) -> Result<()> {
@@ -1006,7 +1008,7 @@ fn write_relation(
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id, hide_timestamp)?);
         let pascal_name = &rel_model.name.to_pascal();
         let graphql_name = &format!("{}{}", graphql_name, rel_name.to_pascal());
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
@@ -1042,6 +1044,7 @@ fn write_relation(
             4,
             no_read,
             no_update,
+            hide_timestamp,
             &mut rel_fields,
             api_def,
         )?;
@@ -1057,7 +1060,7 @@ fn write_relation(
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id)?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id, hide_timestamp)?);
         let pascal_name = &rel_model.name.to_pascal();
         let graphql_name = &format!("{}{}", graphql_name, rel_name.to_pascal());
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
@@ -1093,6 +1096,7 @@ fn write_relation(
             4,
             no_read,
             no_update,
+            hide_timestamp,
             &mut rel_fields,
             api_def,
         )?;
@@ -1107,7 +1111,7 @@ fn write_relation(
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, &[])?);
+        ApiFieldDef::push(api_relation.fields(&rel_model, &[], hide_timestamp)?);
         let pascal_name = &rel_model.name.to_pascal();
         let graphql_name = &format!("{}{}", graphql_name, rel_name.to_pascal());
         relation_buf.push_str(&format!("\n#[rustfmt::skip]\nmod _{} {{\n    ", rel_name));
@@ -1135,6 +1139,7 @@ fn write_relation(
             4,
             false,
             true,
+            hide_timestamp,
             &mut rel_fields,
             api_def,
         )?;
