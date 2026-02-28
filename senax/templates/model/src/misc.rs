@@ -749,4 +749,54 @@ where
         Ok(JsonRawValue(serde_json::value::RawValue::from_string(v)?.into()))
     }
 }
+
+pub(crate) fn split_by_weight<T, F>(
+    values: &[T],
+    limit: usize,
+    max_items: usize,
+    weight: F,
+) -> Vec<&[T]>
+where
+    F: Fn(&T) -> usize,
+{
+    assert!(limit > 0);
+    assert!(max_items > 0);
+
+    let mut result = Vec::new();
+
+    let mut start = 0;
+    let mut sum = 0;
+    let mut count = 0;
+
+    for (i, v) in values.iter().enumerate() {
+        let w = weight(v);
+
+        if w > limit {
+            if count > 0 {
+                result.push(&values[start..i]);
+            }
+            result.push(&values[i..i + 1]);
+            start = i + 1;
+            sum = 0;
+            count = 0;
+            continue;
+        }
+
+        if count > 0 && (sum + w > limit || count >= max_items) {
+            result.push(&values[start..i]);
+            start = i;
+            sum = 0;
+            count = 0;
+        }
+
+        sum += w;
+        count += 1;
+    }
+
+    if count > 0 {
+        result.push(&values[start..]);
+    }
+
+    result
+}
 @{-"\n"}@
