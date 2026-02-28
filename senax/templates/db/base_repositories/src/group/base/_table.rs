@@ -983,7 +983,7 @@ async fn handle_delayed_msg_insert_from_disk(shard_id: ShardId) -> Result<()> {
     }
     let mut vec = Vec::new();
     let mut total_size = 0;
-    let max_size = *BULK_INSERT_MAX_SIZE.get().unwrap();
+    let max_size = *BULK_INSERT_MAX_SIZE.get().unwrap() / 10 * 9;
     while let Ok(x) = db.pop_min() {
         if let Some(x) = x {
             let mut bytes = bytes::Bytes::from(decode_all::<&[u8]>(x.1.borrow())?);
@@ -4779,9 +4779,7 @@ pub async fn ___bulk_insert(conn: &mut DbConn, list: &[ForInsert], ignore: bool,
     if list.is_empty() {
         return Ok(Vec::new());
     }
-    let total_size: usize = list.iter().map(|v| v._data._size()).sum();
-    let ave = total_size / list.len();
-    let chunks = list.chunks(cmp::max(1, BULK_INSERT_MAX_SIZE.get().unwrap() / ave));
+    let chunks = crate::misc::split_by_weight(list, *BULK_INSERT_MAX_SIZE.get().unwrap(), @{ 15000 / def.all_fields_except_read_only_and_auto_inc().len() }@, |v| v._data._size());
     let mut result = Vec::new();
     for chunk in chunks {
         result.push(____bulk_insert(conn, chunk, ignore, replace, overwrite).await?);
@@ -4962,9 +4960,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
 @%- if !def.disable_update() %@
 
 async fn __bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> Result<()> {
-    let total_size: usize = list.iter().map(|v| v._size()).sum();
-    let ave = total_size / list.len();
-    let chunks = list.chunks(cmp::max(1, BULK_INSERT_MAX_SIZE.get().unwrap() / ave));
+    let chunks = crate::misc::split_by_weight(list, *BULK_INSERT_MAX_SIZE.get().unwrap(), @{ 15000 / def.all_fields_except_read_only_and_auto_inc().len() }@, |v| v._size());
     for chunk in chunks {
         ___bulk_upsert(conn, chunk, obj).await?;
     }

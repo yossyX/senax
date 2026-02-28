@@ -19,7 +19,7 @@ include!(concat!(env!("OUT_DIR"), "/seeds.rs"));
 #[allow(non_snake_case)]
 pub struct SeedSchema {
 @%- for (name, defs) in groups %@@% if !defs.is_empty() %@
-    @{ name|ident }@: Option<crate::models::@{ name|snake|ident }@::@{ name|pascal }@>,
+    @{ name|ident }@: Option<_base::models::@{ name|snake|ident }@::@{ name|pascal }@>,
 @%- endif %@@% endfor %@
 }
 impl SeedSchema {

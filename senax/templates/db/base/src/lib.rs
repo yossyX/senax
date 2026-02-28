@@ -165,7 +165,7 @@ async fn set_bulk_insert_max_size() -> Result<(), anyhow::Error> {
             .set(max_allowed_packet.parse::<usize>()? / 8)
             .unwrap();
 @%- else %@
-        BULK_INSERT_MAX_SIZE.set(1024 * 1024).unwrap();
+        BULK_INSERT_MAX_SIZE.set(32 * 1024 * 1024).unwrap();
 @%- endif %@
     }
     Ok(())

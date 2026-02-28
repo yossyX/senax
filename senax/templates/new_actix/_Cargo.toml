@@ -50,7 +50,7 @@ uuid.workspace = true
 validator.workspace = true
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.29", features = ["process", "signal", "fs"] }
+nix = { version = "0.31", features = ["process", "signal", "fs"] }
 signal-hook = "0.3.14"
 signal-hook-tokio = { version = "0.3.1", features = ["futures-v0_3"] }
 @{-"\n"}@

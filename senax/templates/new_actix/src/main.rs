@@ -449,7 +449,7 @@ pub fn get_shutdown_guard() -> Option<Arc<mpsc::Sender<u8>>> {
 #[cfg(unix)]
 fn take_listener(ports: &[&str]) -> Result<HashMap<String, TcpListener>> {
     use nix::fcntl;
-    use std::os::unix::io::{FromRawFd, IntoRawFd};
+    use std::os::unix::io::{FromRawFd, AsRawFd};
 
     let mut results = HashMap::new();
     let mut env_str = Vec::new();
@@ -469,9 +469,8 @@ fn take_listener(ports: &[&str]) -> Result<HashMap<String, TcpListener>> {
     for port in ports {
         if !results.contains_key(*port) {
             let listener = TcpListener::bind(port)?;
-            let fd = listener.into_raw_fd();
-            fcntl::fcntl(fd, fcntl::FcntlArg::F_SETFD(fcntl::FdFlag::empty()))?;
-            let listener = unsafe { TcpListener::from_raw_fd(fd) };
+            fcntl::fcntl(&listener, fcntl::FcntlArg::F_SETFD(fcntl::FdFlag::empty()))?;
+            let fd = listener.as_raw_fd();
             results.insert(port.to_string(), listener);
             env_str.push(format!("{}={}", port, fd));
         }
@@ -491,6 +490,7 @@ fn take_listener(ports: &[&str]) -> Result<HashMap<String, TcpListener>> {
 }
 
 #[cfg(unix)]
+#[allow(unreachable_code)]
 async fn handle_signals() {
     use futures::stream::StreamExt;
     use nix::unistd;

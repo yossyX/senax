@@ -14,7 +14,7 @@ pub use _base::models::USE_FAST_CACHE;
 pub use _base::models::CACHE_UPDATE_LOCK;
 @{-"\n"}@
 @%- for (name, defs) in groups %@
-pub use _base::models::@{ name|snake|ident }@;
+pub use _repo_@{ name|snake }@::repositories::@{ name|snake|ident }@;
 @%- endfor %@
 
 pub use _base::models::NotifyOp;
