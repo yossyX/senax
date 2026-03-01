@@ -178,16 +178,19 @@ pub fn make_table_def(
             schema::DataType::Uuid if is_mysql_mode() => SqlType::Char(schema::UUID_LENGTH),
             schema::DataType::Uuid => SqlType::Uuid,
             schema::DataType::BinaryUuid => SqlType::Binary(schema::BINARY_UUID_LENGTH),
+            schema::DataType::Binary if !is_mysql_mode() => SqlType::Varbinary(0),
             schema::DataType::Binary => SqlType::Binary(
                 col.length
                     .with_context(|| format!("length is required: {:?}", col_name))?
                     .try_into()?,
             ),
+            schema::DataType::Varbinary if !is_mysql_mode() => SqlType::Varbinary(0),
             schema::DataType::Varbinary => SqlType::Varbinary(
                 col.length
                     .unwrap_or(schema::DEFAULT_VARCHAR_LENGTH)
                     .try_into()?,
             ),
+            schema::DataType::Blob if !is_mysql_mode() => SqlType::Blob,
             schema::DataType::Blob if col.length.unwrap_or(65536) < 256 => SqlType::Tinyblob,
             schema::DataType::Blob if col.length.unwrap_or(65536) < 65536 => SqlType::Blob,
             schema::DataType::Blob => SqlType::Longblob,

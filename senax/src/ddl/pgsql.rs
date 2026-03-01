@@ -185,7 +185,7 @@ fn convert_type(typ: &PostgreSQLDataType) -> Result<(SqlType, Option<SqlType>)> 
             (SqlType::Varchar(len.unwrap_or_default() as u32), None)
         }
         PostgreSQLDataType::Text => (SqlType::Text, None),
-        PostgreSQLDataType::Bytea => (SqlType::Varbinary(0), None),
+        PostgreSQLDataType::Bytea => (SqlType::Varbinary(0), Some(SqlType::Blob)),
         PostgreSQLDataType::Date => (SqlType::Date, None),
         PostgreSQLDataType::Time => (SqlType::Time, None),
         PostgreSQLDataType::TimeWithTimeZone => bail!("unsupported PostgreSQL TimeWithTimeZone"),

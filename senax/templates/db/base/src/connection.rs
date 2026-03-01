@@ -1383,11 +1383,13 @@ impl DbConn {
             .or_insert_with(|| Arc::new(Semaphore::new(1)))
             .clone()
             .acquire_owned();
+@%- if config.is_mysql() %@
         let (semaphore, timeout) = if timeout_secs >= 0 {
             let start = std::time::Instant::now();
             let semaphore =
-                tokio::time::timeout(Duration::from_secs(timeout_secs as u64), lock).await??;
-            (semaphore, timeout_secs - start.elapsed().as_secs() as i32)
+                tokio::time::timeout(Duration::from_secs(timeout_secs as u64), lock).await?
+                    .with_context(|| senax_common::err::LockFailed::new(key.to_string()))?;
+            (semaphore, std::cmp::max(0, timeout_secs - start.elapsed().as_secs() as i32))
         } else {
             (lock.await?, timeout_secs)
         };
@@ -1406,6 +1408,42 @@ impl DbConn {
         } else {
             Err(senax_common::err::LockFailed::new(key.to_string()).into())
         }
+@%- else %@
+        let start = std::time::Instant::now();
+        let semaphore = if timeout_secs >= 0 {
+            tokio::time::timeout(Duration::from_secs(timeout_secs as u64), lock).await?
+                .with_context(|| senax_common::err::LockFailed::new(key.to_string()))?
+        } else {
+            lock.await?
+        };
+        let hash = fxhash::hash64(key) as i64;
+        let mut conn = self.acquire_writer().await?;
+        if timeout_secs < 0 {
+            sqlx::query("SELECT pg_advisory_lock($1)")
+                .bind(hash)
+                .fetch_all(conn.as_mut())
+                .await?;
+        } else {
+            loop {
+                let result: (bool,) = sqlx::query_as("SELECT pg_try_advisory_lock($1)")
+                    .bind(hash)
+                    .fetch_one(conn.as_mut())
+                    .await?;
+                if result.0 {
+                    break;
+                }
+                if start.elapsed().as_secs() as i32 >= timeout_secs {
+                    return Err(senax_common::err::LockFailed::new(key.to_string()).into());
+                }
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+        }
+        self.lock_list.push(DbLock {
+            conn: Some(conn),
+            _semaphore: semaphore,
+        });
+        Ok(())
+@%- endif %@
     }
 
     pub fn take_lock(&mut self) -> Option<DbLock> {
@@ -1438,7 +1476,11 @@ impl Drop for DbLock {
     fn drop(&mut self) {
         let mut conn = self.conn.take().unwrap();
         tokio::spawn(async move {
+@%- if config.is_mysql() %@
             if let Err(e) = sqlx::query("DO RELEASE_ALL_LOCKS()")
+@%- else %@
+            if let Err(e) = sqlx::query("SELECT pg_advisory_unlock_all()")
+@%- endif %@
                 .fetch_all(conn.as_mut())
                 .await
             {

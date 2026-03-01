@@ -51,34 +51,34 @@ impl GqlError {
             GqlError::NotFound.extend()
         } else if let Some(e) = reason.downcast_ref::<GqlError>() {
             e.extend()
-        } else if let Some(e) = reason.downcast_ref::<sqlx::Error>() {
+        } else if let Some(err) = reason.downcast_ref::<sqlx::Error>() {
             use sqlx::error::ErrorKind;
-            match e {
+            match err {
                 sqlx::Error::Database(e) => match e.kind() {
                     ErrorKind::UniqueViolation => {
-                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", reason);
+                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(), table = table; "{}", err);
                         GqlError::Conflict(table).extend()
                     }
                     ErrorKind::Other => {
-                        error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", reason);
+                        error!(target: "server::internal_error", ctx = ctx.ctx_no(), table = table; "{}", err);
                         GqlError::ServerError.extend()
                     }
                     _ => {
-                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", reason);
+                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(), table = table; "{}", err);
                         GqlError::BadRequest.extend()
                     }
                 },
                 sqlx::Error::RowNotFound => {
-                    log::warn!(ctx = ctx.ctx_no(); "{}", reason);
+                    log::warn!(ctx = ctx.ctx_no(), table = table; "{}", err);
                     GqlError::NotFound.extend()
                 }
                 _ => {
-                    log::error!(ctx = ctx.ctx_no(); "{}", reason);
+                    log::error!(ctx = ctx.ctx_no(), table = table; "{}", err);
                     GqlError::ServerError.extend()
                 }
             }
         } else {
-            log::error!(ctx = ctx.ctx_no(); "{}", reason);
+            log::error!(ctx = ctx.ctx_no(); "{}", reason.root_cause());
             GqlError::ServerError.extend()
         }
     }

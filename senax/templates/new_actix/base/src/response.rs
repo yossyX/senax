@@ -121,6 +121,7 @@ pub fn json_error_handler(err: error::JsonPayloadError, http_req: &HttpRequest) 
 }
 
 fn error_response(err: anyhow::Error, ctx: &Ctx) -> HttpResponse {
+    let table = err.downcast_ref::<senax_common::err::ErrorTable>().map(|v| v.0).unwrap_or_default();
     if let Some(e) = err.downcast_ref::<validator::ValidationErrors>() {
         info!(target: "server::validation_errors", ctx = ctx.ctx_no(); "{}", e);
         HttpResponse::BadRequest().json(e)
@@ -158,31 +159,31 @@ fn error_response(err: anyhow::Error, ctx: &Ctx) -> HttpResponse {
     } else if let Some(e) = err.downcast_ref::<senax_common::err::RowNotFound>() {
         warn!(target: "server::row_not_found", ctx = ctx.ctx_no(), table = e.table; "{}", e.id);
         HttpResponse::BadRequest().body("Bad Request")
-    } else if let Some(e) = err.downcast_ref::<sqlx::Error>() {
-        match e {
+    } else if let Some(err) = err.downcast_ref::<sqlx::Error>() {
+        match err {
             sqlx::Error::Database(e) => {
                 use sqlx::error::ErrorKind;
                 match e.kind() {
                     ErrorKind::UniqueViolation => {
-                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", err);
+                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(), table = table; "{}", err);
                         HttpResponse::Conflict().body("Conflict")
                     }
                     ErrorKind::Other => {
-                        error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", err);
+                        error!(target: "server::internal_error", ctx = ctx.ctx_no(), table = table; "{}", err);
                         HttpResponse::InternalServerError().body("Internal Server Error")
                     }
                     _ => {
-                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", err);
+                        warn!(target: "server::bad_request", ctx = ctx.ctx_no(), table = table; "{}", err);
                         HttpResponse::BadRequest().body("Bad Request")
                     }
                 }
             }
             sqlx::Error::RowNotFound => {
-                warn!(target: "server::bad_request", ctx = ctx.ctx_no(); "{}", err);
+                warn!(target: "server::bad_request", ctx = ctx.ctx_no(), table = table; "{}", err);
                 HttpResponse::BadRequest().body("Bad Request")
             }
             _ => {
-                error!(target: "server::internal_error", ctx = ctx.ctx_no(); "{}", err);
+                error!(target: "server::internal_error", ctx = ctx.ctx_no(), table = table; "{}", err);
                 HttpResponse::InternalServerError().body("Internal Server Error")
             }
         }
