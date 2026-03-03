@@ -192,9 +192,6 @@ impl fmt::Display for Constraint {
         if self.unique {
             write!(f, " UNIQUE")?;
         }
-        if let Some(srid) = self.srid {
-            write!(f, " /*!80003 SRID {} */", srid)?;
-        }
         if let Some((query, stored)) = &self.query {
             write!(
                 f,
@@ -202,6 +199,9 @@ impl fmt::Display for Constraint {
                 query,
                 if *stored { "STORED" } else { "VIRTUAL" }
             )?;
+        }
+        if let Some(srid) = self.srid {
+            write!(f, " /*!80003 SRID {} */", srid)?;
         }
         Ok(())
     }
