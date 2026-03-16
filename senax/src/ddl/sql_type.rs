@@ -71,11 +71,6 @@ impl SqlType {
             } else {
                 "".to_owned()
             };
-            let srid = if let Some(srid) = constraint.srid {
-                format!(" /*!80003 SRID {} */", srid)
-            } else {
-                "".to_owned()
-            };
             match *self {
                 SqlType::Bool => write!(f, "BOOL"),
                 SqlType::Char(len) => write!(f, "CHAR({}){collation}", len),
@@ -136,8 +131,8 @@ impl SqlType {
                 SqlType::Decimal(m, d) => write!(f, "DECIMAL({}, {})", m, d),
                 SqlType::Json => write!(f, "JSON"),
                 SqlType::Jsonb => write!(f, "JSON"),
-                SqlType::Point => write!(f, "POINT{srid}"),
-                SqlType::Geometry => write!(f, "GEOMETRY{srid}"),
+                SqlType::Point => write!(f, "POINT"),
+                SqlType::Geometry => write!(f, "GEOMETRY"),
                 SqlType::Uuid => unimplemented!("SqlType::Uuid"),
                 SqlType::UnSupported => unimplemented!("SqlType::UnSupported"),
             }

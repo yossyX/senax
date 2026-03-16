@@ -199,6 +199,9 @@ impl fmt::Display for Constraint {
                 if *stored { "STORED" } else { "VIRTUAL" }
             )?;
         }
+        if is_mysql_mode() && let Some(srid) = self.srid {
+            write!(f, " /*!80003 SRID {} */", srid)?;
+        }
         Ok(())
     }
 }
