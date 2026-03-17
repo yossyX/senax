@@ -59,6 +59,7 @@ pub async fn clear_whole_cache() {
 
 #[derive(Clone)]
 pub struct RepositoriesImpl {
+    _lock: Arc<Mutex<()>>,
     // Do not modify this line. (Repo)
 }
 
@@ -76,8 +77,12 @@ impl RepositoriesImpl {
     }
     pub fn new_with_ctx(ctx: &Ctx) -> Self {
         Self {
+            _lock: Arc::new(Mutex::new(())),
             // Do not modify this line. (RepoNew)
         }
+    }
+    pub async fn lock(&self) -> tokio::sync::MutexGuard<'_, ()> {
+        self._lock.lock().await
     }
 }
 

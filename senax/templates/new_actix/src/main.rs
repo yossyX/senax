@@ -453,6 +453,7 @@ fn take_listener(ports: &[&str]) -> Result<HashMap<String, TcpListener>> {
 }
 
 #[cfg(unix)]
+#[allow(unreachable_code)]
 async fn handle_signals() {
     use futures::stream::StreamExt;
     use nix::unistd;

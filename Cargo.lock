@@ -3790,7 +3790,7 @@ dependencies = [
 
 [[package]]
 name = "senax"
-version = "0.3.39"
+version = "0.3.40"
 dependencies = [
  "Inflector",
  "anyhow",

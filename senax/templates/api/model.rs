@@ -421,6 +421,7 @@ impl GqlMutation@{ graphql_name }@ {
         @%- endif %@
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into();
         crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
@@ -434,6 +435,7 @@ impl GqlMutation@{ graphql_name }@ {
         #[graphql(name = "_id")] _id: async_graphql::ID,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
         crate::gql_@{ db_route|snake }@_find!(find_for_update(gql_ctx, &repo, auth, &primary), repo, auth, gql_ctx)
@@ -448,6 +450,7 @@ impl GqlMutation@{ graphql_name }@ {
         data: ReqObj,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         data.validate()
             .map_err(|e| GqlError::ValidationError(e).extend())?;
@@ -469,6 +472,7 @@ impl GqlMutation@{ graphql_name }@ {
         @%- endif %@
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         let mut errors = std::collections::BTreeMap::new();
         for (idx, data) in list.iter().enumerate() {
@@ -525,6 +529,7 @@ impl GqlMutation@{ graphql_name }@ {
         data: ReqObj,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         data.validate()
             .map_err(|e| GqlError::ValidationError(e).extend())?;
@@ -565,6 +570,7 @@ impl GqlMutation@{ graphql_name }@ {
         @%- endif %@
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         delete(repo, auth, @{ def.primaries()|fmt_join_with_paren("{var}", ", ") }@.into()).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(true)
@@ -578,6 +584,7 @@ impl GqlMutation@{ graphql_name }@ {
         #[graphql(name = "_id")] _id: async_graphql::ID,
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         delete(repo, auth, (&_id).try_into()?).await.map_err(|e| GqlError::server_error(gql_ctx, e))?;
         Ok(true)
@@ -609,6 +616,7 @@ impl GqlMutation@{ graphql_name }@ {
         }
         @%- endif %@
         let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         if create_if_empty {
             repo.@{ db|snake }@_repository()
                 .lock(&format!("@{ group }@.@{ mod_name }@.{}", serde_json::to_string(&filter)?), 10)
@@ -701,6 +709,7 @@ impl GqlMutation@{ graphql_name }@ {
         }
         @%- endif %@
         let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         let ctx: &crate::context::Ctx = gql_ctx.data()?;
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
@@ -756,6 +765,7 @@ impl GqlMutation@{ graphql_name }@ {
         }
         @%- endif %@
         let repo: &RepositoriesImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         let @{ mod_name }@_repo = repo.@{ db|snake }@_repository().@{ group|to_var_name }@().@{ mod_name|to_var_name }@();
         let mut query = @{ mod_name }@_repo.@{ selector|to_var_name }@();
