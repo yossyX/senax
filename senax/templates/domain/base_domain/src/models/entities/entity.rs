@@ -57,6 +57,11 @@ impl From<&str> for @{ id_name }@ {
         Self(id.to_string().into())
     }
 }
+impl From<@{ id_name }@> for String {
+    fn from(id: @{ id_name }@) -> Self {
+        id.0.as_ref().clone()
+    }
+}
 @%- endif %@
 impl From<@{ id_name }@> for @{ column_def.get_inner_type(false, false) }@ {
     fn from(id: @{ id_name }@) -> Self {

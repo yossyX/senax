@@ -441,6 +441,7 @@ impl GqlMutation@{ graphql_name }@ {
         @%- endif %@
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = @{ def.primaries()|fmt_join_with_paren("{ident}", ", ") }@.into();
         crate::gql_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, &primary), repo, gql_ctx)
@@ -454,6 +455,7 @@ impl GqlMutation@{ graphql_name }@ {
         #[graphql(name = "_id")] _id: async_graphql::ID,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         let primary: _domain_::@{ pascal_name }@Primary = (&_id).try_into()?;
         crate::gql_find!(find_for_update(gql_ctx, repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, &primary), repo, gql_ctx)
@@ -468,6 +470,7 @@ impl GqlMutation@{ graphql_name }@ {
         #[graphql(default = false)] check_only: bool,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
         let auth: &AuthInfo = gql_ctx.data()?;
         data.validate()
@@ -502,6 +505,7 @@ impl GqlMutation@{ graphql_name }@ {
         #[graphql(default = false)] check_only: bool,
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         let mut errors = std::collections::BTreeMap::new();
         for (idx, data) in list.iter().enumerate() {
@@ -608,6 +612,7 @@ impl GqlMutation@{ graphql_name }@ {
         #[graphql(default = false)] check_only: bool,
     ) -> async_graphql::Result<ResObj> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         data.validate()
             .map_err(|e| GqlError::ValidationError(e).extend())?;
@@ -672,6 +677,7 @@ impl GqlMutation@{ graphql_name }@ {
         }
         @%- endif %@
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         if create_if_empty {
             repo.@{ db|snake }@_repository()
                 .lock(&format!("@{ group }@.@{ mod_name }@.{}", serde_json::to_string(&filter)?), 10)
@@ -764,6 +770,7 @@ impl GqlMutation@{ graphql_name }@ {
         }
         @%- endif %@
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         let ctx: &::_server::context::Ctx = gql_ctx.data()?;
         let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
@@ -819,6 +826,7 @@ impl GqlMutation@{ graphql_name }@ {
         }
         @%- endif %@
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         let @{ group|snake }@_repo = repo.@{ db|snake }@_repository().@{ group|ident }@();
         let mut query = @{ group|snake }@_repo.@{ mod_name|ident }@().@{ selector|ident }@();
@@ -865,6 +873,7 @@ impl GqlMutation@{ graphql_name }@ {
         #[graphql(default = false)] ignore_not_found: bool,
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         delete(repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, @{ def.primaries()|fmt_join_with_paren("{ident}", ", ") }@.into(), ignore_not_found)
             .await
@@ -887,6 +896,7 @@ impl GqlMutation@{ graphql_name }@ {
         #[graphql(default = false)] ignore_not_found: bool,
     ) -> async_graphql::Result<bool> {
         let repo: &RepositoryImpl = gql_ctx.data()?;
+        let _lock = repo.lock().await;
         let auth: &AuthInfo = gql_ctx.data()?;
         delete(repo.@{ db|snake }@_repository().@{ group|ident }@(), auth, (&_id).try_into()?, ignore_not_found)
             .await
