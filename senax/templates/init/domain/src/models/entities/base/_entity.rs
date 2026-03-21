@@ -1621,6 +1621,7 @@ macro_rules! @{ filter_macro_name }@ {
     (RAW $e:expr) => (@{ model_path }@::Filter_::Raw($e.to_string()));
     (RAW $e:expr , [$($p:expr),*] ) => (@{ model_path }@::Filter_::RawWithParam($e.to_string(), vec![ $( $p.to_string() ),* ]));
     (RAW $e:expr , $p:expr ) => (@{ model_path }@::Filter_::RawWithParam($e.to_string(), $p.iter().map(|v| v.to_string()).collect()));
+    (FILTER $e:expr) => ($e);
     (MATCH ( $($i:ident),+ ) AGAINST ($e:expr) IN BOOLEAN MODE) => (@{ model_path }@::Filter_::MatchBoolean(vec![ $( @{ model_path }@::filter_text!($i) ),* ], $e.to_string()));
     (MATCH ( $($i:ident),+ ) AGAINST ($e:expr) WITH QUERY EXPANSION) => (@{ model_path }@::Filter_::MatchExpansion(vec![ $( @{ model_path }@::filter_text!($i) ),* ], $e.to_string()));
     (MATCH ( $($i:ident),+ ) AGAINST ($e:expr)) => (@{ model_path }@::Filter_::Match(vec![ $( @{ model_path }@::filter_text!($i) ),* ], $e.to_string()));

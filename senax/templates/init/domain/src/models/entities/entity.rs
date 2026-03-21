@@ -26,7 +26,7 @@ pub use super::_base::_@{ mod_name }@::@{ id_name }@;
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::{join, Joiner_, @{ pascal_name }@Primary};
 #[rustfmt::skip]
-pub use super::_base::_@{ mod_name }@::{filter, order, Filter_};
+pub use super::_base::_@{ mod_name }@::{filter, order, Filter_, Order_};
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::{
     self, @{ pascal_name }@, @{ pascal_name }@Cache, @{ pascal_name }@Common, 

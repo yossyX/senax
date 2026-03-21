@@ -15,9 +15,9 @@ pub@{ visibility }@ use super::_base::_@{ mod_name }@::{
     @% for id in def.id() %@@{ id_name }@, @{ id_name }@Fetcher, @% endfor %@_@{ pascal_name }@Info, _@{ pascal_name }@Joiner, _@{ pascal_name }@Getter, UnionBuilder as _@{ pascal_name }@UnionBuilder,
 };
 @%- if config.excluded_from_domain %@
-pub@{ visibility }@ use super::_base::_@{ mod_name }@::{filter, order};
+pub@{ visibility }@ use super::_base::_@{ mod_name }@::{filter, order, Filter_, Order_};
 @%- else %@
-pub@{ visibility }@ use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name|to_var_name }@::{filter, order};
+pub@{ visibility }@ use domain::models::@{ db|snake|to_var_name }@::@{ group_name|to_var_name }@::@{ mod_name|to_var_name }@::{filter, order, Filter_, Order_};
 @%- endif %@
 @%- if config.excluded_from_domain %@
 pub@{ visibility }@ use super::_base::_@{ mod_name }@::{join, Joiner_};
