@@ -27,35 +27,35 @@ pub async fn generate(
     skip_empty: bool,
     use_test_db: bool,
 ) -> Result<()> {
-    schema::parse(db, false, false)?;
-    let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
-    let mut new_tables = IndexMap::new();
-    {
-        let group_lock = GROUPS.read().unwrap();
-        let groups = group_lock.as_ref().unwrap();
-        for (_group_name, defs) in groups {
-            for (_model_name, def) in defs {
-                if def.has_table() {
-                    let (table_name, table, _) = make_table_def(def, &config)?;
-                    new_tables.insert(table_name, table);
+    let (mut ddl, mut ddl_list) = if empty {
+        (String::new(), Vec::new())
+    } else {
+        schema::parse(db, false, false)?;
+        let config = CONFIG.read().unwrap().as_ref().unwrap().clone();
+        let mut new_tables = IndexMap::new();
+        {
+            let group_lock = GROUPS.read().unwrap();
+            let groups = group_lock.as_ref().unwrap();
+            for (_group_name, defs) in groups {
+                for (_model_name, def) in defs {
+                    if def.has_table() {
+                        let (table_name, table, _) = make_table_def(def, &config)?;
+                        new_tables.insert(table_name, table);
+                    }
                 }
             }
         }
-    }
-    let url_name = if use_test_db {
-        format!("{}_TEST_DB_URL", db.to_upper_snake())
-    } else {
-        format!("{}_DB_URL", db.to_upper_snake())
+        let url_name = if use_test_db {
+            format!("{}_TEST_DB_URL", db.to_upper_snake())
+        } else {
+            format!("{}_DB_URL", db.to_upper_snake())
+        };
+        let db_url = env::var(&url_name)
+            .with_context(|| format!("{} is required in the .env file.", url_name))?;
+        let old_tables = ddl::table::parse(&db_url).await?;
+        let cli_mode = description.is_none();
+        make_ddl(new_tables, old_tables, cli_mode)?
     };
-    let db_url = env::var(&url_name)
-        .with_context(|| format!("{} is required in the .env file.", url_name))?;
-    let old_tables = ddl::table::parse(&db_url).await?;
-    let cli_mode = description.is_none();
-    let (mut ddl, mut ddl_list) = make_ddl(new_tables, old_tables, cli_mode)?;
-    if empty {
-        ddl.clear();
-        ddl_list.clear();
-    }
     if skip_empty && ddl.is_empty() {
         return Ok(());
     }

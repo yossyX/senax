@@ -11,6 +11,7 @@ cargo run -p db -- migrate -t -c
 senax gen-migrate auto --skip-empty --use-test-db
 cargo run -p db -- migrate -t
 cargo run -p db -- migrate --ignore-missing
+cargo run check
 senax reflect-migration-changes
 # cargo run --features=seed_schema -p db -- gen-seed-schema
 
@@ -37,12 +38,12 @@ codegen () {
   if [ -n "${pid}" ]; then
     kill -s USR2 ${pid}
     sleep 1
-    (cd $2; npm install; npm run codegen)
+    (cd $2; pnpm i; pnpm codegen)
   else
     RUST_LOG=warn $1 &
     pid=$!
     sleep 1
-    (cd $2; npm install; npm run codegen) || true
+    (cd $2; pnpm i; pnpm codegen) || true
     kill ${pid}
   fi
 }

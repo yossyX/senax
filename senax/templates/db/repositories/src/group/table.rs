@@ -14,7 +14,7 @@ pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ 
 #[rustfmt::skip]
 pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{
     _repo_::{self, *}, _@{ pascal_name }@,@% if !config.force_disable_cache %@ _@{ pascal_name }@Cache, _@{ pascal_name }@Cache_,@% endif %@ _@{ pascal_name }@Factory, _@{ pascal_name }@Updater,
-    @% for id in def.id() %@@{ id_name }@, @% endfor %@_@{ pascal_name }@Joiner, UnionBuilder as _@{ pascal_name }@UnionBuilder, Filter_
+    @% for id in def.id() %@@{ id_name }@, @% endfor %@_@{ pascal_name }@Joiner, UnionBuilder as _@{ pascal_name }@UnionBuilder
 };
 @%- if config.exclude_from_domain %@
 pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{Joiner_, join};
@@ -22,9 +22,9 @@ pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ 
 pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{Joiner_, join};
 @%- endif %@
 @%- if config.exclude_from_domain %@
-pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{filter, order};
+pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::{filter, order, Filter_, Order_};
 @%- else %@
-pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{filter, order};
+pub use domain::repository::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::{filter, order, Filter_, Order_};
 @%- endif %@
 @%- if def.act_as_job_queue() %@
 pub use base_repository::repositories::@{ group_name|snake|ident }@::_base::_@{ mod_name }@::QUEUE_NOTIFIER;

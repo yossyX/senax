@@ -449,7 +449,7 @@ pub fn get_shutdown_guard() -> Option<Arc<mpsc::Sender<u8>>> {
 #[cfg(unix)]
 fn take_listener(ports: &[&str]) -> Result<HashMap<String, TcpListener>> {
     use nix::fcntl;
-    use std::os::unix::io::{FromRawFd, AsRawFd};
+    use std::os::unix::io::{AsRawFd, FromRawFd};
 
     let mut results = HashMap::new();
     let mut env_str = Vec::new();

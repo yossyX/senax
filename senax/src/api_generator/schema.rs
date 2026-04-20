@@ -1116,13 +1116,14 @@ impl ApiRelationDef {
             true
         }
     }
-    pub fn fields(&self, model: &ModelDef, rel_id: &[String], hide_timestamp: bool) -> anyhow::Result<Fields> {
+    pub fn fields(&self, rel_name: &str, model: &ModelDef, rel_id: &[String], hide_timestamp: bool) -> anyhow::Result<Fields> {
         for (k, _) in &self.fields {
             anyhow::ensure!(
                 model.merged_fields.contains_key(k),
-                "There is no {} column in the {} model.",
+                "There is no {} column in the {} model for the {} API relation.",
                 k,
-                model.name
+                model.name,
+                rel_name
             );
         }
         if self.disable_auto_fields {

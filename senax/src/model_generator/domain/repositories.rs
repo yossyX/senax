@@ -666,7 +666,7 @@ pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@:
 #[rustfmt::skip]
 pub use super::_base::_@{ mod_name }@::{join, Joiner_};
 #[rustfmt::skip]
-pub use super::_base::_@{ mod_name }@::{filter, order, Filter_};
+pub use super::_base::_@{ mod_name }@::{filter, order, Filter_, Order_};
 pub use super::_base::_@{ mod_name }@::@{ pascal_name }@Factory;
 use super::_base::_@{ mod_name }@::{_@{ pascal_name }@QueryService, _@{ pascal_name }@Repository};
 pub use base_domain::models::@{ db|snake|ident }@::@{ group_name|snake|ident }@::@{ mod_name|ident }@::consts;

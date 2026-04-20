@@ -129,7 +129,7 @@ pub(crate) async fn init() -> Result<()> {
 pub(crate) async fn check(shard_id: ShardId) -> Result<()> {
     use anyhow::Context;
     let mut conn = DbConn::_new(shard_id);
-    _repo_::query().limit(0).select(&mut conn).await.context("Unknown column found in the @{ model_name }@ model.")?;
+    _repo_::query().limit(0).select(&mut conn).await.with_context(|| format!("Schema mismatch detected in the {TABLE_NAME} model on shard {shard_id}."))?;
     Ok(())
 }
 

@@ -51,7 +51,7 @@ pub fn generate(name: &Option<String>, non_snake_case: bool) -> Result<()> {
     }
 
     #[derive(Template)]
-    #[template(path = "init/.gitignore", escape = "none")]
+    #[template(path = "init/_gitignore", escape = "none")]
     struct GitignoreTemplate;
 
     let file_path = base_path.join(".gitignore");

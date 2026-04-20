@@ -45,7 +45,7 @@ strum = { version = "0.27", features = ["derive"] }
 strum_macros = "0.27"
 thiserror = "2"
 tokio = { version = "1.41", features = ["rt-multi-thread"] }
-tracing = { version = "0.1", features = ["release_max_level_warn", "log-always"] }
+tracing = { version = "0.1", features = ["release_max_level_info", "log-always"] }
 utoipa = { version = "5.2.0", features = ["chrono", "decimal", "uuid", "rc_schema"] }
 uuid = { version = "1.6.1", features = ["v6", "v7", "fast-rng", "serde"] }
 validator = { version = "0.20", features = ["derive"] }

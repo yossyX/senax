@@ -16,14 +16,14 @@ fn main() {
                 Command::new("cmd")
                     .arg("/C")
                     .current_dir(std::env::current_dir().unwrap().join("config-app"))
-                    .arg("npm install && npm run build")
+                    .arg("where pnpm >nul 2>&1 && (pnpm i --frozen-lockfile && pnpm build) || (npm ci && npm run build)")
                     .output()
                     .expect("failed to execute process")
             } else {
                 Command::new("bash")
                     .arg("-c")
                     .current_dir(std::env::current_dir().unwrap().join("config-app"))
-                    .arg("npm install && npm run build")
+                    .arg("command -v pnpm >/dev/null 2>&1 && { pnpm i --frozen-lockfile && pnpm build; } || { npm ci && npm run build; }")
                     .output()
                     .expect("failed to execute process")
             };

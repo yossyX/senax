@@ -38,11 +38,35 @@ pub(crate) async fn start_test() -> Result<()> {
 #[rustfmt::skip]
 pub(crate) async fn check() -> Result<()> {
     for shard_id in DbConn::shard_num_range() {
-        @%- for name in unified_joinable %@
-        _base_repo_@{ name }@::check(shard_id).await?;
-        @%- endfor %@
+        let mut has_error = false;
+
+        let _results: Vec<()> = _check(shard_id).await
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|r| match r {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    has_error = true;
+                    eprintln!("{:?}\n", e);
+                    None
+                }
+            })
+            .collect();
+        if has_error {
+            ::anyhow::bail!("check error!")
+        }
     }
     Ok(())
+}
+
+#[rustfmt::skip]
+async fn _check(shard_id: ShardId) -> Vec<Vec<Vec<Result<()>>>> {
+    vec![
+        @%- for name in unified_joinable %@
+        _base_repo_@{ name }@::check(shard_id).await,
+        @%- endfor %@
+    ]
 }
 
 pub(crate) use _base::models::_clear_cache;

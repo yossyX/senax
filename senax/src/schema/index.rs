@@ -269,13 +269,13 @@ impl IndexDef {
                     continue;
                 }
                 let col = model.merged_fields.get(row.0).unwrap_or_else(|| {
-                    error_exit!("There is no {} column on the {} model.", row.0, model.name)
+                    error_exit!("There is no {} column in the {} model.", row.0, model.name)
                 });
                 ret.push((row.0, col));
             }
         } else {
             let col = model.merged_fields.get(name).unwrap_or_else(|| {
-                error_exit!("There is no {} column on the {} model.", name, model.name)
+                error_exit!("There is no {} column in the {} model.", name, model.name)
             });
             ret.push((name, col));
         }
@@ -285,7 +285,7 @@ impl IndexDef {
         let mut v = Vec::new();
         for (index, (name, _)) in (&self.fields).into_iter().enumerate() {
             let col = model.merged_fields.get(name).unwrap_or_else(|| {
-                error_exit!("There is no {} column on the {} model.", name, model.name)
+                error_exit!("There is no {} column in the {} model.", name, model.name)
             });
             v.push(
                 tpl.replace("{name}", name)

@@ -139,10 +139,11 @@ pub async fn start_test() -> Result<()> {
     @%- endfor %@
     Ok(())
 }
-pub async fn check(shard_id: ShardId) -> Result<()> {
-    @%- for (name, defs) in groups %@
-    repositories::@{ name|snake|ident }@::check(shard_id).await?;
-    @%- endfor %@
-    Ok(())
+pub async fn check(shard_id: ShardId) -> Vec<Vec<Result<()>>> {
+    vec![
+        @%- for (name, defs) in groups %@
+        repositories::@{ name|snake|ident }@::check(shard_id).await,
+        @%- endfor %@
+    ]
 }
 @{-"\n"}@

@@ -396,7 +396,7 @@ fn make_relation(
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id, hide_timestamp)?);
+        ApiFieldDef::push(api_relation.fields(rel_name, &rel_model, rel_id, hide_timestamp)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_pascal());
         let index = all_relations.len();
         all_fields.push(FieldDoc {
@@ -455,7 +455,7 @@ fn make_relation(
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         let rel_id = &rel.get_foreign_id(def);
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, rel_id, hide_timestamp)?);
+        ApiFieldDef::push(api_relation.fields(rel_name, &rel_model, rel_id, hide_timestamp)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_pascal());
         let index = all_relations.len();
         all_fields.push(FieldDoc {
@@ -513,7 +513,7 @@ fn make_relation(
         let rel_model = rel.get_foreign_model();
         let api_relation = ApiRelationDef::get(rel_name).unwrap();
         ApiRelationDef::push(api_relation.relations(&rel_model)?);
-        ApiFieldDef::push(api_relation.fields(&rel_model, &[], hide_timestamp)?);
+        ApiFieldDef::push(api_relation.fields(rel_name, &rel_model, &[], hide_timestamp)?);
         let gql_name = format!("{}{}", gql_name, rel_name.to_pascal());
         let index = all_relations.len();
         all_fields.push(FieldDoc {

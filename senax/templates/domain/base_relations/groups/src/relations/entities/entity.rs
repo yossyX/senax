@@ -845,8 +845,9 @@ macro_rules! @{ filter_macro_name }@ {
     (ONLY_TRASHED) => (@{ model_path }@::Filter_::OnlyTrashed);
     (BOOLEAN $e:expr) => (@{ model_path }@::Filter_::Boolean($e));
     (RAW $e:expr) => (@{ model_path }@::Filter_::Raw($e.to_string()));
-    (RAW $e:expr , [$($p:expr),*] ) => (@{ model_path }@::Filter_::RawWithParam($e.to_string(), vec![ $( $p.to_string() ),* ]));
-    (RAW $e:expr , $p:expr ) => (@{ model_path }@::Filter_::RawWithParam($e.to_string(), $p.iter().map(|v| v.to_string()).collect()));
+    (RAW $e:expr , [$($p:expr),*]) => (@{ model_path }@::Filter_::RawWithParam($e.to_string(), vec![ $( $p.to_string() ),* ]));
+    (RAW $e:expr , $p:expr) => (@{ model_path }@::Filter_::RawWithParam($e.to_string(), $p.iter().map(|v| v.to_string()).collect()));
+    (FILTER $e:expr) => ($e);
     ($i:ident EXISTS) => (@{ model_path }@::Filter_::Exists(@{ model_path }@::filter_rel!($i)));
     ($i:ident EXISTS $t:tt) => (@{ model_path }@::Filter_::Exists(@{ model_path }@::filter_rel!($i $t)));
     ($i:ident NOT EXISTS) => (@{ model_path }@::Filter_::NotExists(@{ model_path }@::filter_rel!($i)));
