@@ -365,7 +365,7 @@
                     <td class="no center">{{loop.index}}</td>
                     <td class="type">
                         {%- if index %}{{index | get(key="type", default="INDEX") | upper}}
-                        {%- else %}INDEX{% endif %}
+                        {%- else %}INDEX{% endif -%}
                     </td>
                     <td class="fields">{%- if index and index.fields %}{% for name, field in index.fields -%}
                         {%- if field and field.query %}({{field.query}}){% else %}{{name}}{%- if field and field.length %}({{field.length}}){% endif %}{% endif %}

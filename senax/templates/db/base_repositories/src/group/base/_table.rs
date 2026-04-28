@@ -3370,9 +3370,12 @@ pub mod _repo_ {
         obj.__validate()?;
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__set_default_value(conn).await?;
+        @%- if config.is_mysql() %@
         let sql = r#"INSERT IGNORE INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
-            VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)@% if !config.is_mysql() %@@{ def.auto_inc()|fmt_join(" RETURNING xmax,{col_esc}", "") }@@% endif %@;"#;
-        @%- if !config.is_mysql() %@
+            VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@)"#;
+        @%- else %@
+        let sql = r#"INSERT INTO @{ table_name|db_esc }@ (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{col_esc}", ",") }@) 
+            VALUES (@{ def.all_fields_except_read_only_and_auto_inc()|fmt_join("{placeholder}", ",") }@) ON CONFLICT DO NOTHING@{ def.auto_inc()|fmt_join(" RETURNING xmax,{col_esc}", "") }@;"#;
         let sql = &senax_common::convert_mysql_placeholders_to_postgresql(sql);
         @%- endif %@
         let query = bind_to_query(sqlx::query(sql), &obj._data);
