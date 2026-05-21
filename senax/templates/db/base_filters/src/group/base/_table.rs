@@ -659,7 +659,7 @@ impl BindTr for ColOne_ {
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-        debug!("bind: {:?}", &self);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "bind: {:?}", &self);
         match self {
 @{ def.all_fields_except_json()|fmt_join("            ColOne_::{ident}(v) => query.bind(v{bind_as_for_filter}),", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
@@ -704,7 +704,7 @@ impl BindTr for ColKey_ {
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-        debug!("bind: {:?}", &self);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "bind: {:?}", &self);
         match self {
             @{- def.unique_key()|fmt_index_col("
             ColKey_::{ident}(v) => query.bind(v{bind_as_for_filter}),", "") }@
@@ -790,7 +790,7 @@ impl BindTr for ColMany_ {
         self,
         mut query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-        debug!("bind: {:?}", &self);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "bind: {:?}", &self);
         match self {
 @{ def.all_fields_except_json()|fmt_join("            ColMany_::{ident}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "\n") }@
 @%- for (index_name, index) in def.multi_index(false) %@
@@ -835,7 +835,7 @@ impl BindTr for ColJson_ {
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-        debug!("bind: {:?}", &self);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "bind: {:?}", &self);
         match self {
 @{- def.all_fields_only_json()|fmt_join("
             ColJson_::{ident}(v) => query.bind(v{bind_as_for_filter}),", "") }@
@@ -878,7 +878,7 @@ impl BindTr for ColJsonArray_ {
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-        debug!("bind: {:?}", &self);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "bind: {:?}", &self);
         match self {
 @{- def.all_fields_only_json()|fmt_join("
             ColJsonArray_::{ident}(v) => query.bind(sqlx::types::Json(v{bind_as_for_filter})),", "") }@
@@ -891,7 +891,7 @@ impl BindArrayTr for ColJsonArray_ {
         self,
         mut query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-        debug!("bind: {:?}", &self);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "bind: {:?}", &self);
         match self {
 @{- def.all_fields_only_json()|fmt_join("
             ColJsonArray_::{ident}(v) => {for v in v { query = query.bind(v{bind_as_for_filter}); } query},", "") }@
@@ -934,7 +934,7 @@ impl BindTr for ColGeo_ {
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-        debug!("bind: {:?}", &self);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "bind: {:?}", &self);
         match self {
 @{- def.all_fields_only_geo()|fmt_join("
             ColGeo_::{ident}(v, srid) => query.bind(v{bind_as_for_filter}).bind(srid),", "") }@
@@ -977,7 +977,7 @@ impl BindTr for ColGeoDistance_ {
         self,
         query: Query<'_, DbType, DbArguments>,
     ) -> Query<'_, DbType, DbArguments> {
-        debug!("bind: {:?}", &self);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "bind: {:?}", &self);
         match self {
 @%- if !config.is_mysql() %@
 @{- def.all_fields_only_geo()|fmt_join("

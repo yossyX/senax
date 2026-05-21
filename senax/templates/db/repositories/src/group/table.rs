@@ -248,7 +248,7 @@ impl SessionStore for _@{ pascal_name }@Store {
             let key = start_key.clone();
             tokio::spawn(async move {
                 if let Err(err) = gc(shard_id, key).await {
-                    log::error!("{}", err);
+                    log::error!(target: "db_@{ db|snake }@::@{ group_name|snake }@", "{}", err);
                 }
             });
         }

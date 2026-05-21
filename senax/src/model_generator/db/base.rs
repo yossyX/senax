@@ -74,11 +74,12 @@ pub fn write_files(
     #[derive(Template)]
     #[template(path = "db/base/src/misc.rs", escape = "none")]
     struct MiscTemplate<'a> {
+        pub db: &'a str,
         pub config: &'a ConfigDef,
     }
 
     let file_path = src_dir.join("misc.rs");
-    let tpl = MiscTemplate { config };
+    let tpl = MiscTemplate { db, config };
     fs_write(file_path, tpl.render()?)?;
 
     #[derive(Template)]
@@ -106,6 +107,7 @@ pub fn write_files(
     #[derive(Template)]
     #[template(path = "db/base/src/models.rs", escape = "none")]
     struct ModelsTemplate<'a> {
+        pub db: &'a str,
         pub config: &'a ConfigDef,
         pub groups: &'a GroupsDef,
         pub unified_joinable: &'a Vec<String>,
@@ -119,6 +121,7 @@ pub fn write_files(
         }
     }
     let tpl = ModelsTemplate {
+        db,
         config,
         groups,
         unified_joinable,

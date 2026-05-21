@@ -185,11 +185,13 @@ pub fn generate(
         #[derive(Template)]
         #[template(path = "db/src/lib.rs", escape = "none")]
         struct LibTemplate<'a> {
+            pub db: &'a str,
             pub config: &'a ConfigDef,
             pub non_snake_case: bool,
         }
 
         LibTemplate {
+            db,
             config: &config,
             non_snake_case,
         }

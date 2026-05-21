@@ -89,7 +89,7 @@ impl CacheActor {
                 let _guard = crate::get_shutdown_guard();
                 if let Some(linker) = crate::LINKER_SENDER.get() {
                     if let Err(e) = linker.send(&msg) {
-                        error!("{}", e);
+                        error!(target: "db_@{ db|snake }@::models", "{}", e);
                     }
                 }
                 msg.handle_cache_msg().await;

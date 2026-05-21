@@ -147,7 +147,7 @@ pub(crate) async fn init_db(path: &Path) -> Result<()> {
                     DelayedActor::handle(DelayedMsg::InsertFromDisk);
                     break;
                 }
-                Err(e) => ::log::error!("{}", e),
+                Err(e) => ::log::error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{}", e),
             }
         }
     });
@@ -752,7 +752,7 @@ impl Drop for DelayedInsertBuf {
     fn drop(&mut self) {
         if !self.0.is_empty() {
             if let Err(err) = push_delayed_db(&self.0) {
-                error!("push_delayed_db:{}", err);
+                error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "push_delayed_db:{}", err);
             }
         }
     }
@@ -802,7 +802,7 @@ impl DelayedActor {
                         }
                         future::join_all(handles).await.iter().for_each(|r| {
                             if let Err(err) = r {
-                                error!(table = TABLE_NAME; "INSERT DELAYED ERROR:{}", err);
+                                error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", table = TABLE_NAME; "INSERT DELAYED ERROR:{}", err);
                             }
                         });
                     }
@@ -908,13 +908,13 @@ async fn handle_delayed_msg_insert_from_memory() {
                 conn_list.push(conn);
             }
             Err(err) => {
-                error!(table = TABLE_NAME; "INSERT DELAYED ERROR:{}", err);
+                error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", table = TABLE_NAME; "INSERT DELAYED ERROR:{}", err);
             }
         }
     }
     if conn_list.is_empty() {
         if let Err(err) = push_delayed_db(&vec) {
-            error!("push_delayed_db:{}", err);
+            error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "push_delayed_db:{}", err);
         }
         return;
     }
@@ -937,22 +937,22 @@ async fn _handle_delayed_msg_insert_from_memory(mut conn: DbConn, vec: Vec<ForIn
             match err {
                 sqlx::Error::Io(..) => {
                     // retry all
-                    error!(table = TABLE_NAME; "INSERT DELAYED ERROR:{}", err);
+                    error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", table = TABLE_NAME; "INSERT DELAYED ERROR:{}", err);
                     drop(buf);
                     return;
                 }
                 sqlx::Error::WorkerCrashed => {
                     // retry all
-                    error!(table = TABLE_NAME; "INSERT DELAYED ERROR:{}", err);
+                    error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", table = TABLE_NAME; "INSERT DELAYED ERROR:{}", err);
                     drop(buf);
                     return;
                 }
                 _ => {
-                    error!(table = TABLE_NAME; "INSERT DELAYED FAILED:{}", err);
+                    error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", table = TABLE_NAME; "INSERT DELAYED FAILED:{}", err);
                 }
             }
         } else {
-            error!(table = TABLE_NAME; "INSERT DELAYED FAILED:{}", err);
+            error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", table = TABLE_NAME; "INSERT DELAYED FAILED:{}", err);
         }
     }
     let result = conn.commit().await;
@@ -978,7 +978,7 @@ async fn handle_delayed_msg_insert_from_disk(shard_id: ShardId) -> Result<()> {
     }
     let mut conn = DbConn::_new(shard_id);
     if let Err(err) = conn.begin_immediately().await {
-        error!(table = TABLE_NAME; "INSERT DELAYED ERROR:{}", err);
+        error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", table = TABLE_NAME; "INSERT DELAYED ERROR:{}", err);
         return Ok(());
     }
     let mut vec = Vec::new();
@@ -1057,7 +1057,7 @@ async fn _handle_delayed_msg_save(shard_id: ShardId) {
             loop {
                 let mut conn = DbConn::_new(shard_id);
                 if let Err(err) = conn.begin_immediately().await {
-                    error!(table = TABLE_NAME; "SAVE DELAYED ERROR:{}", err);
+                    error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", table = TABLE_NAME; "SAVE DELAYED ERROR:{}", err);
                     sleep(Duration::from_secs(10)).await;
                     continue;
                 }
@@ -1136,7 +1136,7 @@ async fn _handle_delayed_msg_update(shard_id: ShardId) {
             loop {
                 let mut conn = DbConn::_new(shard_id);
                 if let Err(err) = conn.begin_immediately().await {
-                    error!(table = TABLE_NAME; "UPDATE DELAYED ERROR:{}", err);
+                    error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", table = TABLE_NAME; "UPDATE DELAYED ERROR:{}", err);
                     sleep(Duration::from_secs(10)).await;
                     continue;
                 }
@@ -1224,7 +1224,7 @@ async fn _handle_delayed_msg_upsert(shard_id: ShardId) {
             loop {
                 let mut conn = DbConn::_new(shard_id);
                 if let Err(err) = conn.begin_immediately().await {
-                    error!(table = TABLE_NAME; "UPSERT DELAYED ERROR:{}", err);
+                    error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", table = TABLE_NAME; "UPSERT DELAYED ERROR:{}", err);
                     sleep(Duration::from_secs(10)).await;
                     continue;
                 }
@@ -2133,19 +2133,19 @@ impl QueryBuilder {
     }
     async fn __select(self, sql_cols: &str, conn: &mut DbConn) -> Result<Vec<(DbRow, BTreeMap<&'static str, bool>)>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let filter_flag_names: Vec<_> = self.filter_flag.keys().cloned().collect();
         let sql = self._sql(sql_cols, false, conn.shard_id(), &filter_digest);
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         query = self._bind(query, true);
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         Ok(result
             .into_iter()
@@ -2206,7 +2206,7 @@ impl QueryBuilder {
             }
         }
         if let Some(c) = self.filter {
-            debug!("filter: {:?}", &c);
+            debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "filter: {:?}", &c);
             query = c.bind_to_query(query);
         }
         for value in self.bind.into_iter() {
@@ -2219,7 +2219,7 @@ impl QueryBuilder {
         let ctx_no = conn.ctx_no();
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
         let filter_flag_names: Vec<_> = self.filter_flag.keys().cloned().collect();
-        debug!(ctx = ctx_no; "filter digest:{}", filter_digest);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = ctx_no; "filter digest:{}", filter_digest);
         let sql = self._sql(sql_cols, false, conn.shard_id(), &filter_digest);
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
@@ -2228,15 +2228,15 @@ impl QueryBuilder {
         let mut executor = conn.acquire_reader().await?;
         tokio::spawn(async move {
             let mut query = sqlx::query(&sql);
-            debug!(ctx = ctx_no, sql = &query.sql(); "query");
+            debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = ctx_no, sql = &query.sql(); "query");
             query = self._bind(query, true);
             let now = std::time::Instant::now();
             let mut result = query.fetch(executor.as_mut());
             if now.elapsed() > std::time::Duration::from_secs(1) {
-                warn!(ctx = ctx_no; "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+                warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = ctx_no; "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
             }
             while let Some(v) = result.try_next().await.unwrap_or_else(|e| {
-                warn!("{}", e);
+                warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{}", e);
                 None
             }) {
                 use sqlx::Row;
@@ -2245,7 +2245,7 @@ impl QueryBuilder {
                     flags.insert(name, v.get(name));
                 }
                 if let Err(e) = tx.send((v, flags)).await {
-                    warn!("{}", e);
+                    warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{}", e);
                     break;
                 }
             }
@@ -2257,7 +2257,7 @@ impl QueryBuilder {
     #[allow(clippy::if_same_then_else)]
     async fn _select_from_cache(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Cache>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let filter_flag_names: Vec<_> = self.filter_flag.keys().cloned().collect();
         let sql_cols = write_filter_flag(r#"@{ def.primaries()|fmt_join("{col_query}", ", ") }@"#, &self.filter_flag, conn.shard_id());
@@ -2282,13 +2282,13 @@ impl QueryBuilder {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         let joiner = self.joiner.take();
         query = self._bind(query, true);
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result
             .iter()
@@ -2317,14 +2317,14 @@ impl QueryBuilder {
 
     pub async fn select_for_update(mut self, conn: &mut DbConn) -> Result<Vec<_@{ pascal_name }@Updater>> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let filter_flag_names: Vec<_> = self.filter_flag.keys().cloned().collect();
         let sql = self._sql(Data::_sql_cols(@{ is_mysql_str }@), !conn.wo_tx(), conn.shard_id(), &filter_digest);
         @%- if !config.is_mysql() %@
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         let joiner = self.joiner.take();
         query = self._bind(query, true);
         let now = std::time::Instant::now();
@@ -2334,7 +2334,7 @@ impl QueryBuilder {
             query.fetch_all(conn.get_tx().await?.as_mut()).await?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.into_iter().map(|row| {
             use sqlx::Row;
@@ -2412,7 +2412,7 @@ impl QueryBuilder {
                         yield _@{ pascal_name }@::from((v, flags));
                     }
                     Err(e) => {
-                        error!("{}", e);
+                        error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{}", e);
                         break;
                     }
                 }
@@ -2432,7 +2432,7 @@ impl QueryBuilder {
                         yield v;
                     }
                     Err(e) => {
-                        error!("{}", e);
+                        error!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{}", e);
                         break;
                     }
                 }
@@ -2446,7 +2446,7 @@ impl QueryBuilder {
     #[allow(clippy::if_same_then_else)]
     pub async fn update(self, conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) -> Result<u64> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         @%- if def.updated_at_conf().is_some() %@
         if obj._op.@{ ConfigDef::updated_at()|ident }@ == Op::None {
@@ -2483,13 +2483,13 @@ impl QueryBuilder {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         @{- def.non_primaries_except_read_only()|fmt_join("
         for _n in 0..obj._op.{ident}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{ident}{bind_as});
         }","") }@
-        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "update_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "{}", &obj);
-        debug!("{:?}", &obj);
+        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "update_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "{}", &obj);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
         if let Some(c) = self.filter {
             query = c.bind_to_query(query);
         }
@@ -2503,7 +2503,7 @@ impl QueryBuilder {
             query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         @%- if !config.force_disable_cache %@
         if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
@@ -2535,7 +2535,7 @@ impl QueryBuilder {
     #[allow(clippy::if_same_then_else)]
     pub async fn force_delete(self, conn: &mut DbConn) -> Result<u64> {
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
             r#"DELETE {}FROM @{ table_name|db_esc }@ as _t1 {} {} {}"#,
@@ -2562,8 +2562,8 @@ impl QueryBuilder {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
-        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "delete_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "delete_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "");
         if let Some(c) = self.filter {
             query = c.bind_to_query(query);
         }
@@ -2577,7 +2577,7 @@ impl QueryBuilder {
             query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?
         };
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         @%- if !config.force_disable_cache %@
         if !conn.clear_all_cache && (USE_CACHE || ENABLE_ALL_ROWS_CACHE || ENABLE_UPDATE_NOTICE) {
@@ -2650,7 +2650,7 @@ async fn _union(
             let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
             @%- endif %@
             let mut query = sqlx::query(&sql);
-            debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+            debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
             for builder in chunk {
                 query = builder._bind(query, true);
             }
@@ -2677,7 +2677,7 @@ async fn _union(
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         for builder in list {
             query = builder._bind(query, true);
         }
@@ -2877,7 +2877,7 @@ pub mod _repo_ {
         let mut conn = DbConn::_new_with_ctx(ctx_no, shard_id);
         conn.begin_cache_tx().await?;
         let filter_digest = self.filter.as_ref().map(|f| f.to_string()).unwrap_or_default();
-        debug!(ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "filter digest:{}", filter_digest);
         let force_indexes = make_force_indexes(&filter_digest);
         let mut sql = format!(
             r#"SELECT {}{} FROM @{ table_name|db_esc }@ as _t1 {} {}"#,
@@ -2904,14 +2904,14 @@ pub mod _repo_ {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         if let Some(c) = filter {
             query = c.bind_to_query(query);
         }
         let now = std::time::Instant::now();
         let result = crate::misc::fetch!(conn, query, fetch_all);
         if now.elapsed() > std::time::Duration::from_secs(1) {
-            warn!(ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
+            warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "[SLOW QUERY] time={}s digest={:?}", now.elapsed().as_millis() as f64 / 1000.0, filter_digest);
         }
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
@@ -2960,7 +2960,7 @@ pub mod _repo_ {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         let result = crate::misc::fetch!(conn, query, fetch_all);
         let result: sqlx::Result<Vec<_>> = result.iter().map(CacheData::from_row).collect();
         let time = MSec::now();
@@ -3379,7 +3379,7 @@ pub mod _repo_ {
         let sql = &senax_common::convert_mysql_placeholders_to_postgresql(sql);
         @%- endif %@
         let query = bind_to_query(sqlx::query(sql), &obj._data);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         let (rows_affected, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await.context(err::ErrorTable(TABLE_NAME))?;
         if rows_affected == 0 {
             return Ok(None);
@@ -3388,8 +3388,8 @@ pub mod _repo_ {
         if obj._data.{ident} == 0 {
             obj._data.{ident} = _last_insert_id as {inner};
         }", "") }@
-        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "insert_ignore", ctx = conn.ctx_no(); "{}", &obj);
-        debug!("{:?}", &obj);
+        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "insert_ignore", ctx = conn.ctx_no(); "{}", &obj);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
         obj._is_new = false;
         obj._op = OpData::default();
         @%- if !config.force_disable_cache %@
@@ -3419,8 +3419,8 @@ pub mod _repo_ {
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__validate()?;
         obj.__set_default_value(conn).await?;
-        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "delayed_insert", ctx = conn.ctx_no(); "{}", &obj);
-        debug!("{:?}", &obj);
+        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "delayed_insert", ctx = conn.ctx_no(); "{}", &obj);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
         conn.push_callback(Box::new(|| {
             async move {
                 DELAYED_INSERT_QUEUE.push(obj.into());
@@ -3612,7 +3612,7 @@ pub mod _repo_ {
                 let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
                 @%- endif %@
                 let mut query = sqlx::query(&sql);
-                debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+                debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
     @{- def.soft_delete_tpl2("","
                 query = query.bind(deleted_at);","","
                 query = query.bind(deleted);")}@
@@ -3630,7 +3630,7 @@ pub mod _repo_ {
                 };
                 rows_affected += result.rows_affected();
             }
-            info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "delete_by_ids", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "");
+            info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "delete_by_ids", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "");
             @%- if !config.force_disable_cache %@
             @%- if def.act_as_job_queue() %@
             @%- else if def.clear_all_cache_on_update() %@
@@ -3693,7 +3693,7 @@ pub mod _repo_ {
                 let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
                 @%- endif %@
                 let mut query = sqlx::query(&sql);
-                debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+                debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
                 for id in ids {
                     @{- def.primaries()|fmt_join("
                     query = query.bind(id.{index}{bind_as});", "") }@
@@ -3705,7 +3705,7 @@ pub mod _repo_ {
                 };
                 rows_affected += result.rows_affected();
             }
-            info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "force_delete_by_ids", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "");
+            info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "force_delete_by_ids", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "");
             @%- if !config.force_disable_cache %@
             @%- if def.act_as_job_queue() %@
             @%- else if def.clear_all_cache_on_update() %@
@@ -3811,7 +3811,7 @@ pub mod _repo_ {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         @{- def.primaries()|fmt_join("
         query = query.bind(id.{index}{bind_as});", "") }@
         if conn.wo_tx() {
@@ -3819,7 +3819,7 @@ pub mod _repo_ {
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
         }
-        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "force_delete", ctx = conn.ctx_no(), id = id.to_string(); "{}", &obj);
+        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "force_delete", ctx = conn.ctx_no(), id = id.to_string(); "{}", &obj);
 @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
         @%- else if def.clear_all_cache_on_update() %@
@@ -3843,13 +3843,13 @@ pub mod _repo_ {
 
     pub async fn force_delete_all(conn: &mut DbConn) -> Result<()> {
         let query = sqlx::query(r#"DELETE FROM @{ table_name|db_esc }@"#);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         if conn.wo_tx() {
             query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
         }
-        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "force_delete_all", ctx = conn.ctx_no(); "");
+        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "force_delete_all", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
         @%- else if def.clear_all_cache_on_update() %@
@@ -3869,9 +3869,9 @@ pub mod _repo_ {
 
     pub async fn truncate(conn: &mut DbConn) -> Result<()> {
         let query = sqlx::query(r#"TRUNCATE TABLE @{ table_name|db_esc }@"#);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
-        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "truncate", ctx = conn.ctx_no(); "");
+        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "truncate", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
         @%- else if def.clear_all_cache_on_update() %@
@@ -3898,7 +3898,7 @@ pub mod _repo_ {
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         for (_name, filter) in filter_flag {
             query = filter.bind_to_query(query);
         }
@@ -3971,7 +3971,7 @@ async fn ___find_many(conn: &mut DbConn, sql_cols: &str, ids: &[InnerPrimary], t
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let mut query = sqlx::query(&sql);
-    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+    debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
     for (_name, filter) in filter_flag {
         query = filter.bind_to_query(query);
     }
@@ -4181,7 +4181,7 @@ async fn __find_optional(conn: &mut DbConn, sql_cols: &str, id: InnerPrimary, tr
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let mut query = sqlx::query(&sql);
-    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+    debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
     for (_name, filter) in filter_flag {
         query = filter.bind_to_query(query);
     }
@@ -4228,7 +4228,7 @@ async fn __find_for_update(conn: &mut DbConn, id: &InnerPrimary, trash_mode: Tra
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let mut query = sqlx::query(&sql);
-    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+    debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
     for (_name, filter) in filter_flag {
         query = filter.bind_to_query(query);
     }
@@ -4279,7 +4279,7 @@ async fn __find_many_for_update(conn: &mut DbConn, ids: &[InnerPrimary], trash_m
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         for (_name, filter) in filter_flag.clone() {
             query = filter.bind_to_query(query);
         }
@@ -4413,14 +4413,14 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, ov
     let sql = &senax_common::convert_mysql_placeholders_to_postgresql(sql);
     @%- endif %@
     let query = bind_to_query(sqlx::query(sql), &obj._data);
-    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+    debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
     let (_, _last_insert_id) = conn.execute@{ def.auto_inc()|fmt_join("_with_last_insert_id", "") }@(query).await.context(err::ErrorTable(TABLE_NAME))?;
 @{- def.auto_inc()|fmt_join("
     if obj._data.{ident} == 0 {
         obj._data.{ident} = _last_insert_id as {inner};
     }", "") }@
-    info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "insert", ctx = conn.ctx_no(); "{}", &obj);
-    debug!("{:?}", &obj);
+    info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "insert", ctx = conn.ctx_no(); "{}", &obj);
+    debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
     let mut obj2: _@{ pascal_name }@ = (obj._data.clone(), BTreeMap::default()).into();
     let mut update_cache = true;
 
@@ -4483,7 +4483,7 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         @{- def.non_primaries_except_invisible_and_read_only(false)|fmt_join("
         for _n in 0..obj._op.{ident}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{ident}{bind_as});
@@ -4492,8 +4492,8 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @%- if def.versioned %@
         query = query.bind(obj._data.@{ version_col }@);
         @%- endif %@
-        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "update", ctx = conn.ctx_no(); "{}", &obj);
-        debug!("{:?}", &obj);
+        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "update", ctx = conn.ctx_no(); "{}", &obj);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
         let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned %@_with_last_insert_id@% endif %@(query).await.context(err::ErrorTable(TABLE_NAME))?;
         if rows_affected == 0 {
             anyhow::bail!(err::RowNotFound::new(TABLE_NAME, id.to_string()));
@@ -4578,11 +4578,11 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let query = bind_to_query(sqlx::query(&sql), &obj._data);
-    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+    debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
     let query = bind_non_primaries(&obj, query, &sql);
     let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned || def.counter_field.is_some() %@_with_last_insert_id@% endif %@(query).await.context(err::ErrorTable(TABLE_NAME))?;
-    info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "upsert", ctx = conn.ctx_no(); "{}", &obj);
-    debug!("{:?}", &obj);
+    info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "upsert", ctx = conn.ctx_no(); "{}", &obj);
+    debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
     if rows_affected == 1 {
         @{- def.auto_inc()|fmt_join("
         if obj._data.{ident} == 0 {
@@ -4648,8 +4648,8 @@ async fn __update_many(conn: &mut DbConn, ids: Vec<InnerPrimary>, mut obj: __Upd
     for ids in ids.chunks(IN_CONDITION_LIMIT) {
         rows_affected += ___update_many(conn, ids, &obj).await?;
     }
-    info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "update_many", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "{}", &obj);
-    debug!("{:?}", &obj);
+    info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "update_many", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "{}", &obj);
+    debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
     @%- if !config.force_disable_cache %@
     @%- if def.act_as_job_queue() %@
     @%- else if def.clear_all_cache_on_update() %@
@@ -4717,7 +4717,7 @@ async fn ___update_many(conn: &mut DbConn, ids: &[InnerPrimary], obj: &__Updater
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let query = sqlx::query(&sql);
-    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+    debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
     let mut query = bind_non_primaries(&obj, query, &sql);
     for id in ids {
         @{- def.primaries()|fmt_join("
@@ -4857,7 +4857,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
         @%- endif %@
         let mut query = sqlx::query(&sql);
-        debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         for data in list {
             query = bind_to_query(query, &data._data);
         }
@@ -4888,8 +4888,8 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         let mut _{rel_name} = Vec::new();
         let mut __{rel_name} = Vec::new();", "") }@
         for row in list {
-            info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "bulk_insert", ctx = conn.ctx_no(); "{}", &row);
-            debug!("{:?}", &row);
+            info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "bulk_insert", ctx = conn.ctx_no(); "{}", &row);
+            debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &row);
             let mut obj = row.clone();
     @%- if config.is_mysql() %@
             @{- def.auto_inc()|fmt_join("
@@ -4998,13 +4998,13 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     let sql = senax_common::convert_mysql_placeholders_to_postgresql(&sql);
     @%- endif %@
     let mut query = sqlx::query(&sql);
-    debug!(ctx = conn.ctx_no(), sql = &query.sql(); "query");
+    debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
     for data in list {
         query = bind_to_query(query, data);
-        info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "bulk_upsert", ctx = conn.ctx_no(); "{}", &data);
-        debug!("{:?}", &data);
+        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "bulk_upsert", ctx = conn.ctx_no(); "{}", &data);
+        debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &data);
     }
-    info!(target: "db_update::@{ db|snake }@::@{ group_name }@::@{ mod_name }@", op = "bulk_upsert_updater", ctx = conn.ctx_no(); "{}", obj);
+    info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "bulk_upsert_updater", ctx = conn.ctx_no(); "{}", obj);
     let query = bind_non_primaries(&obj, query, &sql);
     if conn.wo_tx() {
         query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;

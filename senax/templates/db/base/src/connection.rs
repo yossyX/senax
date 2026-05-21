@@ -94,7 +94,7 @@ struct PoolInfo {
 
 impl Drop for PoolInfo {
     fn drop(&mut self) {
-        log::info!("remove connection for {}: {}", self.target, self.addr);
+        log::info!(target: "db_@{ db|snake }@::connection", "remove connection for {}: {}", self.target, self.addr);
     }
 }
 
@@ -220,7 +220,7 @@ async fn config(etcd: &FxHashMap<String, String>, test_mode: bool) -> Result<()>
 }
 
 pub async fn init() -> Result<()> {
-    log::info!("Connecting to database");
+    log::info!(target: "db_@{ db|snake }@::connection", "Connecting to database");
     #[cfg(feature = "etcd")]
     let etcd = senax_common::etcd::map("db/").await?;
     #[cfg(not(feature = "etcd"))]
@@ -258,7 +258,7 @@ pub async fn init() -> Result<()> {
             );
         }
     }
-    log::info!("Connection to database completed.");
+    log::info!(target: "db_@{ db|snake }@::connection", "Connection to database completed.");
 
     tokio::spawn(async {
         loop {
@@ -273,7 +273,7 @@ pub async fn init() -> Result<()> {
             let mut stream = match senax_common::etcd::watch("db/", true).await {
                 Ok(stream) => stream,
                 Err(err) => {
-                    log::error!("{}", err);
+                    log::error!(target: "db_@{ db|snake }@::connection", "{}", err);
                     tokio::time::sleep(Duration::from_secs(60)).await;
                     continue;
                 }
@@ -282,11 +282,11 @@ pub async fn init() -> Result<()> {
                 match stream.message().await {
                     Ok(Some(_)) => {}
                     Ok(None) => {
-                        log::error!("etcd connection has been lost.");
+                        log::error!(target: "db_@{ db|snake }@::connection", "etcd connection has been lost.");
                         break;
                     }
                     Err(err) => {
-                        log::error!("{}", err);
+                        log::error!(target: "db_@{ db|snake }@::connection", "{}", err);
                         break;
                     }
                 }
@@ -297,13 +297,13 @@ pub async fn init() -> Result<()> {
                                 reconnect().await;
                             }
                             Err(err) => {
-                                log::error!("{}", err);
+                                log::error!(target: "db_@{ db|snake }@::connection", "{}", err);
                                 continue;
                             }
                         }
                     }
                     Err(err) => {
-                        log::error!("{}", err);
+                        log::error!(target: "db_@{ db|snake }@::connection", "{}", err);
                         continue;
                     }
                 }
@@ -318,21 +318,21 @@ pub async fn reconnect() {
     for shard_id in DbConn::shard_num_range() {
         join_set.spawn(async move {
             if let Err(e) = connect(true, false, false, Some(shard_id)).await {
-                log::error!("{}", e);
+                log::error!(target: "db_@{ db|snake }@::connection", "{}", e);
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
             if let Err(e) = connect(false, true, false, Some(shard_id)).await {
-                log::error!("{}", e);
+                log::error!(target: "db_@{ db|snake }@::connection", "{}", e);
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
             if let Err(e) = connect(false, false, true, Some(shard_id)).await {
-                log::error!("{}", e);
+                log::error!(target: "db_@{ db|snake }@::connection", "{}", e);
             }
         });
     }
     while let Some(r) = join_set.join_next().await {
         if let Err(e) = r {
-            log::error!("{}", e);
+            log::error!(target: "db_@{ db|snake }@::connection", "{}", e);
         }
     }
 }
@@ -739,7 +739,7 @@ impl DbConn {
         } else {
             let now = SystemTime::now();
             if let Err(e) = connect(true, false, false, Some(shard_id)).await {
-                log::warn!("{}", e);
+                log::warn!(target: "db_@{ db|snake }@::connection", "{}", e);
             }
             if let Ok(conn) = Self::__acquire_writer(shard_id).await {
                 Ok(conn)
@@ -812,7 +812,7 @@ impl DbConn {
         } else {
             let now = SystemTime::now();
             if let Err(e) = connect(false, true, false, Some(shard_id)).await {
-                log::warn!("{}", e);
+                log::warn!(target: "db_@{ db|snake }@::connection", "{}", e);
             }
             if let Ok(conn) = Self::acquire_from_pool(shard_id, &READER).await {
                 Ok(conn)
@@ -848,7 +848,7 @@ impl DbConn {
         } else {
             let now = SystemTime::now();
             if let Err(e) = connect(false, false, true, Some(shard_id)).await {
-                log::warn!("{}", e);
+                log::warn!(target: "db_@{ db|snake }@::connection", "{}", e);
             }
             if let Ok(conn) = Self::__acquire_cache(shard_id).await {
                 Ok(conn)
@@ -1283,7 +1283,7 @@ impl DbConn {
         match Self::__inc_cache_sync(shard_id).await {
             Ok(sync) => sync,
             Err(e) => {
-                log::warn!("{}", e);
+                log::warn!(target: "db_@{ db|snake }@::connection", "{}", e);
                 if Self::is_retryable_error(&e) {
                     Self::__inc_cache_sync(shard_id).await.unwrap_or(0)
                 } else {
@@ -1454,11 +1454,11 @@ impl DbConn {
         if let Some(err) = err.downcast_ref::<sqlx::Error>() {
             match err {
                 sqlx::Error::Io(..) => {
-                    log::warn!("{}", err);
+                    log::warn!(target: "db_@{ db|snake }@::connection", "{}", err);
                     return true;
                 }
                 sqlx::Error::WorkerCrashed => {
-                    log::warn!("{}", err);
+                    log::warn!(target: "db_@{ db|snake }@::connection", "{}", err);
                     return true;
                 }
                 _ => {}
@@ -1484,7 +1484,7 @@ impl Drop for DbLock {
                 .fetch_all(conn.as_mut())
                 .await
             {
-                log::error!("RELEASE_LOCK ERROR: {}", e);
+                log::error!(target: "db_@{ db|snake }@::connection", "RELEASE_LOCK ERROR: {}", e);
             }
         });
     }
@@ -1495,7 +1495,7 @@ impl Drop for DbConn {
         if cfg!(debug_assertions)
             && (self.has_tx() || !self.callback_list.is_empty() || !self.cache_op_list.is_empty())
         {
-            log::debug!("implicit rollback");
+            log::debug!(target: "db_@{ db|snake }@::connection", "implicit rollback");
         }
     }
 }
@@ -1541,7 +1541,7 @@ async fn check_if_writable(options: &DbConnectOptions) -> Result<Option<bool>> {
     let mut conn = match DbConnection::connect_with(options).await {
         Err(sqlx::Error::Database(e)) => {
             // Assumes too many connections
-            warn!("{}", e);
+            warn!(target: "db_@{ db|snake }@::connection", "{}", e);
             return Ok(None);
         }
         Err(e) => {
@@ -1613,7 +1613,7 @@ async fn check_connection(
                 }
             }
             Err(e) => {
-                warn!("{}", e);
+                warn!(target: "db_@{ db|snake }@::connection", "{}", e);
             }
         }
     }
@@ -1637,12 +1637,12 @@ async fn check_connection(
                         }
                     }
                     Err(e) => {
-                        warn!("{}: {}", e, addr);
+                        warn!(target: "db_@{ db|snake }@::connection", "{}: {}", e, addr);
                         None
                     }
                 },
                 Err(_) => {
-                    warn!(
+                    warn!(target: "db_@{ db|snake }@::connection", 
                         "error communicating with database: Connection timeout: {}",
                         addr
                     );
@@ -1685,11 +1685,11 @@ async fn check_connection(
                                 let pool = match pool {
                                     Ok(pool) => pool,
                                     Err(e) => {
-                                        warn!("{}", e);
+                                        warn!(target: "db_@{ db|snake }@::connection", "{}", e);
                                         continue;
                                     }
                                 };
-                                log::info!("add connection for {}: {}", target, addr);
+                                log::info!(target: "db_@{ db|snake }@::connection", "add connection for {}: {}", target, addr);
                                 let mut pools =
                                     pool_collection.get().unwrap()[shard_id].write().await;
                                 if writable == Some(false) {
@@ -1815,7 +1815,7 @@ async fn reset_writer_pool(
                         }
                     }
                     Err(e) => {
-                        warn!("{}", e);
+                        warn!(target: "db_@{ db|snake }@::connection", "{}", e);
                     }
                 }
             }
@@ -1844,7 +1844,7 @@ async fn reset_writer_pool(
                         });
                     }
                     @%- endif %@
-                    log::info!("switch connection for {}: {}", Target::Write, addr);
+                    log::info!(target: "db_@{ db|snake }@::connection", "switch connection for {}: {}", Target::Write, addr);
                     *pool = Some((addr, new_pool));
                 }
             }
@@ -1853,7 +1853,7 @@ async fn reset_writer_pool(
     }
     while let Some(r) = join_set.join_next().await {
         if let Err(e) = r? {
-            log::error!("{}", e);
+            log::error!(target: "db_@{ db|snake }@::connection", "{}", e);
         }
     }
     Ok(())
@@ -2008,7 +2008,7 @@ async fn reset_reader_pool(
                         }
                     }
                     Err(e) => {
-                        warn!("{}", e);
+                        warn!(target: "db_@{ db|snake }@::connection", "{}", e);
                     }
                 }
             }
@@ -2025,7 +2025,7 @@ async fn reset_reader_pool(
                     } else if writable.is_some() {
                         match reader_connect_with(pool_option.clone(), options).await {
                             Ok(pool) => {
-                                log::info!("add connection for {}: {}", target, addr);
+                                log::info!(target: "db_@{ db|snake }@::connection", "add connection for {}: {}", target, addr);
                                 let mut pools = pool_collection.get().unwrap()[idx].write().await;
                                 let pool = Arc::new(PoolInfo {
                                     addr,
@@ -2035,7 +2035,7 @@ async fn reset_reader_pool(
                                 pools.insert(addr, (pool, writable));
                             }
                             Err(e) => {
-                                warn!("{}", e);
+                                warn!(target: "db_@{ db|snake }@::connection", "{}", e);
                             }
                         }
                     }
@@ -2055,7 +2055,7 @@ async fn reset_reader_pool(
     }
     while let Some(r) = join_set.join_next().await {
         if let Err(e) = r? {
-            log::error!("{}", e);
+            log::error!(target: "db_@{ db|snake }@::connection", "{}", e);
         }
     }
     Ok(())
@@ -2103,20 +2103,20 @@ pub fn _is_retryable_error<T>(result: Result<T>, table: &str) -> bool {
             match err {
                 sqlx::Error::Io(..) => {
                     // retry all
-                    log::error!(table = table; "{}", err);
+                    log::error!(target: "db_@{ db|snake }@::connection", table = table; "{}", err);
                     return true;
                 }
                 sqlx::Error::WorkerCrashed => {
                     // retry all
-                    log::error!(table = table; "{}", err);
+                    log::error!(target: "db_@{ db|snake }@::connection", table = table; "{}", err);
                     return true;
                 }
                 _ => {
-                    log::error!(table = table; "{}", err);
+                    log::error!(target: "db_@{ db|snake }@::connection", table = table; "{}", err);
                 }
             }
         } else {
-            log::error!(table = table; "{}", err);
+            log::error!(target: "db_@{ db|snake }@::connection", table = table; "{}", err);
         }
     }
     false

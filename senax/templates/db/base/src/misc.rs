@@ -109,7 +109,7 @@ pub enum BindValue {
 
 impl BindValue {
     pub fn bind(self, query: Query<DbType, DbArguments>) -> Query<DbType, DbArguments> {
-        log::debug!("bind: {:?}", &self);
+        log::debug!(target: "db_@{ db|snake }@::misc", "bind: {:?}", &self);
         match self {
             BindValue::Bool(v) => query.bind(v),
             BindValue::Enum(v) => query.bind(v),

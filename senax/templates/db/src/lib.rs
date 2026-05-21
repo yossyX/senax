@@ -89,7 +89,7 @@ pub async fn migrate(
         if let Err(e) = res?
             && let Some(e) = error.replace(e)
         {
-            log::error!("{}", e);
+            log::error!(target: "db_@{ db|snake }@", "{}", e);
         }
     }
     if let Some(e) = error {

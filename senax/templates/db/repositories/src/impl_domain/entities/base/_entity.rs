@@ -458,7 +458,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                     .collect();
                 if excluded > 0 {
                     // This is usually not an issue, but if it occurs frequently, please review the process.
-                    log::warn!(ctx = conn.ctx_no(); "Objects updated while querying have been excluded: count={}.", excluded);
+                    log::warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "Objects updated while querying have been excluded: count={}.", excluded);
                 }
                 Ok(result)
                 @%- else %@
@@ -573,7 +573,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                     let conn = conn_lock.deref_mut();
                     if excluded > 0 {
                         // This is usually not an issue, but if it occurs frequently, please review the process.
-                        log::warn!(ctx = conn.ctx_no(); "Objects updated while streaming have been excluded: count={}.", excluded);
+                        log::warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "Objects updated while streaming have been excluded: count={}.", excluded);
                     }
                     if single_transaction {
                         conn.release_read_tx()?;
@@ -693,7 +693,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                     match check {
                         Ok(true) => Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@>)),
                         Ok(false) => {
-                            log::warn!(ctx = conn.ctx_no(); "Forbidden: {:?}", @{ def.primaries()|fmt_join_with_paren2("self.id.clone()", "self.id.{index}.clone()", ", ") }@);
+                            log::warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "Forbidden: {:?}", @{ def.primaries()|fmt_join_with_paren2("self.id.clone()", "self.id.{index}.clone()", ", ") }@);
                             Ok(None)
                         }
                         Err(_) => {
@@ -710,7 +710,7 @@ impl _@{ pascal_name }@QueryService for @{ pascal_name }@RepositoryImpl {
                                 obj._filter_flag.append(&mut flags);
                                 Ok(Some(Box::new(obj) as Box<dyn @{ pascal_name }@>))
                             } else {
-                                log::warn!(ctx = conn.ctx_no(); "Forbidden: {:?}", @{ def.primaries()|fmt_join_with_paren2("self.id", "self.id.{index}", ", ") }@);
+                                log::warn!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(); "Forbidden: {:?}", @{ def.primaries()|fmt_join_with_paren2("self.id", "self.id.{index}", ", ") }@);
                                 Ok(None)
                             }
                         }

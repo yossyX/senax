@@ -134,10 +134,10 @@ pub async fn _start(
                 if let Some(data) = data {
                     match data {
                         Ok(msg) => msg.handle_cache_msg().await,
-                        Err(e) => warn!("{}", e),
+                        Err(e) => warn!(target: "db_@{ db|snake }@", "{}", e),
                     }
                 } else {
-                    warn!("cache clear received");
+                    warn!(target: "db_@{ db|snake }@", "cache clear received");
                     tokio::spawn(async move {
                         let sync_map = DbConn::inc_all_cache_sync().await;
                         models::_clear_cache(&sync_map, false).await;
@@ -196,7 +196,7 @@ pub fn get_shutdown_guard() -> Option<Arc<mpsc::Sender<u8>>> {
     if let Some(guard) = SHUTDOWN_GUARD.get() {
         guard.upgrade()
     } else {
-        warn!("SHUTDOWN_GUARD lost!");
+        warn!(target: "db_@{ db|snake }@", "SHUTDOWN_GUARD lost!");
         None
     }
 }

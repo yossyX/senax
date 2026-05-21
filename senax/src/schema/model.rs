@@ -1239,8 +1239,7 @@ impl ModelDef {
     pub fn is_auto_primary_except(&self, except: &[String]) -> bool {
         self.primaries()
             .iter()
-            .filter(|(k, _v)| !except.contains(*k))
-            .next_back()
+            .rfind(|(k, _v)| !except.contains(*k))
             .map(|(_, def)| def.auto.is_some())
             .unwrap_or_else(|| {
                 error_exit!(

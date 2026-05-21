@@ -1796,8 +1796,8 @@ impl FieldDef {
     }
 
     pub fn get_filter_type(&self, is_domain: bool) -> String {
-        if is_domain && self.value_object.is_some() {
-            let name = self.value_object.as_ref().unwrap().to_pascal();
+        if is_domain && let Some(value_object) = self.value_object.as_ref() {
+            let name = value_object.to_pascal();
             return format!("value_objects::{}", name);
         }
         if let Some(ref class) = self.id_class {
@@ -2601,8 +2601,8 @@ impl FieldDef {
     }
 
     pub fn get_outer_type(&self, is_domain: bool) -> String {
-        let typ = if is_domain && self.value_object.is_some() {
-            let name = self.value_object.as_ref().unwrap().to_pascal();
+        let typ = if is_domain && let Some(value_object) = self.value_object.as_ref() {
+            let name = value_object.to_pascal();
             format!("value_objects::{}", name)
         } else if let Some(ref class) = self.id_class {
             class.to_string()
@@ -2779,8 +2779,8 @@ impl FieldDef {
         }
     }
     pub fn get_outer_owned_type(&self, is_domain: bool, factory: bool) -> String {
-        let typ = if is_domain && self.value_object.is_some() {
-            let name = self.value_object.as_ref().unwrap().to_pascal();
+        let typ = if is_domain && let Some(value_object) = self.value_object.as_ref() {
+            let name = value_object.to_pascal();
             format!("value_objects::{}", name)
         } else if let Some(ref class) = self.id_class {
             class.to_string()
