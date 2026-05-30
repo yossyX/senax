@@ -488,7 +488,7 @@ function Field({ formData, definitions }: any) {
           <AutoField
             name="user_defined_json_type"
             {...formData}
-            hidden={!["json"].includes(type)}
+            hidden={!["json", "jsonb"].includes(type)}
           />
           <AutoField name="exclude_from_cache" {...formData} />
           <AutoField name="skip_factory" {...formData} />
@@ -990,7 +990,7 @@ function Filter({ formData, definitions }: any) {
       types.push("array_string")
     }
     if ([
-      "json", "array_int", "array_string"
+      "json", "jsonb", "array_int", "array_string"
     ].includes(type)) {
       types.push("json")
     }

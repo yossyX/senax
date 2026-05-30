@@ -2488,7 +2488,7 @@ impl QueryBuilder {
         for _n in 0..obj._op.{ident}.get_bind_num({may_null}) {
             query = query.bind(obj._update.{ident}{bind_as});
         }","") }@
-        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "update_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "{}", &obj);
+        debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "update_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "{}", &obj);
         debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
         if let Some(c) = self.filter {
             query = c.bind_to_query(query);
@@ -2563,7 +2563,7 @@ impl QueryBuilder {
         @%- endif %@
         let mut query = sqlx::query(&sql);
         debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
-        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "delete_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "");
+        debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "delete_with_filter", filter = format!("{:?}", &self.filter), ctx = conn.ctx_no(); "");
         if let Some(c) = self.filter {
             query = c.bind_to_query(query);
         }
@@ -3388,7 +3388,7 @@ pub mod _repo_ {
         if obj._data.{ident} == 0 {
             obj._data.{ident} = _last_insert_id as {inner};
         }", "") }@
-        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "insert_ignore", ctx = conn.ctx_no(); "{}", &obj);
+        debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "insert_ignore", ctx = conn.ctx_no(); "{}", &obj);
         debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
         obj._is_new = false;
         obj._op = OpData::default();
@@ -3419,7 +3419,7 @@ pub mod _repo_ {
         ensure!(obj.is_new(), "The obj is not new.");
         obj.__validate()?;
         obj.__set_default_value(conn).await?;
-        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "delayed_insert", ctx = conn.ctx_no(); "{}", &obj);
+        debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "delayed_insert", ctx = conn.ctx_no(); "{}", &obj);
         debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
         conn.push_callback(Box::new(|| {
             async move {
@@ -3630,7 +3630,7 @@ pub mod _repo_ {
                 };
                 rows_affected += result.rows_affected();
             }
-            info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "delete_by_ids", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "");
+            debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "delete_by_ids", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "");
             @%- if !config.force_disable_cache %@
             @%- if def.act_as_job_queue() %@
             @%- else if def.clear_all_cache_on_update() %@
@@ -3705,7 +3705,7 @@ pub mod _repo_ {
                 };
                 rows_affected += result.rows_affected();
             }
-            info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "force_delete_by_ids", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "");
+            debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "force_delete_by_ids", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "");
             @%- if !config.force_disable_cache %@
             @%- if def.act_as_job_queue() %@
             @%- else if def.clear_all_cache_on_update() %@
@@ -3819,7 +3819,7 @@ pub mod _repo_ {
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
         }
-        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "force_delete", ctx = conn.ctx_no(), id = id.to_string(); "{}", &obj);
+        debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "force_delete", ctx = conn.ctx_no(), id = id.to_string(); "{}", &obj);
 @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
         @%- else if def.clear_all_cache_on_update() %@
@@ -3849,7 +3849,7 @@ pub mod _repo_ {
         } else {
             query.execute(conn.get_tx().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
         }
-        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "force_delete_all", ctx = conn.ctx_no(); "");
+        debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "force_delete_all", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
         @%- else if def.clear_all_cache_on_update() %@
@@ -3871,7 +3871,7 @@ pub mod _repo_ {
         let query = sqlx::query(r#"TRUNCATE TABLE @{ table_name|db_esc }@"#);
         debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
         query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
-        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "truncate", ctx = conn.ctx_no(); "");
+        debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "truncate", ctx = conn.ctx_no(); "");
         @%- if !config.force_disable_cache %@
         @%- if def.act_as_job_queue() %@
         @%- else if def.clear_all_cache_on_update() %@
@@ -4419,7 +4419,7 @@ async fn __save_insert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater, ov
     if obj._data.{ident} == 0 {
         obj._data.{ident} = _last_insert_id as {inner};
     }", "") }@
-    info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "insert", ctx = conn.ctx_no(); "{}", &obj);
+    debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "insert", ctx = conn.ctx_no(); "{}", &obj);
     debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
     let mut obj2: _@{ pascal_name }@ = (obj._data.clone(), BTreeMap::default()).into();
     let mut update_cache = true;
@@ -4492,7 +4492,7 @@ async fn __save_update(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
         @%- if def.versioned %@
         query = query.bind(obj._data.@{ version_col }@);
         @%- endif %@
-        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "update", ctx = conn.ctx_no(); "{}", &obj);
+        debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "update", ctx = conn.ctx_no(); "{}", &obj);
         debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
         let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned %@_with_last_insert_id@% endif %@(query).await.context(err::ErrorTable(TABLE_NAME))?;
         if rows_affected == 0 {
@@ -4581,7 +4581,7 @@ async fn __save_upsert(conn: &mut DbConn, mut obj: _@{ pascal_name }@Updater) ->
     debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
     let query = bind_non_primaries(&obj, query, &sql);
     let (rows_affected, _last_insert_id) = conn.execute@% if def.versioned || def.counter_field.is_some() %@_with_last_insert_id@% endif %@(query).await.context(err::ErrorTable(TABLE_NAME))?;
-    info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "upsert", ctx = conn.ctx_no(); "{}", &obj);
+    debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "upsert", ctx = conn.ctx_no(); "{}", &obj);
     debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
     if rows_affected == 1 {
         @{- def.auto_inc()|fmt_join("
@@ -4648,7 +4648,7 @@ async fn __update_many(conn: &mut DbConn, ids: Vec<InnerPrimary>, mut obj: __Upd
     for ids in ids.chunks(IN_CONDITION_LIMIT) {
         rows_affected += ___update_many(conn, ids, &obj).await?;
     }
-    info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "update_many", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "{}", &obj);
+    debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "update_many", ctx = conn.ctx_no(), ids = primaries_to_str(&ids); "{}", &obj);
     debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &obj);
     @%- if !config.force_disable_cache %@
     @%- if def.act_as_job_queue() %@
@@ -4888,7 +4888,7 @@ fn ____bulk_insert<'a>(conn: &'a mut DbConn, list: &'a [ForInsert], ignore: bool
         let mut _{rel_name} = Vec::new();
         let mut __{rel_name} = Vec::new();", "") }@
         for row in list {
-            info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "bulk_insert", ctx = conn.ctx_no(); "{}", &row);
+            debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "bulk_insert", ctx = conn.ctx_no(); "{}", &row);
             debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &row);
             let mut obj = row.clone();
     @%- if config.is_mysql() %@
@@ -5001,10 +5001,10 @@ async fn ___bulk_upsert(conn: &mut DbConn, list: &[Data], obj: &__Updater__) -> 
     debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", ctx = conn.ctx_no(), sql = &query.sql(); "query");
     for data in list {
         query = bind_to_query(query, data);
-        info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "bulk_upsert", ctx = conn.ctx_no(); "{}", &data);
+        debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "bulk_upsert", ctx = conn.ctx_no(); "{}", &data);
         debug!(target: "db_@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", "{:?}", &data);
     }
-    info!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "bulk_upsert_updater", ctx = conn.ctx_no(); "{}", obj);
+    debug!(target: "_db_update::@{ db|snake }@::@{ group_name|snake }@::@{ mod_name }@", op = "bulk_upsert_updater", ctx = conn.ctx_no(); "{}", obj);
     let query = bind_non_primaries(&obj, query, &sql);
     if conn.wo_tx() {
         query.execute(conn.acquire_writer().await?.as_mut()).await.context(err::ErrorTable(TABLE_NAME))?;
