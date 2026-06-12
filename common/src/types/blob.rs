@@ -5,7 +5,6 @@ use base64::{Engine as _, engine::general_purpose};
 use once_cell::sync::OnceCell;
 use schemars::JsonSchema;
 use schemars::schema::{InstanceType, Schema, SchemaObject};
-use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
@@ -14,8 +13,19 @@ use std::sync::RwLock;
 
 pub static FILES: OnceCell<RwLock<HashMap<String, Cow<[u8]>>>> = OnceCell::new();
 
-#[derive(Serialize, Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, JsonSchema)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, JsonSchema)]
 pub struct Blob(#[schemars(schema_with = "crate::types::blob::schema")] pub Vec<u8>);
+
+// Serialize as a base64 string for symmetry with Deserialize (file path or
+// base64) and with the declared JSON schema (string).
+impl serde::Serialize for Blob {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&general_purpose::STANDARD.encode(&self.0))
+    }
+}
 
 pub(crate) fn schema(_: &mut schemars::r#gen::SchemaGenerator) -> Schema {
     let schema = SchemaObject {
@@ -62,7 +72,10 @@ impl<'de> serde::Deserialize<'de> for Blob {
                 )))
             }
         }
-        deserializer.deserialize_bytes(IdVisitor)
+        // A Blob is represented as a file path or a base64 string, so it must be
+        // deserialized as a string. deserialize_bytes fails on formats that do not
+        // support raw bytes (e.g. YAML used by seeds).
+        deserializer.deserialize_str(IdVisitor)
     }
 }
 
