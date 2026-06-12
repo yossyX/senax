@@ -1,5 +1,5 @@
 use nom::branch::alt;
-use nom::bytes::complete::{tag, tag_no_case};
+use nom::bytes::complete::{tag, tag_no_case, take_until};
 use nom::character::complete::{digit1, multispace0, multispace1};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, many1};
@@ -94,9 +94,83 @@ pub fn key_specification(i: &[u8]) -> IResult<&[u8], TableKey> {
         unique,
         key_or_index,
         spatial,
+        check_constraint,
         constraint,
     ))
     .parse(i)
+}
+
+// Matches a parenthesized expression with balanced parentheses,
+// skipping over string/identifier literals ('...', "...", `...`).
+fn balanced_parens(i: &[u8]) -> IResult<&[u8], &[u8]> {
+    if i.first() != Some(&b'(') {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            i,
+            nom::error::ErrorKind::Char,
+        )));
+    }
+    let mut depth = 0usize;
+    let mut quote: Option<u8> = None;
+    let mut idx = 0usize;
+    while idx < i.len() {
+        let c = i[idx];
+        if let Some(q) = quote {
+            if c == b'\\' && q != b'`' {
+                idx += 1; // skip escaped character
+            } else if c == q {
+                if i.get(idx + 1) == Some(&q) {
+                    idx += 1; // doubled quote
+                } else {
+                    quote = None;
+                }
+            }
+        } else {
+            match c {
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Ok((&i[idx + 1..], &i[..=idx]));
+                    }
+                }
+                b'\'' | b'"' | b'`' => quote = Some(c),
+                _ => {}
+            }
+        }
+        idx += 1;
+    }
+    Err(nom::Err::Error(nom::error::Error::new(
+        i,
+        nom::error::ErrorKind::Eof,
+    )))
+}
+
+// CONSTRAINT `name` CHECK ((expr)) [NOT ENFORCED | /*!80016 NOT ENFORCED */]
+fn check_constraint(i: &[u8]) -> IResult<&[u8], TableKey> {
+    let (remaining_input, (_, _, name, _, _, _, clause, _, _)) = (
+        tag_no_case("CONSTRAINT"),
+        multispace1,
+        sql_identifier,
+        multispace1,
+        tag_no_case("CHECK"),
+        multispace0,
+        balanced_parens,
+        opt((multispace1, opt(tag_no_case("NOT ")), tag_no_case("ENFORCED"))),
+        opt((
+            multispace0,
+            tag("/*!80016"),
+            take_until("*/"),
+            tag("*/"),
+        )),
+    )
+        .parse(i)?;
+
+    let name = String::from_utf8(name.to_vec()).unwrap().replace("``", "`");
+    let clause = String::from_utf8(clause.to_vec()).unwrap();
+    Ok((
+        remaining_input,
+        TableKey::CheckConstraint(name, clause),
+    ))
 }
 
 fn full_text_key(i: &[u8]) -> IResult<&[u8], TableKey> {

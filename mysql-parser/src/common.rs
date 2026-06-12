@@ -245,6 +245,8 @@ pub enum TableKey {
         Option<ReferenceOption>,
         Option<ReferenceOption>,
     ),
+    /// CHECK constraint: name, raw clause (parenthesized expression as written).
+    CheckConstraint(String, String),
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize, derive_more::Display)]
@@ -338,6 +340,9 @@ impl fmt::Display for TableKey {
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
+            }
+            TableKey::CheckConstraint(ref name, ref clause) => {
+                write!(f, "CONSTRAINT {} CHECK {}", escape(name), clause)
             }
             TableKey::Constraint(
                 ref name,
