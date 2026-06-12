@@ -218,11 +218,11 @@ impl DbCache {
         } else {
             None
         };
-        let storage_cache = if use_storage_cache && path.is_some() {
+        let storage_cache = if use_storage_cache && let Some(path) = path {
             Some(Arc::new(get_storage_cache(
                 name,
                 is_hot_deploy,
-                path.unwrap(),
+                path,
                 ttl,
             )?))
         } else {
